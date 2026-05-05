@@ -19,12 +19,15 @@ crawler/
 │   ├── test-detail-crawl.ts      # Dev utility: run detail crawl on a single product URL
 │   ├── test-parser.ts            # Dev utility: test parser output against a live page
 │   ├── configs/
-│   │   ├── platforms.ts          # Array of 32 SiteConfig entries (platform registry)
+│   │   ├── platforms.ts          # Array of 34 SiteConfig entries (platform registry; +Uniqlo KR/US)
 │   │   └── analyze-prompt.ts     # LiteLLM system prompt for image analysis
 │   └── lib/
 │       ├── types.ts              # Shared TypeScript interfaces (Product, SiteConfig, CrawlResult)
 │       ├── cafe24-engine.ts      # Cafe24 Playwright engine (591 lines)
-│       ├── shopify-engine.ts     # Shopify fetch engine (281 lines)
+│       ├── shopify-engine.ts     # Shopify fetch engine (now imports FX from ./fx)
+│       ├── uniqlo-engine.ts      # Uniqlo fetch engine (region-parameterized: KR + US)
+│       ├── fx.ts                 # Shared FX_TO_KRW table + convertToKrw (lifted from shopify-engine)
+│       ├── robots-check.ts       # robots.txt blanket-Disallow detector (engine-agnostic)
 │       ├── product-analyzer.ts   # LiteLLM analysis wrapper
 │       ├── fashion-genome.ts     # XLSX parsing utilities for brand_nodes
 │       ├── body-info-extractor.ts# Body measurement extraction from review text
@@ -62,12 +65,15 @@ crawler/
 
 ```
 configs/platforms.ts
-  └─ SiteConfig[] (32 entries, type: "cafe24" | "shopify")
+  └─ SiteConfig[] (34 entries, type: "cafe24" | "shopify" | "uniqlo")
         │
         ▼
 src/crawl.ts  (engine selection)
   ├─ type === "cafe24"  →  lib/cafe24-engine.ts crawlCafe24()
-  └─ type === "shopify" →  lib/shopify-engine.ts crawlShopify()
+  ├─ type === "shopify" →  lib/shopify-engine.ts crawlShopify()
+  └─ type === "uniqlo"  →  lib/uniqlo-engine.ts crawlUniqlo()
+                              (region: "KR" | "US" drives API path,
+                               source currency, and locale; SPEC-002)
         │
         ▼
 CrawlResult { platform, products[], stats, errors[] }

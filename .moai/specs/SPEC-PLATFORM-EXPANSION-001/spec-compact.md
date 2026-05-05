@@ -111,8 +111,8 @@ Total est. LOC: ~614.
 
 The following are explicitly out of scope.
 
-- **ZARA**: Akamai Bot Manager + no public API + ToS unverified. Deferred to follow-up `SPEC-PLATFORM-002`. Entry condition: 7 calendar days of successful Uniqlo production runs with zero crawl-aborts (REQ-005 not triggered).
-- **29CM**: Robots.txt permissive but Next.js App Router with no public JSON API (RSC payload only). Deferred to follow-up `SPEC-PLATFORM-003`. Same 7-day soak entry condition.
+- **ZARA**: Akamai Bot Manager + no public API + ToS unverified. Deferred to a follow-up SPEC. **AMENDED 2026-05-05: 7-day soak gate removed; follow-up SPEC may proceed once SPEC-001 dry-run + characterization tests are green.**
+- **29CM**: Robots.txt permissive but Next.js App Router with no public JSON API (RSC payload only). Deferred to a follow-up SPEC under the same relaxed entry conditions as ZARA above.
 - **Musinsa**: `robots.txt` verbatim `User-agent: * / Disallow: /` (last updated 2025.10.24). Per project HARD rule #1, will NOT pursue via web crawling. B2B partner-API path is non-engineering track.
 - **H&M**: `robots.txt` itself returns HTTP 403 from AkamaiGHost. Deferred indefinitely.
 - **Inditex sub-brands**: Bershka, Pull&Bear, Massimo Dutti, Stradivarius, Oysho, Zara Home — share Akamai parent infra. Deferred-with-ZARA.

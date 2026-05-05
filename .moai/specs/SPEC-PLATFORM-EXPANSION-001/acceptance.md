@@ -208,4 +208,4 @@ This SPEC is considered complete when ALL of the following are true:
 - A live `pnpm crawl --site=uniqlo-kr` invocation succeeds, writes `data/uniqlo-kr-products.json`, and the file contains at least 100 products with non-null required fields.
 - `.moai/project/structure.md` "Adding a New Platform" checklist is updated to include the `robots.txt` verification step.
 - The Run phase has not introduced any new production dependency beyond what is in `tech.md`.
-- The 7-day soak window (from the first successful production run forward) has been initiated; this window's outcome gates whether SPEC-PLATFORM-002 can be opened.
+- ~~The 7-day soak window (from the first successful production run forward) has been initiated; this window's outcome gates whether SPEC-PLATFORM-002 can be opened.~~ **AMENDED 2026-05-05: soak gate removed by user direction. Follow-up SPECs may proceed once dry-run + characterization tests are green; see plan.md §2.4.**

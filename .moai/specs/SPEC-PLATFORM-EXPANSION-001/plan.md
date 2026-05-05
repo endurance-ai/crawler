@@ -48,12 +48,17 @@ This SPEC adds Uniqlo (KR storefront) as the 33rd registered platform in the cra
 
 ### 2.4 ZARA / 29CM Follow-up SPEC Entry Conditions
 
-- The 2순위 follow-up SPEC `SPEC-PLATFORM-002` (ZARA) and `SPEC-PLATFORM-003` (29CM) will not be opened until **all** of the following conditions are met for SPEC-PLATFORM-EXPANSION-001:
-  1. The Uniqlo dry-run probe (REQ-003) has succeeded against the live API and the characterization-test fixture (REQ-006) is green.
-  2. The Uniqlo crawler has run successfully against production for **7 calendar days** with **zero crawl-aborts** (i.e., REQ-005 was not triggered for any category iteration during the soak window).
-  3. No undocumented Uniqlo API shape drift has been observed during the soak window (the fixture-based regression check in characterization tests has not flagged a drift).
-- The soak-window measure is calendar-day based, not per-run based, because Uniqlo's catalog-update cadence is daily and a 7-day window covers a full weekly update cycle.
-- If the soak fails (any of the three conditions above), SPEC-PLATFORM-002 entry is deferred until the underlying Uniqlo issue is diagnosed and resolved, and the soak window restarts.
+**AMENDED 2026-05-05 (post-SPEC-002): The 7-day soak gate has been removed by user direction.** Follow-up SPECs (ZARA, 29CM, additional Uniqlo regions, etc.) MAY be opened immediately once SPEC-001's dry-run probe passes and characterization tests are green. No production soak window is required.
+
+Original gate (now removed for reference):
+- ~~7 calendar days of zero crawl-aborts in production before opening SPEC-PLATFORM-002 / 003.~~
+- ~~Soak-window restart on any failure.~~
+
+Current entry conditions (relaxed):
+1. SPEC-001 dry-run probe (REQ-003) succeeded against the live API.
+2. Characterization-test fixture (REQ-006) is green.
+
+The risks the soak gate originally guarded against (API drift, Akamai escalation, robots.txt change) are now caught by the always-on test suite (KR + US fixture parity per SPEC-002 REQ-008) and the runtime `robots-check.ts` pre-flight. Production drift, if it occurs, surfaces in the next crawl run rather than being preemptively blocked.
 
 ## 3. EARS Requirements (proposed — to be finalized in spec.md)
 
@@ -94,7 +99,7 @@ User decisions confirmed: hardcoded `apiCategoryPaths` (Q1), `node:test` runner 
 Verification needed before Run phase:
 - [x] Q1 resolved — `apiCategoryPaths` (hardcoded) is the chosen mechanism. WOMEN, MEN, KIDS top-level codes plus their direct sub-category codes (jackets, knitwear, T-shirts, pants, etc.) enumerated explicitly in `platforms.ts`.
 - [x] Q2 resolved — `node:test` (built-in). Zero new devDependencies. Test files: `.test.ts` extension.
-- [x] Q3 resolved — 7 calendar days with zero crawl-aborts is the entry condition for SPEC-PLATFORM-002 (ZARA) and SPEC-PLATFORM-003 (29CM). See §2.4.
+- [x] Q3 resolved — Originally 7 calendar days with zero crawl-aborts was the entry condition for follow-up SPECs. **AMENDED 2026-05-05: gate removed by user direction.** Follow-up SPECs may proceed immediately once dry-run + characterization tests are green. See §2.4.
 - [x] Q4 resolved — Inditex sub-brands (Bershka, Pull&Bear, Massimo Dutti, Stradivarius, Oysho, Zara Home) and H&M Group sub-brands (COS, Weekday, Monki, Arket) are explicitly enumerated in §2.3.
 - [x] Q5 resolved — rate limit is **1 req/sec (1000ms)** baseline per platform, with a 5-element UA rotation list. The `--rate=N` operator override is supported via REQ-007.
 - [x] Confirmed: out-of-scope per research.md §3.5 (Uniqlo product IDs map to existing schema; null product_no fallback is acceptable per current import-products.ts behavior). Run-phase will verify via dry-run output diff against products schema before live import.
