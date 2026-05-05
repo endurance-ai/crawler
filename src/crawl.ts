@@ -21,6 +21,7 @@ import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
+import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
 import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
@@ -88,6 +89,81 @@ async function probeSite(config: SiteConfig) {
       }
     } catch (err) {
       console.log(`   ❌ 접속 실패: ${err}`)
+    }
+    return
+  }
+
+  if (config.type === "zara") {
+    const firstUrl = config.categoryUrls?.[0]
+    if (!firstUrl) {
+      console.log(`   ❌ zara-kr: categoryUrls is empty — cannot probe`)
+      return
+    }
+    let browser
+    try {
+      browser = await chromium.launch({headless: true, channel: "chrome"})
+    } catch (err) {
+      console.log(`   ❌ Chromium (channel:'chrome') launch failed: ${err}`)
+      console.log(`      Install with: npx playwright install chrome`)
+      return
+    }
+    try {
+      const ctx = await browser.newContext({
+        userAgent: pickZaraUserAgent(0),
+        locale: "ko-KR",
+        timezoneId: "Asia/Seoul",
+        viewport: {width: 1440, height: 900},
+      })
+      const page = await ctx.newPage()
+      let xhrPayload: unknown = null
+      page.on("response", async (res) => {
+        if (xhrPayload) return
+        if (/\/category\/\d+\/products\?ajax=true/.test(res.url())) {
+          try {
+            const buf = await res.body()
+            xhrPayload = JSON.parse(buf.toString("utf-8"))
+          } catch {}
+        }
+      })
+      const response = await page.goto(firstUrl, {waitUntil: "domcontentloaded", timeout: 30000})
+      console.log(`   HTTP: ${response?.status()}`)
+      const body = await page.content()
+      const intercept = detectBmVerifyIntercept(body)
+      if (intercept.isIntercept) {
+        console.log(`   ❌ Akamai intercept detected (${intercept.reason}); body=${body.length} bytes`)
+        await ctx.close()
+        return
+      }
+      // Dismiss cookie banner
+      try {
+        await page.locator("#onetrust-accept-btn-handler").click({timeout: 2500})
+      } catch {}
+      try {
+        await page.waitForSelector(".product-grid-product, [data-productid]", {timeout: 12000})
+      } catch {}
+      // Mild scroll to trigger XHR
+      for (let y = 0; y < 4000 && !xhrPayload; y += 600) {
+        await page.evaluate((yy) => window.scrollTo(0, yy), y)
+        await page.waitForTimeout(350)
+      }
+      await page.waitForTimeout(1500)
+      if (!xhrPayload) {
+        console.log(`   ⚠️  no /category/{id}/products?ajax=true XHR captured`)
+        await ctx.close()
+        return
+      }
+      const {harvestRawProducts, parseProductsFromXhr} = await import("./lib/zara-engine")
+      const raws = harvestRawProducts(xhrPayload)
+      const products = parseProductsFromXhr(raws.slice(0, 3), config.baseUrl, config.key)
+      console.log(`   ✅ ZARA bypass OK: harvested ${raws.length} raw products from XHR; sample 3:`)
+      for (const p of products) {
+        console.log(`      ${p.priceFormatted} — ${p.name.slice(0, 40)} → ${p.productUrl.slice(0, 80)}`)
+      }
+      await ctx.close()
+    } catch (err) {
+      console.log(`   ❌ probe failed: ${err}`)
+    } finally {
+      await browser.close().catch(() => {})
     }
     return
   }
@@ -204,6 +280,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   const cafe24Sites = configs.filter((c) => c.type === "cafe24")
   const shopifySites = configs.filter((c) => c.type === "shopify")
   const uniqloSites = configs.filter((c) => c.type === "uniqlo")
+  const zaraSites = configs.filter((c) => c.type === "zara")
 
   // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
   if (uniqloSites.length > 0) {
@@ -238,6 +315,35 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
       }),
     )
     results.push(...uniqloResults.filter((r): r is CrawlResult => r !== null))
+  }
+
+  // ZARA — sequential (each crawl launches its own Chromium browser
+  // internally; running in parallel multiplies memory cost without
+  // throughput benefit at the current 1-platform scale).
+  if (zaraSites.length > 0) {
+    for (const config of zaraSites) {
+      const robots = await checkRobots(config.baseUrl)
+      if (!robots.allowed) {
+        console.error(
+          `❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
+            `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
+        )
+        process.exit(1)
+      }
+    }
+    for (const config of zaraSites) {
+      try {
+        if (dryRun) {
+          await probeSite(config)
+          continue
+        }
+        const result = await crawlZara(config)
+        saveResult(outDir, result)
+        results.push(result)
+      } catch (err) {
+        console.error(`❌ ${config.name} 크롤 실패:`, err)
+      }
+    }
   }
 
   // Shopify (브라우저 불필요 — 전부 병렬)

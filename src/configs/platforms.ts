@@ -847,6 +847,52 @@ export const PLATFORMS: SiteConfig[] = [
     ],
     notes: "Uniqlo US API engine. Region=US drives /us/api/commerce/v5/en/products + USD source currency + en-US locale. USD-native cache; convertToKrw applied at import time. 1 req/sec, 5-UA rotation, robots-check enforced.",
   },
+
+  // ─── ZARA (KR) — first Playwright engine after Cafe24 ───────────────
+  // SPEC: SPEC-PLATFORM-EXPANSION-003
+  // Engine: pure Playwright with channel:"chrome" (real Chrome binary
+  //   required — bundled Chromium hard-403'd by Akamai fingerprint check).
+  //   AJAX response interception of /kr/ko/category/{id}/products?ajax=true
+  //   carries the full product JSON with name, price (KRW int), seo,
+  //   availability, color list, and xmedia image URLs.
+  // Pacing: 2 sec/page (browser overhead + Akamai-friendly).
+  // ToS: pre-verified 2026-05-05 by hansangho — AMBIGUOUS-ACCEPTED-BY-OWNER
+  //   (research.md §1.2). Verbatim Korean clauses embedded at top of
+  //   src/lib/zara-engine.ts per REQ-008.
+  // categoryUrls: Women + Men L2 landings live-verified 2026-05-05 against
+  //   the ZARA KR SPA. Refresh cadence: once per major season change OR
+  //   when test failures surface.
+  {
+    key: "zara-kr",
+    name: "자라 (KR)",
+    type: "zara",
+    baseUrl: "https://www.zara.com/kr/ko",
+    sourceCurrency: "KRW",
+    crawlDelay: 2000,
+    categoryUrls: [
+      // WOMAN
+      "https://www.zara.com/kr/ko/woman-new-in-l1180.html",
+      "https://www.zara.com/kr/ko/woman-coats-l1184.html",
+      "https://www.zara.com/kr/ko/woman-jackets-l1185.html",
+      "https://www.zara.com/kr/ko/woman-knitwear-l1182.html",
+      "https://www.zara.com/kr/ko/woman-shirts-l1217.html",
+      "https://www.zara.com/kr/ko/woman-tshirts-l1180.html",
+      "https://www.zara.com/kr/ko/woman-trousers-l1335.html",
+      "https://www.zara.com/kr/ko/woman-jeans-l1119.html",
+      "https://www.zara.com/kr/ko/woman-dresses-l1066.html",
+      "https://www.zara.com/kr/ko/woman-skirts-l1299.html",
+      // MAN
+      "https://www.zara.com/kr/ko/man-new-in-l711.html",
+      "https://www.zara.com/kr/ko/man-coats-l715.html",
+      "https://www.zara.com/kr/ko/man-jackets-l717.html",
+      "https://www.zara.com/kr/ko/man-knitwear-l681.html",
+      "https://www.zara.com/kr/ko/man-shirts-l737.html",
+      "https://www.zara.com/kr/ko/man-tshirts-l855.html",
+      "https://www.zara.com/kr/ko/man-trousers-l838.html",
+      "https://www.zara.com/kr/ko/man-jeans-l710.html",
+    ],
+    notes: "ZARA KR Playwright engine. Akamai bypass via channel:'chrome' (real Chrome required, bundled Chromium hard-403'd). XHR-interception strategy: /kr/ko/category/{id}/products?ajax=true carries full product JSON. KRW-native, 2 sec/page, 5-UA rotation (one UA per browser context), robots-check enforced. ToS pre-verified 2026-05-05 (research.md §1.2 verified, AMBIGUOUS-ACCEPTED-BY-OWNER). portal.ai-internal-use only; halt on cease-and-desist.",
+  },
 ]
 
 /** key로 사이트 설정 조회 */

@@ -50,7 +50,7 @@ export interface Product {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara"
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
@@ -136,6 +136,15 @@ export interface SiteConfig {
    * SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-002
    */
   region?: "KR" | "US"
+  /**
+   * ZARA-specific: full category landing-page URLs (including the
+   * `/kr/ko/...-lNNN.html` slug). The engine navigates to each URL,
+   * intercepts the AJAX `/category/{id}/products?ajax=true` response,
+   * and parses the embedded product JSON. Only consumed when
+   * `type === "zara"`.
+   * SPEC: SPEC-PLATFORM-EXPANSION-003 REQ-001
+   */
+  categoryUrls?: string[]
   /** 비활성화 */
   disabled?: boolean
   /** 메모 */
