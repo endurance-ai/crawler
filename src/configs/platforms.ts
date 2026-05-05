@@ -758,6 +758,48 @@ export const PLATFORMS: SiteConfig[] = [
     maxPages: 40,
     crawlDelay: 1500,
   },
+
+  // ─── Uniqlo (KR) — first non-Cafe24/non-Shopify engine ───────────────
+  // SPEC: SPEC-PLATFORM-EXPANSION-001
+  // path format: "<L1_gender>,<L2_class>,<L3_category>,<L4_subcategory>"
+  // (4 positions, comma-separated, URL-encoded by the engine).
+  {
+    key: "uniqlo-kr",
+    name: "유니클로 (KR)",
+    type: "uniqlo",
+    baseUrl: "https://www.uniqlo.com/kr/ko",
+    sourceCurrency: "KRW",
+    crawlDelay: 1000,
+    apiCategoryPaths: [
+      // WOMEN (57892) — top-level + L2 classes
+      "57892,,,",
+      "57892,57959,,",  // 티셔츠 & UT & 브라탑
+      "57892,95354,,",  // 셔츠 & 블라우스 & 폴로셔츠
+      "57892,95353,,",  // 니트 & 가디건
+      "57892,57958,,",  // 아우터
+      "57892,57960,,",  // 팬츠
+      "57892,57961,,",  // 원피스 & 스커트
+      "57892,57963,,",  // 이너웨어
+      "57892,57964,,",  // 파자마 & 홈웨어 (lounge)
+      "57892,57965,,",  // 액세서리
+      "57892,57962,,",  // 스포츠 유틸리티 웨어
+      // MEN (57893) — top-level + L2 classes
+      "57893,,,",
+      "57893,57967,,",  // 티셔츠 & 스웨트셔츠 & UT
+      "57893,95356,,",  // 셔츠 & 폴로셔츠
+      "57893,95355,,",  // 니트 & 가디건
+      "57893,57966,,",  // 아우터
+      "57893,57968,,",  // 팬츠
+      "57893,57970,,",  // 이너웨어
+      "57893,57971,,",  // 라운지 팬츠 & 홈웨어
+      "57893,57972,,",  // 액세서리
+      "57893,57969,,",  // 스포츠 유틸리티 웨어
+      // KIDS (57894) and BABY (57925) — top-level only
+      "57894,,,",
+      "57925,,,",
+    ],
+    notes: "Uniqlo KR API engine. Path = 4-position L1,L2,L3,L4. KRW native, 1 req/sec, 5-UA rotation, robots-check enforced.",
+  },
 ]
 
 /** key로 사이트 설정 조회 */
