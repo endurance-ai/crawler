@@ -5,6 +5,13 @@
  * gate (REQ-004 of SPEC-PLATFORM-EXPANSION-001). Engine-agnostic — applies
  * to every platform regardless of `type`.
  *
+ * Documentary allowlist (verified known-good baseUrls — pass blanket check):
+ *   - uniqlo.com/kr/ko    (SPEC-PLATFORM-EXPANSION-001)
+ *   - uniqlo.com/us/en    (SPEC-PLATFORM-EXPANSION-002)
+ * The runtime check itself is content-based on the fetched robots.txt body;
+ * the list above is purely a maintainability marker for operators adding
+ * new platforms.
+ *
  * @MX:NOTE: Fail-closed on every fetch error. Returning `allowed:false` on
  * 4xx/5xx/network/timeout is a deliberate security choice — fail-open would
  * silently bypass project HARD rule #1 ("Sites that explicitly forbid

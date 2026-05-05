@@ -1,21 +1,44 @@
 /**
- * Uniqlo (KR) crawl engine.
+ * Uniqlo (KR + US) crawl engine — region-parameterized.
  *
- * Fetch-pagination over `/kr/api/commerce/v5/ko/products` using the
- * `path` query parameter to scope each iteration to a category. Pure
- * `fetch` — no Playwright. Mirrors the structural pattern of
- * `shopify-engine.ts` (image-host whitelist, abort-on-error, no FX).
+ * Fetch-pagination over `/<region>/api/commerce/v5/<locale>/products`
+ * using the `path` query parameter to scope each iteration to a
+ * category. Pure `fetch` — no Playwright. Mirrors the structural
+ * pattern of `shopify-engine.ts` (image-host whitelist, abort-on-error,
+ * no FX at engine time — caller converts at upsert time when needed).
  *
- * SPEC: SPEC-PLATFORM-EXPANSION-001
+ * SPEC: SPEC-PLATFORM-EXPANSION-001 (KR baseline),
+ *       SPEC-PLATFORM-EXPANSION-002 (US extension via region parameter)
  */
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {checkRobots} from "./robots-check"
 
+type UniqloRegion = "KR" | "US"
+
 // API host is the bare uniqlo.com origin — note the API lives at the host
-// root, NOT under `/kr/ko` (which is the SPA prefix). We derive the API
-// base from `config.baseUrl`'s origin and append the canonical API path.
-const UNIQLO_API_PATH = "/kr/api/commerce/v5/ko/products"
+// root, NOT under the SPA locale prefix. We derive the API base from
+// `config.baseUrl`'s origin and append the region-specific API path.
+//
+// SPEC-PLATFORM-EXPANSION-002 REQ-002: API path/locale/currency become
+// functions of `config.region` instead of hardcoded constants.
+function buildApiPath(region: UniqloRegion): string {
+  return region === "US"
+    ? "/us/api/commerce/v5/en/products"
+    : "/kr/api/commerce/v5/ko/products"
+}
+
+function localeForRegion(region: UniqloRegion): string {
+  return region === "US" ? "en-US" : "ko-KR"
+}
+
+function defaultCurrencyForRegion(region: UniqloRegion): "USD" | "KRW" {
+  return region === "US" ? "USD" : "KRW"
+}
+
+function defaultSymbolForRegion(region: UniqloRegion): string {
+  return region === "US" ? "$" : "₩"
+}
 
 const PAGE_LIMIT = 100
 
@@ -134,19 +157,29 @@ function mapImages(item: UniqloItem): {primary: string; all: string[]} {
 
 /**
  * Pure parse function — converts a Uniqlo API JSON payload into a
- * `Product[]`. Exposed for unit testing against the frozen fixture.
+ * `Product[]`. Exposed for unit testing against the frozen fixtures
+ * (one per region).
  *
  * `baseUrl` is used to build the productUrl (`<baseUrl>/products/<productId>`).
  * `platformKey` maps to `Product.platform`.
+ * `region` drives source currency code, default symbol, and locale for
+ *   `priceFormatted`. Defaults to "KR" for backward compat.
+ *
+ * SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-002 — region parameter replaces
+ *   the previously hardcoded "KRW" / "ko-KR" / "₩" assumptions.
  */
 export function parseProducts(
   json: UniqloApiResponse,
   baseUrl: string,
   platformKey: string,
+  region: UniqloRegion = "KR",
 ): Product[] {
   const items = json.result?.items ?? []
   const products: Product[] = []
   const crawledAt = new Date().toISOString()
+  const locale = localeForRegion(region)
+  const sourceCurrency = defaultCurrencyForRegion(region)
+  const fallbackSymbol = defaultSymbolForRegion(region)
 
   for (const item of items) {
     if (!item.productId) continue
@@ -154,7 +187,7 @@ export function parseProducts(
     const baseValue = item.prices?.base?.value
     const promoValue = item.prices?.promo?.value
     const price = typeof baseValue === "number" ? baseValue : null
-    const symbol = item.prices?.base?.currency?.symbol ?? "₩"
+    const symbol = item.prices?.base?.currency?.symbol ?? fallbackSymbol
     const promoPrice =
       typeof promoValue === "number" && typeof baseValue === "number" && promoValue < baseValue
         ? promoValue
@@ -176,7 +209,7 @@ export function parseProducts(
       price,
       originalPrice: price,
       salePrice: promoPrice,
-      priceFormatted: price !== null ? `${symbol}${price.toLocaleString("ko-KR")}` : "",
+      priceFormatted: price !== null ? `${symbol}${price.toLocaleString(locale)}` : "",
       imageUrl: primary,
       productUrl: `${baseUrl}/products/${item.productId}`,
       inStock: item.representative?.sales ?? true,
@@ -187,7 +220,7 @@ export function parseProducts(
       color: colorNames.length > 0 ? colorNames.join(", ").slice(0, 500) : undefined,
       sizeInfo: sizeNames.length > 0 ? sizeNames.join(", ").slice(0, 200) : undefined,
       images: all.length > 0 ? all : undefined,
-      sourceCurrency: "KRW",
+      sourceCurrency,
       sourcePrice: price ?? undefined,
     })
   }
@@ -202,14 +235,17 @@ export function parseProducts(
  * a CrawlResult, never throws. Errors are surfaced via result.errors[].
  * @MX:REASON: fan_in >= 3 (runCrawl, probeSite, characterization tests).
  * Behavior change here ripples through dispatch wiring and test fixtures;
- * keep the contract stable.
- * @MX:SPEC: SPEC-PLATFORM-EXPANSION-001 REQ-002, REQ-005
+ * keep the contract stable. Region parameter (KR vs US) is the only
+ * region-specific dial — narrow surface for region-specific bugs.
+ * @MX:SPEC: SPEC-PLATFORM-EXPANSION-001 REQ-002, REQ-005; SPEC-PLATFORM-EXPANSION-002 REQ-002, REQ-003
  */
 export async function crawlUniqlo(config: SiteConfig): Promise<CrawlResult> {
   const startTime = Date.now()
   const errors: string[] = []
   const allProducts: Product[] = []
   const crawlDelay = config.crawlDelay ?? 1000
+  const region: UniqloRegion = config.region ?? "KR"
+  const apiPath = buildApiPath(region)
   const apiOrigin = (() => {
     try {
       return new URL(config.baseUrl).origin
@@ -243,7 +279,7 @@ export async function crawlUniqlo(config: SiteConfig): Promise<CrawlResult> {
 
     while (true) {
       const url =
-        `${apiOrigin}${UNIQLO_API_PATH}` +
+        `${apiOrigin}${apiPath}` +
         `?path=${encodeURIComponent(path)}&limit=${PAGE_LIMIT}&offset=${offset}`
 
       // @MX:WARN: [AUTO] Pacing window — each request waits `crawlDelay`
@@ -338,7 +374,7 @@ export async function crawlUniqlo(config: SiteConfig): Promise<CrawlResult> {
         break
       }
 
-      const pageProducts = parseProducts(json, config.baseUrl, config.key)
+      const pageProducts = parseProducts(json, config.baseUrl, config.key, region)
       allProducts.push(...pageProducts)
       console.log(`   ${path} offset=${offset}: ${pageProducts.length} products`)
 

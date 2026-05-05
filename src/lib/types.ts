@@ -129,6 +129,13 @@ export interface SiteConfig {
    * Only consumed when `type === "uniqlo"`.
    */
   apiCategoryPaths?: string[]
+  /**
+   * Uniqlo-specific: region selector driving API path, source currency,
+   * and price-formatter locale. Defaults to "KR" for backward compat
+   * if absent. Only consumed when `type === "uniqlo"`.
+   * SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-002
+   */
+  region?: "KR" | "US"
   /** 비활성화 */
   disabled?: boolean
   /** 메모 */

@@ -9,6 +9,11 @@
 import * as fs from "fs"
 import * as path from "path"
 import {createClient} from "@supabase/supabase-js"
+// @MX:NOTE: Import-time USD→KRW conversion for caches whose source
+// currency is non-KRW (currently Uniqlo US). Cache stores native USD;
+// only the Supabase upsert payload sees post-conversion KRW.
+// SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
+import {convertToKrw} from "./lib/fx"
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -39,6 +44,8 @@ interface CrawledProduct {
   brand: string
   name: string
   price: number | null
+  originalPrice?: number | null
+  salePrice?: number | null
   priceFormatted: string
   imageUrl: string
   productUrl: string
@@ -55,6 +62,8 @@ interface CrawledProduct {
   sizeInfo?: string
   tags?: string[]
   productCode?: string
+  /** Source currency (KRW default; "USD" for Uniqlo US cache) */
+  sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
   // 리뷰 데이터
   reviewCount?: number
   reviews?: CrawledReview[]
@@ -144,6 +153,7 @@ async function main() {
     }
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 
+    let fxSkipped = 0
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
@@ -159,13 +169,44 @@ async function main() {
         return n && n > 0 && n <= MAX_PRICE ? n : null
       }
 
+      // SPEC-PLATFORM-EXPANSION-002 REQ-004: import-time USD→KRW
+      // conversion. When the cache's sourceCurrency is non-KRW (currently
+      // only Uniqlo US ships with "USD"), convert numeric price fields
+      // before sanitization. Cached on-disk values remain untouched.
+      // If convertToKrw returns null (unknown currency), skip the product.
+      const sourceCurrency = (p.sourceCurrency as string | undefined) ?? "KRW"
+      let priceRaw = p.price as number | null | undefined
+      let originalRaw = p.originalPrice as number | null | undefined
+      let saleRaw = p.salePrice as number | null | undefined
+      if (sourceCurrency !== "KRW") {
+        const conv = (v: number | null | undefined): number | null | undefined => {
+          if (typeof v !== "number") return v
+          return convertToKrw(v, sourceCurrency)
+        }
+        const convPrice = conv(priceRaw)
+        // If the primary price is non-null but conversion yielded null,
+        // the FX table does not contain this currency — skip with warning.
+        if (typeof priceRaw === "number" && convPrice === null) {
+          console.warn(
+            `   ⚠️  Skipping product (unknown currency "${sourceCurrency}"): ${(p.name as string) || productUrl}`,
+          )
+          fxSkipped += 1
+          return null
+        }
+        priceRaw = convPrice
+        const convOriginal = conv(originalRaw)
+        originalRaw = typeof originalRaw === "number" && convOriginal === null ? null : convOriginal
+        const convSale = conv(saleRaw)
+        saleRaw = typeof saleRaw === "number" && convSale === null ? null : convSale
+      }
+
       return {
         brand,
         name: p.name as string,
         category: (p.category as string) || null,
-        price: sanitizePrice(p.salePrice) ?? sanitizePrice(p.price),
-        original_price: sanitizePrice(p.originalPrice) ?? sanitizePrice(p.price),
-        sale_price: sanitizePrice(p.salePrice),
+        price: sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw),
+        original_price: sanitizePrice(originalRaw) ?? sanitizePrice(priceRaw),
+        sale_price: sanitizePrice(saleRaw),
         product_no: productNo,
         image_url: p.imageUrl as string,
         product_url: productUrl,
@@ -185,7 +226,10 @@ async function main() {
         last_seen_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
-    })
+    }).filter((r): r is NonNullable<typeof r> => r !== null)
+    if (fxSkipped > 0) {
+      console.log(`   ⚠️  ${fxSkipped} product(s) skipped due to unknown source currency`)
+    }
 
     // 50개씩 배치 upsert
     const BATCH = 50

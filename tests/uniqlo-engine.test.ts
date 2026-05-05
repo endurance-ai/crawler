@@ -1,7 +1,9 @@
 /**
  * Characterization tests for the Uniqlo engine.
  *
- * SPEC: SPEC-PLATFORM-EXPANSION-001
+ * SPEC: SPEC-PLATFORM-EXPANSION-001 (KR baseline)
+ *       SPEC-PLATFORM-EXPANSION-002 (US extension; REQ-007 parameterizes
+ *         every shared assertion to run against both fixtures)
  * Runs via: node --test --import tsx ./tests/*.test.ts
  */
 
@@ -13,21 +15,33 @@ import {fileURLToPath} from "node:url"
 
 import {crawlUniqlo, isSafeUniqloImageUrl, parseProducts, parseRateFlag, pickUserAgent,} from "../src/lib/uniqlo-engine"
 import {checkRobots, parseRobotsBody} from "../src/lib/robots-check"
+import {convertToKrw} from "../src/lib/fx"
 import type {SiteConfig} from "../src/lib/types"
 
 // ─── Fixture loading ──────────────────────────────────
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const FIXTURE_PATH = path.join(__dirname, "fixtures", "uniqlo-kr-products.fixture.json")
+const KR_FIXTURE_PATH = path.join(__dirname, "fixtures", "uniqlo-kr-products.fixture.json")
+const US_FIXTURE_PATH = path.join(__dirname, "fixtures", "uniqlo-us-products.fixture.json")
 
-function loadFixture(): unknown {
-  const raw = fs.readFileSync(FIXTURE_PATH, "utf-8")
+function loadFixture(p: string = KR_FIXTURE_PATH): unknown {
+  const raw = fs.readFileSync(p, "utf-8")
   return JSON.parse(raw)
 }
 
 const TEST_BASE_URL = "https://www.uniqlo.com/kr/ko"
 const TEST_KEY = "uniqlo-kr"
+const US_BASE_URL = "https://www.uniqlo.com/us/en"
+const US_KEY = "uniqlo-us"
+
+// SPEC-PLATFORM-EXPANSION-002 REQ-007: shared characterization-test
+// matrix. Every entry runs through the same assertions; region-specific
+// expectations are added on top.
+const FIXTURE_MATRIX = [
+  {region: "KR" as const, fixturePath: KR_FIXTURE_PATH, baseUrl: TEST_BASE_URL, key: TEST_KEY, currency: "KRW"},
+  {region: "US" as const, fixturePath: US_FIXTURE_PATH, baseUrl: US_BASE_URL, key: US_KEY, currency: "USD"},
+]
 
 const TEST_CONFIG: SiteConfig = {
   key: TEST_KEY,
@@ -78,33 +92,62 @@ const BLANKET_DISALLOW_ROBOTS = "User-agent: *\nDisallow: /\n"
 
 // ─── AC-2: fixture parity ─────────────────────────────
 
-test("AC-2 parseProducts: every product has populated name/imageUrl/productUrl/price and whitelisted host", () => {
-  const fixture = loadFixture()
+// SPEC-PLATFORM-EXPANSION-002 REQ-007 / REQ-008: shared characterization
+// parity. The same assertions run against BOTH fixtures; failure on either
+// blocks deployment regardless of which region triggered it.
+for (const fx of FIXTURE_MATRIX) {
+  test(`AC-2 parseProducts [${fx.region}]: every product has populated name/imageUrl/productUrl/price and whitelisted host`, () => {
+    const fixture = loadFixture(fx.fixturePath)
+    const products = parseProducts(
+      fixture as Parameters<typeof parseProducts>[0],
+      fx.baseUrl,
+      fx.key,
+      fx.region,
+    )
+
+    assert.ok(products.length >= 50, `[${fx.region}] expected >=50 products, got ${products.length}`)
+
+    for (const p of products) {
+      assert.equal(typeof p.name, "string")
+      assert.ok(p.name.length > 0, `[${fx.region}] empty name for product ${p.productCode}`)
+      assert.ok(p.productUrl.startsWith(`${fx.baseUrl}/products/`), `[${fx.region}] bad productUrl: ${p.productUrl}`)
+      assert.equal(typeof p.price, "number")
+      assert.ok((p.price as number) > 0, `[${fx.region}] non-positive price for ${p.productCode}`)
+      assert.equal(typeof p.imageUrl, "string")
+      assert.ok(p.imageUrl.length > 0, `[${fx.region}] empty imageUrl for ${p.productCode}`)
+      assert.ok(
+        isSafeUniqloImageUrl(p.imageUrl),
+        `[${fx.region}] imageUrl host not whitelisted: ${p.imageUrl}`,
+      )
+      if (p.images) {
+        for (const img of p.images) {
+          assert.ok(isSafeUniqloImageUrl(img), `[${fx.region}] secondary image host not whitelisted: ${img}`)
+        }
+      }
+      // Region-specific: sourceCurrency must match.
+      assert.equal(p.sourceCurrency, fx.currency, `[${fx.region}] expected sourceCurrency=${fx.currency}, got ${p.sourceCurrency}`)
+    }
+  })
+}
+
+// US-fixture-specific assertions (REQ-007): USD currency, decimal price,
+// non-Korean priceFormatted.
+test("AC-3 [US] parseProducts: prices are positive USD decimals, priceFormatted does not use ₩", () => {
+  const fixture = loadFixture(US_FIXTURE_PATH)
   const products = parseProducts(
     fixture as Parameters<typeof parseProducts>[0],
-    TEST_BASE_URL,
-    TEST_KEY,
+    US_BASE_URL,
+    US_KEY,
+    "US",
   )
-
-  assert.ok(products.length >= 50, `expected >=50 products, got ${products.length}`)
-
+  assert.ok(products.length >= 50, `expected >=50 US products, got ${products.length}`)
   for (const p of products) {
-    assert.equal(typeof p.name, "string")
-    assert.ok(p.name.length > 0, `empty name for product ${p.productCode}`)
-    assert.ok(p.productUrl.startsWith(`${TEST_BASE_URL}/products/`), `bad productUrl: ${p.productUrl}`)
+    assert.equal(p.sourceCurrency, "USD")
     assert.equal(typeof p.price, "number")
-    assert.ok((p.price as number) > 0, `non-positive price for ${p.productCode}`)
-    assert.equal(typeof p.imageUrl, "string")
-    assert.ok(p.imageUrl.length > 0, `empty imageUrl for ${p.productCode}`)
-    assert.ok(
-      isSafeUniqloImageUrl(p.imageUrl),
-      `imageUrl host not whitelisted: ${p.imageUrl}`,
-    )
-    if (p.images) {
-      for (const img of p.images) {
-        assert.ok(isSafeUniqloImageUrl(img), `secondary image host not whitelisted: ${img}`)
-      }
-    }
+    assert.ok((p.price as number) > 0, `non-positive US price for ${p.productCode}`)
+    // USD decimals are typically <1000 — sanity range.
+    assert.ok((p.price as number) < 10_000, `US price unexpectedly high (looks like KRW?): ${p.price}`)
+    assert.ok(!p.priceFormatted.includes("₩"), `US priceFormatted should not contain ₩: ${p.priceFormatted}`)
   }
 })
 
@@ -472,15 +515,61 @@ test("AC-2 cross-category pacing: 3 single-page categories enforce 2 inter-reque
 
 // ─── AC-1: platform registry ──────────────────────────
 
-test("AC-1 platform registry: getPlatformsByType('uniqlo') returns exactly one entry with key=uniqlo-kr", async () => {
+test("AC-1 platform registry: getPlatformsByType('uniqlo') returns uniqlo-kr (region=KR) and uniqlo-us (region=US)", async () => {
   const {getPlatformsByType} = await import("../src/configs/platforms")
   const entries = getPlatformsByType("uniqlo")
-  assert.equal(entries.length, 1, "expected exactly one Uniqlo platform registered")
-  assert.equal(entries[0].key, "uniqlo-kr")
-  assert.equal(entries[0].type, "uniqlo")
-  assert.equal(entries[0].baseUrl, "https://www.uniqlo.com/kr/ko")
+  assert.equal(entries.length, 2, "expected exactly two Uniqlo platforms registered (KR + US)")
+
+  const kr = entries.find((e) => e.key === "uniqlo-kr")
+  const us = entries.find((e) => e.key === "uniqlo-us")
+  assert.ok(kr, "uniqlo-kr entry missing")
+  assert.ok(us, "uniqlo-us entry missing")
+
+  assert.equal(kr!.type, "uniqlo")
+  assert.equal(kr!.baseUrl, "https://www.uniqlo.com/kr/ko")
+  assert.equal(kr!.region, "KR")
+  assert.equal(kr!.sourceCurrency, "KRW")
   assert.ok(
-    Array.isArray(entries[0].apiCategoryPaths) && entries[0].apiCategoryPaths!.length > 0,
+    Array.isArray(kr!.apiCategoryPaths) && kr!.apiCategoryPaths!.length > 0,
     "uniqlo-kr SiteConfig must have a non-empty apiCategoryPaths",
   )
+
+  assert.equal(us!.type, "uniqlo")
+  assert.equal(us!.baseUrl, "https://www.uniqlo.com/us/en")
+  assert.equal(us!.region, "US")
+  assert.equal(us!.sourceCurrency, "USD")
+  assert.ok(
+    Array.isArray(us!.apiCategoryPaths) && us!.apiCategoryPaths!.length >= 4,
+    "uniqlo-us SiteConfig must enumerate at least the 4 gender top-levels",
+  )
+  // Verify the four gender top-levels per REQ-001.
+  for (const tl of ["22210,,,", "22211,,,", "22212,,,", "22213,,,"]) {
+    assert.ok(us!.apiCategoryPaths!.includes(tl), `uniqlo-us apiCategoryPaths missing ${tl}`)
+  }
+})
+
+// AC-4: import-time FX conversion (mirrors src/import-products.ts logic).
+// SPEC-PLATFORM-EXPANSION-002 REQ-004.
+test("AC-4 import-time FX: USD products convert to integer KRW; unknown currency skipped", () => {
+  const synthetic = [
+    {sourceCurrency: "USD", price: 29.9, originalPrice: 29.9, salePrice: null, name: "A"},
+    {sourceCurrency: "USD", price: 19.9, originalPrice: 25.0, salePrice: 19.9, name: "B"},
+    {sourceCurrency: "USD", price: 49.9, originalPrice: null, salePrice: null, name: "C"},
+    {sourceCurrency: "ZZZ", price: 100, originalPrice: 100, salePrice: null, name: "Z"},
+  ]
+  const converted = synthetic
+    .map((p) => {
+      const sc = p.sourceCurrency
+      if (sc === "KRW") return {price: p.price, name: p.name}
+      const krw = typeof p.price === "number" ? convertToKrw(p.price, sc) : null
+      if (typeof p.price === "number" && krw === null) return null // skip
+      return {price: krw, name: p.name}
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+
+  assert.equal(converted.length, 3, "expected 3 products after skipping ZZZ")
+  assert.equal(converted[0].price, Math.round(29.9 * 1430)) // 42757
+  assert.equal(converted[1].price, Math.round(19.9 * 1430)) // 28457
+  assert.equal(converted[2].price, Math.round(49.9 * 1430)) // 71357
+  assert.ok(!converted.some((c) => c.name === "Z"), "unknown-currency product must be skipped")
 })
