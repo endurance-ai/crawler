@@ -1,0 +1,34 @@
+{
+  "name": "crawler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fashion SKU crawler for Portal.ai — Cafe24 + Shopify harvester writing into Supabase + R2",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "crawl": "dotenv -e .env -- tsx src/crawl.ts",
+    "import:products": "dotenv -e .env -- tsx src/import-products.ts",
+    "import:attributes": "dotenv -e .env -- tsx src/import-attributes.ts",
+    "import:brand-nodes": "dotenv -e .env -- tsx src/import-brand-nodes.ts",
+    "probe:reviews": "dotenv -e .env -- tsx src/probe-reviews.ts",
+    "analyze:products": "dotenv -e .env -- tsx src/analyze-products.ts",
+    "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
+    "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.1",
+    "openai": "^6.32.0",
+    "playwright": "^1.58.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "dotenv-cli": "^11.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.0"
+  }
+}
