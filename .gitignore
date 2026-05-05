@@ -21,3 +21,6 @@ output/
 
 # Data
 /data
+
+# MoAI session logs / traces
+.moai/logs/
