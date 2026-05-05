@@ -758,6 +758,95 @@ export const PLATFORMS: SiteConfig[] = [
     maxPages: 40,
     crawlDelay: 1500,
   },
+
+  // ─── Uniqlo (KR) — first non-Cafe24/non-Shopify engine ───────────────
+  // SPEC: SPEC-PLATFORM-EXPANSION-001
+  // path format: "<L1_gender>,<L2_class>,<L3_category>,<L4_subcategory>"
+  // (4 positions, comma-separated, URL-encoded by the engine).
+  {
+    key: "uniqlo-kr",
+    name: "유니클로 (KR)",
+    type: "uniqlo",
+    baseUrl: "https://www.uniqlo.com/kr/ko",
+    region: "KR",
+    sourceCurrency: "KRW",
+    crawlDelay: 1000,
+    apiCategoryPaths: [
+      // WOMEN (57892) — top-level + L2 classes
+      "57892,,,",
+      "57892,57959,,",  // 티셔츠 & UT & 브라탑
+      "57892,95354,,",  // 셔츠 & 블라우스 & 폴로셔츠
+      "57892,95353,,",  // 니트 & 가디건
+      "57892,57958,,",  // 아우터
+      "57892,57960,,",  // 팬츠
+      "57892,57961,,",  // 원피스 & 스커트
+      "57892,57963,,",  // 이너웨어
+      "57892,57964,,",  // 파자마 & 홈웨어 (lounge)
+      "57892,57965,,",  // 액세서리
+      "57892,57962,,",  // 스포츠 유틸리티 웨어
+      // MEN (57893) — top-level + L2 classes
+      "57893,,,",
+      "57893,57967,,",  // 티셔츠 & 스웨트셔츠 & UT
+      "57893,95356,,",  // 셔츠 & 폴로셔츠
+      "57893,95355,,",  // 니트 & 가디건
+      "57893,57966,,",  // 아우터
+      "57893,57968,,",  // 팬츠
+      "57893,57970,,",  // 이너웨어
+      "57893,57971,,",  // 라운지 팬츠 & 홈웨어
+      "57893,57972,,",  // 액세서리
+      "57893,57969,,",  // 스포츠 유틸리티 웨어
+      // KIDS (57894) and BABY (57925) — top-level only
+      "57894,,,",
+      "57925,,,",
+    ],
+    notes: "Uniqlo KR API engine. Path = 4-position L1,L2,L3,L4. KRW native, 1 req/sec, 5-UA rotation, robots-check enforced.",
+  },
+
+  // ─── Uniqlo (US) — region=US shared engine, USD-native cache ────────
+  // SPEC: SPEC-PLATFORM-EXPANSION-002
+  // path format: same 4-position scheme as KR. US class IDs from live
+  // probe aggregations.tree.classes (research.md §1 [^u-us4]):
+  //   23294 Outerwear, 23295 T-Shirts & Sweats, 23296 Jeans & Pants,
+  //   23297 Dresses & Skirts, 23298 Innerwear & Underwear,
+  //   23299 Loungewear & Home, 23300 Accessories,
+  //   95663 Shirts & Blouses, 95664 Sweaters & Cardigans
+  // Gender L1 codes: 22210 WOMEN, 22211 MEN, 22212 KIDS, 22213 BABY.
+  {
+    key: "uniqlo-us",
+    name: "유니클로 (US)",
+    type: "uniqlo",
+    baseUrl: "https://www.uniqlo.com/us/en",
+    region: "US",
+    sourceCurrency: "USD",
+    crawlDelay: 1000,
+    apiCategoryPaths: [
+      // WOMEN (22210) — top-level + L2 classes
+      "22210,,,",
+      "22210,23295,,",  // T-Shirts & Sweats
+      "22210,95663,,",  // Shirts & Blouses
+      "22210,95664,,",  // Sweaters & Cardigans
+      "22210,23294,,",  // Outerwear
+      "22210,23296,,",  // Jeans & Pants
+      "22210,23297,,",  // Dresses & Skirts
+      "22210,23298,,",  // Innerwear & Underwear
+      "22210,23299,,",  // Loungewear & Home
+      "22210,23300,,",  // Accessories
+      // MEN (22211) — top-level + L2 classes
+      "22211,,,",
+      "22211,23295,,",  // T-Shirts & Sweats
+      "22211,95663,,",  // Shirts & Polos
+      "22211,95664,,",  // Sweaters & Cardigans
+      "22211,23294,,",  // Outerwear
+      "22211,23296,,",  // Jeans & Pants
+      "22211,23298,,",  // Innerwear & Underwear
+      "22211,23299,,",  // Loungewear & Home
+      "22211,23300,,",  // Accessories
+      // KIDS (22212) and BABY (22213) — top-level only
+      "22212,,,",
+      "22213,,,",
+    ],
+    notes: "Uniqlo US API engine. Region=US drives /us/api/commerce/v5/en/products + USD source currency + en-US locale. USD-native cache; convertToKrw applied at import time. 1 req/sec, 5-UA rotation, robots-check enforced.",
+  },
 ]
 
 /** key로 사이트 설정 조회 */

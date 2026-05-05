@@ -50,7 +50,7 @@ export interface Product {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo"
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
@@ -121,6 +121,21 @@ export interface SiteConfig {
   sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
   /** 요청 간 딜레이 ms (기본: 2000) */
   crawlDelay?: number
+  /**
+   * Uniqlo-specific: list of category `path` query values consumed by
+   * `crawlUniqlo` against `/kr/api/commerce/v5/ko/products`. Each entry is
+   * a 4-position comma-separated string `<L1>,<L2>,<L3>,<L4>` (gender,
+   * class, category, subcategory). URL-encoding is handled by the engine.
+   * Only consumed when `type === "uniqlo"`.
+   */
+  apiCategoryPaths?: string[]
+  /**
+   * Uniqlo-specific: region selector driving API path, source currency,
+   * and price-formatter locale. Defaults to "KR" for backward compat
+   * if absent. Only consumed when `type === "uniqlo"`.
+   * SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-002
+   */
+  region?: "KR" | "US"
   /** 비활성화 */
   disabled?: boolean
   /** 메모 */

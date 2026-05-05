@@ -1,0 +1,7 @@
+{
+  "detected": true,
+  "matched_keywords": ["supabase", "postgresql", "@supabase/supabase-js"],
+  "source_files": ["package.json", ".moai/project/tech.md", ".moai/project/codemaps/dependencies.md"],
+  "scanned_at": "2026-05-05T16:15:00+09:00",
+  "tech_md_hash": "4ece77ce46c60dedb8382cf3eb3d0e56acbd611a443f60b200108c5378179898"
+}

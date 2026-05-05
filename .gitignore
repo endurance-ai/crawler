@@ -18,3 +18,9 @@ output/
 .DS_Store
 .idea/
 .vscode/
+
+# Data
+/data
+
+# MoAI session logs / traces
+.moai/logs/

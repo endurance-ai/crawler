@@ -6,39 +6,10 @@
  */
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
-
-// 2026-04 기준 고정 환율 (POC — 실시간 환율 API는 후속 작업)
-const FX_TO_KRW: Record<string, number> = {
-  USD: 1430,
-  EUR: 1560,
-  GBP: 1750,
-  KRW: 1,
-}
-
-const CURRENCY_SYMBOL: Record<string, string> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  KRW: "₩",
-}
-
-// Shopify Markets localization cookie — currency 기반 국가 코드 매핑
-// 미설정 시 스토어가 IP geo로 로컬 통화 반환 (한국 IP → KRW로 리턴 → 통화 혼선)
-const CURRENCY_TO_COUNTRY: Record<string, string> = {
-  USD: "US",
-  GBP: "GB",
-  EUR: "DE",
-  KRW: "KR",
-}
-
-function convertToKrw(price: number, currency: string): number | null {
-  const rate = FX_TO_KRW[currency]
-  if (rate === undefined) {
-    console.warn(`[FX] 알 수 없는 통화 "${currency}" — 가격 변환 skip`)
-    return null
-  }
-  return Math.round(price * rate)
-}
+import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY, convertToKrw} from "./fx"
+// SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
+// use by import-products.ts. Behavior unchanged — re-imports preserve
+// numeric output bit-for-bit.
 
 // Shopify handle은 kebab-case 영숫자로만 구성 (spec) — path injection 방지
 const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/

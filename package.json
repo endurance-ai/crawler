@@ -8,6 +8,7 @@
     "node": ">=22.0.0",
     "pnpm": ">=9.0.0"
   },
+  "packageManager": "pnpm@10.33.2",
   "scripts": {
     "crawl": "dotenv -e .env -- tsx src/crawl.ts",
     "import:products": "dotenv -e .env -- tsx src/import-products.ts",
@@ -17,6 +18,7 @@
     "analyze:products": "dotenv -e .env -- tsx src/analyze-products.ts",
     "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
+    "test": "sh -c 'node --test --import tsx ./tests/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

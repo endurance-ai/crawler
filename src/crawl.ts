@@ -20,6 +20,8 @@ import * as path from "path"
 import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlShopify} from "./lib/shopify-engine"
+import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
+import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, SiteConfig} from "./lib/types"
@@ -45,6 +47,50 @@ function parseArgs() {
 async function probeSite(config: SiteConfig) {
   console.log(`\n🔍 프로빙: ${config.name} (${config.baseUrl})`)
   console.log(`   타입: ${config.type}`)
+
+  // REQ-004 pre-flight: robots.txt blanket-Disallow check before any
+  // product-path fetch. Engine-agnostic — applies to all types.
+  const robots = await checkRobots(config.baseUrl)
+  if (!robots.allowed) {
+    console.error(
+      `   ❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
+        `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
+    )
+    process.exit(1)
+  }
+
+  if (config.type === "uniqlo") {
+    try {
+      const apiOrigin = new URL(config.baseUrl).origin
+      const url = `${apiOrigin}/kr/api/commerce/v5/ko/products?path=${encodeURIComponent(
+        config.apiCategoryPaths?.[0] ?? "57892,,,",
+      )}&limit=1&offset=0`
+      const res = await fetch(url, {
+        headers: {"User-Agent": pickUserAgent(0), Accept: "application/json"},
+      })
+      if (!res.ok) {
+        console.log(`   ❌ HTTP ${res.status}`)
+        return
+      }
+      const data = (await res.json()) as {result?: {items?: Array<Record<string, unknown>>}}
+      const sample = data.result?.items?.[0]
+      console.log(`   ✅ Uniqlo API 접근 가능`)
+      if (sample) {
+        const baseValue = (sample.prices as {base?: {value?: number}} | undefined)?.base?.value
+        console.log(`   📦 name: ${String(sample.name ?? "(없음)")}`)
+        console.log(`   📦 productCode: ${String(sample.productId ?? "(없음)")}`)
+        console.log(`   📦 prices.base.value: ${baseValue ?? "(없음)"}`)
+        console.log(
+          `   📦 productUrl: ${config.baseUrl}/products/${String(sample.productId ?? "")}`,
+        )
+      } else {
+        console.log(`   📦 샘플: (items 비어있음)`)
+      }
+    } catch (err) {
+      console.log(`   ❌ 접속 실패: ${err}`)
+    }
+    return
+  }
 
   if (config.type === "shopify") {
     try {
@@ -157,6 +203,42 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
 
   const cafe24Sites = configs.filter((c) => c.type === "cafe24")
   const shopifySites = configs.filter((c) => c.type === "shopify")
+  const uniqloSites = configs.filter((c) => c.type === "uniqlo")
+
+  // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
+  if (uniqloSites.length > 0) {
+    // REQ-004 pre-flight: every Uniqlo site must pass robots-check before
+    // any product fetch. crawlUniqlo also re-checks internally so the
+    // engine remains correct when invoked directly, but we surface the
+    // block early at the dispatch level for clearer operator output.
+    for (const config of uniqloSites) {
+      const robots = await checkRobots(config.baseUrl)
+      if (!robots.allowed) {
+        console.error(
+          `❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
+            `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
+        )
+        process.exit(1)
+      }
+    }
+    const uniqloResults = await Promise.all(
+      uniqloSites.map(async (config) => {
+        try {
+          if (dryRun) {
+            await probeSite(config)
+            return null
+          }
+          const result = await crawlUniqlo(config)
+          saveResult(outDir, result)
+          return result
+        } catch (err) {
+          console.error(`❌ ${config.name} 크롤 실패:`, err)
+          return null
+        }
+      }),
+    )
+    results.push(...uniqloResults.filter((r): r is CrawlResult => r !== null))
+  }
 
   // Shopify (브라우저 불필요 — 전부 병렬)
   if (shopifySites.length > 0) {
@@ -277,6 +359,19 @@ async function main() {
   const detailFlag = !!flags.detail
   const reviewFlag = !!flags.reviews
 
+  // REQ-007: --rate=N parser. Validate at parse time BEFORE any fetch.
+  // Rejects N>5, N<=0, non-integer N (e.g. 2.5, "abc").
+  let rateOverrideMs: number | null = null
+  if (typeof flags.rate === "string") {
+    const parsed = parseRateFlag(flags.rate)
+    if (parsed instanceof Error) {
+      console.error(`❌ ${parsed.message}`)
+      process.exit(1)
+    }
+    rateOverrideMs = parsed.delayMs
+    console.log(`⏱  --rate=${parsed.ratePerSecond}: per-request delay overridden to ${rateOverrideMs}ms`)
+  }
+
   // --list: 플랫폼 목록 출력
   if (flags.list) {
     console.log("\n📋 등록된 플랫폼:")
@@ -366,6 +461,12 @@ async function main() {
       config.crawlReviews = true
     }
     console.log("💬 리뷰 크롤링 활성화")
+  }
+
+  if (rateOverrideMs !== null) {
+    for (const config of targets) {
+      config.crawlDelay = rateOverrideMs
+    }
   }
 
   console.log(`\n🚀 크롤링 시작: ${targets.map((t) => t.name).join(", ")}`)
