@@ -17,7 +17,7 @@
     "analyze:products": "dotenv -e .env -- tsx src/analyze-products.ts",
     "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
-    "test": "tsc --noEmit",
+    "test": "sh -c 'tsc --noEmit'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
