@@ -91,14 +91,24 @@ There is no shared HTTP server, daemon, or message queue. Scripts are run manual
 
 Follow this checklist when adding a new Cafe24 or Shopify site. The next session working on new-platform integration should follow these steps literally.
 
-### Step 1: Identify the platform type
+### Step 1: Verify robots.txt (HARD precondition)
+
+Before writing any code, fetch the target site's `robots.txt` and confirm the `User-agent: *` group does NOT contain a verbatim `Disallow: /` rule:
+
+```
+curl -A 'Mozilla/5.0 ... Chrome/131.0.0.0' https://<target-host>/robots.txt
+```
+
+If the wildcard group contains `Disallow: /`, the platform MUST be deferred. Per project HARD rule #1 ("Sites that explicitly forbid crawling → DEFER"), pursuing such a platform via web crawling is forbidden — escalate to the project owner for a B2B partner-API conversation instead. The crawler enforces this check programmatically at every crawl start (`src/lib/robots-check.ts`), but performing it manually at platform-registration time prevents wasted onboarding effort.
+
+### Step 2: Identify the platform type
 
 - Open the target site in a browser.
 - If the URL pattern contains `/product/list.html?cate_no=` or the page source references `cafe24.com`, it is Cafe24.
 - If `GET https://{store}/products.json` returns valid JSON, it is Shopify.
 - For any other platform, a new engine must be built before proceeding.
 
-### Step 2: Determine category discovery mode
+### Step 3: Determine category discovery mode
 
 For Cafe24:
 - Try `auto` mode first: inspect the site nav for `<a href="...cate_no=NNN">` links.
@@ -109,7 +119,7 @@ For Shopify:
 - Category discovery is not applicable. Shopify engine paginates all products from `/products.json`.
 - Set `sourceCurrency` to the store's pricing currency if not KRW.
 
-### Step 3: Add a SiteConfig entry
+### Step 4: Add a SiteConfig entry
 
 Open `src/configs/platforms.ts` and append a new object to the `PLATFORMS` array:
 
@@ -133,7 +143,7 @@ Open `src/configs/platforms.ts` and append a new object to the `PLATFORMS` array
 
 For Shopify, omit `category` and add `sourceCurrency` if non-KRW.
 
-### Step 4: Run a probe
+### Step 5: Run a probe
 
 ```
 pnpm crawl --probe=my-site
@@ -141,7 +151,7 @@ pnpm crawl --probe=my-site
 
 This loads the page without collecting products. Verify that the site is reachable and that the category links resolve.
 
-### Step 5: Run a dry-run
+### Step 6: Run a dry-run
 
 ```
 pnpm crawl --dry-run --site=my-site
@@ -149,7 +159,7 @@ pnpm crawl --dry-run --site=my-site
 
 Confirms category discovery output without fetching product pages.
 
-### Step 6: Run a real crawl on a single page
+### Step 7: Run a real crawl on a single page
 
 ```
 pnpm crawl --site=my-site
@@ -160,7 +170,7 @@ Check `data/my-site-products.json`. Confirm:
 - `name`, `price`, `imageUrl`, `productUrl` are populated.
 - `errors` array is empty or has acceptable failures.
 
-### Step 7: If selectors fail, add overrides
+### Step 8: If selectors fail, add overrides
 
 If product items, names, or prices are not extracted, add a `selectors` override in the SiteConfig:
 
@@ -174,11 +184,11 @@ selectors: {
 
 The Cafe24 engine will use these in place of the fallback chain (`src/lib/cafe24-engine.ts:19-66`).
 
-### Step 8: (Optional) Add a detail parser
+### Step 9: (Optional) Add a detail parser
 
 If `crawlDetails: true` is set on the config, the engine calls `getDetailParser(config.key)` from `src/lib/parsers/detail/`. Add a parser file there for site-specific detail page extraction.
 
-### Step 9: Import to Supabase
+### Step 10: Import to Supabase
 
 ```
 pnpm import:products --site=my-site
@@ -186,6 +196,6 @@ pnpm import:products --site=my-site
 
 Confirm rows appear in Supabase `products` table with the correct `platform` value (matches `key`).
 
-### Step 10: Commit the SiteConfig addition
+### Step 11: Commit the SiteConfig addition
 
 The only file that needs to change for a new Cafe24/Shopify platform with standard behavior is `src/configs/platforms.ts`. New engines (ZARA, H&M, etc.) also require a new file in `src/lib/`.
