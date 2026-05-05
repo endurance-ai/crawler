@@ -19,13 +19,14 @@ crawler/
 │   ├── test-detail-crawl.ts      # Dev utility: run detail crawl on a single product URL
 │   ├── test-parser.ts            # Dev utility: test parser output against a live page
 │   ├── configs/
-│   │   ├── platforms.ts          # Array of 34 SiteConfig entries (platform registry; +Uniqlo KR/US)
+│   │   ├── platforms.ts          # Array of 35 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR)
 │   │   └── analyze-prompt.ts     # LiteLLM system prompt for image analysis
 │   └── lib/
 │       ├── types.ts              # Shared TypeScript interfaces (Product, SiteConfig, CrawlResult)
 │       ├── cafe24-engine.ts      # Cafe24 Playwright engine (591 lines)
 │       ├── shopify-engine.ts     # Shopify fetch engine (now imports FX from ./fx)
 │       ├── uniqlo-engine.ts      # Uniqlo fetch engine (region-parameterized: KR + US)
+│       ├── zara-engine.ts        # ZARA KR Playwright engine (channel:'chrome' + XHR-interception, SPEC-003)
 │       ├── fx.ts                 # Shared FX_TO_KRW table + convertToKrw (lifted from shopify-engine)
 │       ├── robots-check.ts       # robots.txt blanket-Disallow detector (engine-agnostic)
 │       ├── product-analyzer.ts   # LiteLLM analysis wrapper
@@ -65,15 +66,19 @@ crawler/
 
 ```
 configs/platforms.ts
-  └─ SiteConfig[] (34 entries, type: "cafe24" | "shopify" | "uniqlo")
+  └─ SiteConfig[] (35 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara")
         │
         ▼
 src/crawl.ts  (engine selection)
-  ├─ type === "cafe24"  →  lib/cafe24-engine.ts crawlCafe24()
-  ├─ type === "shopify" →  lib/shopify-engine.ts crawlShopify()
-  └─ type === "uniqlo"  →  lib/uniqlo-engine.ts crawlUniqlo()
-                              (region: "KR" | "US" drives API path,
-                               source currency, and locale; SPEC-002)
+  ├─ type === "cafe24"  →  lib/cafe24-engine.ts crawlCafe24()  (Playwright, framework selector chains)
+  ├─ type === "shopify" →  lib/shopify-engine.ts crawlShopify() (fetch /products.json)
+  ├─ type === "uniqlo"  →  lib/uniqlo-engine.ts crawlUniqlo()   (fetch /api/commerce/v5)
+  │                            (region: "KR" | "US" drives API path,
+  │                             source currency, and locale; SPEC-002)
+  └─ type === "zara"    →  lib/zara-engine.ts crawlZara()       (Playwright channel:"chrome" required;
+                               bundled Chromium hard-403'd by Akamai. Engine intercepts the
+                               /kr/ko/category/{id}/products?ajax=true XHR JSON inside the
+                               browser session and parses the embedded product shape; SPEC-003)
         │
         ▼
 CrawlResult { platform, products[], stats, errors[] }
