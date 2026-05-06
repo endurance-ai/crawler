@@ -1,13 +1,13 @@
 # crawler
 
-> Portal.ai fashion SKU crawler. Cafe24 (Playwright) + Shopify (JSON) harvester writing into Supabase + R2.
+> kiko.ai fashion SKU crawler. Cafe24 (Playwright) + Shopify (JSON) harvester writing into Supabase + R2.
 
 `portal/app` (Next.js) consumes this data via Supabase. No direct API between the two — DB is the contract.
 
 ```
 [Crawler / EC2 batch]                    [Supabase + R2]                   [Vercel / Next.js]
 ─────────────────────                    ────────────────                  ──────────────────
-Cafe24 engine (Playwright)         →     products / brands / images   →    portal.ai
+Cafe24 engine (Playwright)         →     products / brands / images   →    kiko.ai
 Shopify engine (/products.json)          R2 bucket (image binaries)        search & recommendation
 configs/platforms.ts (32 sites)
 ```
@@ -95,11 +95,11 @@ Roadmap: ZARA, H&M, 29CM, Musinsa, Uniqlo, Furutsu.
 
 | Project | Path | Role |
 |---------|------|------|
-| portal.ai | endurance-ai/portal.ai | Next.js search & recommendation web (consumer) |
+| kiko.ai | endurance-ai/kiko.ai-app | Next.js search & recommendation web (consumer) |
 | ai-server | endurance-ai/ai-server | FastAPI search server (FashionSigLIP + pgvector) |
 
 ## Notes
 
 - Public repo — never commit `.env`. Only `.env.example` is tracked.
-- DB schema is owned by `endurance-ai/portal.ai` (`supabase/migrations/`).
-- Ported from `endurance-ai/portal.ai @ 5e3e7a0` on 2026-05-05.
+- DB schema is owned by `endurance-ai/kiko.ai-app` (`supabase/migrations/`).
+- Ported from `endurance-ai/kiko.ai-app @ 5e3e7a0` on 2026-05-05.
