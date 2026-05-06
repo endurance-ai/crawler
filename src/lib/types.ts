@@ -130,10 +130,13 @@ export interface SiteConfig {
    */
   apiCategoryPaths?: string[]
   /**
-   * Uniqlo-specific: region selector driving API path, source currency,
-   * and price-formatter locale. Defaults to "KR" for backward compat
-   * if absent. Only consumed when `type === "uniqlo"`.
-   * SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-002
+   * Region selector for engines that ship a single shared module across
+   * multiple storefronts. Drives engine-specific dials (API path, locale,
+   * timezone, source currency, price-formatter symbol). Defaults to "KR"
+   * for backward compat if absent. Consumed when `type === "uniqlo"`
+   * (SPEC-PLATFORM-EXPANSION-002) and when `type === "zara"`
+   * (SPEC-PLATFORM-EXPANSION-005); ignored for other platform types.
+   * SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-002, SPEC-PLATFORM-EXPANSION-005 REQ-002
    */
   region?: "KR" | "US"
   /**

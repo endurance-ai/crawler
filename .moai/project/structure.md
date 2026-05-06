@@ -1,6 +1,6 @@
 ---
 type: project
-updated: 2026-05-05
+updated: 2026-05-06
 ---
 
 # Project Structure
@@ -19,14 +19,14 @@ crawler/
 │   ├── test-detail-crawl.ts      # Dev utility: run detail crawl on a single product URL
 │   ├── test-parser.ts            # Dev utility: test parser output against a live page
 │   ├── configs/
-│   │   ├── platforms.ts          # Array of 36 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR, +29CM KR)
+│   │   ├── platforms.ts          # Array of 37 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR/US, +29CM KR)
 │   │   └── analyze-prompt.ts     # LiteLLM system prompt for image analysis
 │   └── lib/
 │       ├── types.ts              # Shared TypeScript interfaces (Product, SiteConfig, CrawlResult)
 │       ├── cafe24-engine.ts      # Cafe24 Playwright engine (591 lines)
 │       ├── shopify-engine.ts     # Shopify fetch engine (now imports FX from ./fx)
 │       ├── uniqlo-engine.ts      # Uniqlo fetch engine (region-parameterized: KR + US)
-│       ├── zara-engine.ts        # ZARA KR Playwright engine (channel:'chrome' + XHR-interception, SPEC-003)
+│       ├── zara-engine.ts        # ZARA Playwright engine (channel:'chrome' + XHR-interception; region-parameterized: KR + US; SPEC-003/005)
 │       ├── 29cm-engine.ts        # 29CM KR Playwright engine (vanilla headless + XHR-interception, Cloudflare-passive, SPEC-004)
 │       ├── fx.ts                 # Shared FX_TO_KRW table + convertToKrw (lifted from shopify-engine)
 │       ├── robots-check.ts       # robots.txt blanket-Disallow detector (engine-agnostic)
@@ -55,7 +55,7 @@ crawler/
 | Script | pnpm command | Flags / Input | Output | Supabase write target |
 |--------|-------------|--------------|--------|----------------------|
 | `src/crawl.ts` | `pnpm crawl` | `--site=KEY`, `--all`, `--type=cafe24\|shopify`, `--list`, `--probe=KEY`, `--dry-run` | `data/{key}-products.json` | None (writes JSON only) |
-| `src/import-products.ts` | `pnpm import:products` | `--site=KEY` (optional) | Console log | `products`, `reviews` |
+| `src/import-products.ts` | `pnpm import:products` | `--site=KEY` (optional) | Console log | `products` (`source_currency`, `source_price` columns; dedup by `product_url`), `reviews` |
 | `src/import-attributes.ts` | `pnpm import:attributes` | — | Console log | Supplementary attributes |
 | `src/import-brand-nodes.ts` | `pnpm import:brand-nodes` | Reads `data/Fashion_genome_*.xlsx` | Console log | `brand_nodes` |
 | `src/probe-reviews.ts` | `pnpm probe:reviews` | `--site=KEY` | Console log (diagnostic) | None |
@@ -67,7 +67,7 @@ crawler/
 
 ```
 configs/platforms.ts
-  └─ SiteConfig[] (36 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm")
+  └─ SiteConfig[] (37 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm")
         │
         ▼
 src/crawl.ts  (engine selection)
@@ -77,9 +77,12 @@ src/crawl.ts  (engine selection)
   │                            (region: "KR" | "US" drives API path,
   │                             source currency, and locale; SPEC-002)
   ├─ type === "zara"    →  lib/zara-engine.ts crawlZara()       (Playwright channel:"chrome" required;
-  │                            bundled Chromium hard-403'd by Akamai. Engine intercepts the
-  │                            /kr/ko/category/{id}/products?ajax=true XHR JSON inside the
-  │                            browser session and parses the embedded product shape; SPEC-003)
+  │                            bundled Chromium hard-403'd by Akamai. Region-parameterized:
+  │                            config.region="KR" → /kr/ko/category/{id}/products?ajax=true
+  │                            config.region="US" → /us/en/category/{id}/products?ajax=true
+  │                            Browser locale/timezone driven by region. sourceCurrency
+  │                            stored native (KRW or USD); convertToKrw applied at import
+  │                            time via fx.ts. SPEC-003 (KR), SPEC-005 (US).)
   └─ type === "29cm"    →  lib/29cm-engine.ts crawl29cm()       (Playwright vanilla headless;
                                Cloudflare-passive (no JS challenge). Engine intercepts the
                                display-bff-api.29cm.co.kr/api/v1/listing/items XHR JSON

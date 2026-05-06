@@ -868,6 +868,10 @@ export const PLATFORMS: SiteConfig[] = [
     type: "zara",
     baseUrl: "https://www.zara.com/kr/ko",
     sourceCurrency: "KRW",
+    // SPEC-PLATFORM-EXPANSION-005 REQ-001: explicit region binding now
+    // that the engine is region-parameterized (zara-kr + zara-us share
+    // src/lib/zara-engine.ts).
+    region: "KR",
     crawlDelay: 2000,
     categoryUrls: [
       // WOMAN
@@ -892,6 +896,69 @@ export const PLATFORMS: SiteConfig[] = [
       "https://www.zara.com/kr/ko/man-jeans-l710.html",
     ],
     notes: "ZARA KR Playwright engine. Akamai bypass via channel:'chrome' (real Chrome required, bundled Chromium hard-403'd). XHR-interception strategy: /kr/ko/category/{id}/products?ajax=true carries full product JSON. KRW-native, 2 sec/page, 5-UA rotation (one UA per browser context), robots-check enforced. ToS pre-verified 2026-05-05 (research.md §1.2 verified, AMBIGUOUS-ACCEPTED-BY-OWNER). portal.ai-internal-use only; halt on cease-and-desist.",
+  },
+
+  // ─── ZARA (US) — region=US shared engine, USD-native cache ──────────
+  // SPEC: SPEC-PLATFORM-EXPANSION-005
+  // Engine: src/lib/zara-engine.ts is region-parameterized (zara-kr +
+  //   zara-us share one module per SPEC-005 §9 DDD ANALYZE-PRESERVE-IMPROVE).
+  //   `config.region === "US"` drives:
+  //     • browser context locale="en-US", timezoneId="America/New_York"
+  //     • parseProductsFromXhr region/sourceCurrency parameters
+  //     • formatZaraPrice("$" + price.toFixed(2))
+  //   AJAX response interception of /us/en/category/{id}/products?ajax=true
+  //   carries the full product JSON (region-agnostic regex pattern).
+  // Pacing: 2 sec/page (mirrors KR — Akamai-friendly + browser overhead).
+  // Akamai posture: REQ-007 verified 2026-05-06 — 5/5 (100%) sequential
+  //   page.goto reach real product DOM via channel:'chrome'.
+  // ToS: REQ-008 verified 2026-05-06 — canonical PDF located via SPA
+  //   homepage footer; verdict AMBIGUOUS-ACCEPTED-BY-OWNER. Verbatim
+  //   English §3, §17 clauses embedded at top of src/lib/zara-engine.ts.
+  // categoryUrls: 18 Women + Men L2 landings sourced from
+  //   sitemap-category-us-en.xml.gz 2026-05-06; KR L-codes that collide
+  //   (l1184, l1185, l1180, l717, l710) are explicitly excluded.
+  //   REQ-009 verified 2026-05-06: 17/18 PASS. man-outerwear-l715 removed
+  //   (page renders cards but does not fire AJAX endpoint — engine
+  //   XHR-interception cannot harvest).
+  // Currency: USD-native cache; convertToKrw applied at import time via
+  //   existing src/lib/fx.ts (FX_TO_KRW.USD = 1430, populated by SPEC-002).
+  //   No engine-time conversion; no live FX API.
+  {
+    key: "zara-us",
+    name: "자라 (US)",
+    type: "zara",
+    baseUrl: "https://www.zara.com/us/en",
+    region: "US",
+    sourceCurrency: "USD",
+    crawlDelay: 2000,
+    categoryUrls: [
+      // WOMAN (10)
+      "https://www.zara.com/us/en/woman-new-in-l1180.html",
+      "https://www.zara.com/us/en/woman-outerwear-l1184.html",
+      "https://www.zara.com/us/en/woman-jackets-l1114.html",
+      "https://www.zara.com/us/en/woman-knitwear-l1152.html",
+      "https://www.zara.com/us/en/woman-shirts-l1217.html",
+      "https://www.zara.com/us/en/woman-tshirts-l1362.html",
+      "https://www.zara.com/us/en/woman-trousers-l1335.html",
+      "https://www.zara.com/us/en/woman-jeans-l1119.html",
+      "https://www.zara.com/us/en/woman-dresses-l1066.html",
+      "https://www.zara.com/us/en/woman-skirts-l1299.html",
+      // MAN (7) — l715 (man-outerwear) removed 2026-05-06 per REQ-009:
+      //   live verification 3/3 attempts captured 47 product cards but
+      //   the page does NOT fire /us/en/category/{id}/products?ajax=true
+      //   XHR (data is delivered via a different mechanism). The engine's
+      //   XHR-interception strategy cannot harvest products from this URL.
+      //   Re-add only if (a) engine adds an HTML-fallback parse path or
+      //   (b) ZARA restores the AJAX endpoint for this category.
+      "https://www.zara.com/us/en/man-new-in-l711.html",
+      "https://www.zara.com/us/en/man-jackets-l640.html",
+      "https://www.zara.com/us/en/man-knitwear-l681.html",
+      "https://www.zara.com/us/en/man-shirts-l737.html",
+      "https://www.zara.com/us/en/man-tshirts-l855.html",
+      "https://www.zara.com/us/en/man-trousers-l838.html",
+      "https://www.zara.com/us/en/man-jeans-l659.html",
+    ],
+    notes: "ZARA US Playwright engine. Shares src/lib/zara-engine.ts with KR via region:'US' (SPEC-005 §9 DDD). Run-phase gates verified 2026-05-06: REQ-007 Akamai bypass 5/5 (100%) with channel:'chrome' against woman-new-in-l1180. REQ-008 ToS captured from canonical PDF terms-and-conditions-en_US-20250829.pdf via SPA homepage footer; verdict AMBIGUOUS-ACCEPTED-BY-OWNER (no automation keyword present; §17 IP rights structurally parallel to KR §15) — verbatim English clauses embedded at top of zara-engine.ts. REQ-009 live URL verification 17/18 (man-outerwear-l715 removed: page does not fire AJAX endpoint). XHR-interception: /us/en/category/{id}/products?ajax=true (region-agnostic regex). USD-native cache, USD→KRW import-time conversion via SPEC-002 fx.ts hook (FX_TO_KRW.USD = 1430). 2 sec/page pacing, 5-UA rotation, robots-check enforced. portal.ai-internal-use only; halt-on-cease-and-desist; re-verify > 90 days OR Inditex USA, Inc. communication OR ToS PDF version change.",
   },
 
   // ─── 29CM (KR) — second Playwright engine, Cloudflare-passive ───────

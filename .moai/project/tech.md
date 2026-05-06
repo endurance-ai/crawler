@@ -1,6 +1,6 @@
 ---
 type: project
-updated: 2026-05-05
+updated: 2026-05-06
 ---
 
 # Tech Stack
@@ -76,7 +76,7 @@ There is no automated test suite. Adding a platform or modifying an engine requi
 - Cafe24 stores: 22 sites, Playwright Chromium, `crawlDelay` default 2000ms.
 - Shopify stores: 10 sites, fetch-based `/products.json`, no browser required.
 - Uniqlo: KR + US storefronts, fetch-based `/api/commerce/v5/products`, region-parameterized.
-- ZARA: KR storefront only, Playwright `channel:'chrome'` required (Akamai bypass — bundled Chromium hard-403'd), XHR-interception of `/category/{id}/products?ajax=true`.
+- ZARA: KR + US storefronts, Playwright `channel:'chrome'` required (Akamai bypass — bundled Chromium hard-403'd), XHR-interception of `/category/{id}/products?ajax=true`. Region-parameterized engine; US cache stores USD-native prices, `convertToKrw` applied at import time via `fx.ts`.
 - 29CM: KR storefront only, Playwright vanilla `headless: true` (Cloudflare-passive), XHR-interception of `display-bff-api.29cm.co.kr/api/v1/listing/items`. ToS verbatim-embedded with OWNER OVERRIDE (portal.ai-internal-use only, halt-on-cease-and-desist, 90-day re-verification).
 - All sites: Public-facing product catalog pages only. No authenticated endpoints.
 
@@ -99,5 +99,5 @@ Documented in user interview (Round 2):
 2. **No CAPTCHA bypass**: If a site returns a CAPTCHA challenge, the crawl fails gracefully and logs the error. No solving library is used.
 3. **No IP evasion**: No proxy pool, no header rotation beyond standard browser UA. Rate limiting is the only anti-detection measure.
 4. **Mandatory rate limits**: `crawlDelay` is configurable per SiteConfig (default 2000ms). Do not set to 0.
-5. **FX rates are static**: USD=1430, EUR=1560, GBP=1750 KRW (hardcoded in `src/lib/shopify-engine.ts:11-16`). Live FX API is a future item.
+5. **FX rates are static**: USD=1430, EUR=1560, GBP=1750 KRW (defined in `src/lib/fx.ts`, shared by shopify-engine and import-products). Shopify and ZARA US cache prices in native currency; `convertToKrw` is applied at import time. Live FX API is a future item.
 6. **Schema write-only**: This repo never reads Supabase schema migrations or DDL. Do not add migration files here.
