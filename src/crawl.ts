@@ -22,6 +22,14 @@ import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
+import {
+  crawl29cm,
+  is29cmCloudflareChallenge,
+  parseProductsFromXhr as parse29cmXhr,
+  pick29cmUserAgent,
+  genderFromCategoryCode as genderFor29cm,
+  harvestRawItems as harvest29cmItems,
+} from "./lib/29cm-engine"
 import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
@@ -168,6 +176,82 @@ async function probeSite(config: SiteConfig) {
     return
   }
 
+  if (config.type === "29cm") {
+    const codes = config.apiCategoryCodes ?? []
+    const firstCode = codes[0]
+    if (typeof firstCode !== "number") {
+      console.log(`   ❌ 29cm-kr: apiCategoryCodes is empty — cannot probe`)
+      return
+    }
+    const probeUrl = `https://www.29cm.co.kr/store/category/list?categoryLargeCode=${firstCode}&sort=RECOMMENDED`
+    let browser
+    try {
+      browser = await chromium.launch({headless: true})
+    } catch (err) {
+      console.log(`   ❌ Chromium launch failed: ${err}`)
+      console.log(`      Install with: npx playwright install chromium`)
+      return
+    }
+    const ctx = await browser.newContext({
+      userAgent: pick29cmUserAgent(0),
+      locale: "ko-KR",
+      timezoneId: "Asia/Seoul",
+      viewport: {width: 1440, height: 900},
+    })
+    try {
+      const page = await ctx.newPage()
+      let xhrPayload: unknown = null
+      const onResponse = async (res: import("playwright").Response) => {
+        if (xhrPayload) return
+        if (/display-bff-api\.29cm\.co\.kr\/api\/v1\/listing\/items(?:\?|$)/.test(res.url())) {
+          try {
+            const buf = await res.body()
+            xhrPayload = JSON.parse(buf.toString("utf-8"))
+          } catch {}
+        }
+      }
+      page.on("response", onResponse)
+      try {
+        const response = await page.goto(probeUrl, {waitUntil: "domcontentloaded", timeout: 30000})
+        console.log(`   HTTP: ${response?.status()}`)
+        const body = await page.content()
+        const intercept = is29cmCloudflareChallenge(body)
+        if (intercept.isIntercept) {
+          console.log(`   ❌ Cloudflare intercept (${intercept.reason}); body=${body.length} bytes`)
+          return
+        }
+        // Mild scroll to trigger React Query fetch
+        for (let i = 0; i < 8 && !xhrPayload; i++) {
+          await page.evaluate((y) => window.scrollTo(0, y), (i + 1) * 800)
+          await page.waitForTimeout(500)
+        }
+        await page.waitForTimeout(1500)
+        if (!xhrPayload) {
+          console.log(`   ⚠️  no display-bff-api/listing/items XHR captured`)
+          return
+        }
+        const harvested = harvest29cmItems(xhrPayload)
+        for (const it of harvested) {
+          it._categoryCode = firstCode
+          it._gender = genderFor29cm(firstCode)
+        }
+        const products = parse29cmXhr(harvested.slice(0, 3), config.baseUrl, config.key)
+        console.log(`   ✅ 29CM XHR OK: harvested ${harvested.length} raw items; sample 3:`)
+        for (const p of products) {
+          console.log(`      ${p.priceFormatted} — ${p.name.slice(0, 40)} → ${p.productUrl.slice(0, 80)}`)
+        }
+      } finally {
+        page.off("response", onResponse)
+      }
+    } catch (err) {
+      console.log(`   ❌ probe failed: ${err}`)
+    } finally {
+      await ctx.close().catch(() => {})
+      await browser.close().catch(() => {})
+    }
+    return
+  }
+
   if (config.type === "shopify") {
     try {
       const res = await fetch(`${config.baseUrl}/products.json?limit=1`)
@@ -281,6 +365,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   const shopifySites = configs.filter((c) => c.type === "shopify")
   const uniqloSites = configs.filter((c) => c.type === "uniqlo")
   const zaraSites = configs.filter((c) => c.type === "zara")
+  const twentyninecmSites = configs.filter((c) => c.type === "29cm")
 
   // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
   if (uniqloSites.length > 0) {
@@ -338,6 +423,34 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlZara(config)
+        saveResult(outDir, result)
+        results.push(result)
+      } catch (err) {
+        console.error(`❌ ${config.name} 크롤 실패:`, err)
+      }
+    }
+  }
+
+  // 29CM — sequential (each crawl launches its own Chromium browser
+  // internally; mirrors ZARA's per-engine browser-launch pattern).
+  if (twentyninecmSites.length > 0) {
+    for (const config of twentyninecmSites) {
+      const robots = await checkRobots(config.baseUrl)
+      if (!robots.allowed) {
+        console.error(
+          `❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
+            `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
+        )
+        process.exit(1)
+      }
+    }
+    for (const config of twentyninecmSites) {
+      try {
+        if (dryRun) {
+          await probeSite(config)
+          continue
+        }
+        const result = await crawl29cm(config)
         saveResult(outDir, result)
         results.push(result)
       } catch (err) {
