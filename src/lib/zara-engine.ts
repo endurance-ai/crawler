@@ -21,6 +21,65 @@
  */
 
 /**
+ * ZARA US Terms of Service — captured by project owner 2026-05-06 (hansangho)
+ * via canonical PDF located through SPA homepage footer.
+ * Source PDF: static.zara.net/static/pdfs/US/terms-and-conditions/terms-and-conditions-en_US-20250829.pdf
+ * Last modified (per PDF footer): August 26, 2025.
+ *
+ * Keyword scan: "crawl", "crawler", "scrape", "scraping", "robot", "bot",
+ * "automated", "automation", "data harvest", "data extraction",
+ * "screen scraping", "AI training", "machine learning" — NONE present
+ * verbatim in the 24-page PDF. ZARA US ToS does NOT name automation
+ * directly (in contrast to 29CM KR which named "크롤러(Crawler)" verbatim).
+ *
+ * §3 (USE OF OUR WEBSITE) bullet 1:
+ * You may only use the Website and/or Mobile App to make legitimate
+ * inquiries or orders.
+ *
+ * §3 (USE OF OUR WEBSITE) bullet 5:
+ * You will not attempt to interfere or interfere in any way with the
+ * Site's network, the Mobile App's network, or our networks, or related
+ * network security, or attempt to use the Site's or Mobile App's service
+ * to gain unauthorized access to any other computer system.
+ *
+ * §17 (INTELLECTUAL PROPERTY — primary residual risk; structurally
+ * analogous to ZARA KR §15):
+ * The Site and Mobile App, including all of its information and contents,
+ * such as text, data, wallpaper, icons, characters, artwork, images,
+ * photographs, graphics, music, sound, messages, graphics, software and
+ * the HTML used to generate the pages (collectively, "Materials"), is
+ * ZARA property or that of our suppliers or licensors and is protected by
+ * patent, trademark and/or copyright under United States and/or foreign
+ * laws. Except as otherwise provided on the Site, the Mobile App, or in
+ * these Terms, you may not use, download, upload, copy, print, display,
+ * perform, reproduce, publish, modify, delete, add to, license, post,
+ * transmit, or distribute any Materials from the Site or Mobile App in
+ * whole or in part for any public or commercial purpose without the
+ * specific prior written permission of ZARA. We grant you a personal,
+ * limited, non-exclusive, nontransferable license to access the Site
+ * and/or Mobile App and to use the information and services contained on
+ * the Site and/or Mobile App.
+ * […]
+ * Any commercial use of the Site or Mobile App is strictly prohibited,
+ * except as allowed herein or otherwise approved by us. You may not
+ * download or save a copy of any of the Materials or screens for any
+ * purpose except as otherwise provided by ZARA.
+ *
+ * Verdict: AMBIGUOUS-ACCEPTED-BY-OWNER (parallel to KR §15 disposition).
+ * No clause unambiguously forbids automated catalog access; §17 IP rights
+ * are structurally analogous to KR §15 with slightly more explicit
+ * "may not download or save a copy of any of the Materials" wording.
+ * Conditions: portal.ai-internal-use only; halt-on-cease-and-desist;
+ *             re-verify on ToS PDF version change (filename carries
+ *             20250829 date stamp) OR ZARA USA, Inc. communication
+ *             OR > 90 days elapsed.
+ * Governing law (§Governing Law and Venue): State of New York. Federal
+ *             or state courts of New York for litigation; AAA arbitration
+ *             for disputes.
+ * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-008
+ */
+
+/**
  * ZARA KR Playwright engine.
  *
  * Strategy: navigate to each category landing page in a real Chromium
@@ -46,9 +105,14 @@
  * SPEC: SPEC-PLATFORM-EXPANSION-003 REQ-001..REQ-009
  */
 
-import {chromium, type Browser, type Page} from "playwright"
+import {type Browser, chromium, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {checkRobots} from "./robots-check"
+
+// SPEC-PLATFORM-EXPANSION-005 REQ-002: region parameter drives source
+// currency, price-formatter locale/symbol, and browser context locale +
+// timezone. KR remains the default for backward compatibility.
+export type ZaraRegion = "KR" | "US"
 
 // ─── User-Agent rotation (one UA per browser context) ────────
 
@@ -85,12 +149,63 @@ export function isSafeZaraImageUrl(src: string): boolean {
   }
 }
 
-// ─── productUrl whitelist regex ──────────────────────────
+// ─── productUrl whitelist regex (per-baseUrl) ──────────────
 
-const ZARA_PRODUCT_URL_RE = /^https:\/\/www\.zara\.com\/kr\/ko\/[^"'\s]+-p\d+\.html$/
+/**
+ * Build a region-aware productUrl whitelist pattern keyed off the
+ * SiteConfig `baseUrl`. The baseUrl typically looks like
+ * `https://www.zara.com/kr/ko` or `https://www.zara.com/us/en`; we
+ * escape regex metacharacters and append the canonical product-slug
+ * tail `/<keyword>-p<id>.html`.
+ *
+ * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-002 (region parameterization)
+ */
+export function buildZaraProductUrlPattern(baseUrl: string): RegExp {
+  const trimmed = baseUrl.replace(/\/+$/, "")
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  // Slug character set is URL-safe only — alphanumerics, percent-encoded
+  // bytes, hyphen, dot. This rejects path-traversal sequences (../, /,
+  // protocol-relative strings) that the previous `[^"'\s]+` permitted.
+  // Security review 2026-05-06: SPEC-005 P1 hardening.
+  return new RegExp(`^${escaped}/[A-Za-z0-9%.\\-]+-p\\d+\\.html$`)
+}
 
-export function isSafeZaraProductUrl(url: string): boolean {
-  return typeof url === "string" && ZARA_PRODUCT_URL_RE.test(url)
+export function isSafeZaraProductUrl(url: string, baseUrl: string): boolean {
+  if (typeof url !== "string") return false
+  return buildZaraProductUrlPattern(baseUrl).test(url)
+}
+
+// ─── price formatter (region-aware) ─────────────────────
+
+/**
+ * Region-aware raw-price normalizer. The ZARA XHR payload encodes
+ * `price` differently per region (verified empirically 2026-05-06
+ * against live KR + US captures):
+ *   - KR: integer KRW (e.g. raw.price=19900 means ₩19,900)
+ *   - US: integer cents (e.g. raw.price=14900 means $149.00)
+ * Returns the normalized numeric price in the region's natural unit
+ * (KRW integer for KR, USD decimal for US). Engine call sites pass
+ * the normalized value to `formatZaraPrice` and store it on
+ * `Product.price` / `Product.sourcePrice`.
+ *
+ * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-003 (cache stores native
+ *       USD decimal), Run-phase IMPROVE finding 2026-05-06.
+ */
+export function normalizeZaraPrice(rawPrice: number, region: ZaraRegion): number {
+  if (region === "US") return rawPrice / 100
+  return rawPrice
+}
+
+/**
+ * Region-aware price formatter. KR keeps the existing
+ * `₩{price.toLocaleString("ko-KR")}` output bit-for-bit; US emits
+ * `${price.toFixed(2)}` (USD decimal with two trailing digits).
+ *
+ * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-002, AC-4
+ */
+export function formatZaraPrice(price: number, region: ZaraRegion): string {
+  if (region === "US") return `$${price.toFixed(2)}`
+  return `₩${price.toLocaleString("ko-KR")}`
 }
 
 // ─── bm-verify intercept detector ────────────────────────
@@ -245,6 +360,8 @@ export function parseProductsFromXhr(
   json: unknown,
   baseUrl: string,
   platformKey: string,
+  region: ZaraRegion = "KR",
+  sourceCurrency: "KRW" | "USD" = "KRW",
 ): Product[] {
   // Accept either a raw payload or a pre-harvested array.
   let raws: RawZaraProduct[]
@@ -255,10 +372,11 @@ export function parseProductsFromXhr(
   }
   const out: Product[] = []
   const crawledAt = new Date().toISOString()
+  const productUrlPattern = buildZaraProductUrlPattern(baseUrl)
   for (const raw of raws) {
     if (!raw.id || !raw.name || typeof raw.price !== "number" || raw.price <= 0) continue
     const productUrl = buildProductUrl(baseUrl, raw.seo)
-    if (!isSafeZaraProductUrl(productUrl)) continue
+    if (!productUrlPattern.test(productUrl)) continue
     const xm = raw.detail?.colors?.[0]?.xmedia?.[0]
     const imageUrl = buildImageUrl(xm)
     if (!imageUrl || !isSafeZaraImageUrl(imageUrl)) continue
@@ -266,14 +384,15 @@ export function parseProductsFromXhr(
       .map((c) => c.colorName)
       .filter((n): n is string => typeof n === "string" && n.length > 0)
     const inStock = (raw.availability ?? "").toLowerCase() === "in_stock"
+    const normalizedPrice = normalizeZaraPrice(raw.price, region)
     out.push({
       brand: "ZARA",
       name: raw.name,
       category: [raw.familyName, raw.subfamilyName].filter(Boolean).join(" / "),
-      price: raw.price,
-      originalPrice: raw.price,
+      price: normalizedPrice,
+      originalPrice: normalizedPrice,
       salePrice: null,
-      priceFormatted: `₩${raw.price.toLocaleString("ko-KR")}`,
+      priceFormatted: formatZaraPrice(normalizedPrice, region),
       imageUrl,
       productUrl,
       inStock,
@@ -282,8 +401,8 @@ export function parseProductsFromXhr(
       crawledAt,
       productCode: raw.seo?.seoProductId ?? String(raw.id),
       color: colorNames.length > 0 ? colorNames.join(", ").slice(0, 500) : undefined,
-      sourceCurrency: "KRW",
-      sourcePrice: raw.price,
+      sourceCurrency,
+      sourcePrice: normalizedPrice,
     })
   }
   return out
@@ -320,6 +439,8 @@ async function crawlOneCategory(
   baseUrl: string,
   platformKey: string,
   gender: string,
+  region: ZaraRegion,
+  sourceCurrency: "KRW" | "USD",
 ): Promise<CategoryScrapeResult> {
   const result: CategoryScrapeResult = {url: categoryUrl, products: []}
 
@@ -387,7 +508,7 @@ async function crawlOneCategory(
     // Parse — annotate each raw with _gender so the parser maps it correctly.
     const harvested = harvestRawProducts(xhrPayload)
     for (const r of harvested) r._gender = gender
-    const products = parseProductsFromXhr(harvested, baseUrl, platformKey)
+    const products = parseProductsFromXhr(harvested, baseUrl, platformKey, region, sourceCurrency)
     result.products = products
     return result
   } catch (err) {
@@ -398,11 +519,22 @@ async function crawlOneCategory(
   }
 }
 
-function deriveGenderFromUrl(url: string): string {
-  if (/\/kr\/ko\/(woman|women)/.test(url)) return "women"
-  if (/\/kr\/ko\/(man|men)/.test(url)) return "men"
-  if (/\/kr\/ko\/(kids|kid)/.test(url)) return "kids"
-  return ""
+/**
+ * Region-agnostic gender derivation. Matches any 2-letter country/2-letter
+ * language locale prefix (e.g. `/kr/ko/`, `/us/en/`) followed by the gender
+ * slug. Return values are unchanged from the KR-only predecessor so that
+ * downstream `mapGender` semantics are preserved bit-for-bit.
+ *
+ * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-002
+ */
+export function deriveGenderFromUrl(url: string): string {
+  if (typeof url !== "string") return ""
+  const m = url.match(/\/(?:[a-z]{2})\/(?:[a-z]{2})\/(woman|women|man|men|kids|kid)/)
+  if (!m) return ""
+  const slug = m[1]
+  if (slug === "woman" || slug === "women") return "women"
+  if (slug === "man" || slug === "men") return "men"
+  return "kids"
 }
 
 /**
@@ -420,6 +552,16 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
   const allProducts: Product[] = []
   const crawlDelay = config.crawlDelay ?? 2000
   const categoryUrls = config.categoryUrls ?? []
+  // SPEC-PLATFORM-EXPANSION-005 REQ-002: region drives source currency
+  // and browser context locale/timezone. Default to KR for backward
+  // compatibility with the SPEC-003 zara-kr SiteConfig.
+  const region: ZaraRegion = config.region === "US" ? "US" : "KR"
+  const sourceCurrency: "KRW" | "USD" =
+    config.sourceCurrency === "USD" || config.sourceCurrency === "KRW"
+      ? config.sourceCurrency
+      : region === "US"
+        ? "USD"
+        : "KRW"
 
   console.log(`\n${"─".repeat(50)}`)
   console.log(`🏪 ${config.name} (${config.baseUrl}) [ZARA]`)
@@ -473,14 +615,23 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
 
       const ctx = await browser.newContext({
         userAgent: ua,
-        locale: "ko-KR",
-        timezoneId: "Asia/Seoul",
+        ...(region === "US"
+          ? {locale: "en-US", timezoneId: "America/New_York"}
+          : {locale: "ko-KR", timezoneId: "Asia/Seoul"}),
         viewport: {width: 1440, height: 900},
       })
       const page = await ctx.newPage()
       let result: CategoryScrapeResult
       try {
-        result = await crawlOneCategory(page, categoryUrl, config.baseUrl, config.key, gender)
+        result = await crawlOneCategory(
+          page,
+          categoryUrl,
+          config.baseUrl,
+          config.key,
+          gender,
+          region,
+          sourceCurrency,
+        )
       } finally {
         await ctx.close().catch(() => {})
       }

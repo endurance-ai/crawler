@@ -30,7 +30,10 @@ import * as path from "node:path"
 import {fileURLToPath} from "node:url"
 
 import {
+  buildZaraProductUrlPattern,
+  deriveGenderFromUrl,
   detectBmVerifyIntercept,
+  formatZaraPrice,
   harvestRawProducts,
   isSafeZaraImageUrl,
   isSafeZaraProductUrl,
@@ -61,7 +64,7 @@ function loadFixture(): Fixture {
 test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl/productUrl", () => {
   const fixture = loadFixture()
   assert.ok(fixture.samples.length >= 30, `expected >=30 samples, got ${fixture.samples.length}`)
-  const products = parseProductsFromXhr(fixture.samples, TEST_BASE_URL, TEST_KEY)
+  const products = parseProductsFromXhr(fixture.samples, TEST_BASE_URL, TEST_KEY, "KR", "KRW")
   assert.ok(products.length > 0, `parser produced 0 Products from ${fixture.samples.length} samples`)
   // We expect at least 80% of samples to survive (some may have missing
   // image data; those are silently skipped per defensive null-handling).
@@ -79,7 +82,7 @@ test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl
     assert.ok((p.price as number) >= 1_000, `price suspiciously low: ${p.price}`)
     assert.ok((p.price as number) <= 10_000_000, `price suspiciously high: ${p.price}`)
     assert.ok(
-      isSafeZaraProductUrl(p.productUrl),
+      isSafeZaraProductUrl(p.productUrl, TEST_BASE_URL),
       `productUrl format invalid: ${p.productUrl}`,
     )
     assert.ok(p.productUrl.startsWith(TEST_BASE_URL + "/"), `productUrl wrong base: ${p.productUrl}`)
@@ -96,7 +99,7 @@ test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl
 
 test("AC-2 parseProductsFromXhr: gender annotation derives from _gender field", () => {
   const fixture = loadFixture()
-  const products = parseProductsFromXhr(fixture.samples, TEST_BASE_URL, TEST_KEY)
+  const products = parseProductsFromXhr(fixture.samples, TEST_BASE_URL, TEST_KEY, "KR", "KRW")
   const womenSamples = fixture.samples.filter((s) => s._gender === "women")
   const menSamples = fixture.samples.filter((s) => s._gender === "men")
   assert.ok(womenSamples.length > 0 && menSamples.length > 0, "fixture should cover both genders")
@@ -119,10 +122,10 @@ test("AC-2 parseProductsFromXhr: accepts a deeply-nested raw payload via harvest
       },
     ],
   }
-  const products = parseProductsFromXhr(wrapped, TEST_BASE_URL, TEST_KEY)
+  const products = parseProductsFromXhr(wrapped, TEST_BASE_URL, TEST_KEY, "KR", "KRW")
   assert.ok(products.length > 0, "harvest should find nested products")
   for (const p of products) {
-    assert.ok(isSafeZaraProductUrl(p.productUrl))
+    assert.ok(isSafeZaraProductUrl(p.productUrl, TEST_BASE_URL))
     assert.ok(isSafeZaraImageUrl(p.imageUrl))
   }
 })
@@ -153,24 +156,34 @@ test("isSafeZaraImageUrl: rejects non-whitelisted and non-https URLs", () => {
 
 test("isSafeZaraProductUrl: accepts the canonical /kr/ko/...-pNNNNNNN.html shape", () => {
   assert.equal(
-    isSafeZaraProductUrl("https://www.zara.com/kr/ko/some-keyword-p03641406.html"),
+    isSafeZaraProductUrl("https://www.zara.com/kr/ko/some-keyword-p03641406.html", TEST_BASE_URL),
     true,
   )
   // URL-encoded Korean keyword
   assert.equal(
     isSafeZaraProductUrl(
       "https://www.zara.com/kr/ko/%E1%84%85%E1%85%B5%E1%84%87%E1%85%B3-p12345678.html",
+      TEST_BASE_URL,
     ),
     true,
   )
 })
 
 test("isSafeZaraProductUrl: rejects non-canonical URLs", () => {
-  assert.equal(isSafeZaraProductUrl("https://www.zara.com/us/en/foo-p1.html"), false) // wrong locale
-  assert.equal(isSafeZaraProductUrl("https://www.zara.com/kr/ko/cat/sub.html"), false) // no -pNNN
-  assert.equal(isSafeZaraProductUrl("https://evil.example.com/foo-p1.html"), false)
-  assert.equal(isSafeZaraProductUrl("http://www.zara.com/kr/ko/foo-p1.html"), false) // http
-  assert.equal(isSafeZaraProductUrl(""), false)
+  assert.equal(
+    isSafeZaraProductUrl("https://www.zara.com/us/en/foo-p1.html", TEST_BASE_URL),
+    false,
+  ) // wrong locale
+  assert.equal(
+    isSafeZaraProductUrl("https://www.zara.com/kr/ko/cat/sub.html", TEST_BASE_URL),
+    false,
+  ) // no -pNNN
+  assert.equal(isSafeZaraProductUrl("https://evil.example.com/foo-p1.html", TEST_BASE_URL), false)
+  assert.equal(
+    isSafeZaraProductUrl("http://www.zara.com/kr/ko/foo-p1.html", TEST_BASE_URL),
+    false,
+  ) // http
+  assert.equal(isSafeZaraProductUrl("", TEST_BASE_URL), false)
 })
 
 // ─── detectBmVerifyIntercept ──
@@ -238,10 +251,11 @@ test("pickZaraUserAgent: every entry begins with Mozilla/5.0", () => {
 
 // ─── AC-1: platform registry ──
 
-test("AC-1 platform registry: getPlatformsByType('zara') returns zara-kr with valid SiteConfig", async () => {
+test("AC-1 platform registry: getPlatformsByType('zara') returns zara-kr + zara-us, with zara-kr first", async () => {
   const {getPlatformsByType} = await import("../src/configs/platforms")
   const entries = getPlatformsByType("zara")
-  assert.equal(entries.length, 1, `expected 1 zara platform, got ${entries.length}`)
+  // SPEC-005: zara-us activated 2026-05-06 after REQ-007/008/009 cleared.
+  assert.equal(entries.length, 2, `expected 2 zara platforms (kr + us), got ${entries.length}`)
   const z = entries[0]!
   assert.equal(z.key, "zara-kr")
   assert.equal(z.type, "zara")
@@ -259,5 +273,168 @@ test("AC-1 platform registry: getPlatformsByType('zara') returns zara-kr with va
   }
   // Should NOT carry uniqlo-only fields.
   assert.equal(z.apiCategoryPaths, undefined, "zara-kr must NOT have apiCategoryPaths")
-  assert.equal(z.region, undefined, "zara-kr must NOT have region")
+  // SPEC-PLATFORM-EXPANSION-005 REQ-001: zara-kr now carries explicit region.
+  assert.equal(z.region, "KR", "zara-kr must have explicit region:'KR'")
+})
+
+// ─── SPEC-005 AC-1: zara-us platform registry (active post-Run-phase gates) ──
+
+test("AC-1 platform registry: zara-us is registered and active (REQ-007/008/009 cleared 2026-05-06)", async () => {
+  const {getSiteConfig} = await import("../src/configs/platforms")
+  const z = getSiteConfig("zara-us")
+  assert.ok(z, "zara-us SiteConfig must exist")
+  assert.equal(z!.key, "zara-us")
+  assert.equal(z!.type, "zara")
+  assert.equal(z!.baseUrl, "https://www.zara.com/us/en")
+  assert.equal(z!.region, "US")
+  assert.equal(z!.sourceCurrency, "USD")
+  assert.equal(z!.crawlDelay, 2000)
+  // SPEC-005 REQ-007/008/009 cleared 2026-05-06: zara-us is active (no disabled flag).
+  assert.notEqual(z!.disabled, true, "zara-us must NOT be disabled after Run-phase gates cleared")
+  assert.ok(Array.isArray(z!.categoryUrls), "categoryUrls must be present")
+  // REQ-009 result: 17/18 PASS. man-outerwear-l715 removed (no AJAX endpoint).
+  assert.equal(
+    z!.categoryUrls!.length,
+    17,
+    `expected exactly 17 category URLs (10 women + 7 men, post REQ-009 remediation), got ${z!.categoryUrls!.length}`,
+  )
+  for (const u of z!.categoryUrls!) {
+    assert.ok(u.startsWith("https://www.zara.com/us/en/"), `bad URL: ${u}`)
+    assert.ok(/-l\d+\.html$/.test(u), `URL doesn't end with -lNNN.html: ${u}`)
+  }
+  // l715 must NOT be present
+  assert.ok(
+    !z!.categoryUrls!.some((u) => u.includes("man-outerwear-l715")),
+    "man-outerwear-l715 was removed per REQ-009 (no AJAX endpoint)",
+  )
+})
+
+// ─── SPEC-005 AC-4: formatZaraPrice region-aware output ──
+
+test("AC-4 formatZaraPrice: KR emits ₩ + ko-KR locale grouping", () => {
+  assert.equal(formatZaraPrice(19900, "KR"), "₩19,900")
+  assert.equal(formatZaraPrice(0, "KR"), "₩0")
+  assert.equal(formatZaraPrice(1_234_567, "KR"), "₩1,234,567")
+})
+
+test("AC-4 formatZaraPrice: US emits $ + 2-decimal fixed", () => {
+  assert.equal(formatZaraPrice(29.9, "US"), "$29.90")
+  assert.equal(formatZaraPrice(0, "US"), "$0.00")
+  assert.equal(formatZaraPrice(99, "US"), "$99.00")
+})
+
+// ─── SPEC-005: deriveGenderFromUrl region-agnostic ──
+
+test("deriveGenderFromUrl: derives gender from US locale URLs", () => {
+  assert.equal(
+    deriveGenderFromUrl("https://www.zara.com/us/en/woman-new-in-l1180.html"),
+    "women",
+  )
+  assert.equal(
+    deriveGenderFromUrl("https://www.zara.com/us/en/man-jackets-l640.html"),
+    "men",
+  )
+  assert.equal(
+    deriveGenderFromUrl("https://www.zara.com/us/en/kids-something-l999.html"),
+    "kids",
+  )
+})
+
+test("deriveGenderFromUrl: derives gender from KR locale URLs (regression)", () => {
+  assert.equal(
+    deriveGenderFromUrl("https://www.zara.com/kr/ko/woman-new-in-l1180.html"),
+    "women",
+  )
+  assert.equal(
+    deriveGenderFromUrl("https://www.zara.com/kr/ko/man-jackets-l717.html"),
+    "men",
+  )
+  assert.equal(
+    deriveGenderFromUrl("https://www.zara.com/kr/ko/kids-foo-l1.html"),
+    "kids",
+  )
+  assert.equal(deriveGenderFromUrl("https://www.zara.com/kr/ko/home-l9999.html"), "")
+})
+
+// ─── SPEC-005: buildZaraProductUrlPattern per-baseUrl validator ──
+
+test("buildZaraProductUrlPattern: KR base accepts KR URLs and rejects US URLs", () => {
+  const pat = buildZaraProductUrlPattern("https://www.zara.com/kr/ko")
+  assert.equal(pat.test("https://www.zara.com/kr/ko/foo-p123.html"), true)
+  assert.equal(pat.test("https://www.zara.com/us/en/foo-p123.html"), false)
+})
+
+test("buildZaraProductUrlPattern: US base accepts US URLs and rejects KR URLs", () => {
+  const pat = buildZaraProductUrlPattern("https://www.zara.com/us/en")
+  assert.equal(pat.test("https://www.zara.com/us/en/foo-p123.html"), true)
+  assert.equal(pat.test("https://www.zara.com/kr/ko/foo-p123.html"), false)
+})
+
+test("buildZaraProductUrlPattern: trailing slash on baseUrl is normalized", () => {
+  const pat = buildZaraProductUrlPattern("https://www.zara.com/us/en/")
+  assert.equal(pat.test("https://www.zara.com/us/en/foo-p1.html"), true)
+})
+
+// ─── SPEC-005 AC-3 / REQ-010: parameterized US fixture characterization ──
+
+const US_FIXTURE_PATH = path.join(__dirname, "fixtures", "zara-us-products.fixture.json")
+const US_BASE_URL = "https://www.zara.com/us/en"
+const US_KEY = "zara-us"
+
+interface UsFixture {
+  capturedAt: string
+  baseUrl: string
+  ajaxUrls?: Record<string, string>
+  samples: Array<RawZaraProduct & {_gender?: string; _category?: string}>
+}
+
+function loadUsFixture(): UsFixture | null {
+  if (!fs.existsSync(US_FIXTURE_PATH)) return null
+  return JSON.parse(fs.readFileSync(US_FIXTURE_PATH, "utf-8")) as UsFixture
+}
+
+test("AC-3 parseProductsFromXhr (US): every product has populated name/price/imageUrl/productUrl with USD-decimal", () => {
+  const fixture = loadUsFixture()
+  assert.ok(fixture, `expected US fixture at ${US_FIXTURE_PATH}`)
+  assert.ok(fixture!.samples.length >= 30, `expected >=30 US samples, got ${fixture!.samples.length}`)
+  const products = parseProductsFromXhr(fixture!.samples, US_BASE_URL, US_KEY, "US", "USD")
+  assert.ok(products.length > 0, `parser produced 0 Products from ${fixture!.samples.length} US samples`)
+  const survival = products.length / fixture!.samples.length
+  assert.ok(
+    survival >= 0.5,
+    `expected >=50% of US samples to parse cleanly, got ${(survival * 100).toFixed(1)}%`,
+  )
+  for (const p of products) {
+    assert.equal(typeof p.name, "string")
+    assert.ok(p.name.length > 0, `empty name for ${p.productCode}`)
+    assert.equal(typeof p.price, "number")
+    assert.ok((p.price as number) > 0, `non-positive price for ${p.productCode}`)
+    // USD sanity range — ZARA US prices typically 0.01 ≤ p ≤ 50,000
+    assert.ok((p.price as number) >= 0.01, `USD price suspiciously low: ${p.price}`)
+    assert.ok((p.price as number) <= 50_000, `USD price suspiciously high: ${p.price}`)
+    assert.ok(
+      isSafeZaraProductUrl(p.productUrl, US_BASE_URL),
+      `productUrl format invalid for US base: ${p.productUrl}`,
+    )
+    assert.ok(p.productUrl.startsWith(US_BASE_URL + "/"), `productUrl wrong base: ${p.productUrl}`)
+    assert.ok(
+      isSafeZaraImageUrl(p.imageUrl),
+      `imageUrl host not whitelisted: ${p.imageUrl}`,
+    )
+    assert.equal(p.platform, US_KEY)
+    assert.equal(p.sourceCurrency, "USD")
+    assert.equal(p.brand, "ZARA")
+    assert.ok(p.priceFormatted.startsWith("$"), `US priceFormatted should use $: ${p.priceFormatted}`)
+    // US priceFormatted always carries 2-decimal precision
+    assert.ok(/\.\d{2}$/.test(p.priceFormatted), `US priceFormatted should end in .NN: ${p.priceFormatted}`)
+  }
+})
+
+test("AC-3 parseProductsFromXhr (US): gender annotation derives from _gender field (women fixture)", () => {
+  const fixture = loadUsFixture()
+  assert.ok(fixture)
+  const products = parseProductsFromXhr(fixture!.samples, US_BASE_URL, US_KEY, "US", "USD")
+  // First-URL fixture is woman-new-in-l1180 → all _gender annotations should be "women"
+  const hasWomen = products.some((p) => p.gender.includes("women"))
+  assert.ok(hasWomen, "expected at least one women product in US fixture parsed output")
 })

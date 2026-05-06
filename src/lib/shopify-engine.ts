@@ -6,10 +6,17 @@
  */
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
-import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY, convertToKrw} from "./fx"
+import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
-// use by import-products.ts. Behavior unchanged — re-imports preserve
-// numeric output bit-for-bit.
+// use by import-products.ts.
+//
+// SPEC-005 amendment 2026-05-06: Shopify engine no longer applies
+// engine-time KRW conversion. Cache stores native source-currency
+// values (e.g. USD 99.90, GBP 100.00). FX conversion is performed
+// at import time by import-products.ts (see SPEC-002 REQ-004 hook),
+// matching the ZARA / Uniqlo region-engine pattern. This eliminates
+// double-conversion when import-products.ts converts a value that
+// was already converted by the engine.
 
 // Shopify handle은 kebab-case 영숫자로만 구성 (spec) — path injection 방지
 const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/
@@ -137,7 +144,6 @@ export async function crawlShopify(config: SiteConfig): Promise<CrawlResult> {
 
         const firstVariant = sp.variants[0]
         const srcPrice = firstVariant ? parseFloat(firstVariant.price) : null
-        const priceKrw = srcPrice !== null ? convertToKrw(srcPrice, currency) : null
         const inStock = sp.variants.some((v) => v.available)
 
         // gender 추론 (태그에서)
@@ -188,14 +194,23 @@ export async function crawlShopify(config: SiteConfig): Promise<CrawlResult> {
 
         const tags = sp.tags.length > 0 ? sp.tags.slice(0, 50).map((t) => t.slice(0, 100)) : undefined
 
+        // SPEC-005 amendment 2026-05-06: store native source-currency
+        // value as `price`; import-products.ts handles FX conversion.
+        // priceFormatted preserves the symbol + decimal precision
+        // (USD/EUR/GBP: 2 decimals; KRW: integer with locale grouping).
+        const priceFormatted = srcPrice !== null
+          ? (currency === "KRW"
+              ? `${symbol}${srcPrice.toLocaleString("ko-KR")}`
+              : `${symbol}${srcPrice.toFixed(2)}`)
+          : ""
         allProducts.push({
           brand: sp.vendor || config.name,
           name: sp.title,
           category: sp.product_type || "",
-          price: priceKrw,
-          originalPrice: priceKrw,
+          price: srcPrice,
+          originalPrice: srcPrice,
           salePrice: null,
-          priceFormatted: srcPrice !== null ? `${symbol}${srcPrice.toFixed(0)}` : "",
+          priceFormatted,
           imageUrl,
           productUrl: `${config.baseUrl}/products/${sp.handle}`,
           inStock,

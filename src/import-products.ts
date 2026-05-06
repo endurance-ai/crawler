@@ -153,6 +153,27 @@ async function main() {
     }
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 
+    // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
+    // were generated BEFORE the engine native-currency unification.
+    // Old caches stored `price` already converted to KRW (e.g. £100 →
+    // 175000). If the first sample has sourceCurrency in {USD, EUR, GBP}
+    // AND a `price` value implausibly large for that currency (> 5000),
+    // it almost certainly is the old format. Refuse to import to avoid
+    // double conversion silently inflating Supabase prices.
+    if (raw.length > 0) {
+      const sample = raw[0] as unknown as Record<string, unknown>
+      const sc = typeof sample.sourceCurrency === "string" ? sample.sourceCurrency : undefined
+      const sp = typeof sample.price === "number" ? sample.price : null
+      if (sc && (sc === "USD" || sc === "EUR" || sc === "GBP") && sp !== null && sp > 5000) {
+        console.error(
+          `   ❌ ${file} appears to be in legacy KRW-converted format (sourceCurrency=${sc}, price=${sp}). ` +
+            `Re-crawl this platform with the current Shopify engine before importing. Skipping.`,
+        )
+        totalErrors++
+        continue
+      }
+    }
+
     let fxSkipped = 0
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
@@ -200,6 +221,15 @@ async function main() {
         saleRaw = typeof saleRaw === "number" && convSale === null ? null : convSale
       }
 
+      // Preserve the original (pre-FX) source price + currency for the
+      // admin UI's USD-first / KRW-fallback display. SPEC-005 amendment
+      // 2026-05-06: schema migration 036 added `source_currency` +
+      // `source_price` columns. KRW-source rows store the same numeric
+      // value as `price`; non-KRW rows (USD, EUR, GBP) store the native
+      // decimal (e.g. USD 99.90).
+      const sourcePriceRaw = typeof p.sourcePrice === "number"
+        ? p.sourcePrice
+        : (typeof p.price === "number" ? p.price : null)
       return {
         brand,
         name: p.name as string,
@@ -207,6 +237,11 @@ async function main() {
         price: sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw),
         original_price: sanitizePrice(originalRaw) ?? sanitizePrice(priceRaw),
         sale_price: sanitizePrice(saleRaw),
+        source_currency: sourceCurrency,
+        // Sanitize source_price the same way as `price` to reject NaN/
+        // Infinity / out-of-range values from malformed payloads. SPEC-005
+        // P1 security review 2026-05-06.
+        source_price: sanitizePrice(sourcePriceRaw),
         product_no: productNo,
         image_url: p.imageUrl as string,
         product_url: productUrl,
@@ -231,13 +266,61 @@ async function main() {
       console.log(`   ⚠️  ${fxSkipped} product(s) skipped due to unknown source currency`)
     }
 
+    // Dedup by product_url — Postgres rejects ON CONFLICT batches that
+    // contain the same conflict key twice ("cannot affect row a second
+    // time"). ZARA in particular surfaces the same product across
+    // multiple category landings (e.g. new-in + outerwear + dresses),
+    // so the raw cache can carry a product_url 10+ times.
+    //
+    // Merge strategy (SPEC-005 P1 review 2026-05-06): instead of last-
+    // wins, prefer non-null values when merging — sale_price, original_
+    // price, color, material, etc. from any duplicate row carry over.
+    // gender arrays are merged; everything else takes the last non-null.
+    type Row = (typeof rows)[number]
+    const merge = (a: Row, b: Row): Row => {
+      const pickRicher = <K extends keyof Row>(key: K): Row[K] => {
+        const av = a[key]
+        const bv = b[key]
+        // Prefer non-null/non-empty
+        if (bv === null || bv === undefined || bv === "") return av
+        if (av === null || av === undefined || av === "") return bv
+        return bv  // both non-null: take the later occurrence
+      }
+      const mergedGender = (() => {
+        const ga = Array.isArray(a.gender) ? a.gender : []
+        const gb = Array.isArray(b.gender) ? b.gender : []
+        return [...new Set([...ga, ...gb])]
+      })()
+      return {
+        ...b,
+        sale_price: a.sale_price ?? b.sale_price,
+        original_price: pickRicher("original_price"),
+        color: pickRicher("color"),
+        material: pickRicher("material"),
+        description: pickRicher("description"),
+        gender: mergedGender,
+        category: pickRicher("category"),
+        subcategory: pickRicher("subcategory"),
+      }
+    }
+    const dedupedByUrl = new Map<string, Row>()
+    for (const r of rows) {
+      const existing = dedupedByUrl.get(r.product_url)
+      dedupedByUrl.set(r.product_url, existing ? merge(existing, r) : r)
+    }
+    const beforeDedup = rows.length
+    const deduped = [...dedupedByUrl.values()]
+    if (beforeDedup !== deduped.length) {
+      console.log(`   🧹 dedup: ${beforeDedup} → ${deduped.length} (${beforeDedup - deduped.length} duplicate product_url merged)`)
+    }
+
     // 50개씩 배치 upsert
     const BATCH = 50
     let inserted = 0
     let errors = 0
 
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const batch = rows.slice(i, i + BATCH)
+    for (let i = 0; i < deduped.length; i += BATCH) {
+      const batch = deduped.slice(i, i + BATCH)
       const {error} = await supabase.from("products").upsert(batch, {
         onConflict: "product_url",
         ignoreDuplicates: false,
@@ -248,11 +331,11 @@ async function main() {
         errors++
       } else {
         inserted += batch.length
-        process.stdout.write(`\r   💾 ${inserted}/${rows.length}`)
+        process.stdout.write(`\r   💾 ${inserted}/${deduped.length}`)
       }
     }
 
-    console.log(`\r   ✅ ${inserted}/${rows.length} 적재 (에러 ${errors}건)`)
+    console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
     totalInserted += inserted
     totalErrors += errors
 
