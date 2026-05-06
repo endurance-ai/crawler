@@ -1,0 +1,3783 @@
+{
+  "meta": {
+    "result": "SUCCESS"
+  },
+  "data": {
+    "list": [
+      {
+        "itemId": 3882178,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3882178%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3882178,
+            "itemName": "[곰송이gomsongyi X 29Edition] COTTON RUFFLE BLOUSE_OFF WHITE",
+            "brandNo": 36259,
+            "brandName": "튜드먼트",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 88740,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[곰송이gomsongyi X 29Edition] COTTON RUFFLE BLOUSE_OFF WHITE",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f13e2b522c0bb5bc92557edbbf41da.jpg",
+          "isSoldOut": false,
+          "originalPrice": 109900,
+          "displayPrice": 88740,
+          "saleRate": 19,
+          "brandId": 36259,
+          "brandName": "튜드먼트",
+          "reviewScore": 4.5,
+          "reviewCount": 34,
+          "likeCount": 6289,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "에디션",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3185392,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3185392%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3185392,
+            "itemName": "[오제, 묵화 PICK] 에센셜 라운드넥 반팔 티셔츠 MDTS073_10 Colors",
+            "brandNo": 10654,
+            "brandName": "몽돌",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 22200,
+            "discountRate": 40,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[오제, 묵화 PICK] 에센셜 라운드넥 반팔 티셔츠 MDTS073_10 Colors",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f128cfe3e36d419454f55a8a0462c2.jpg",
+          "isSoldOut": false,
+          "originalPrice": 37000,
+          "displayPrice": 22200,
+          "saleRate": 40,
+          "brandId": 10654,
+          "brandName": "몽돌",
+          "reviewScore": 5,
+          "reviewCount": 519,
+          "likeCount": 22194,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3853196,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3853196?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3853196%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3853196,
+            "itemName": "Rose Petal Tee-Olive",
+            "brandNo": 15063,
+            "brandName": "비터셀즈",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 36660,
+            "discountRate": 25,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Rose Petal Tee-Olive",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f1242bc584e2adb4938bcefcc9d9c7.jpg",
+          "isSoldOut": false,
+          "originalPrice": 49000,
+          "displayPrice": 36660,
+          "saleRate": 25,
+          "brandId": 15063,
+          "brandName": "비터셀즈",
+          "reviewScore": 5,
+          "reviewCount": 111,
+          "likeCount": 9095,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3896753,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3896753?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3896753%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3896753,
+            "itemName": "[3rd] Loose-fit paper knit [KNSS07KN01]_Cream beige",
+            "brandNo": 25863,
+            "brandName": "노운베러",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268105100,
+            "middleCategoryName": "니트웨어",
+            "smallCategoryNo": 268105110,
+            "smallCategoryName": "기타 니트",
+            "price": 62990,
+            "discountRate": 38,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[3rd] Loose-fit paper knit [KNSS07KN01]_Cream beige",
+          "thumbnailUrl": "https://img.29cm.co.kr/next-product/2026/04/03/22d52a6b8eb94ddabc4983cca7d9a6e9_20260403165750.jpg",
+          "isSoldOut": false,
+          "originalPrice": 102000,
+          "displayPrice": 62990,
+          "saleRate": 38,
+          "brandId": 25863,
+          "brandName": "노운베러",
+          "reviewScore": 5,
+          "reviewCount": 31,
+          "likeCount": 8986,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268105100,
+                "smallCategoryCode": 268105110
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3866102,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3866102?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3866102%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3866102,
+            "itemName": "[여울 PICK] WOMAN 썸머 루즈핏 래글런 핀턱 블라우스 [IVORY] / GF2LBL514",
+            "brandNo": 4699,
+            "brandName": "제너럴아이디어",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 40130,
+            "discountRate": 26,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[여울 PICK] WOMAN 썸머 루즈핏 래글런 핀턱 블라우스 [IVORY] / GF2LBL514",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f141dafbe01a4fbc9223fafa55db99.jpg",
+          "isSoldOut": false,
+          "originalPrice": 54000,
+          "displayPrice": 40130,
+          "saleRate": 26,
+          "brandId": 4699,
+          "brandName": "제너럴아이디어",
+          "reviewScore": 4.5,
+          "reviewCount": 153,
+          "likeCount": 26244,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3322447,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3322447?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3322447%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3322447,
+            "itemName": "[인플루언서 착용/16th]checked puff sleeve blouse_lime green",
+            "brandNo": 71518,
+            "brandName": "포에트서울",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268116100,
+            "middleCategoryName": "단독",
+            "smallCategoryNo": 268116101,
+            "smallCategoryName": "상의",
+            "price": 55600,
+            "discountRate": 36,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[인플루언서 착용/16th]checked puff sleeve blouse_lime green",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202507/11f058719de5ffc78909a13f313cfb67.jpg",
+          "isSoldOut": false,
+          "originalPrice": 87000,
+          "displayPrice": 55600,
+          "saleRate": 36,
+          "brandId": 71518,
+          "brandName": "포에트서울",
+          "reviewScore": 4.5,
+          "reviewCount": 33,
+          "likeCount": 10698,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268116100,
+                "smallCategoryCode": 268116101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 2178417,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/2178417?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F2178417%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 2178417,
+            "itemName": "[33차][기장선택] Relaxed Fit Denim - Light blue",
+            "brandNo": 10250,
+            "brandName": "르바",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268116100,
+            "middleCategoryName": "단독",
+            "smallCategoryNo": 268116102,
+            "smallCategoryName": "하의",
+            "price": 88020,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[33차][기장선택] Relaxed Fit Denim - Light blue",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f11d1e5d71a840a54017f7fb8a356b.jpg",
+          "isSoldOut": false,
+          "originalPrice": 109000,
+          "displayPrice": 88020,
+          "saleRate": 19,
+          "brandId": 10250,
+          "brandName": "르바",
+          "reviewScore": 5,
+          "reviewCount": 1001,
+          "likeCount": 27266,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268116100,
+                "smallCategoryCode": 268116102
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3928801,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3928801?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3928801%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3928801,
+            "itemName": "[3rd] FRONT WRAP BLOUSE (4color,2size)",
+            "brandNo": 9441,
+            "brandName": "유제",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 96000,
+            "discountRate": 0,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[3rd] FRONT WRAP BLOUSE (4color,2size)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f139f7a499e36885eedf3035e6b6c1.jpg",
+          "isSoldOut": false,
+          "originalPrice": 96000,
+          "displayPrice": 96000,
+          "saleRate": 0,
+          "brandId": 9441,
+          "brandName": "유제",
+          "reviewScore": 5,
+          "reviewCount": 30,
+          "likeCount": 9760,
+          "isLiked": false,
+          "textBadges": [],
+          "imageBadges": [],
+          "extraFees": [
+            {
+              "prefixIcon": "ic-delivery",
+              "text": "3,000"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3928868,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3928868?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3928868%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3928868,
+            "itemName": "[주미니 Pick] Raglan wrap detail blouse [TISU06BL08]_Ivory",
+            "brandNo": 3421,
+            "brandName": "틸아이다이",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 49640,
+            "discountRate": 32,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[주미니 Pick] Raglan wrap detail blouse [TISU06BL08]_Ivory",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f1437ce6ba4a0485eed1cab38b6e11.jpg",
+          "isSoldOut": false,
+          "originalPrice": 73000,
+          "displayPrice": 49640,
+          "saleRate": 32,
+          "brandId": 3421,
+          "brandName": "틸아이다이",
+          "reviewScore": 5,
+          "reviewCount": 11,
+          "likeCount": 5997,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3191643,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3191643?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3191643%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3191643,
+            "itemName": "50s EMBROIDERED T-SHIRT (7COL)",
+            "brandNo": 36259,
+            "brandName": "튜드먼트",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268116100,
+            "middleCategoryName": "단독",
+            "smallCategoryNo": 268116101,
+            "smallCategoryName": "상의",
+            "price": 33920,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "50s EMBROIDERED T-SHIRT (7COL)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f12ccf618d0485945487d2cb7b7013.jpg",
+          "isSoldOut": false,
+          "originalPrice": 42000,
+          "displayPrice": 33920,
+          "saleRate": 19,
+          "brandId": 36259,
+          "brandName": "튜드먼트",
+          "reviewScore": 5,
+          "reviewCount": 1191,
+          "likeCount": 23969,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268116100,
+                "smallCategoryCode": 268116101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3751730,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3751730?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3751730%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3751730,
+            "itemName": "PWC RIBBED EVERYDAY SHORT SLEEVE TEE_8COLOR",
+            "brandNo": 18965,
+            "brandName": "파르티멘토 우먼",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 22190,
+            "discountRate": 23,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "PWC RIBBED EVERYDAY SHORT SLEEVE TEE_8COLOR",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202602/11f107e298265bd8a540edf76538b259.jpg",
+          "isSoldOut": false,
+          "originalPrice": 29000,
+          "displayPrice": 22190,
+          "saleRate": 23,
+          "brandId": 18965,
+          "brandName": "파르티멘토 우먼",
+          "reviewScore": 5,
+          "reviewCount": 441,
+          "likeCount": 16635,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3071499,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3071499?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3071499%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3071499,
+            "itemName": "RS String Wide Sweat Pants White",
+            "brandNo": 72648,
+            "brandName": "렌세",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106102,
+            "smallCategoryName": "와이드",
+            "price": 29030,
+            "discountRate": 32,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "RS String Wide Sweat Pants White",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202503/11f0091e2a727bbfb9e64ffdaeaa1405.jpg",
+          "isSoldOut": false,
+          "originalPrice": 43000,
+          "displayPrice": 29030,
+          "saleRate": 32,
+          "brandId": 72648,
+          "brandName": "렌세",
+          "reviewScore": 4.5,
+          "reviewCount": 52,
+          "likeCount": 1876,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106102
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3266768,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3266768?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3266768%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3266768,
+            "itemName": "[지연착용][기장선택]에센셜 린넨 팬츠 9Color",
+            "brandNo": 75971,
+            "brandName": "하네",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268116100,
+            "middleCategoryName": "단독",
+            "smallCategoryNo": 268116102,
+            "smallCategoryName": "하의",
+            "price": 41860,
+            "discountRate": 48,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[지연착용][기장선택]에센셜 린넨 팬츠 9Color",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f133c0bb07e43c89a0713cee88446b.jpg",
+          "isSoldOut": false,
+          "originalPrice": 80000,
+          "displayPrice": 41860,
+          "saleRate": 48,
+          "brandId": 75971,
+          "brandName": "하네",
+          "reviewScore": 4.5,
+          "reviewCount": 497,
+          "likeCount": 18161,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraFees": [
+            {
+              "text": "옵션비 별도"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268116100,
+                "smallCategoryCode": 268116102
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3777277,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3777277?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3777277%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3777277,
+            "itemName": "Picnic Check Shirt_Blue",
+            "brandNo": 86198,
+            "brandName": "108파운드",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103106,
+            "smallCategoryName": "셔츠",
+            "price": 52400,
+            "discountRate": 36,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Picnic Check Shirt_Blue",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f11eafa5d7f670a3c069db27e87624.jpg",
+          "isSoldOut": false,
+          "originalPrice": 82000,
+          "displayPrice": 52400,
+          "saleRate": 36,
+          "brandId": 86198,
+          "brandName": "108파운드",
+          "reviewScore": 5,
+          "reviewCount": 143,
+          "likeCount": 7073,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103106
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3863665,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3863665?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3863665%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3863665,
+            "itemName": "[essential] [4차] Base v-neck t-shirt (4colors)",
+            "brandNo": 13213,
+            "brandName": "블루브릭",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 30600,
+            "discountRate": 24,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[essential] [4차] Base v-neck t-shirt (4colors)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f12c9f4a3141159454e3194fe721bd.jpg",
+          "isSoldOut": false,
+          "originalPrice": 40000,
+          "displayPrice": 30600,
+          "saleRate": 24,
+          "brandId": 13213,
+          "brandName": "블루브릭",
+          "reviewScore": 5,
+          "reviewCount": 18,
+          "likeCount": 5812,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3886773,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3886773?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3886773%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3886773,
+            "itemName": "[주미니 Pick] Tencel blended overfit shirt [TISU05SH05]_Green",
+            "brandNo": 3421,
+            "brandName": "틸아이다이",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103106,
+            "smallCategoryName": "셔츠",
+            "price": 63360,
+            "discountRate": 36,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[주미니 Pick] Tencel blended overfit shirt [TISU05SH05]_Green",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f13eac7924fc8485ee4121af180d04.jpg",
+          "isSoldOut": false,
+          "originalPrice": 99000,
+          "displayPrice": 63360,
+          "saleRate": 36,
+          "brandId": 3421,
+          "brandName": "틸아이다이",
+          "reviewScore": 5,
+          "reviewCount": 27,
+          "likeCount": 7317,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103106
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3889163,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3889163?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3889163%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3889163,
+            "itemName": "ANGLED LACE SLEEVELESS BLOUSE, CREAM",
+            "brandNo": 22473,
+            "brandName": "썬번프로젝트",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103103,
+            "smallCategoryName": "슬리브리스",
+            "price": 55720,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "ANGLED LACE SLEEVELESS BLOUSE, CREAM",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f13d1cee8861ec85ee573325d0c876.jpg",
+          "isSoldOut": false,
+          "originalPrice": 69000,
+          "displayPrice": 55720,
+          "saleRate": 19,
+          "brandId": 22473,
+          "brandName": "썬번프로젝트",
+          "reviewScore": 5,
+          "reviewCount": 1,
+          "likeCount": 4154,
+          "isLiked": false,
+          "textBadges": [],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraFees": [
+            {
+              "prefixIcon": "ic-delivery",
+              "text": "3,000"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103103
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 2123023,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/2123023?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F2123023%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 2123023,
+            "itemName": "캡 내장 심리스 쿨링 크롭 레이어드 이너 나시 수면브라 끈나시",
+            "brandNo": 3389,
+            "brandName": "코즈넉",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268109100,
+            "middleCategoryName": "언더웨어",
+            "smallCategoryNo": 268109107,
+            "smallCategoryName": "브라탑/캐미솔",
+            "price": 7350,
+            "discountRate": 26,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "캡 내장 심리스 쿨링 크롭 레이어드 이너 나시 수면브라 끈나시",
+          "thumbnailUrl": "https://img.29cm.co.kr/next-product/2023/06/21/f78da8d9730e4748bf188f93d6395163_20230621184221.jpg",
+          "isSoldOut": false,
+          "originalPrice": 9900,
+          "displayPrice": 7350,
+          "saleRate": 26,
+          "brandId": 3389,
+          "brandName": "코즈넉",
+          "reviewScore": 4.5,
+          "reviewCount": 4541,
+          "likeCount": 50381,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraFees": [
+            {
+              "prefixIcon": "ic-delivery",
+              "text": "3,000"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268109100,
+                "smallCategoryCode": 268109107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3748753,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3748753?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3748753%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3748753,
+            "itemName": "Light Oversized Check Shirts Blue / Black",
+            "brandNo": 26100,
+            "brandName": "미치코런던 코시노",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103106,
+            "smallCategoryName": "셔츠",
+            "price": 58140,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Light Oversized Check Shirts Blue / Black",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202602/11f10652f6fa275ca3c0e3b2f8f9c675.jpg",
+          "isSoldOut": false,
+          "originalPrice": 72000,
+          "displayPrice": 58140,
+          "saleRate": 19,
+          "brandId": 26100,
+          "brandName": "미치코런던 코시노",
+          "reviewScore": 4.5,
+          "reviewCount": 183,
+          "likeCount": 14296,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103106
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 2605280,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/2605280?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F2605280%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 2605280,
+            "itemName": "[장다연 PICK] LOND WAIST TUCK  BLOUSE (Z-BL-4225)",
+            "brandNo": 27282,
+            "brandName": "아틀리에 나인",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 34300,
+            "discountRate": 30,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[장다연 PICK] LOND WAIST TUCK  BLOUSE (Z-BL-4225)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f1443e2ae7a0a9bc9203b7952e90f1.jpg",
+          "isSoldOut": false,
+          "originalPrice": 49000,
+          "displayPrice": 34300,
+          "saleRate": 30,
+          "brandId": 27282,
+          "brandName": "아틀리에 나인",
+          "reviewScore": 5,
+          "reviewCount": 1884,
+          "likeCount": 59241,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3364526,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3364526?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3364526%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3364526,
+            "itemName": "G BABY TEE_3 Colors",
+            "brandNo": 16723,
+            "brandName": "글로니",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268116100,
+            "middleCategoryName": "단독",
+            "smallCategoryNo": 268116101,
+            "smallCategoryName": "상의",
+            "price": 42000,
+            "discountRate": 0,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "G BABY TEE_3 Colors",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202507/11f0616e24e8841789093f8953460bc7.jpg",
+          "isSoldOut": false,
+          "originalPrice": 42000,
+          "displayPrice": 42000,
+          "saleRate": 0,
+          "brandId": 16723,
+          "brandName": "글로니",
+          "reviewScore": 5,
+          "reviewCount": 302,
+          "likeCount": 7300,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268116100,
+                "smallCategoryCode": 268116101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3400426,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3400426?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3400426%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3400426,
+            "itemName": "[후크/노후크] 누디 볼륨 브라 - 3Colors",
+            "brandNo": 83832,
+            "brandName": "엣프터",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268109100,
+            "middleCategoryName": "언더웨어",
+            "smallCategoryNo": 268109101,
+            "smallCategoryName": "브라",
+            "price": 17930,
+            "discountRate": 55,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[후크/노후크] 누디 볼륨 브라 - 3Colors",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202507/11f06d05fe6e7128964a558829ca38bc.jpg",
+          "isSoldOut": false,
+          "originalPrice": 39800,
+          "displayPrice": 17930,
+          "saleRate": 55,
+          "brandId": 83832,
+          "brandName": "엣프터",
+          "reviewScore": 4.5,
+          "reviewCount": 204,
+          "likeCount": 7042,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraFees": [
+            {
+              "text": "옵션비 별도"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268109100,
+                "smallCategoryCode": 268109101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 2442739,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/2442739?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F2442739%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 2442739,
+            "itemName": "[7차]_[김나영 착용] CIGARETTE CAPRI PANTS (BLACK)",
+            "brandNo": 36259,
+            "brandName": "튜드먼트",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106111,
+            "smallCategoryName": "기타 팬츠",
+            "price": 79950,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[7차]_[김나영 착용] CIGARETTE CAPRI PANTS (BLACK)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f137d0ec8d14bc85ee795eb8b826b7.jpg",
+          "isSoldOut": false,
+          "originalPrice": 99000,
+          "displayPrice": 79950,
+          "saleRate": 19,
+          "brandId": 36259,
+          "brandName": "튜드먼트",
+          "reviewScore": 4.5,
+          "reviewCount": 693,
+          "likeCount": 16532,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106111
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3442316,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3442316?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3442316%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3442316,
+            "itemName": "Oversized Essential Shirt-Ivory",
+            "brandNo": 15063,
+            "brandName": "비터셀즈",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103106,
+            "smallCategoryName": "셔츠",
+            "price": 44250,
+            "discountRate": 25,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Oversized Essential Shirt-Ivory",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202509/11f08ee4330bbbb2be179f250251205a.jpg",
+          "isSoldOut": false,
+          "originalPrice": 59000,
+          "displayPrice": 44250,
+          "saleRate": 25,
+          "brandId": 15063,
+          "brandName": "비터셀즈",
+          "reviewScore": 5,
+          "reviewCount": 252,
+          "likeCount": 19309,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103106
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3354267,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3354267?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3354267%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3354267,
+            "itemName": "Tompkins Loopwheeled Tubular Tee 4 Color",
+            "brandNo": 89408,
+            "brandName": "브론슨",
+            "largeCategoryNo": 272100100,
+            "largeCategoryName": "남성의류",
+            "middleCategoryNo": 272103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 272103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 34430,
+            "discountRate": 23,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Tompkins Loopwheeled Tubular Tee 4 Color",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f1325f4b5612ae9ec55919758da351.jpg",
+          "isSoldOut": false,
+          "originalPrice": 45000,
+          "displayPrice": 34430,
+          "saleRate": 23,
+          "brandId": 89408,
+          "brandName": "브론슨",
+          "reviewScore": 5,
+          "reviewCount": 565,
+          "likeCount": 4027,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 272100100,
+                "mediumCategoryCode": 272103100,
+                "smallCategoryCode": 272103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3334217,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3334217?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3334217%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3334217,
+            "itemName": "PWC EVERYDAY BALLOON JOGGER PANTS_18COLOR",
+            "brandNo": 18965,
+            "brandName": "파르티멘토 우먼",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106107,
+            "smallCategoryName": "트레이닝",
+            "price": 40550,
+            "discountRate": 23,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "PWC EVERYDAY BALLOON JOGGER PANTS_18COLOR",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202602/11f1065e8d9969e2a540b78b5577ef66.jpg",
+          "isSoldOut": false,
+          "originalPrice": 53000,
+          "displayPrice": 40550,
+          "saleRate": 23,
+          "brandId": 18965,
+          "brandName": "파르티멘토 우먼",
+          "reviewScore": 5,
+          "reviewCount": 1581,
+          "likeCount": 15618,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3085644,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3085644?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3085644%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3085644,
+            "itemName": "[이은주PICK][XS 사이즈 추가] SIPT7153 컴포트 라인 카프리 팬츠_Black",
+            "brandNo": 10005,
+            "brandName": "시야쥬",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106111,
+            "smallCategoryName": "기타 팬츠",
+            "price": 64310,
+            "discountRate": 28,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[이은주PICK][XS 사이즈 추가] SIPT7153 컴포트 라인 카프리 팬츠_Black",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202605/11f14749446302f285ee5935715b9b20.jpg",
+          "isSoldOut": false,
+          "originalPrice": 89000,
+          "displayPrice": 64310,
+          "saleRate": 28,
+          "brandId": 10005,
+          "brandName": "시야쥬",
+          "reviewScore": 5,
+          "reviewCount": 119,
+          "likeCount": 6612,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106111
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3867297,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3867297?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3867297%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3867297,
+            "itemName": "[울랄라] BASIC Womens Pajama Set_Long Pants",
+            "brandNo": 12396,
+            "brandName": "울랄라 파자마",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268110100,
+            "middleCategoryName": "홈웨어",
+            "smallCategoryNo": 268110110,
+            "smallCategoryName": "기타 세트",
+            "price": 24750,
+            "discountRate": 59,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[울랄라] BASIC Womens Pajama Set_Long Pants",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f123397c7905f2a540e5003f81f8fb.jpg",
+          "isSoldOut": false,
+          "originalPrice": 60000,
+          "displayPrice": 24750,
+          "saleRate": 59,
+          "brandId": 12396,
+          "brandName": "울랄라 파자마",
+          "reviewScore": 5,
+          "reviewCount": 252,
+          "likeCount": 5770,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268110100,
+                "smallCategoryCode": 268110110
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3789405,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3789405?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3789405%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3789405,
+            "itemName": "[예약배송] Ruffle shirring crop blouse [FRSP06BL04]_Ivory",
+            "brandNo": 76174,
+            "brandName": "프리버07",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 64080,
+            "discountRate": 33,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[예약배송] Ruffle shirring crop blouse [FRSP06BL04]_Ivory",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f11e9d1af1d186a54055d618102c26.jpg",
+          "isSoldOut": false,
+          "originalPrice": 95000,
+          "displayPrice": 64080,
+          "saleRate": 33,
+          "brandId": 76174,
+          "brandName": "프리버07",
+          "reviewScore": 4.5,
+          "reviewCount": 28,
+          "likeCount": 4231,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3891910,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3891910?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3891910%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3891910,
+            "itemName": "[3차] Barry One-Shoulder Blouse (Blue Stripe)",
+            "brandNo": 23664,
+            "brandName": "포 유어 아이즈 온리",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 98520,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[3차] Barry One-Shoulder Blouse (Blue Stripe)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f1371939f5dc89bc92fd3fed4c8ccc.jpg",
+          "isSoldOut": false,
+          "originalPrice": 122000,
+          "displayPrice": 98520,
+          "saleRate": 19,
+          "brandId": 23664,
+          "brandName": "포 유어 아이즈 온리",
+          "reviewScore": 5,
+          "reviewCount": 10,
+          "likeCount": 5233,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3259431,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3259431?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3259431%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3259431,
+            "itemName": "[2PACK] 에센셜 라운드넥 반팔 티셔츠",
+            "brandNo": 10654,
+            "brandName": "몽돌",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 38850,
+            "discountRate": 48,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[2PACK] 에센셜 라운드넥 반팔 티셔츠",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f1268e5352c27794549b83a369c5fb.jpg",
+          "isSoldOut": false,
+          "originalPrice": 74000,
+          "displayPrice": 38850,
+          "saleRate": 48,
+          "brandId": 10654,
+          "brandName": "몽돌",
+          "reviewScore": 4.5,
+          "reviewCount": 297,
+          "likeCount": 6876,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3902513,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3902513?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3902513%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3902513,
+            "itemName": "[지연 착용][29 단독]도트 스트랩 프릴 블라우스 2Color",
+            "brandNo": 75971,
+            "brandName": "하네",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 48300,
+            "discountRate": 44,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[지연 착용][29 단독]도트 스트랩 프릴 블라우스 2Color",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f1348f9940bb7889a0b595e4b0d799.jpg",
+          "isSoldOut": false,
+          "originalPrice": 86000,
+          "displayPrice": 48300,
+          "saleRate": 44,
+          "brandId": 75971,
+          "brandName": "하네",
+          "reviewScore": 4.5,
+          "reviewCount": 20,
+          "likeCount": 5193,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3862295,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3862295?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3862295%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3862295,
+            "itemName": "[기장선택] [3차] Liberty denim (raw blue)",
+            "brandNo": 13213,
+            "brandName": "블루브릭",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106101,
+            "smallCategoryName": "스트레이트",
+            "price": 104170,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[기장선택] [3차] Liberty denim (raw blue)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f12bfb70150fa99454eb6bb7ff0b5b.jpg",
+          "isSoldOut": false,
+          "originalPrice": 129000,
+          "displayPrice": 104170,
+          "saleRate": 19,
+          "brandId": 13213,
+          "brandName": "블루브릭",
+          "reviewScore": 5,
+          "reviewCount": 38,
+          "likeCount": 2896,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3853199,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3853199?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3853199%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3853199,
+            "itemName": "Rose Petal Tee-White",
+            "brandNo": 15063,
+            "brandName": "비터셀즈",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 36660,
+            "discountRate": 25,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Rose Petal Tee-White",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f1264aa9981dbfb493756198d7a6f4.jpg",
+          "isSoldOut": false,
+          "originalPrice": 49000,
+          "displayPrice": 36660,
+          "saleRate": 25,
+          "brandId": 15063,
+          "brandName": "비터셀즈",
+          "reviewScore": 5,
+          "reviewCount": 76,
+          "likeCount": 4401,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3329172,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3329172?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3329172%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3329172,
+            "itemName": "[7차 리오더] Linen boat-neck jacket_cream",
+            "brandNo": 27780,
+            "brandName": "녹섭",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268116100,
+            "middleCategoryName": "단독",
+            "smallCategoryNo": 268116103,
+            "smallCategoryName": "아우터",
+            "price": 167320,
+            "discountRate": 35,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[7차 리오더] Linen boat-neck jacket_cream",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202507/11f05bbc1b0d21edafc08f016cceff25.jpg",
+          "isSoldOut": false,
+          "originalPrice": 259000,
+          "displayPrice": 167320,
+          "saleRate": 35,
+          "brandId": 27780,
+          "brandName": "녹섭",
+          "reviewScore": 4.5,
+          "reviewCount": 65,
+          "likeCount": 9007,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268116100,
+                "smallCategoryCode": 268116103
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3378134,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3378134?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3378134%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3378134,
+            "itemName": "Oversized Sasha Stripe Shirt-Ivory",
+            "brandNo": 15063,
+            "brandName": "비터셀즈",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103106,
+            "smallCategoryName": "셔츠",
+            "price": 48750,
+            "discountRate": 25,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Oversized Sasha Stripe Shirt-Ivory",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202508/11f078b1e6eb2522964a19dc7fe10e1c.jpg",
+          "isSoldOut": false,
+          "originalPrice": 65000,
+          "displayPrice": 48750,
+          "saleRate": 25,
+          "brandId": 15063,
+          "brandName": "비터셀즈",
+          "reviewScore": 5,
+          "reviewCount": 207,
+          "likeCount": 15351,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103106
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3053156,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3053156?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3053156%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3053156,
+            "itemName": "A3510 Nature heritage 티셔츠_Melange gray",
+            "brandNo": 4715,
+            "brandName": "반원 아틀리에",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 28380,
+            "discountRate": 34,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "A3510 Nature heritage 티셔츠_Melange gray",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f12bd40291da079454e72a142f976c.jpg",
+          "isSoldOut": false,
+          "originalPrice": 43000,
+          "displayPrice": 28380,
+          "saleRate": 34,
+          "brandId": 4715,
+          "brandName": "반원 아틀리에",
+          "reviewScore": 4.5,
+          "reviewCount": 628,
+          "likeCount": 16193,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3805363,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3805363?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3805363%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3805363,
+            "itemName": "[5차/예약배송] [기장선택] Indigo navy straight denim",
+            "brandNo": 49308,
+            "brandName": "코어드",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106101,
+            "smallCategoryName": "스트레이트",
+            "price": 100940,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[5차/예약배송] [기장선택] Indigo navy straight denim",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f11d1f55ae6512a540c309e05fb334.jpg",
+          "isSoldOut": false,
+          "originalPrice": 125000,
+          "displayPrice": 100940,
+          "saleRate": 19,
+          "brandId": 49308,
+          "brandName": "코어드",
+          "reviewScore": 5,
+          "reviewCount": 62,
+          "likeCount": 7748,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3815852,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3815852?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3815852%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3815852,
+            "itemName": "[15th] Oe Capri Pants (Black)",
+            "brandNo": 86164,
+            "brandName": "가더",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106111,
+            "smallCategoryName": "기타 팬츠",
+            "price": 72680,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[15th] Oe Capri Pants (Black)",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202602/11f112de8609e184a3c09f0c15e65c07.jpg",
+          "isSoldOut": false,
+          "originalPrice": 90000,
+          "displayPrice": 72680,
+          "saleRate": 19,
+          "brandId": 86164,
+          "brandName": "가더",
+          "reviewScore": 5,
+          "reviewCount": 93,
+          "likeCount": 5483,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106111
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3799149,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3799149?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3799149%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3799149,
+            "itemName": "Logo Applique Zip-Up Hoodie [2 Color]",
+            "brandNo": 47016,
+            "brandName": "포에브",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268102100,
+            "middleCategoryName": "아우터",
+            "smallCategoryNo": 268102110,
+            "smallCategoryName": "후드 집업",
+            "price": 50100,
+            "discountRate": 49,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Logo Applique Zip-Up Hoodie [2 Color]",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f1449f85cd77ffbc92bb8a17cbeb45.jpg",
+          "isSoldOut": false,
+          "originalPrice": 98000,
+          "displayPrice": 50100,
+          "saleRate": 49,
+          "brandId": 47016,
+          "brandName": "포에브",
+          "reviewScore": 5,
+          "reviewCount": 138,
+          "likeCount": 4321,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268102100,
+                "smallCategoryCode": 268102110
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3283897,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3283897?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3283897%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3283897,
+            "itemName": "SLIM FIT CROP CAPRI PANTS_BLACK",
+            "brandNo": 6598,
+            "brandName": "아흐레",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106103,
+            "smallCategoryName": "슬림",
+            "price": 41930,
+            "discountRate": 57,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "SLIM FIT CROP CAPRI PANTS_BLACK",
+          "thumbnailUrl": "https://img.29cm.co.kr/next-product/2026/05/06/a836e1f131504755a244771ac8b15634_20260506160851.jpg",
+          "isSoldOut": false,
+          "originalPrice": 98000,
+          "displayPrice": 41930,
+          "saleRate": 57,
+          "brandId": 6598,
+          "brandName": "아흐레",
+          "reviewScore": 4.5,
+          "reviewCount": 76,
+          "likeCount": 3378,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106103
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3075385,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3075385?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3075385%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3075385,
+            "itemName": "[31th]Capri Slit Pants_Black",
+            "brandNo": 57017,
+            "brandName": "아르토",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106111,
+            "smallCategoryName": "기타 팬츠",
+            "price": 89000,
+            "discountRate": 0,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[31th]Capri Slit Pants_Black",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202505/11f03c3b87ccd3d797750d106d353ff7.png",
+          "isSoldOut": false,
+          "originalPrice": 89000,
+          "displayPrice": 89000,
+          "saleRate": 0,
+          "brandId": 57017,
+          "brandName": "아르토",
+          "reviewScore": 4.5,
+          "reviewCount": 449,
+          "likeCount": 9131,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106111
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3852778,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3852778?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3852778%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3852778,
+            "itemName": "[29CM 단독] 조이 플리츠 브이넥 탑_ivory",
+            "brandNo": 108764,
+            "brandName": "플리츠무드",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103107,
+            "smallCategoryName": "블라우스",
+            "price": 62370,
+            "discountRate": 37,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[29CM 단독] 조이 플리츠 브이넥 탑_ivory",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202603/11f1243b0a12555b94544beb8742c738.jpg",
+          "isSoldOut": false,
+          "originalPrice": 99000,
+          "displayPrice": 62370,
+          "saleRate": 37,
+          "brandId": 108764,
+          "brandName": "플리츠무드",
+          "reviewScore": 5,
+          "reviewCount": 4,
+          "likeCount": 3831,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103107
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3909126,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3909126?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3909126%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3909126,
+            "itemName": "[5th] Fuzzy Heart Logo Over-Fit Top - Ivory",
+            "brandNo": 18640,
+            "brandName": "썸웨어버터",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 37490,
+            "discountRate": 23,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[5th] Fuzzy Heart Logo Over-Fit Top - Ivory",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f13a28d6d8c86085ee21cf0bb8db11.jpg",
+          "isSoldOut": false,
+          "originalPrice": 49000,
+          "displayPrice": 37490,
+          "saleRate": 23,
+          "brandId": 18640,
+          "brandName": "썸웨어버터",
+          "reviewScore": 4.5,
+          "reviewCount": 5,
+          "likeCount": 3169,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 2739238,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/2739238?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F2739238%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 2739238,
+            "itemName": "듀얼 쿨 튜브탑 6Color / 8Size",
+            "brandNo": 4760,
+            "brandName": "컴포트랩",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268109100,
+            "middleCategoryName": "언더웨어",
+            "smallCategoryNo": 268109101,
+            "smallCategoryName": "브라",
+            "price": 37900,
+            "discountRate": 33,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": false
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "듀얼 쿨 튜브탑 6Color / 8Size",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f144a05f6d981a85ee3958f419321f.jpg",
+          "isSoldOut": false,
+          "originalPrice": 56900,
+          "displayPrice": 37900,
+          "saleRate": 33,
+          "brandId": 4760,
+          "brandName": "컴포트랩",
+          "reviewScore": 4.5,
+          "reviewCount": 2338,
+          "likeCount": 13869,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268109100,
+                "smallCategoryCode": 268109101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3879249,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3879249?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3879249%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3879249,
+            "itemName": "[쁨이 PICK][2 PACK]Essential Golgi Half Tee-10colors",
+            "brandNo": 15063,
+            "brandName": "비터셀즈",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268103100,
+            "middleCategoryName": "상의",
+            "smallCategoryNo": 268103101,
+            "smallCategoryName": "반소매 티셔츠",
+            "price": 47690,
+            "discountRate": 28,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[쁨이 PICK][2 PACK]Essential Golgi Half Tee-10colors",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f12da191ca3a7bb49357bd77c96bd9.jpg",
+          "isSoldOut": false,
+          "originalPrice": 66000,
+          "displayPrice": 47690,
+          "saleRate": 28,
+          "brandId": 15063,
+          "brandName": "비터셀즈",
+          "reviewScore": 5,
+          "reviewCount": 75,
+          "likeCount": 5260,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "에디션",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268103100,
+                "smallCategoryCode": 268103101
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3410519,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3410519?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3410519%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3410519,
+            "itemName": "Elloy Low-rise Jean_Blue",
+            "brandNo": 86198,
+            "brandName": "108파운드",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106104,
+            "smallCategoryName": "데님",
+            "price": 66110,
+            "discountRate": 33,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "Elloy Low-rise Jean_Blue",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202508/11f07292f6698ef8964a931cef0bc522.jpg",
+          "isSoldOut": false,
+          "originalPrice": 98000,
+          "displayPrice": 66110,
+          "saleRate": 33,
+          "brandId": 86198,
+          "brandName": "108파운드",
+          "reviewScore": 5,
+          "reviewCount": 307,
+          "likeCount": 14900,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106104
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3882212,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3882212?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3882212%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3882212,
+            "itemName": "[곰송이gomsongyi X 29Edition] LINEN LONG SKIRT_WHITE",
+            "brandNo": 36259,
+            "brandName": "튜드먼트",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268107100,
+            "middleCategoryName": "스커트",
+            "smallCategoryNo": 268107103,
+            "smallCategoryName": "롱",
+            "price": 96820,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[곰송이gomsongyi X 29Edition] LINEN LONG SKIRT_WHITE",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202604/11f13e29f3d268fa85eea39b3472166b.jpg",
+          "isSoldOut": false,
+          "originalPrice": 119900,
+          "displayPrice": 96820,
+          "saleRate": 19,
+          "brandId": 36259,
+          "brandName": "튜드먼트",
+          "reviewScore": 4.5,
+          "reviewCount": 7,
+          "likeCount": 2128,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "쿠폰",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "에디션",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268107100,
+                "smallCategoryCode": 268107103
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 2472990,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/2472990?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F2472990%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 2472990,
+            "itemName": "[14차 리오더,숏기장] 시그니쳐 세미 와이드 데님 팬츠_CREAM WHITE",
+            "brandNo": 24286,
+            "brandName": "으음키임",
+            "largeCategoryNo": 272100100,
+            "largeCategoryName": "남성의류",
+            "middleCategoryNo": 272104100,
+            "middleCategoryName": "하의",
+            "smallCategoryNo": 272104102,
+            "smallCategoryName": "와이드 팬츠",
+            "price": 83810,
+            "discountRate": 28,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": true,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          },
+          "impression": {},
+          "onClick": {}
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[14차 리오더,숏기장] 시그니쳐 세미 와이드 데님 팬츠_CREAM WHITE",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202403/11eeecb2ead5ad8b88b1f918b36519b5.jpg",
+          "isSoldOut": false,
+          "originalPrice": 116000,
+          "displayPrice": 83810,
+          "saleRate": 28,
+          "brandId": 24286,
+          "brandName": "으음키임",
+          "reviewScore": 5,
+          "reviewCount": 2290,
+          "likeCount": 34571,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 272100100,
+                "mediumCategoryCode": 272104100,
+                "smallCategoryCode": 272104102
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      },
+      {
+        "itemId": 3231989,
+        "itemType": "PRODUCT",
+        "itemUrl": {
+          "webLink": "https://product.29cm.co.kr/catalog/3231989?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "appLink": "app29cm://web/https%3A%2F%2Fproduct.29cm.co.kr%2Fcatalog%2F3231989%3FcategoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        },
+        "itemEvent": {
+          "eventProperties": {
+            "itemType": "PRODUCT",
+            "itemNo": 3231989,
+            "itemName": "[13차] Classic Staple Denim Shorts - Stone Navy",
+            "brandNo": 10250,
+            "brandName": "르바",
+            "largeCategoryNo": 268100100,
+            "largeCategoryName": "여성의류",
+            "middleCategoryNo": 268106100,
+            "middleCategoryName": "바지",
+            "smallCategoryNo": 268106108,
+            "smallCategoryName": "쇼트",
+            "price": 71870,
+            "discountRate": 19,
+            "isSoldout": false,
+            "isDeliveryToday": false,
+            "isColorchip": false,
+            "experimentData": {
+              "is_colorchip_item": false,
+              "is_cart_coupon_item": true
+            },
+            "isAd": false
+          }
+        },
+        "itemInfo": {
+          "itemType": "PRODUCT",
+          "productName": "[13차] Classic Staple Denim Shorts - Stone Navy",
+          "thumbnailUrl": "https://img.29cm.co.kr/item/202504/11f01f1a1f3ff058b1316f3712584b76.jpg",
+          "isSoldOut": false,
+          "originalPrice": 89000,
+          "displayPrice": 71870,
+          "saleRate": 19,
+          "brandId": 10250,
+          "brandName": "르바",
+          "reviewScore": 4.5,
+          "reviewCount": 449,
+          "likeCount": 9370,
+          "isLiked": false,
+          "textBadges": [
+            {
+              "text": "조건부 무료배송",
+              "size": "small",
+              "variant": "secondary"
+            },
+            {
+              "text": "단독",
+              "size": "small",
+              "variant": "secondary"
+            }
+          ],
+          "imageBadges": [
+            {
+              "text": "단독브랜드",
+              "size": "medium",
+              "variant": "primary"
+            }
+          ],
+          "extraInfo": {
+            "categories": [
+              {
+                "largeCategoryCode": 268100100,
+                "mediumCategoryCode": 268106100,
+                "smallCategoryCode": 268106108
+              }
+            ]
+          },
+          "isCategoryFirstPurchaseOnly": false
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "size": 50,
+      "hasNext": true,
+      "totalCount": 365584
+    }
+  }
+}

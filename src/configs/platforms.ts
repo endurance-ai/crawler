@@ -893,6 +893,45 @@ export const PLATFORMS: SiteConfig[] = [
     ],
     notes: "ZARA KR Playwright engine. Akamai bypass via channel:'chrome' (real Chrome required, bundled Chromium hard-403'd). XHR-interception strategy: /kr/ko/category/{id}/products?ajax=true carries full product JSON. KRW-native, 2 sec/page, 5-UA rotation (one UA per browser context), robots-check enforced. ToS pre-verified 2026-05-05 (research.md §1.2 verified, AMBIGUOUS-ACCEPTED-BY-OWNER). portal.ai-internal-use only; halt on cease-and-desist.",
   },
+
+  // ─── 29CM (KR) — second Playwright engine, Cloudflare-passive ───────
+  // SPEC: SPEC-PLATFORM-EXPANSION-004
+  // Engine: pure Playwright with vanilla `headless: true` (Cloudflare on
+  //   29CM is passive — verified 2026-05-06: 5/5 attempts, no challenge,
+  //   100% reliability). XHR interception of display-bff-api.29cm.co.kr/
+  //   api/v1/listing/items carries full product JSON.
+  // Pacing: 2 sec/category (Cloudflare-friendly + browser overhead).
+  // ToS: captured live 2026-05-06 by hansangho via Playwright at
+  //   /home/agreement. 제11조 제2항 9호 names "크롤러(Crawler)" verbatim
+  //   (FORBIDS literal reading). OWNER OVERRIDE: hansangho 2026-05-06,
+  //   conditioned on portal.ai-internal-use only + halt-on-cease-and-
+  //   desist + 90-day re-verification. Verbatim clauses embedded at top
+  //   of src/lib/29cm-engine.ts per REQ-008.
+  // apiCategoryCodes: 10 Women + Men L1 fashion codes (research.md §1.6),
+  //   live-verified 2026-05-06 via display-bff-api response sample.
+  {
+    key: "29cm-kr",
+    name: "29CM (KR)",
+    type: "29cm",
+    baseUrl: "https://www.29cm.co.kr",
+    sourceCurrency: "KRW",
+    crawlDelay: 2000,
+    apiCategoryCodes: [
+      // Women fashion L1 codes
+      268100100, // 여성의류
+      269100100, // 여성가방
+      270100100, // 여성슈즈
+      271100100, // 여성액세서리
+      305100100, // 여성주얼리
+      // Men fashion L1 codes
+      272100100, // 남성의류
+      273100100, // 남성가방
+      274100100, // 남성슈즈
+      275100100, // 남성액세서리
+      306100100, // 남성주얼리
+    ],
+    notes: "29CM KR Playwright + XHR-interception engine. Cloudflare passive (no JS challenge); vanilla headless:true sufficient — channel:'chrome' is documented escalation path. KRW-native, 2 sec/category, 5-UA rotation (one UA per browser context), robots-check enforced. ToS captured 2026-05-06: 제11조 제2항 9호 verbatim names '크롤러' (FORBIDS literal); OWNER OVERRIDE by hansangho 2026-05-06 conditioned on portal.ai-internal-use only + halt-on-cease-and-desist + 90-day re-verification. Lifestyle/design/books/kitchen/beauty/electronics categories out of scope.",
+  },
 ]
 
 /** key로 사이트 설정 조회 */

@@ -1,9 +1,9 @@
 ---
 id: SPEC-PLATFORM-EXPANSION-004
-version: 0.1.0
-status: draft
+version: 0.2.0
+status: implemented
 created_at: "2026-05-05"
-updated_at: "2026-05-05"
+updated_at: "2026-05-06"
 author: hansangho
 priority: high
 issue_number: 0
@@ -14,6 +14,7 @@ labels: [crawler, platform, 29cm, playwright, infrastructure]
 
 | Date | Version | Summary |
 |---|---|---|
+| 2026-05-06 | v0.2.0 | Run-phase implementation complete. REQ-007 PASS (5/5 = 100% reliability against `categoryLargeCode=268100100` with vanilla `headless: true`; no Cloudflare challenge observed). REQ-008 verdict: literal reading **FORBIDS** — 제11조 제2항 9호 verbatim names "크롤러(Crawler)" as a prohibited tool (without prior consent). Disposition: **OWNER OVERRIDE** by hansangho 2026-05-06, conditioned on portal.ai-internal-use only + 2 sec/category pacing + halt-on-cease-and-desist + 90-day re-verification. Verbatim Korean clauses (제11조 제2항 9호 + 10호) embedded as top-of-file comment block in `src/lib/29cm-engine.ts`. Implementation deltas vs plan: (1) productUrl host is `product.29cm.co.kr/catalog/{ID}` (NOT `www.29cm.co.kr/product/catalog/` as the plan hypothesized); whitelist regex updated. (2) XHR endpoint confirmed: `display-bff-api.29cm.co.kr/api/v1/listing/items`. (3) DOM selector adjusted to `a[href^="https://product.29cm.co.kr/catalog/"]` from the plan's `[href^="/product/catalog/"]`. (4) Image hosts confirmed verbatim: `img.29cm.co.kr` + `asset.29cm.co.kr`. Test suite: 17 new test cases (AC-1..AC-7), 59/59 pass overall. Live `pnpm crawl --probe=29cm-kr` smoke test passing (50 raw items harvested, 3 sample products with valid URLs/prices/images). |
 | 2026-05-05 | v0.1.0 | Initial draft. Adds 29CM (KR) as the 36th registered platform — second Playwright-based engine after ZARA, first Cloudflare-fronted (vs Akamai-fronted) Playwright engine. Five user-confirmed decisions baked in: (1) **scope** — 29CM KR Women + Men full fashion catalog (의류/가방/슈즈/액세서리/주얼리, 10 top-level codes); lifestyle/design/books/kitchen/beauty out of scope; (2) **engine path** — Path (c) Pure Playwright + XHR interception, selected after research.md §2 conclusively ruled out Path (a) mobile-API discovery (search-api requires non-empty keyword and returns ~48-item caps; item-api/display-bff-api are auth-gated returning HTTP 500/404 from external clients) and Path (b) Next.js RSC reverse-engineering (App Router pages ship navigation-only data; Pages Router /store/category/list ships `__NEXT_DATA__` with sub-category nav only — products are loaded via React Query client-side); (3) **soak gate removed** — SPEC-001 §2.4 amendment dated 2026-05-05 removes the 7-day Uniqlo KR soak entry condition; SPEC-004 proceeds immediately; (4) **scope ceiling** — engine + 29CM robots.txt verification + ToS verification only; size-system normalization, multi-region orchestration (29CM is KR-only), Musinsa graduation (29CM is owned by Musinsa but Musinsa.com remains deferred per its own `Disallow: /` robots.txt), IP rotation, schema migration, Xvfb-in-CI, and any fingerprint-evasion library are explicitly out of scope; (5) **Cloudflare browser config** — vanilla `chromium.launch({headless: "new"})` is the default (research.md §3.1 confirmed Cloudflare on 29CM is passive — 5/5 sequential plain-fetch HTTP 200 with full content); `channel: "chrome"` is the documented escalation path if vanilla proves insufficient at Run-phase verification (REQ-007). |
 
 ---

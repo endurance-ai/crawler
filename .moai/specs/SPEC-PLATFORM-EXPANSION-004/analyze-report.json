@@ -1,0 +1,277 @@
+{
+  "targetUrl": "https://www.29cm.co.kr/store/category/list?categoryLargeCode=268100100&sort=RECOMMENDED",
+  "attempts": [
+    {
+      "attempt": 1,
+      "htmlBytes": 798170,
+      "productHrefCount": 203,
+      "jsonXhrCount": 9,
+      "cloudflareIntercept": false,
+      "capturedXhrUrls": [
+        "https://display-bff-api.29cm.co.kr/api/v1/menu/category-plp?largeCategoryCode=268100100",
+        "https://cache.29cm.co.kr/notice/?limit=5&notice_type=official",
+        "https://flag.29cm.co.kr/proxy?environment=production&appName=frontend-29cm-platform&sessionId=873744402",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+        "https://content-api.29cm.co.kr/api/v4/campaigns/head-banners",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/facet-group",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/sorts?pageType=CATEGORY_PLP",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count"
+      ],
+      "imageHosts": [
+        "asset.29cm.co.kr",
+        "img.29cm.co.kr"
+      ],
+      "pass": true,
+      "hrefDiag": {
+        "counts": {
+          "productCatalog": 0,
+          "productAny": 203,
+          "productOnly": 0
+        },
+        "samples": [
+          "https://www.29cm.co.kr/my-page/heart/product",
+          "https://www.29cm.co.kr/best-products",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        ]
+      },
+      "largestXhrUrl": "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+      "largestXhrBytes": 76376
+    },
+    {
+      "attempt": 2,
+      "htmlBytes": 798107,
+      "productHrefCount": 203,
+      "jsonXhrCount": 9,
+      "cloudflareIntercept": false,
+      "capturedXhrUrls": [
+        "https://display-bff-api.29cm.co.kr/api/v1/menu/category-plp?largeCategoryCode=268100100",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/facet-group",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/sorts?pageType=CATEGORY_PLP",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+        "https://cache.29cm.co.kr/notice/?limit=5&notice_type=official",
+        "https://flag.29cm.co.kr/proxy?environment=production&appName=frontend-29cm-platform&sessionId=522813171",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+        "https://content-api.29cm.co.kr/api/v4/campaigns/head-banners"
+      ],
+      "imageHosts": [
+        "asset.29cm.co.kr",
+        "img.29cm.co.kr"
+      ],
+      "pass": true,
+      "hrefDiag": {
+        "counts": {
+          "productCatalog": 0,
+          "productAny": 203,
+          "productOnly": 0
+        },
+        "samples": [
+          "https://www.29cm.co.kr/my-page/heart/product",
+          "https://www.29cm.co.kr/best-products",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        ]
+      },
+      "largestXhrUrl": "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+      "largestXhrBytes": 76376
+    },
+    {
+      "attempt": 3,
+      "htmlBytes": 798170,
+      "productHrefCount": 203,
+      "jsonXhrCount": 9,
+      "cloudflareIntercept": false,
+      "capturedXhrUrls": [
+        "https://display-bff-api.29cm.co.kr/api/v1/menu/category-plp?largeCategoryCode=268100100",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/facet-group",
+        "https://flag.29cm.co.kr/proxy?environment=production&appName=frontend-29cm-platform&sessionId=619955779",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/sorts?pageType=CATEGORY_PLP",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+        "https://content-api.29cm.co.kr/api/v4/campaigns/head-banners",
+        "https://cache.29cm.co.kr/notice/?limit=5&notice_type=official",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count"
+      ],
+      "imageHosts": [
+        "asset.29cm.co.kr",
+        "img.29cm.co.kr"
+      ],
+      "pass": true,
+      "hrefDiag": {
+        "counts": {
+          "productCatalog": 0,
+          "productAny": 203,
+          "productOnly": 0
+        },
+        "samples": [
+          "https://www.29cm.co.kr/my-page/heart/product",
+          "https://www.29cm.co.kr/best-products",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        ]
+      },
+      "largestXhrUrl": "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+      "largestXhrBytes": 76376
+    },
+    {
+      "attempt": 4,
+      "htmlBytes": 798107,
+      "productHrefCount": 203,
+      "jsonXhrCount": 9,
+      "cloudflareIntercept": false,
+      "capturedXhrUrls": [
+        "https://display-bff-api.29cm.co.kr/api/v1/menu/category-plp?largeCategoryCode=268100100",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/facet-group",
+        "https://flag.29cm.co.kr/proxy?environment=production&appName=frontend-29cm-platform&sessionId=620901217",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/sorts?pageType=CATEGORY_PLP",
+        "https://content-api.29cm.co.kr/api/v4/campaigns/head-banners",
+        "https://cache.29cm.co.kr/notice/?limit=5&notice_type=official",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count"
+      ],
+      "imageHosts": [
+        "asset.29cm.co.kr",
+        "img.29cm.co.kr"
+      ],
+      "pass": true,
+      "hrefDiag": {
+        "counts": {
+          "productCatalog": 0,
+          "productAny": 203,
+          "productOnly": 0
+        },
+        "samples": [
+          "https://www.29cm.co.kr/my-page/heart/product",
+          "https://www.29cm.co.kr/best-products",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        ]
+      },
+      "largestXhrUrl": "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+      "largestXhrBytes": 76376
+    },
+    {
+      "attempt": 5,
+      "htmlBytes": 798170,
+      "productHrefCount": 203,
+      "jsonXhrCount": 9,
+      "cloudflareIntercept": false,
+      "capturedXhrUrls": [
+        "https://display-bff-api.29cm.co.kr/api/v1/menu/category-plp?largeCategoryCode=268100100",
+        "https://flag.29cm.co.kr/proxy?environment=production&appName=frontend-29cm-platform&sessionId=437281771",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+        "https://content-api.29cm.co.kr/api/v4/campaigns/head-banners",
+        "https://cache.29cm.co.kr/notice/?limit=5&notice_type=official",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/facet-group",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/sorts?pageType=CATEGORY_PLP",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+        "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count"
+      ],
+      "imageHosts": [
+        "asset.29cm.co.kr",
+        "img.29cm.co.kr"
+      ],
+      "pass": true,
+      "hrefDiag": {
+        "counts": {
+          "productCatalog": 0,
+          "productAny": 203,
+          "productOnly": 0
+        },
+        "samples": [
+          "https://www.29cm.co.kr/my-page/heart/product",
+          "https://www.29cm.co.kr/best-products",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3882178?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode=",
+          "https://product.29cm.co.kr/catalog/3185392?categoryLargeCode=268100100&categoryMediumCode=&categorySmallCode="
+        ]
+      },
+      "largestXhrUrl": "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+      "largestXhrBytes": 76376
+    }
+  ],
+  "passCount": 5,
+  "reliability": 1,
+  "req007Pass": true,
+  "imageHosts": [
+    "asset.29cm.co.kr",
+    "img.29cm.co.kr"
+  ],
+  "topXhrEndpoints": [
+    [
+      "https://display-bff-api.29cm.co.kr/api/v1/listing/items/count",
+      10
+    ],
+    [
+      "https://display-bff-api.29cm.co.kr/api/v1/menu/category-plp",
+      5
+    ],
+    [
+      "https://cache.29cm.co.kr/notice/",
+      5
+    ],
+    [
+      "https://flag.29cm.co.kr/proxy",
+      5
+    ],
+    [
+      "https://display-bff-api.29cm.co.kr/api/v1/listing/items",
+      5
+    ],
+    [
+      "https://content-api.29cm.co.kr/api/v4/campaigns/head-banners",
+      5
+    ],
+    [
+      "https://display-bff-api.29cm.co.kr/api/v1/listing/facet-group",
+      5
+    ],
+    [
+      "https://display-bff-api.29cm.co.kr/api/v1/listing/sorts",
+      5
+    ]
+  ],
+  "bestXhrUrl": "https://display-bff-api.29cm.co.kr/api/v1/listing/items?colorchipVariant=control",
+  "bestXhrBytes": 76376,
+  "tosKeywordMatches": {
+    "자동화": 2,
+    "크롤": 1,
+    "스크래": 0,
+    "봇": 1,
+    "로봇": 1,
+    "데이터 수집": 0,
+    "추출": 2,
+    "agent": 1,
+    "robot": 1,
+    "scrape": 0,
+    "crawl": 1,
+    "automated": 0,
+    "automation": 0,
+    "AI 학습": 0,
+    "머신러닝": 0
+  },
+  "tosBodyChars": 33305,
+  "capturedAt": "2026-05-06T08:45:26.517Z"
+}

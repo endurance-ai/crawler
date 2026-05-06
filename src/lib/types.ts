@@ -50,7 +50,7 @@ export interface Product {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm"
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
@@ -145,6 +145,17 @@ export interface SiteConfig {
    * SPEC: SPEC-PLATFORM-EXPANSION-003 REQ-001
    */
   categoryUrls?: string[]
+  /**
+   * 29CM-specific: numeric L1 category codes (`categoryLargeCode`)
+   * consumed by `crawl29cm`. The engine constructs landing-page URLs
+   * `https://www.29cm.co.kr/store/category/list?categoryLargeCode={CODE}
+   * &sort=RECOMMENDED` at runtime and intercepts the
+   * `display-bff-api.29cm.co.kr/api/v1/listing/items` JSON XHR. Only
+   * consumed when `type === "29cm"`. Distinct from `apiCategoryPaths`
+   * (Uniqlo string tuples) and `categoryUrls` (ZARA full URLs).
+   * SPEC: SPEC-PLATFORM-EXPANSION-004 REQ-001
+   */
+  apiCategoryCodes?: number[]
   /** 비활성화 */
   disabled?: boolean
   /** 메모 */
