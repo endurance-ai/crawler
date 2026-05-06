@@ -1,12 +1,14 @@
 ---
 id: SPEC-PLATFORM-EXPANSION-005
-version: 0.1.0
-status: draft
+version: 1.0.0
+status: shipped
 created_at: "2026-05-06"
 updated_at: "2026-05-06"
+shipped_at: "2026-05-06"
 author: hansangho
 priority: high
 issue_number: 0
+pr_number: 5
 labels: [crawler, platform, zara, zara-us, playwright, region-parameterization, infrastructure]
 ---
 
@@ -14,6 +16,7 @@ labels: [crawler, platform, zara, zara-us, playwright, region-parameterization, 
 
 | Date | Version | Summary |
 |---|---|---|
+| 2026-05-06 | v1.0.0 | Run phase completed and shipped via PR #5 (commit fedaee8). All three HARD preconditions cleared 2026-05-06: **REQ-007** Akamai bypass 5/5 (100%) with `chromium.launch({channel:"chrome"})` against `zara.com/us/en/woman-new-in-l1180.html`; **REQ-008** US English ToS captured from canonical PDF located via SPA homepage footer (`static.zara.net/static/pdfs/US/terms-and-conditions/terms-and-conditions-en_US-20250829.pdf`, last modified 2025-08-26) — verdict **AMBIGUOUS-ACCEPTED-BY-OWNER** (no automation keyword present in 24-page scan; §17 IP rights structurally analogous to ZARA KR §15 with slightly more explicit "may not download or save a copy of any of the Materials" wording). Verbatim §3 + §17 English clauses embedded at top of `src/lib/zara-engine.ts` alongside KR Korean clauses; **REQ-009** live URL verification 17/18 PASS — `man-outerwear-l715` removed from `categoryUrls` because page renders cards but does NOT fire `/us/en/category/{id}/products?ajax=true` AJAX endpoint (engine XHR-interception cannot harvest). Run-phase IMPROVE finding: ZARA US `price` field encodes USD as **integer cents** (raw 14900 = $149.00), distinct from KR which is integer KRW; engine adds `normalizeZaraPrice(rawPrice, region)` helper to bridge. P1 review fixes: `buildZaraProductUrlPattern` slug regex tightened to URL-safe charset `[A-Za-z0-9%.\-]+` (path-traversal hardening); `import-products.ts` `source_price` sanitized; dedup last-wins replaced with non-null-prefer merge (`sale_price`/`gender`/`color`/etc.); legacy Shopify KRW-format cache auto-rejected at import time. Schema migration 036 (companion PR `app#36`) added `products.source_currency` + `products.source_price` columns for global pricing display; admin UI shows USD-first / KRW-fallback via `formatProductPrice` helper. zara-us SiteConfig active (`disabled` removed); 17 categoryUrls (10 Women + 7 Men). Tests: 70/70 (KR 11 bit-for-bit preserved + US 8 new helper units + parameterized fixture). |
 | 2026-05-06 | v0.1.0 | Initial draft. Adds ZARA US storefront (`zara.com/us/en`) as the 36th registered platform — second ZARA region after KR (SPEC-003), structural cross-product of SPEC-002 region pattern (Uniqlo KR + US shared engine) and SPEC-003 ZARA engine. Five user-confirmed decisions baked in: (1) **region scope** — ZARA US only (`zara.com/us/en`); other regions (ES, EU, UK, JP, AU, etc.) are NOT in scope and require their own SPEC; (2) **catalog scope** — Women + Men full fashion catalog (18 L2 landings verified via `sitemap-category-us-en.xml.gz` 2026-05-06); Kids/Baby out of scope (mirrors SPEC-003); (3) **engine architecture** — region-parameterize the existing `src/lib/zara-engine.ts` per SPEC-002 Uniqlo precedent; one engine module handles both KR and US; do NOT create `zara-us-engine.ts`; (4) **currency** — USD-native cache, USD→KRW conversion at import time via existing `src/lib/fx.ts` (`FX_TO_KRW.USD = 1430` already populated by SPEC-002); no engine-time conversion; no live FX API; (5) **soak gate** — removed by user direction 2026-05-05; SPEC-005 proceeds in parallel with SPEC-003/004 production. Three Run-phase HARD preconditions encoded as REQ-007 (Akamai bypass 5x reliability against US — KR's verification CANNOT be substituted for US), REQ-008 (US English ToS captured live in Playwright; canonical PDF NOT discoverable at plan phase per research.md §1.2), and REQ-009 (live `categoryUrls` URL-list verification — KR L-codes do NOT transfer naively; research.md §1.5 documents 5+ verified collisions). |
 
 ---
