@@ -2,7 +2,7 @@
   "name": "crawler",
   "version": "0.1.0",
   "private": true,
-  "description": "Fashion SKU crawler for Portal.ai — Cafe24 + Shopify harvester writing into Supabase + R2",
+  "description": "Fashion SKU crawler for kiko.ai — Cafe24 + Shopify harvester writing into Supabase + R2",
   "type": "module",
   "engines": {
     "node": ">=22.0.0",
