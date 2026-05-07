@@ -19,7 +19,7 @@ crawler/
 │   ├── test-detail-crawl.ts      # Dev utility: run detail crawl on a single product URL
 │   ├── test-parser.ts            # Dev utility: test parser output against a live page
 │   ├── configs/
-│   │   ├── platforms.ts          # Array of 44 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR/US, +29CM KR, +Farfetch KR/US, +Slam Jam, +Antonioli, +Browns, +Mohawk General, +Union LA)
+│   │   ├── platforms.ts          # Array of 46 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR/US, +29CM KR, +Farfetch KR/US, +Slam Jam, +Antonioli, +Browns, +Mohawk General, +Union LA, +Concepts, +18 East)
 │   │   └── analyze-prompt.ts     # LiteLLM system prompt for image analysis
 │   └── lib/
 │       ├── types.ts              # Shared TypeScript interfaces (Product, SiteConfig, CrawlResult)
@@ -68,7 +68,7 @@ crawler/
 
 ```
 configs/platforms.ts
-  └─ SiteConfig[] (44 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch")
+  └─ SiteConfig[] (46 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch")
         │
         ▼
 src/crawl.ts  (engine selection)

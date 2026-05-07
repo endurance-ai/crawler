@@ -824,6 +824,26 @@ export const PLATFORMS: SiteConfig[] = [
     crawlDelay: 1500,
     notes: "Union Los Angeles. Japanese heritage + US streetwear luxury. ~53 vendors observed 2026-05-07: Union LA(자체)/RRR123/Kapital/A.PRESSE/Visvim/Jacques Marie Mage/Martine Rose/Patta/Aaron Levine. Japanese heritage brand selection unmatched by other registered platforms. SPEC-PLATFORM-EXPANSION-008.",
   },
+  {
+    key: "concepts",
+    name: "Concepts",
+    type: "shopify",
+    baseUrl: "https://cncpts.com",
+    sourceCurrency: "USD",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "Concepts Boston, sneakers + contemporary multi-brand. ~72 vendors observed 2026-05-07: Nike(133)/Adidas(117)/NB(83)/Jordan(71)/BAPE(61)/GANNI(58)/Stone Island(45)/Honor The Gift(35)/Dime(27)/Danielle Guizio(26). New value vs existing catalog: BAPE, Stone Island, Dime, Honor The Gift. SPEC-PLATFORM-EXPANSION-008 round 2.",
+  },
+  {
+    key: "18east",
+    name: "18 East",
+    type: "shopify",
+    baseUrl: "https://18east.co",
+    sourceCurrency: "USD",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "18 East NYC indie designer single-brand DTC (~90% in-house: 357/398 SKU). Auxiliary vendors: ROTOTO, REVOLUTION KNITS, KEEN, NANGA. Standalone 18 East catalog parallel to other DTC entries (ALD/Kith/Stussy). SPEC-PLATFORM-EXPANSION-008 round 2.",
+  },
 
   // ─── Uniqlo (KR) — first non-Cafe24/non-Shopify engine ───────────────
   // SPEC: SPEC-PLATFORM-EXPANSION-001
