@@ -24,12 +24,21 @@ import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
 import {
   crawl29cm,
+  genderFromCategoryCode as genderFor29cm,
+  harvestRawItems as harvest29cmItems,
   is29cmCloudflareChallenge,
   parseProductsFromXhr as parse29cmXhr,
   pick29cmUserAgent,
-  genderFromCategoryCode as genderFor29cm,
-  harvestRawItems as harvest29cmItems,
 } from "./lib/29cm-engine"
+import {
+  crawlFarfetch,
+  deriveGenderFromUrl as deriveFarfetchGender,
+  detectChallengeIntercept as detectFarfetchChallenge,
+  extractCardsFromDom as extractFarfetchCards,
+  type FarfetchRegion,
+  parseProductsFromCards as parseFarfetchCards,
+  pickFarfetchUserAgent,
+} from "./lib/farfetch-engine"
 import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
@@ -252,6 +261,84 @@ async function probeSite(config: SiteConfig) {
     return
   }
 
+  if (config.type === "farfetch") {
+    const allUrls = config.categoryUrls ?? []
+    if (allUrls.length === 0) {
+      console.log(`   ❌ ${config.key}: categoryUrls is empty — cannot probe`)
+      return
+    }
+    // Top-level pages (`/men/items.aspx`, `/women/items.aspx`) are
+    // curated showcases without per-card brand/price text. Prefer L2
+    // landings (slugs like `/clothing-2/`, `/shoes-2/`) so the probe
+    // exercises the parser's product-extraction path.
+    const isL2 = (u: string) => /\/(?:men|women|kids)\/[^/]+\/items\.aspx$/.test(u)
+    const probeOrder = [...allUrls.filter(isL2), ...allUrls.filter((u) => !isL2(u))]
+    let browser
+    try {
+      browser = await chromium.launch({headless: true, channel: "chrome"})
+    } catch (err) {
+      console.log(`   ❌ Chromium (channel:'chrome') launch failed: ${err}`)
+      console.log(`      Install with: npx playwright install chrome`)
+      return
+    }
+    const region: FarfetchRegion = config.region === "US" ? "US" : "KR"
+    const sourceCurrency: "KRW" | "USD" = region === "US" ? "USD" : "KRW"
+    const MAX_PROBE_URLS = 3
+    try {
+      const ctx = await browser.newContext({
+        userAgent: pickFarfetchUserAgent(0),
+        viewport: {width: 1440, height: 900},
+        ...(region === "US"
+          ? {locale: "en-US", timezoneId: "America/New_York"}
+          : {locale: "ko-KR", timezoneId: "Asia/Seoul"}),
+      })
+      const page = await ctx.newPage()
+      let probeSucceeded = false
+      for (let i = 0; i < Math.min(MAX_PROBE_URLS, probeOrder.length); i++) {
+        const url = probeOrder[i]!
+        if (i > 0) await page.waitForTimeout(2000)
+        console.log(`   ⏳ [${i + 1}/${Math.min(MAX_PROBE_URLS, probeOrder.length)}] ${url}`)
+        const response = await page.goto(url, {waitUntil: "domcontentloaded", timeout: 30000})
+        const body = await page.content()
+        const title = await page.title()
+        const intercept = detectFarfetchChallenge(body, title)
+        if (intercept.isIntercept) {
+          console.log(`      ❌ intercept detected (${intercept.reason}); body=${body.length} bytes`)
+          continue
+        }
+        try {
+          await page.waitForSelector('[data-component*="ProductCard"]', {timeout: 15000})
+        } catch {}
+        for (let s = 0; s < 4; s++) {
+          await page.evaluate((y: number) => window.scrollTo(0, y), (s + 1) * 800).catch(() => {})
+          await page.waitForTimeout(400)
+        }
+        const cards = await extractFarfetchCards(page)
+        const gender = deriveFarfetchGender(url)
+        const products = parseFarfetchCards(cards, config.baseUrl, config.key, region, sourceCurrency, gender)
+        console.log(`      HTTP=${response?.status()} cards=${cards.length} products=${products.length}`)
+        if (products.length > 0) {
+          console.log(`   ✅ Farfetch DOM-scrape OK; sample 3:`)
+          for (const p of products.slice(0, 3)) {
+            console.log(`      ${p.priceFormatted} — ${p.brand} ${p.name.slice(0, 30)} → ${p.productUrl.slice(0, 80)}`)
+          }
+          probeSucceeded = true
+          break
+        }
+        console.log(`      ⚠️  cards extracted but no product parsed (likely curated/top-level page) — trying next URL`)
+      }
+      if (!probeSucceeded) {
+        console.log(`   ❌ all probed URLs returned 0 parsed products — selector drift or empty catalog`)
+      }
+      await ctx.close()
+    } catch (err) {
+      console.log(`   ❌ probe failed: ${err}`)
+    } finally {
+      await browser.close().catch(() => {})
+    }
+    return
+  }
+
   if (config.type === "shopify") {
     try {
       const res = await fetch(`${config.baseUrl}/products.json?limit=1`)
@@ -366,6 +453,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   const uniqloSites = configs.filter((c) => c.type === "uniqlo")
   const zaraSites = configs.filter((c) => c.type === "zara")
   const twentyninecmSites = configs.filter((c) => c.type === "29cm")
+  const farfetchSites = configs.filter((c) => c.type === "farfetch")
 
   // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
   if (uniqloSites.length > 0) {
@@ -459,21 +547,60 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
     }
   }
 
-  // Shopify (브라우저 불필요 — 전부 병렬)
-  if (shopifySites.length > 0) {
-    const shopifyResults = await Promise.all(
-      shopifySites.map(async (config) => {
-        try {
-          const result = await crawlShopify(config)
-          saveResult(outDir, result)
-          return result
-        } catch (err) {
-          console.error(`❌ ${config.name} 크롤 실패:`, err)
-          return null
+  // Farfetch — sequential (each crawl launches its own Chromium internally;
+  // mirrors ZARA's per-engine browser-launch pattern).
+  if (farfetchSites.length > 0) {
+    for (const config of farfetchSites) {
+      const robots = await checkRobots(config.baseUrl)
+      if (!robots.allowed) {
+        console.error(
+          `❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
+            `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
+        )
+        process.exit(1)
+      }
+    }
+    for (const config of farfetchSites) {
+      try {
+        if (dryRun) {
+          await probeSite(config)
+          continue
         }
-      })
-    )
-    results.push(...shopifyResults.filter((r): r is CrawlResult => r !== null))
+        const result = await crawlFarfetch(config)
+        saveResult(outDir, result)
+        results.push(result)
+      } catch (err) {
+        console.error(`❌ ${config.name} 크롤 실패:`, err)
+      }
+    }
+  }
+
+  // Shopify — sequential per site (fetch-based, no browser needed) with
+  // inter-site delay to respect Shopify/Cloudflare per-IP rate limits.
+  // Empirical 2026-05-07: parallel Promise.all of 10 sites triggered
+  // HTTP 429 across most of them; cooldown was ~10–30 minutes.
+  // Sequential + 5-sec inter-site delay keeps total throughput well below
+  // Shopify's per-IP burst threshold while preserving correctness.
+  // SPEC-PLATFORM-EXPANSION-007 v0.2.2 (2026-05-07).
+  if (shopifySites.length > 0) {
+    const SHOPIFY_INTER_SITE_DELAY_MS = 5000
+    for (let i = 0; i < shopifySites.length; i++) {
+      const config = shopifySites[i]!
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, SHOPIFY_INTER_SITE_DELAY_MS))
+      }
+      try {
+        if (dryRun) {
+          await probeSite(config)
+          continue
+        }
+        const result = await crawlShopify(config)
+        saveResult(outDir, result)
+        results.push(result)
+      } catch (err) {
+        console.error(`❌ ${config.name} 크롤 실패:`, err)
+      }
+    }
   }
 
   // Cafe24 — 사이트별 병렬 (PARALLEL_LIMIT개씩)
@@ -626,7 +753,16 @@ async function main() {
   if (flags.all) {
     targets = getActivePlatforms()
   } else if (typeof flags.type === "string") {
-    targets = getPlatformsByType(flags.type as SiteConfig["type"])
+    // SPEC-PLATFORM-AUTOMATION-009 (2026-05-07): support comma-separated
+    // types so cron can run e.g. `--type=shopify,uniqlo,zara,29cm,farfetch`
+    // (Cafe24 KR self-brands excluded from daily cron by user direction).
+    const types = flags.type.split(",").map((t) => t.trim()).filter(Boolean)
+    const seen = new Set<string>()
+    for (const t of types) {
+      for (const c of getPlatformsByType(t as SiteConfig["type"])) {
+        if (!seen.has(c.key)) { seen.add(c.key); targets.push(c) }
+      }
+    }
   } else if (typeof flags.site === "string") {
     const keys = flags.site.split(",")
     for (const key of keys) {
@@ -637,26 +773,48 @@ async function main() {
         console.error(`❌ 알 수 없는 플랫폼: ${key} (--list로 확인)`)
       }
     }
-  } else {
+  }
+
+  // Apply exclusions (combine with any of --all/--type/--site selections).
+  // SPEC-PLATFORM-AUTOMATION-009 (2026-05-07).
+  if (typeof flags["exclude-type"] === "string") {
+    const excludeTypes = new Set(
+      flags["exclude-type"].split(",").map((t) => t.trim()).filter(Boolean)
+    )
+    targets = targets.filter((c) => !excludeTypes.has(c.type))
+  }
+  if (typeof flags["exclude-site"] === "string") {
+    const excludeSites = new Set(
+      flags["exclude-site"].split(",").map((s) => s.trim()).filter(Boolean)
+    )
+    targets = targets.filter((c) => !excludeSites.has(c.key))
+  }
+
+  if (targets.length === 0 && !flags.list && !flags.probe) {
     console.log(`
 🕷️ 범용 플랫폼 크롤러
 
 사용법:
-  npx tsx scripts/crawl.ts --list                     등록된 플랫폼 목록
-  npx tsx scripts/crawl.ts --site=obscura             단일 사이트 크롤
-  npx tsx scripts/crawl.ts --site=obscura,llud        복수 사이트
-  npx tsx scripts/crawl.ts --all                      전체 크롤링
-  npx tsx scripts/crawl.ts --type=cafe24              타입별 크롤링
-  npx tsx scripts/crawl.ts --probe=obscura            사이트 구조 프로빙
-  npx tsx scripts/crawl.ts --dry-run --site=obscura   카테고리만 탐색
+  npx tsx scripts/crawl.ts --list                                등록된 플랫폼 목록
+  npx tsx scripts/crawl.ts --site=obscura                        단일 사이트 크롤
+  npx tsx scripts/crawl.ts --site=obscura,llud                   복수 사이트
+  npx tsx scripts/crawl.ts --all                                 전체 크롤링
+  npx tsx scripts/crawl.ts --type=cafe24                         단일 타입
+  npx tsx scripts/crawl.ts --type=shopify,uniqlo,zara,29cm,farfetch   복수 타입
+  npx tsx scripts/crawl.ts --all --exclude-type=cafe24           Cafe24 제외 전체
+  npx tsx scripts/crawl.ts --all --exclude-site=heights-store    특정 사이트 제외
+  npx tsx scripts/crawl.ts --probe=obscura                       사이트 구조 프로빙
+  npx tsx scripts/crawl.ts --dry-run --site=obscura              카테고리만 탐색
 
 옵션:
-  --list        등록된 플랫폼 목록
-  --site=KEY    크롤링 대상 (콤마 구분)
-  --all         전체 활성 플랫폼
-  --type=TYPE   cafe24 / shopify
-  --probe=KEY   사이트 구조 확인
-  --dry-run     카테고리 탐색만 (상품 안 긁음)
+  --list                  등록된 플랫폼 목록
+  --site=KEY[,KEY,...]    크롤링 대상 (콤마 구분)
+  --all                   전체 활성 플랫폼
+  --type=TYPE[,TYPE,...]  타입별: cafe24, shopify, uniqlo, zara, 29cm, farfetch (콤마 구분)
+  --exclude-type=TYPE     선택된 타겟에서 타입 제외 (--all과 조합)
+  --exclude-site=KEY      선택된 타겟에서 사이트 제외
+  --probe=KEY             사이트 구조 확인
+  --dry-run               카테고리 탐색만 (상품 안 긁음)
   --detail      상세 페이지 크롤링 (description, color, material 수집)
   --reviews     리뷰 크롤링 (--detail 없이도 가능, 리뷰 보드 페이지 기반)
 `)

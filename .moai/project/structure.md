@@ -19,7 +19,7 @@ crawler/
 │   ├── test-detail-crawl.ts      # Dev utility: run detail crawl on a single product URL
 │   ├── test-parser.ts            # Dev utility: test parser output against a live page
 │   ├── configs/
-│   │   ├── platforms.ts          # Array of 37 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR/US, +29CM KR)
+│   │   ├── platforms.ts          # Array of 42 SiteConfig entries (platform registry; +Uniqlo KR/US, +ZARA KR/US, +29CM KR, +Farfetch KR/US, +Slam Jam, +Antonioli, +Browns)
 │   │   └── analyze-prompt.ts     # LiteLLM system prompt for image analysis
 │   └── lib/
 │       ├── types.ts              # Shared TypeScript interfaces (Product, SiteConfig, CrawlResult)
@@ -28,6 +28,7 @@ crawler/
 │       ├── uniqlo-engine.ts      # Uniqlo fetch engine (region-parameterized: KR + US)
 │       ├── zara-engine.ts        # ZARA Playwright engine (channel:'chrome' + XHR-interception; region-parameterized: KR + US; SPEC-003/005)
 │       ├── 29cm-engine.ts        # 29CM KR Playwright engine (vanilla headless + XHR-interception, Cloudflare-passive, SPEC-004)
+│       ├── farfetch-engine.ts    # Farfetch Playwright engine (channel:'chrome' + DOM-scrape; region-parameterized: KR + US; SPEC-006)
 │       ├── fx.ts                 # Shared FX_TO_KRW table + convertToKrw (lifted from shopify-engine)
 │       ├── robots-check.ts       # robots.txt blanket-Disallow detector (engine-agnostic)
 │       ├── product-analyzer.ts   # LiteLLM analysis wrapper
@@ -67,7 +68,7 @@ crawler/
 
 ```
 configs/platforms.ts
-  └─ SiteConfig[] (37 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm")
+  └─ SiteConfig[] (42 entries, type: "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch")
         │
         ▼
 src/crawl.ts  (engine selection)
@@ -83,11 +84,21 @@ src/crawl.ts  (engine selection)
   │                            Browser locale/timezone driven by region. sourceCurrency
   │                            stored native (KRW or USD); convertToKrw applied at import
   │                            time via fx.ts. SPEC-003 (KR), SPEC-005 (US).)
-  └─ type === "29cm"    →  lib/29cm-engine.ts crawl29cm()       (Playwright vanilla headless;
-                               Cloudflare-passive (no JS challenge). Engine intercepts the
-                               display-bff-api.29cm.co.kr/api/v1/listing/items XHR JSON
-                               and parses the embedded product shape. apiCategoryCodes:
-                               numeric L1 codes → URL constructed at runtime; SPEC-004)
+  ├─ type === "29cm"    →  lib/29cm-engine.ts crawl29cm()       (Playwright vanilla headless;
+  │                            Cloudflare-passive (no JS challenge). Engine intercepts the
+  │                            display-bff-api.29cm.co.kr/api/v1/listing/items XHR JSON
+  │                            and parses the embedded product shape. apiCategoryCodes:
+  │                            numeric L1 codes → URL constructed at runtime; SPEC-004)
+  └─ type === "farfetch"→  lib/farfetch-engine.ts crawlFarfetch() (Playwright channel:"chrome" required;
+                               same Akamai bypass as ZARA. Engine walks SSR'd
+                               [data-component*="ProductCard"] DOM via page.evaluate
+                               (DOM-scrape, NOT XHR-interception — Farfetch SSRs the
+                               product list directly). Region-parameterized: config.region
+                               drives KR (server-geo, KRW-native) vs US (locale=en-US,
+                               USD-native). Pagination quirk: ?page=N returns 4xx with
+                               populated body — engine treats 4xx + cards>=10 as success.
+                               3 sec/page pacing (more conservative than ZARA's 2 sec).
+                               SPEC-006 (KR + US extension by user 2026-05-07).)
         │
         ▼
 CrawlResult { platform, products[], stats, errors[] }
