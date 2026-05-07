@@ -1,0 +1,236 @@
+{
+  "_meta": {
+    "capturedAt": "2026-05-06T16:28:44.674Z",
+    "capturedFrom": "https://www.farfetch.com/kr/shopping/men/clothing-2/items.aspx",
+    "cardCount": 32,
+    "spec": "SPEC-PLATFORM-EXPANSION-006 REQ-010 PRESERVE",
+    "operator": "hansangho",
+    "notes": "Frozen DOM extraction snapshot. Refresh on selector drift or seasonal redesign."
+  },
+  "cards": [
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/ralph-lauren-rrl--item-30688530.aspx",
+      "name": "와이드 진",
+      "brand": "Ralph Lauren RRL",
+      "priceText": "₩659,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/30/68/85/30/30688530_59744076_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/bode--item-35182773.aspx",
+      "name": "레이크우드 로고 패치 패널 셔츠",
+      "brand": "BODE",
+      "priceText": "₩730,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/35/18/27/73/35182773_66799386_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/lemaire--item-30582033.aspx",
+      "name": "박시 핏 데님 재킷",
+      "brand": "LEMAIRE",
+      "priceText": "₩1,050,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/30/58/20/33/30582033_60518506_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/moschino--item-32952674.aspx",
+      "name": "그래픽 프린트 스윔 쇼츠",
+      "brand": "Moschino",
+      "priceText": "₩319,000₩239,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/95/26/74/32952674_63379500_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/our-legacy--item-34006644.aspx",
+      "name": "체크 체스트 포켓 셔츠",
+      "brand": "OUR LEGACY",
+      "priceText": "₩566,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/00/66/44/34006644_65028739_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/deus-ex-machina--item-34806012.aspx",
+      "name": "엠포리움 니너 카 그래픽 티셔츠",
+      "brand": "Deus Ex Machina",
+      "priceText": "₩125,000₩94,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/80/60/12/34806012_66369410_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/ami-paris--item-35203974.aspx",
+      "name": "코튼 아미 드 쾨흐 폴로",
+      "brand": "AMI Paris",
+      "priceText": "₩547,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/35/20/39/74/35203974_66593230_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/adidas-x-item-34802022.aspx",
+      "name": "X 아디다스 로고 패치 메시 쇼츠",
+      "brand": "adidas",
+      "priceText": "₩311,000₩233,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/80/20/22/34802022_67736636_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/gallery-dept--item-32029749.aspx",
+      "name": "수비니어 티셔츠",
+      "brand": "GALLERY DEPT.",
+      "priceText": "₩559,000₩419,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/02/97/49/32029749_61766586_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/kidsuper--item-34855444.aspx",
+      "name": "스타 아플리케 집업 후디",
+      "brand": "KidSuper",
+      "priceText": "₩617,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/85/54/44/34855444_66493190_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/versace-jeans-couture--item-34029651.aspx",
+      "name": "로고 패치 셔츠",
+      "brand": "Versace Jeans Couture",
+      "priceText": "₩430,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/02/96/51/34029651_64947310_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/represent--item-34348208.aspx",
+      "name": "드림 온 투어 티셔츠",
+      "brand": "Represent",
+      "priceText": "₩261,000₩196,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/34/82/08/34348208_65404922_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/lemaire--item-33858733.aspx",
+      "name": "레더 칼라 셔츠 재킷",
+      "brand": "LEMAIRE",
+      "priceText": "₩1,170,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/33/85/87/33/33858733_64670146_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/vetements--item-33485319.aspx",
+      "name": "후드 집업",
+      "brand": "VETEMENTS",
+      "priceText": "₩1,481,000₩1,111,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/33/48/53/19/33485319_64680325_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/mm6-maison-margiela--item-30403131.aspx",
+      "name": "프린지 헴 진",
+      "brand": "MM6 Maison Margiela",
+      "priceText": "₩772,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/30/40/31/31/30403131_59308209_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/acne-studios--item-32951395.aspx",
+      "name": "후드 집업",
+      "brand": "Acne Studios",
+      "priceText": "₩1,260,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/95/13/95/32951395_66114603_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/stussy--item-33941169.aspx",
+      "name": "빌트 투 라스트 피그 다이 코튼 티셔츠",
+      "brand": "Stüssy",
+      "priceText": "₩124,000₩93,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/33/94/11/69/33941169_64825607_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/y-3--item-33294422.aspx",
+      "name": "반소매 티셔츠",
+      "brand": "Y-3",
+      "priceText": "₩157,000₩117,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/33/29/44/22/33294422_65464840_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/maniere-de-voir--item-34731963.aspx",
+      "name": "레니 휩스티치 티셔츠",
+      "brand": "Manière De Voir",
+      "priceText": "₩338,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/34/73/19/63/34731963_66860369_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/fear-of-god-essentials--item-32386851.aspx",
+      "name": "클래식 자수 후디",
+      "brand": "FEAR OF GOD ESSENTIALS",
+      "priceText": "₩340,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/38/68/51/32386851_63432090_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/ralph-lauren-rrl--item-30689266.aspx",
+      "name": "디스트레스드 스트레이트 진",
+      "brand": "Ralph Lauren RRL",
+      "priceText": "₩779,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/30/68/92/66/30689266_59575144_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/jacquemus--item-32611271.aspx",
+      "name": "로고 테이프 스트로베리 패치 티셔츠",
+      "brand": "Jacquemus",
+      "priceText": "₩322,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/61/12/71/32611271_62821570_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/our-legacy--item-23932038.aspx",
+      "name": "코튼 티셔츠",
+      "brand": "OUR LEGACY",
+      "priceText": "₩164,000₩123,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/23/93/20/38/23932038_57323832_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/polo-ralph-lauren-ny-item-32632383.aspx",
+      "name": "NY 양키스 봄버 재킷",
+      "brand": "Polo Ralph Lauren",
+      "priceText": "₩942,000₩706,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/63/23/83/32632383_64888176_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/misbhv--item-35088587.aspx",
+      "name": "로고 프린트 디스트레스드 티셔츠",
+      "brand": "MISBHV",
+      "priceText": "₩290,000₩218,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/35/08/85/87/35088587_67084950_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/y-3-3-item-33214697.aspx",
+      "name": "3 스트라이프 와이드 트랙팬츠",
+      "brand": "Y-3",
+      "priceText": "₩481,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/33/21/46/97/33214697_64798198_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/maniere-de-voir--item-35631845.aspx",
+      "name": "집업 넥 니트 폴로 셔츠",
+      "brand": "Manière De Voir",
+      "priceText": "₩191,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/35/63/18/45/35631845_66798598_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/gallery-dept--item-33592723.aspx",
+      "name": "그래픽 프린트 티셔츠",
+      "brand": "GALLERY DEPT.",
+      "priceText": "₩480,000₩360,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/33/59/27/23/33592723_64615520_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/jacquemus--item-32548586.aspx",
+      "name": "펠레 자수 그래픽 티셔츠",
+      "brand": "Jacquemus",
+      "priceText": "₩366,000₩275,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/54/85/86/32548586_64433106_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/acne-studios--item-32952159.aspx",
+      "name": "로고 장식 티셔츠",
+      "brand": "Acne Studios",
+      "priceText": "₩520,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/95/21/59/32952159_63931167_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/polo-ralph-lauren-3-item-16935000.aspx",
+      "name": "로고 자수 티셔츠 3팩 세트",
+      "brand": "Polo Ralph Lauren",
+      "priceText": "₩79,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/16/93/50/00/16935000_65129219_480.jpg"
+    },
+    {
+      "href": "https://www.farfetch.com/kr/shopping/men/fear-of-god-essentials--item-32386856.aspx",
+      "name": "클래식 후드 집업",
+      "brand": "FEAR OF GOD ESSENTIALS",
+      "priceText": "₩437,000₩328,000",
+      "imageUrl": "https://cdn-images.farfetch-contents.com/32/38/68/56/32386856_63431246_480.jpg"
+    }
+  ]
+}

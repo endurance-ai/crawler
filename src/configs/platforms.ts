@@ -16,7 +16,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://shopamomento.com",
     paginate: true,
-    maxPages: 20,
+    maxPages: 300,
     pricePattern: /KRW\s*([\d,]+)/,
     priceCurrency: "₩",
     category: {
@@ -50,7 +50,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://slowsteadyclub.com",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -71,7 +71,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://adekuver.com",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -100,7 +100,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://etcseoul.com",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -124,7 +124,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://visualaid.kr",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     defaultGender: ["women"],
     category: {
       discovery: "manual",
@@ -149,7 +149,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://www.8division.com",
     paginate: true,
-    maxPages: 20,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -173,7 +173,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://sculpstore.com",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -205,7 +205,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://fr8ight.co.kr",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -256,7 +256,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://eastlogue.com",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -289,7 +289,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://sienneboutique.com",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     defaultGender: ["women"],
     category: {
       discovery: "manual",
@@ -311,7 +311,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://mardimercredi.com",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     defaultGender: ["women"],
     category: {
       discovery: "manual",
@@ -340,7 +340,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://triplestore.co.kr",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -375,7 +375,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://noclaim.co.kr",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     category: { discovery: "auto" },
     defaultGender: ["unisex"],
     disabled: true,
@@ -387,7 +387,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://swallowlounge.co.kr",
     paginate: true,
-    maxPages: 15,
+    maxPages: 300,
     category: { discovery: "auto" },
     defaultGender: ["unisex"],
     notes: "성수동 편집샵. Crepuscule, Toga, Blurhms, Aton 등 50+ 브랜드. 10~50만원대",
@@ -398,7 +398,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://takeastreet.com",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -419,7 +419,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://chanceclothing.co.kr",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -440,7 +440,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://havatishop.com",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -482,7 +482,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://www.ptry.co.kr",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: { discovery: "auto" },
     defaultGender: ["unisex"],
     disabled: true,
@@ -494,7 +494,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://beslow.co.kr",
     paginate: true,
-    maxPages: 20,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -513,7 +513,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://anotheroffice.co.kr",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -537,7 +537,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://bastong.co.kr",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -552,7 +552,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://roughside.co.kr",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -581,7 +581,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://blankroom.house",
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: {
       discovery: "manual",
       categories: [
@@ -602,7 +602,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://steadyeverywear.com",
     disabled: true,
     paginate: true,
-    maxPages: 10,
+    maxPages: 300,
     category: { discovery: "auto" },
     defaultGender: ["unisex"],
     notes: "데일리 캐주얼. JS 렌더링 심해서 카테고리 구조 파악 불가",
@@ -673,7 +673,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://www.aimeleondore.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -682,7 +682,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://kith.com",
     sourceCurrency: "USD",
-    maxPages: 200,
+    maxPages: 300,
     crawlDelay: 1500,
     notes: "Multi-brand editorial, ~15~25k SKU 예상",
   },
@@ -692,7 +692,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://www.stussy.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -701,7 +701,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://noahny.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -710,7 +710,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://wearebraindead.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -719,7 +719,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://cactusplantfleamarket.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -728,7 +728,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://www.drakes.com",
     sourceCurrency: "GBP",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -737,7 +737,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://bdgastore.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -746,7 +746,7 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://032c.com",
     sourceCurrency: "EUR",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
   },
   {
@@ -755,8 +755,50 @@ export const PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://apc-us.com",
     sourceCurrency: "USD",
-    maxPages: 40,
+    maxPages: 300,
     crawlDelay: 1500,
+  },
+
+  // ─── Multi-brand editorial (Shopify) — SPEC-007 ──────────────────────
+  // Three Shopify-backed luxury/streetwear multi-brand editorials added
+  // 2026-05-07. Live probe (.moai/cache/spec-007-prep/probe.ts):
+  //   - Slam Jam:  127 vendors, 2500+ SKU sample, top: Nike/OAMC/adidas/Undercover
+  //   - Antonioli: 185 vendors, 2500+ SKU sample, top: Ann Demeulemeester/Rick Owens/Gucci/Balenciaga
+  //   - Browns:    347 vendors, 2500+ SKU sample, top: Zimmermann/The Row/Khaite/Jacquemus
+  // Per user memory `feedback_region_preference.md`: prefer global/US over
+  // KR localization. Engine sends `localization={GB,DE}` cookie via
+  // `CURRENCY_TO_COUNTRY` mapping → Shopify Markets returns native EUR/GBP
+  // prices (NOT auto-converted KRW). import-products.ts handles GBP→KRW
+  // (×1750) and EUR→KRW (×1560) at upsert time per SPEC-002 hook.
+  {
+    key: "slam-jam",
+    name: "Slam Jam",
+    type: "shopify",
+    baseUrl: "https://slamjam.com",
+    sourceCurrency: "EUR",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "Slam Jam Milan, 1989-est, streetwear/contemporary multi-brand editorial. ~127 vendors observed 2026-05-07; Nike/OAMC/adidas/Undercover/Puma top. Shopify Markets routes EUR via localization=DE cookie. SPEC-PLATFORM-EXPANSION-007. maxPages bumped 50→100 (2026-05-07).",
+  },
+  {
+    key: "antonioli",
+    name: "Antonioli",
+    type: "shopify",
+    baseUrl: "https://antonioli.eu",
+    sourceCurrency: "EUR",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "Antonioli Milan, 1987-est, luxury contemporary multi-brand editorial. ~185 vendors observed 2026-05-07; Ann Demeulemeester/Rick Owens/Gucci/Balenciaga/Prada/Loewe top. Shopify Markets routes EUR via localization=DE cookie (KR-IP would otherwise auto-route to KRW). SPEC-PLATFORM-EXPANSION-007. maxPages bumped 50→100 (2026-05-07).",
+  },
+  {
+    key: "browns",
+    name: "Browns Fashion",
+    type: "shopify",
+    baseUrl: "https://brownsfashion.com",
+    sourceCurrency: "GBP",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "Browns Fashion London, 1970-est, Farfetch group subsidiary with separate curation team. ~347 vendors observed 2026-05-07; Zimmermann/The Row/Le Gramme/Khaite/Tom Wood/Valentino top. Women's luxury heavy. Migrated to Shopify in 2024. Distinct SKU IDs from Farfetch (Shopify product handle vs Farfetch -item-{id}.aspx) — no Supabase dedup collision. Shopify Markets routes GBP via localization=GB cookie. SPEC-PLATFORM-EXPANSION-007. maxPages bumped 50→100 (2026-05-07) — first run hit 50-page cap at 12,495 products.",
   },
 
   // ─── Uniqlo (KR) — first non-Cafe24/non-Shopify engine ───────────────
@@ -998,6 +1040,106 @@ export const PLATFORMS: SiteConfig[] = [
       306100100, // 남성주얼리
     ],
     notes: "29CM KR Playwright + XHR-interception engine. Cloudflare passive (no JS challenge); vanilla headless:true sufficient — channel:'chrome' is documented escalation path. KRW-native, 2 sec/category, 5-UA rotation (one UA per browser context), robots-check enforced. ToS captured 2026-05-06: 제11조 제2항 9호 verbatim names '크롤러' (FORBIDS literal); OWNER OVERRIDE by hansangho 2026-05-06 conditioned on portal.ai-internal-use only + halt-on-cease-and-desist + 90-day re-verification. Lifestyle/design/books/kitchen/beauty/electronics categories out of scope.",
+  },
+
+  // ─── Farfetch (KR) — luxury multi-brand DOM-scrape engine ───────────
+  // SPEC: SPEC-PLATFORM-EXPANSION-006
+  // Engine: src/lib/farfetch-engine.ts is region-parameterized
+  //   (farfetch-kr + farfetch-us share one module per SPEC-006 §9 DDD).
+  //   `config.region` drives browser context locale + timezone, source
+  //   currency, price formatter. KR is server-geo-routed (KRW-native).
+  // Strategy: Playwright `channel:"chrome"` + DOM-scrape extraction
+  //   (Farfetch SSRs product cards directly; no XHR-interception).
+  //   Selector: `[data-component*="ProductCard"]`. Image hosts
+  //   whitelist: cdn-images.farfetch-contents.com, cdn-static.farfetch-
+  //   contents.com.
+  // Pacing: 3 sec/page (more conservative than ZARA's 2 sec — luxury
+  //   multi-brand has higher anti-bot monitoring potential).
+  // ToS: live-captured 2026-05-07 (REQ-008). §13 names "데이터 마이닝,
+  //   로봇, 데이터 수집 및 발췌 툴" generically and prohibits creating a
+  //   database from "가격 및 상품 리스트" without written consent.
+  //   Verdict: AMBIGUOUS-ACCEPTED-BY-OWNER (hansangho 2026-05-07).
+  //   Verbatim Korean clauses embedded at top of farfetch-engine.ts.
+  // categoryUrls: 8 sitemap-derived URLs verified 2026-05-07 via REQ-009
+  //   probe (KR multi-nav 8/8 pass at 3-sec pacing).
+  {
+    key: "farfetch-kr",
+    name: "파페치 (KR)",
+    type: "farfetch",
+    baseUrl: "https://www.farfetch.com/kr",
+    region: "KR",
+    sourceCurrency: "KRW",
+    crawlDelay: 3000,
+    // Top-level `/{gender}/items.aspx` URLs are deliberately omitted
+    // — they render curated showcase tiles without per-card brand/price
+    // text, yielding 0 parsed products (verified 2026-05-07 full crawl).
+    // Only L2 buckets carry the [data-component*="ProductCard"] grid
+    // with hydrated brand/name/price text. Sub-L2 segments (sale,
+    // jewellery, watches) are added defensively; the engine's 4xx-with-
+    // populated-body rule and abort-on-3 mechanism cover URL drift.
+    categoryUrls: [
+      // Men L2 (slug numbering verified 2026-05-07 via live nav DOM)
+      "https://www.farfetch.com/kr/shopping/men/clothing-2/items.aspx",
+      "https://www.farfetch.com/kr/shopping/men/shoes-2/items.aspx",
+      "https://www.farfetch.com/kr/shopping/men/bags-purses-2/items.aspx",
+      "https://www.farfetch.com/kr/shopping/men/accessories-all-2/items.aspx",
+      // Women L2
+      "https://www.farfetch.com/kr/shopping/women/clothing-1/items.aspx",
+      "https://www.farfetch.com/kr/shopping/women/shoes-1/items.aspx",
+      "https://www.farfetch.com/kr/shopping/women/bags-purses-1/items.aspx",
+      "https://www.farfetch.com/kr/shopping/women/accessories-all-1/items.aspx",
+    ],
+    notes: "Farfetch KR Playwright + DOM-scrape engine. channel:'chrome' (real Chrome required, similar Akamai posture to ZARA). KR-routed via IP geo-detection — KRW native, Korean product names. 3 sec/page pacing (more conservative than ZARA's 2 sec — luxury multi-brand has higher monitoring potential). 5-UA rotation (one UA per context), robots-check enforced. ToS captured 2026-05-07 (REQ-008): §13 names '데이터 마이닝, 로봇' generically + DB-from-price-list prohibition; verdict AMBIGUOUS-ACCEPTED-BY-OWNER (hansangho). Verbatim Korean clauses embedded in src/lib/farfetch-engine.ts top-of-file. REQ-007 Akamai bypass 8/8 pass with channel:'chrome' at 3-sec pacing 2026-05-07. REQ-009 categoryUrls live-verified 2026-05-07. Pagination ?page=N returns 4xx with populated body — engine treats 4xx + cards>=10 as success. portal.ai-internal-use only; halt-on-cease-and-desist; re-verify > 90 days OR Farfetch UK Limited (Coupang Inc.) communication OR ToS body change.",
+  },
+
+  // ─── Farfetch (US) — region=US shared engine, USD-native cache ──────
+  // SPEC: SPEC-PLATFORM-EXPANSION-006 (US extension by user request 2026-05-07)
+  // Engine: shares src/lib/farfetch-engine.ts with KR via region:'US'.
+  // Currency: USD-native cache; convertToKrw applied at import time via
+  //   existing src/lib/fx.ts (FX_TO_KRW.USD = 1430, populated by SPEC-002).
+  // ToS: same legal entity as KR. Farfetch's /terms-and-conditions/
+  //   serves Korean ToS text with notice "This section is currently only
+  //   available in Korean." — KR §13 binding text applies to US storefront.
+  // Verification status: REQ-007/009 for US storefront NOT empirically
+  //   verified from KR-resident operator IP (Farfetch geo-routes KR IPs
+  //   away from /shopping/{gender}/items.aspx to /kr/shopping/...).
+  //   Production deployment from US-routable infrastructure SHOULD re-run
+  //   the live multi-nav probe via `pnpm crawl --probe=farfetch-us`. The
+  //   region-parameterized engine is structurally symmetric to KR (same
+  //   Akamai vendor, same Playwright lifecycle, same DOM selectors).
+  //   Operator may set `disabled: true` if production probe fails.
+  {
+    key: "farfetch-us",
+    name: "Farfetch (US)",
+    type: "farfetch",
+    baseUrl: "https://www.farfetch.com",
+    region: "US",
+    sourceCurrency: "USD",
+    crawlDelay: 3000,
+    // KR-resident operator IP forces server-side geo-routing to /kr/
+    // regardless of locale header — verified 2026-05-07 (debug-us.ts:
+    // hrefs returned as /kr/shopping/... and prices as ₩, NOT $). The
+    // engine cannot harvest US-storefront cards without a US-routable
+    // egress (residential US IP, US datacenter, or cloud region in
+    // North America). Re-enable by removing `disabled: true` once
+    // production runs from US-routable infra AND `pnpm crawl
+    // --probe=farfetch-us` returns USD-priced products.
+    disabled: true,
+    // Top-level `/{gender}/items.aspx` omitted (curated showcase, 0
+    // parsed products). Same rationale as farfetch-kr.
+    categoryUrls: [
+      // Men L2 (mirrors KR slug structure)
+      "https://www.farfetch.com/shopping/men/clothing-2/items.aspx",
+      "https://www.farfetch.com/shopping/men/shoes-2/items.aspx",
+      "https://www.farfetch.com/shopping/men/bags-purses-2/items.aspx",
+      "https://www.farfetch.com/shopping/men/accessories-all-2/items.aspx",
+      // Women L2
+      "https://www.farfetch.com/shopping/women/clothing-1/items.aspx",
+      "https://www.farfetch.com/shopping/women/shoes-1/items.aspx",
+      "https://www.farfetch.com/shopping/women/bags-purses-1/items.aspx",
+      "https://www.farfetch.com/shopping/women/accessories-all-1/items.aspx",
+    ],
+    notes: "Farfetch US Playwright engine. Shares src/lib/farfetch-engine.ts with KR via region:'US' (SPEC-006 user-extension 2026-05-07). USD-native cache, USD→KRW import-time conversion via SPEC-002 fx.ts hook. KR §13 ToS body applies (Farfetch /terms-and-conditions/ serves Korean text with 'currently only available in Korean' notice; same legal entity). channel:'chrome' real Chrome required, 3-sec pacing, 5-UA rotation, robots-check enforced. REQ-007/009 NOT empirically verified from KR-resident IP (geo-routing forced); production deployment from US-routable infrastructure should re-run `pnpm crawl --probe=farfetch-us`. Set disabled:true if production probe fails. portal.ai-internal-use only; halt-on-cease-and-desist.",
   },
 ]
 

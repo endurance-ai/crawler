@@ -25,3 +25,4 @@ output/
 # MoAI session logs / traces
 .moai/logs/
 .moai/reports/
+.moai/cache/

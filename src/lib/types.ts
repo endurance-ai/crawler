@@ -50,7 +50,7 @@ export interface Product {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch"
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */

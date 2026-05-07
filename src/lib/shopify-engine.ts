@@ -21,6 +21,31 @@ import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 // Shopify handle은 kebab-case 영숫자로만 구성 (spec) — path injection 방지
 const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/
 
+/**
+ * Fetch with exponential backoff on HTTP 429 (rate-limited) and 503.
+ * Honors Retry-After header when present (seconds OR HTTP-date).
+ * Max 3 retries, then returns the last response so caller can record error.
+ *
+ * SPEC-PLATFORM-EXPANSION-007 v0.2.2 (2026-05-07): added after empirical
+ * observation that parallel Shopify dispatch triggered 429 across 8 sites.
+ */
+async function fetchWithBackoff(url: string, init: RequestInit): Promise<Response> {
+  const MAX_RETRIES = 3
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const res = await fetch(url, init)
+    if (res.status !== 429 && res.status !== 503) return res
+    if (attempt === MAX_RETRIES - 1) return res
+    const retryAfter = res.headers.get("Retry-After")
+    let waitMs = (attempt + 1) * 5000  // 5s → 10s → 15s default
+    if (retryAfter) {
+      const asInt = parseInt(retryAfter, 10)
+      if (!isNaN(asInt)) waitMs = Math.max(waitMs, asInt * 1000)
+    }
+    await new Promise((r) => setTimeout(r, waitMs))
+  }
+  return await fetch(url, init)
+}
+
 // 이미지 URL 화이트리스트 — Shopify CDN 또는 스토어 자체 도메인만 허용
 function isSafeImageUrl(src: string, baseHost: string): boolean {
   if (!src.startsWith("https://")) return false
@@ -98,10 +123,25 @@ export async function crawlShopify(config: SiteConfig): Promise<CrawlResult> {
   for (let page = 1; page <= maxPages; page++) {
     try {
       const url = `${config.baseUrl}/products.json?page=${page}&limit=250`
-      const res = await fetch(url, {
+      // Full Chrome-131 header set — node fetch's default header set
+      // (UA + Accept only) was being fingerprinted as bot by Cloudflare
+      // even though curl with same UA + Cookie returned 200. Adding the
+      // sec-ch-ua client hint family + standard browser Accept-Encoding
+      // mimics a real Chrome request and avoids the 429 fingerprint trap.
+      // SPEC-PLATFORM-EXPANSION-007 v0.2.2 (2026-05-07).
+      const res = await fetchWithBackoff(url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          Accept: "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+          "Accept-Encoding": "gzip, deflate, br",
+          "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"macOS"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          Referer: config.baseUrl + "/",
           Cookie: localizationCookie,
         },
       })
