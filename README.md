@@ -74,9 +74,9 @@ output/                        # gitignored (per-run cache)
 
 | Metric | Value (2026-05-07) |
 |--------|--------------------|
-| Platforms | 42 (20 Cafe24 KR + 13 Shopify global + 2 Uniqlo + 2 ZARA + 1 29CM + 1 Farfetch KR + 3 disabled) |
-| SKUs (cron, Cafe24 제외) | ~83,700 / day |
-| Unique brands | 2,100+ |
+| Platforms | 44 (20 Cafe24 KR + 15 Shopify global + 2 Uniqlo + 2 ZARA + 1 29CM + 1 Farfetch KR + 3 disabled) |
+| SKUs (cron, Cafe24 제외) | ~93,500 / day |
+| Unique brands | 2,300+ |
 
 | SPEC | Status | Description |
 |------|--------|-------------|
@@ -86,6 +86,7 @@ output/                        # gitignored (per-run cache)
 | SPEC-005 | shipped | ZARA US region extension |
 | SPEC-006 | shipped | Farfetch KR + farfetch-engine.ts (DOM-scrape) |
 | SPEC-007 | shipped | Slam Jam + Antonioli + Browns (Shopify multi-brand editorials) |
+| SPEC-008 | shipped | Mohawk General + Union LA (Japanese heritage + indie minimal designer focus) |
 
 Roadmap (US-routable infra 후): Farfetch US, MyTheresa, SSENSE, Mr Porter, Net-a-Porter, Saks, Bergdorf, Neiman Marcus, 24S — all KR-IP geo-blocked at edge.
 

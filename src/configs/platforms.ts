@@ -801,6 +801,30 @@ export const PLATFORMS: SiteConfig[] = [
     notes: "Browns Fashion London, 1970-est, Farfetch group subsidiary with separate curation team. ~347 vendors observed 2026-05-07; Zimmermann/The Row/Le Gramme/Khaite/Tom Wood/Valentino top. Women's luxury heavy. Migrated to Shopify in 2024. Distinct SKU IDs from Farfetch (Shopify product handle vs Farfetch -item-{id}.aspx) — no Supabase dedup collision. Shopify Markets routes GBP via localization=GB cookie. SPEC-PLATFORM-EXPANSION-007. maxPages bumped 50→100 (2026-05-07) — first run hit 50-page cap at 12,495 products.",
   },
 
+  // ─── Tier 1 unique-selection editorial (SPEC-008) ───────────────────
+  // Both confirmed Shopify accessible from KR-IP (deep-probe 2026-05-07).
+  // Selected for minimum brand overlap with existing 42 platforms.
+  {
+    key: "mohawk-general",
+    name: "Mohawk General Store",
+    type: "shopify",
+    baseUrl: "https://www.mohawkgeneralstore.com",
+    sourceCurrency: "USD",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "Mohawk General Store LA. Minimal Japanese + Scandinavian + indie designer focus. ~110 unique vendors observed 2026-05-07: Auralee/SMOCK/Lemaire/Hai/mfpen/Studio Nicholson/Baserange/Comme Si/Still By Hand/Gimaguas top. Almost zero overlap with existing platforms — high incremental value. Shopify Markets routes USD via localization=US cookie. SPEC-PLATFORM-EXPANSION-008.",
+  },
+  {
+    key: "union-la",
+    name: "Union LA",
+    type: "shopify",
+    baseUrl: "https://store.unionlosangeles.com",
+    sourceCurrency: "USD",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "Union Los Angeles. Japanese heritage + US streetwear luxury. ~53 vendors observed 2026-05-07: Union LA(자체)/RRR123/Kapital/A.PRESSE/Visvim/Jacques Marie Mage/Martine Rose/Patta/Aaron Levine. Japanese heritage brand selection unmatched by other registered platforms. SPEC-PLATFORM-EXPANSION-008.",
+  },
+
   // ─── Uniqlo (KR) — first non-Cafe24/non-Shopify engine ───────────────
   // SPEC: SPEC-PLATFORM-EXPANSION-001
   // path format: "<L1_gender>,<L2_class>,<L3_category>,<L4_subcategory>"
