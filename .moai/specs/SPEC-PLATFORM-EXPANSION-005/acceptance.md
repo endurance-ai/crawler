@@ -315,7 +315,7 @@ Verification methods used in this document:
   - Source URL (the actual landing page captured, since `/help-center/legal/terms-of-use` may return 404 and fallback was used).
   - Verdict label (one of: `PERMITS`, `AMBIGUOUS-ACCEPTED-BY-OWNER`, `AMBIGUOUS-REJECTED`, `FORBIDS`).
   - SPEC-005 cross-reference.
-  - One-line summary of residual-risk conditions: portal.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS publication-date change OR Inditex USA, Inc. communication OR > 90 days elapsed.
+  - One-line summary of residual-risk conditions: kiko.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS publication-date change OR Inditex USA, Inc. communication OR > 90 days elapsed.
 - If the captured text contains ANY clause that unambiguously forbids automated catalog access, web scraping, or the use of crawler/bot/automation tools (e.g., a clause naming "no scraping," "no crawler," "no automated access," "no data harvesting"), the operator:
   - Sets `disabled: true` on the `zara-us` SiteConfig entry (or does not commit the entry with `disabled: false`).
   - Abandons the US engine activation. The engine refactor itself remains in place because it does not affect KR.

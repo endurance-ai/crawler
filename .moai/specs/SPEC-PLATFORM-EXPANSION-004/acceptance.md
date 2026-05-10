@@ -340,7 +340,7 @@ Verification methods used in this document:
    * [...repeat for each relevant clause...]
    *
    * Verdict: <one of: PERMITS | AMBIGUOUS-ACCEPTED-BY-OWNER | AMBIGUOUS-REJECTED | FORBIDS>
-   * Conditions: portal.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS text
+   * Conditions: kiko.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS text
    *             change OR 29CM/Musinsa direct communication OR > 90 days elapsed.
    * SPEC: SPEC-PLATFORM-EXPANSION-004 REQ-008
    */

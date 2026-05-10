@@ -24,7 +24,7 @@ Extend the Uniqlo engine introduced in SPEC-PLATFORM-EXPANSION-001 to cover the 
 
 ### 2.2 Out-of-Scope (this SPEC)
 
-- **Size-system normalization**: Uniqlo US uses XS/S/M/L; KR uses 90/95/100. Both stored as-is in `Product.sizes`. Cross-region size mapping is a portal.ai schema concern, not a crawler concern.
+- **Size-system normalization**: Uniqlo US uses XS/S/M/L; KR uses 90/95/100. Both stored as-is in `Product.sizes`. Cross-region size mapping is a kiko.ai schema concern, not a crawler concern.
 - **Multi-region fanout / orchestration**: No `--site=uniqlo-all`, no parallel multi-region runner. Each region is a separate `pnpm crawl --site=...` invocation.
 - **IP rotation, residential proxy networks**: Forbidden by project HARD rules. Inherited from SPEC-001.
 - **Supabase schema migration**: No new `price_usd` column, no `original_price_usd` column. Per orchestrator decision §3, conversion happens at import time and Supabase only sees post-conversion KRW.

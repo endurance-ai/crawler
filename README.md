@@ -2,7 +2,7 @@
 
 > kiko.ai fashion SKU crawler. Multi-engine harvester (Cafe24 / Shopify / Uniqlo API / ZARA / 29CM / Farfetch) writing into Supabase + R2.
 
-`portal/app` (Next.js) consumes this data via Supabase. No direct API between the two — DB is the contract.
+`kikoai/app` (Next.js) consumes this data via Supabase. No direct API between the two — DB is the contract.
 
 ```
 [Crawler / EC2 batch]                       [Supabase + R2]                   [Vercel / Next.js]

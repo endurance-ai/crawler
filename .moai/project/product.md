@@ -5,11 +5,11 @@ updated: 2026-05-06
 
 # crawler
 
-Fashion SKU harvester that feeds product data into portal.ai via Supabase and Cloudflare R2.
+Fashion SKU harvester that feeds product data into kiko.ai via Supabase and Cloudflare R2.
 
 ## Target Audience
 
-The primary consumer of this system's output is the portal.ai Next.js application (sibling repo: `endurance-ai/portal`). The crawler writes into Supabase tables that portal.ai reads. There is no direct API between the two systems — Supabase is the data contract boundary.
+The primary consumer of this system's output is the kiko.ai Next.js application (sibling repo: `endurance-ai/portal`). The crawler writes into Supabase tables that kiko.ai reads. There is no direct API between the two systems — Supabase is the data contract boundary.
 
 Operators of this system are backend engineers adding platforms, running scheduled crawls, and maintaining the import pipeline. The system is not end-user-facing.
 
@@ -48,7 +48,7 @@ Three distinct import scripts cover the full data lifecycle:
 
 - JSON cache in `data/` (gitignored, volatile): intermediate crawl output per site key.
 - Supabase (persistent): `products`, `reviews`, `brand_nodes`, `product_analyses`.
-- Schema ownership is on the portal.ai side. This crawler is a write-only consumer.
+- Schema ownership is on the kiko.ai side. This crawler is a write-only consumer.
 
 ## Roadmap
 
@@ -66,7 +66,7 @@ Planned platform additions (no committed timeline):
 
 The following are explicitly outside this project's boundaries:
 
-- **Schema management**: Supabase table DDL and migrations are owned by portal.ai. This repo has no migration directory.
+- **Schema management**: Supabase table DDL and migrations are owned by kiko.ai. This repo has no migration directory.
 - **Real-time sync**: The pipeline is batch-oriented. There is no webhook, streaming, or change data capture.
 - **CAPTCHA bypass**: Not implemented, not planned. Anti-bot ethics is a hard constraint (see `src/lib/shopify-engine.ts:44`).
 - **IP rotation / proxy pools**: No evasion tooling. If a site blocks the crawler, it is treated as an access denial.

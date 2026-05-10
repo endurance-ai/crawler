@@ -474,7 +474,7 @@ Risks specific to SPEC-004. SPEC-001 risk mitigations (`robots-check` enforcemen
 
 ## §6. Sources
 
-All URLs fetched 2026-05-05 from project working directory (`/Users/hansangho/Desktop/portal/crawler`):
+All URLs fetched 2026-05-05 from project working directory (`/Users/hansangho/Desktop/kikoai/crawler`):
 
 External probes:
 - `https://www.29cm.co.kr/robots.txt` (HTTP 200, full text §1.1)
@@ -503,19 +503,19 @@ Static asset / bundle inspection:
 - `https://cdn-resource-microservice.29cm.co.kr/shop/v1/_next/static/chunks/6111-03de1476d4d5a12a.js` (65 KB chunk; contains `categoryLargeCode` URL builder, §1.4)
 
 Internal source files referenced:
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/spec.md` §Non-Goals (29CM deferral with user appetite for hybrid path noted)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/research.md` §1, §2.4, §3.4 (robots-check pattern; abort-on-3-errors mechanic; engine dispatch surface)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-002/spec.md` (region-parameterization pattern; FX module lift to `src/lib/fx.ts` — out of scope for SPEC-004 since 29CM is KRW-native)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-003/spec.md` (Playwright + XHR interception pattern; ToS clause embedding precedent; abort-on-3 broadened to Playwright failure modes)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-003/research.md` §1.2, §3, §4 (ToS verification methodology; Playwright-bypass test framework; rollback paths)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-003/plan.md` §4-§6 (file modification table template; reference implementations; tech stack inheritance)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/zara-engine.ts` (Playwright + XHR interception template — full pattern reused)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/uniqlo-engine.ts` (5-element UA rotation list, image-host whitelist, abort-on-3 mechanic, pure parse function pattern)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/robots-check.ts` (REQ-005 reuse — engine-agnostic, no modification needed)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/types.ts:53` (PlatformType union, currently `"cafe24" | "shopify" | "uniqlo" | "zara"` per SPEC-003)
-- `/Users/hansangho/Desktop/portal/crawler/src/configs/platforms.ts` (SiteConfig entries; `apiCategoryPaths` and `categoryUrls` field precedents)
-- `/Users/hansangho/Desktop/portal/crawler/src/crawl.ts` (dispatch + probe wiring template)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/project/structure.md` (platform table — currently 35 platforms; SPEC-004 grows to 36)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/project/product.md` (32-platform original target → 36 post-SPEC-004)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/project/tech.md` (Playwright `^1.58.2` already in deps, `node:test` runner already configured by SPEC-001)
-- `/Users/hansangho/Desktop/portal/crawler/package.json` (test script `node --test --import tsx ./tests/*.test.ts` — reused for 29CM tests)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/spec.md` §Non-Goals (29CM deferral with user appetite for hybrid path noted)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/research.md` §1, §2.4, §3.4 (robots-check pattern; abort-on-3-errors mechanic; engine dispatch surface)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-002/spec.md` (region-parameterization pattern; FX module lift to `src/lib/fx.ts` — out of scope for SPEC-004 since 29CM is KRW-native)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-003/spec.md` (Playwright + XHR interception pattern; ToS clause embedding precedent; abort-on-3 broadened to Playwright failure modes)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-003/research.md` §1.2, §3, §4 (ToS verification methodology; Playwright-bypass test framework; rollback paths)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-003/plan.md` §4-§6 (file modification table template; reference implementations; tech stack inheritance)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/zara-engine.ts` (Playwright + XHR interception template — full pattern reused)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/uniqlo-engine.ts` (5-element UA rotation list, image-host whitelist, abort-on-3 mechanic, pure parse function pattern)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/robots-check.ts` (REQ-005 reuse — engine-agnostic, no modification needed)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/types.ts:53` (PlatformType union, currently `"cafe24" | "shopify" | "uniqlo" | "zara"` per SPEC-003)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/configs/platforms.ts` (SiteConfig entries; `apiCategoryPaths` and `categoryUrls` field precedents)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/crawl.ts` (dispatch + probe wiring template)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/project/structure.md` (platform table — currently 35 platforms; SPEC-004 grows to 36)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/project/product.md` (32-platform original target → 36 post-SPEC-004)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/project/tech.md` (Playwright `^1.58.2` already in deps, `node:test` runner already configured by SPEC-001)
+- `/Users/hansangho/Desktop/kikoai/crawler/package.json` (test script `node --test --import tsx ./tests/*.test.ts` — reused for 29CM tests)

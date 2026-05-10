@@ -117,7 +117,7 @@ The following are explicitly out of scope.
 - **H&M**: `robots.txt` itself returns HTTP 403 from AkamaiGHost. Deferred indefinitely.
 - **Inditex sub-brands**: Bershka, Pull&Bear, Massimo Dutti, Stradivarius, Oysho, Zara Home — share Akamai parent infra. Deferred-with-ZARA.
 - **H&M Group sub-brands**: COS, Weekday, Monki, Arket — share AkamaiGHost active blocker. Deferred indefinitely.
-- **Schema migration**: No portal.ai Supabase change. Uniqlo fields map onto existing `products` table.
+- **Schema migration**: No kiko.ai Supabase change. Uniqlo fields map onto existing `products` table.
 - **Cloudflare R2**: Already noted future in `product.md`. Not part of this SPEC.
 - **Live FX rate API**: Uniqlo prices natively in KRW. Hardcoded FX in `shopify-engine.ts` unchanged.
 - **Linter / formatter**: ESLint, Biome, Prettier — out of scope. `tsc --noEmit` remains the only static check.

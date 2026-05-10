@@ -299,7 +299,7 @@ Verification methods used in this document:
    * 또는 계약 내용을 복사하는 행위는 허용됩니다.
    *
    * Verdict: AMBIGUOUS-ACCEPTED-BY-OWNER
-   * Conditions: portal.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS PDF
+   * Conditions: kiko.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS PDF
    *             version change OR ITX Korea Limited communication OR > 90 days elapsed.
    * SPEC: SPEC-PLATFORM-EXPANSION-003 REQ-008 (amended v0.2.0)
    */

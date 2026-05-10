@@ -40,7 +40,7 @@ Path (a) is recommended with the explicit caveat that **the first Run-phase ANAL
 ZARA KR's Terms of Service was pre-verified at plan phase by retrieving the canonical PDF (2025-11-25 version) from Inditex's static asset CDN (`static.zara.net/static/pdfs/KR/terms-and-conditions/terms-and-conditions-ko_KR-20251125.pdf`, 228 KB, 11 pages) and scanning all pages for automation/scraping keywords (자동화, 크롤, 스크래, 봇, 로봇, agent, robot, scrape, crawl, automated, automation, etc.). Full keyword scan results and verbatim clause quotations are recorded in research.md §1.2 (verified). Three relevant clauses were identified and reviewed by the project owner:
 
 1. **§2.1** (general use limit) — "이용자는 회사에 대한 정당한 요청이나 주문 목적으로만 웹사이트를 이용할 수 있습니다." Verdict: AMBIGUOUS, no automation-specific language.
-2. **§6 bullet 2** (automated purchasing) — "자동구매 소프트웨어 기타 유사한 도구를 사용하여 다중 주문, 반복 구매, 사재기를 하는 행위." Verdict: DOES NOT APPLY — clause specifically targets automated purchasing, not data harvesting; portal.ai's crawler does not place orders.
+2. **§6 bullet 2** (automated purchasing) — "자동구매 소프트웨어 기타 유사한 도구를 사용하여 다중 주문, 반복 구매, 사재기를 하는 행위." Verdict: DOES NOT APPLY — clause specifically targets automated purchasing, not data harvesting; kiko.ai's crawler does not place orders.
 3. **§15** (IP rights) — "웹사이트 내의 모든 콘텐츠에 대한 저작권, 상표권 등 일체의 지적 재산권은 회사 또는 회사가 권한을 부여한 자에게 귀속됩니다. 이용자는 회사 또는 회사가 권한을 부여한 자의 허락을 받아 해당 콘텐츠를 사용할 수 있습니다." Verdict: PRIMARY RESIDUAL RISK — IP rights clause technically requires permission for any content use beyond personal order history.
 
 **Verdict: AMBIGUOUS-ACCEPTED-BY-OWNER.** No explicit anti-scraping clause exists in the ZARA KR ToS. The §15 IP clause is the primary residual risk, accepted by project owner on 2026-05-05 with the following conditions:
@@ -48,7 +48,7 @@ ZARA KR's Terms of Service was pre-verified at plan phase by retrieving the cano
 1. Verbatim §2.1, §6-bullet-2, and §15 Korean text MUST be embedded as a top-of-file comment block in `src/lib/zara-engine.ts` for permanent audit record (this is REQ-008's Run-phase task — narrowed from "verify ToS in browser" to "embed pre-verified clauses").
 2. Capture date and operator name (2026-05-05, hansangho) MUST be recorded.
 3. `disabled: false` is permitted on the `zara-kr` SiteConfig entry — engine ships live.
-4. portal.ai-internal-use only is the assumed scope. Public re-distribution of ZARA product data is NOT covered by this acceptance and would require separate legal review.
+4. kiko.ai-internal-use only is the assumed scope. Public re-distribution of ZARA product data is NOT covered by this acceptance and would require separate legal review.
 5. If ZARA Inditex Korea (ITX Korea Limited) issues a cease-and-desist communication, the operator MUST set `disabled: true` immediately, halt production crawls, and re-evaluate per project HARD rule #1.
 
 ---
@@ -72,7 +72,7 @@ The following are explicitly out of scope for this SPEC. Items in this section M
 - **Fingerprint-evasion libraries**: `puppeteer-extra-plugin-stealth`, `playwright-stealth`, `undici` with custom JA3, etc., are forbidden by project HARD rules. The engine MUST work with vanilla Playwright + realistic UA + locale + viewport, OR not at all.
 - **Xvfb-in-CI for `headless: false` mode**: if `headless: "new"` proves insufficient against Akamai, introducing Xvfb is a separate SPEC (operational dependency on the CI image), NOT part of SPEC-003. SPEC-003's rollback path on `headless: "new"` insufficiency is deferral, not workaround.
 - **IP rotation, residential proxy networks, CAPTCHA solving services, authenticated scraping**: inherited HARD prohibitions from SPEC-001 §2.3. Forbidden.
-- **Schema migration**: no portal.ai Supabase schema change. ZARA fields (name, price, image URL, product URL, color names, sizes, gender) all map onto existing `Product` columns. No new column needed.
+- **Schema migration**: no kiko.ai Supabase schema change. ZARA fields (name, price, image URL, product URL, color names, sizes, gender) all map onto existing `Product` columns. No new column needed.
 - **Live FX rate API**: ZARA KR sells natively in KRW. No FX conversion is invoked. The hardcoded `FX_TO_KRW` table in `src/lib/fx.ts` (lifted from `shopify-engine.ts` per SPEC-002 REQ-005) remains untouched.
 - **Linter / formatter introduction**: inherited from SPEC-001/002. `tsc --noEmit` remains the only static check.
 - **Vitest framework introduction**: inherited from SPEC-001/002. `node:test` is the runner.
@@ -190,7 +190,7 @@ Source: research.md §3.3 (`headless: "new"` ~85% reliability per public reports
 
 ### REQ-008 [Ubiquitous] — AMENDED 2026-05-05 v0.2.0 (pre-verified)
 
-**THE `src/lib/zara-engine.ts` source file SHALL** contain a top-of-file comment block embedding the verbatim Korean-language §2.1, §6-bullet-2, and §15 ZARA KR ToS clauses captured from the 2025-11-25 PDF (`static.zara.net/static/pdfs/KR/terms-and-conditions/terms-and-conditions-ko_KR-20251125.pdf`) at plan phase. The block **SHALL** include: (a) the verbatim Korean clause text for all three sections, (b) the capture date (2026-05-05) and operator name (hansangho), (c) the verdict label "AMBIGUOUS-ACCEPTED-BY-OWNER", (d) the SPEC-003 cross-reference, and (e) a one-line summary of the residual-risk conditions (portal.ai-internal-use only; halt-on-cease-and-desist). The original Korean text **MUST NOT** be paraphrased, translated-only, or summarized in this comment block — verbatim quoting is the audit-evidence contract.
+**THE `src/lib/zara-engine.ts` source file SHALL** contain a top-of-file comment block embedding the verbatim Korean-language §2.1, §6-bullet-2, and §15 ZARA KR ToS clauses captured from the 2025-11-25 PDF (`static.zara.net/static/pdfs/KR/terms-and-conditions/terms-and-conditions-ko_KR-20251125.pdf`) at plan phase. The block **SHALL** include: (a) the verbatim Korean clause text for all three sections, (b) the capture date (2026-05-05) and operator name (hansangho), (c) the verdict label "AMBIGUOUS-ACCEPTED-BY-OWNER", (d) the SPEC-003 cross-reference, and (e) a one-line summary of the residual-risk conditions (kiko.ai-internal-use only; halt-on-cease-and-desist). The original Korean text **MUST NOT** be paraphrased, translated-only, or summarized in this comment block — verbatim quoting is the audit-evidence contract.
 
 **THE operator SHALL NOT** be required to re-verify the ToS in a real browser at Run-phase, because plan-phase verification (research.md §1.2 verified) is treated as authoritative for the SPEC-003 implementation window. Re-verification is required ONLY if any of the following triggers occur after Run-phase begins: (i) ZARA publishes a new ToS PDF version on `static.zara.net/static/pdfs/KR/`, (ii) ITX Korea Limited issues a direct communication (cease-and-desist, terms-update notice), or (iii) more than 90 calendar days elapse between plan-phase verification (2026-05-05) and the first production crawl.
 

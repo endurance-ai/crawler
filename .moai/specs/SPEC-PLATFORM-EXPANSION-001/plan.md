@@ -30,7 +30,7 @@ This SPEC adds Uniqlo (KR storefront) as the 33rd registered platform in the cra
 - **29CM** — listed as 2순위 in research.md §5.2. Same treatment as ZARA: separate follow-up SPEC, opened only after the Uniqlo soak period.
 - **Musinsa** — robots.txt verbatim `User-agent: * / Disallow: /` (research.md §2.4, [^m1]). Per project HARD rule #1 ("Sites that explicitly forbid crawling → DEFER"), this SPEC will NOT pursue Musinsa via crawling. Documented as deferred — pursue B2B partner API discussion separately as a non-engineering track.
 - **H&M** — robots.txt itself returns HTTP 403 from AkamaiGHost (research.md §2.2, [^h1]). Cannot read the bot policy without a real browser session. Documented as deferred indefinitely — re-evaluate only if upstream policy changes.
-- Any portal.ai Supabase schema migration. Research §6 confirms Uniqlo data maps onto existing `Product` columns with no new fields needed.
+- Any kiko.ai Supabase schema migration. Research §6 confirms Uniqlo data maps onto existing `Product` columns with no new fields needed.
 - Cloudflare R2 image storage integration (already noted as future in `product.md` "Out of Scope").
 - Live FX rate API. Uniqlo prices in KRW natively, so no FX conversion is invoked (research.md §5.1 confirms KRW storefront).
 - Linter / formatter introduction (ESLint, Biome, Prettier) — keep as project-level concern. tsc --noEmit remains the only static check.
@@ -132,7 +132,7 @@ New dev concern (not a dependency):
 | Akamai Bot Manager escalates anti-bot for the API path | Low | High | `crawlDelay: 1000` ms baseline; REQ-005 aborts on 3 consecutive 4xx/5xx. 5-element UA rotation list, no IP rotation, no fingerprint randomization beyond UA. If Akamai blocks, the crawler fails loud (visible in `CrawlResult.errors`) rather than retrying silently |
 | robots.txt policy change (Uniqlo introduces `Disallow: /kr/api/`) | Low | High | `robots-check.ts` runs at every crawl start (REQ-004). A policy change blocks the next crawl, surfaces in error output, and forces a re-evaluation before the next run |
 | Missing test framework forces yak-shaving | Low | Low | Use built-in `node:test` — no new dependency, no config file. If this proves brittle, the next SPEC can introduce vitest deliberately |
-| Schema mismatch with portal.ai products table (e.g. `product_no` extraction returns null) | Low | Medium | Research.md §3.5 confirms `product_no` accepts null. Pre-flight: dry-run output is hand-inspected for one category before the first non-dry-run crawl. Treated as a Run-phase verification step, not a code change |
+| Schema mismatch with kiko.ai products table (e.g. `product_no` extraction returns null) | Low | Medium | Research.md §3.5 confirms `product_no` accepts null. Pre-flight: dry-run output is hand-inspected for one category before the first non-dry-run crawl. Treated as a Run-phase verification step, not a code change |
 | `apiCategoryPaths` becomes stale (Uniqlo adds/removes categories) | Medium | Low | The empty `total=0` case is handled (REQ-002 termination condition). Stale entries waste a request but do not corrupt output. Sitemap-driven discovery (Q1) would mitigate this — deferred to follow-up SPEC if it becomes a real maintenance burden |
 | New engine type sets a precedent that subsequent SPECs may misuse | Low | Medium | The `apiCategoryPaths` field is named conservatively (api-prefixed, narrow type). Any future API-based engine should add its own narrow field rather than reusing this one. Documented in §8 as an open design note |
 

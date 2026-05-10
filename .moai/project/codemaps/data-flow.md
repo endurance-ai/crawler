@@ -94,9 +94,9 @@ crawler (this repo)
 Supabase
   │
   │  READ ONLY
-  │  portal.ai queries product data for user-facing display
+  │  kiko.ai queries product data for user-facing display
   ▼
-portal.ai (endurance-ai/portal)
+kiko.ai (endurance-ai/portal)
 ```
 
 The crawler never reads from Supabase except in `analyze-products.ts`, which reads `products` rows to find unanalyzed items. It does not read schema, migrations, or any table it does not also write to.

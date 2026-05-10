@@ -107,7 +107,7 @@ ZARA's Korean storefront ToS is published behind client-side React routing on `z
 
 Translation: "Users may use the website only for legitimate requests to the Company or for ordering purposes."
 
-Verdict on automation: **AMBIGUOUS**. portal.ai-style data harvesting is neither a "legitimate request to the Company" nor an "ordering purpose" per a strict reading; under a more lenient reading, "legitimate request" could cover catalog browsing by automated agents that respect robots.txt. The clause does not name "automation," "crawler," "scraper," "robot," or any automation-specific term.
+Verdict on automation: **AMBIGUOUS**. kiko.ai-style data harvesting is neither a "legitimate request to the Company" nor an "ordering purpose" per a strict reading; under a more lenient reading, "legitimate request" could cover catalog browsing by automated agents that respect robots.txt. The clause does not name "automation," "crawler," "scraper," "robot," or any automation-specific term.
 
 #### Finding 2 — §6 회사의 주문 거절, 제한 및 취소 (Company's Right to Refuse, Limit, Cancel Orders), bullet point 2 [SPECIFIC TO PURCHASE BOTS, NOT SCRAPING]
 > 이용자가 웹사이트의 정상적인 운영과 거래질서에 영향을 미치고 다른 이용자의 공정 거래 권리를 침해하는 다음과 같은 행위를 하는 경우:
@@ -116,14 +116,14 @@ Verdict on automation: **AMBIGUOUS**. portal.ai-style data harvesting is neither
 
 Translation: "Where a user, by impacting the website's normal operation and transaction order and infringing other users' fair trade rights, engages in the following acts: [...] (2) Using automated purchasing software or other similar tools to make multiple orders, repeat purchases, or hoarding."
 
-Verdict on automation: **DOES NOT APPLY TO READ-ONLY SCRAPING**. The clause specifically targets **자동구매 (automated purchasing)** — not data harvesting. portal.ai's crawler does not place orders. The "기타 유사한 도구 (other similar tools)" language could be stretched by a hostile counsel to include scraping bots, but the explicit context is purchasing-related.
+Verdict on automation: **DOES NOT APPLY TO READ-ONLY SCRAPING**. The clause specifically targets **자동구매 (automated purchasing)** — not data harvesting. kiko.ai's crawler does not place orders. The "기타 유사한 도구 (other similar tools)" language could be stretched by a hostile counsel to include scraping bots, but the explicit context is purchasing-related.
 
 #### Finding 3 — §15 지적 재산권 (Intellectual Property Rights) [PRIMARY RESIDUAL RISK]
 > 웹사이트 내의 모든 콘텐츠에 대한 저작권, 상표권 등 일체의 지적 재산권은 회사 또는 회사가 권한을 부여한 자에게 귀속됩니다. 이용자는 회사 또는 회사가 권한을 부여한 자의 허락을 받아 해당 콘텐츠를 사용할 수 있습니다. 그러나 이용자가 필요한 범위 내에서 자신의 주문내역 또는 계약 내용을 복사하는 행위는 허용됩니다.
 
 Translation: "All copyrights, trademarks, and other intellectual property rights for all content within the website belong to the Company or those authorized by the Company. Users may use such content with the permission of the Company or those authorized by the Company. However, copying one's own order history or contract content within the necessary scope is permitted."
 
-Verdict on automation: **TECHNICALLY PROHIBITS UNAUTHORIZED CONTENT USE**. portal.ai's downstream use of ZARA product names, prices, and images falls under "use of content" requiring permission. The narrow exception ("자신의 주문내역" — one's own order history) does not cover catalog data. This is the **primary residual risk** of SPEC-003.
+Verdict on automation: **TECHNICALLY PROHIBITS UNAUTHORIZED CONTENT USE**. kiko.ai's downstream use of ZARA product names, prices, and images falls under "use of content" requiring permission. The narrow exception ("자신의 주문내역" — one's own order history) does not cover catalog data. This is the **primary residual risk** of SPEC-003.
 
 #### Findings 4–N — Negative results
 
@@ -138,7 +138,7 @@ Conditions of acceptance (encoded as REQ-008 amendment):
 2. The captured-on date and operator name (2026-05-05, hansangho) MUST be recorded.
 3. `disabled: false` is permitted on the `zara-kr` SiteConfig entry — engine ships live.
 4. If ZARA Inditex Korea (ITX Korea Limited, 110111-9160203) issues a cease-and-desist communication, the operator MUST set `disabled: true` immediately, halt production crawls, and re-evaluate via project HARD rule #1.
-5. portal.ai-internal-use only is the assumed scope. Public re-distribution of ZARA product data is NOT covered by this acceptance and would require separate legal review.
+5. kiko.ai-internal-use only is the assumed scope. Public re-distribution of ZARA product data is NOT covered by this acceptance and would require separate legal review.
 
 **REQ-008 is therefore PRE-VERIFIED at plan phase. Run-phase is not blocked on ToS verification.** AC-10 graduates from "Run-phase HARD precondition" to "plan-phase pre-satisfied; Run-phase task = embed clause text into engine source comment block."
 
@@ -417,16 +417,16 @@ All URLs fetched 2026-05-05 from project working directory:
 
 Internal source files referenced:
 
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/research.md` §2.1 (ZARA preliminary findings), §2.4 (Musinsa robots.txt blanket-disallow precedent), §3.4 (engine dispatch surface)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/spec.md` §Non-Goals (ZARA deferral with user appetite for Playwright noted), §Files Affected (REQ-004 robots-check pattern)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-002/spec.md` (region-parameterization precedent — informs where to slot ZARA's `categoryUrls` SiteConfig field; SPEC-002 confirms `region` is reserved for engine-internal localization, NOT for cross-engine multiplexing)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/research/uniqlo-multistore-probe-2026-05-05.md` (live-probe methodology used in this research)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/cafe24-engine.ts:19-66` (DEFAULT_SELECTORS — fallback chain pattern model for ZARA selectors), `:139-350` (collectProductsFromPage — `page.evaluate` extraction pattern), `:354-394` (crawlCategory — pagination loop pattern adapted to scroll), `:398-590` (crawlCafe24 entry — Playwright lifecycle wrapper)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/uniqlo-engine.ts` (fixture-based test pattern, abort-on-3-errors mechanic, UA rotation list)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/robots-check.ts` (REQ-005 reuse — engine-agnostic, no modification needed)
-- `/Users/hansangho/Desktop/portal/crawler/src/configs/platforms.ts:766-803` (uniqlo-kr SiteConfig precedent) and `:814-849` (uniqlo-us SiteConfig precedent for region-parameterized SiteConfig pattern)
-- `/Users/hansangho/Desktop/portal/crawler/src/crawl.ts:62-93` (uniqlo probe handler precedent), `:199-241` (uniqlo runCrawl partition precedent), `:261-300` (cafe24 Playwright dispatch precedent — model for ZARA dispatch)
-- `/Users/hansangho/Desktop/portal/crawler/src/import-products.ts:148-212` (Supabase upsert mapping — out of scope for SPEC-003, no schema changes)
-- `/Users/hansangho/Desktop/portal/crawler/.moai/project/tech.md` (Playwright already at `^1.58.2` in deps, no new package required)
-- `/Users/hansangho/Desktop/portal/crawler/package.json` (test script `node --test --import tsx ./tests/*.test.ts` — reused for ZARA tests)
-- `/Users/hansangho/Desktop/portal/crawler/tests/uniqlo-engine.test.ts` (test structure precedent — fixture loading, mock fetch patterns)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/research.md` §2.1 (ZARA preliminary findings), §2.4 (Musinsa robots.txt blanket-disallow precedent), §3.4 (engine dispatch surface)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-001/spec.md` §Non-Goals (ZARA deferral with user appetite for Playwright noted), §Files Affected (REQ-004 robots-check pattern)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/specs/SPEC-PLATFORM-EXPANSION-002/spec.md` (region-parameterization precedent — informs where to slot ZARA's `categoryUrls` SiteConfig field; SPEC-002 confirms `region` is reserved for engine-internal localization, NOT for cross-engine multiplexing)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/research/uniqlo-multistore-probe-2026-05-05.md` (live-probe methodology used in this research)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/cafe24-engine.ts:19-66` (DEFAULT_SELECTORS — fallback chain pattern model for ZARA selectors), `:139-350` (collectProductsFromPage — `page.evaluate` extraction pattern), `:354-394` (crawlCategory — pagination loop pattern adapted to scroll), `:398-590` (crawlCafe24 entry — Playwright lifecycle wrapper)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/uniqlo-engine.ts` (fixture-based test pattern, abort-on-3-errors mechanic, UA rotation list)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/robots-check.ts` (REQ-005 reuse — engine-agnostic, no modification needed)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/configs/platforms.ts:766-803` (uniqlo-kr SiteConfig precedent) and `:814-849` (uniqlo-us SiteConfig precedent for region-parameterized SiteConfig pattern)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/crawl.ts:62-93` (uniqlo probe handler precedent), `:199-241` (uniqlo runCrawl partition precedent), `:261-300` (cafe24 Playwright dispatch precedent — model for ZARA dispatch)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/import-products.ts:148-212` (Supabase upsert mapping — out of scope for SPEC-003, no schema changes)
+- `/Users/hansangho/Desktop/kikoai/crawler/.moai/project/tech.md` (Playwright already at `^1.58.2` in deps, no new package required)
+- `/Users/hansangho/Desktop/kikoai/crawler/package.json` (test script `node --test --import tsx ./tests/*.test.ts` — reused for ZARA tests)
+- `/Users/hansangho/Desktop/kikoai/crawler/tests/uniqlo-engine.test.ts` (test structure precedent — fixture loading, mock fetch patterns)

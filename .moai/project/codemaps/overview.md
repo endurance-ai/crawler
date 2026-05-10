@@ -40,7 +40,7 @@ The crawler is organized into three layers. Each layer has a single responsibili
                          │ SELECT (read-only)
                          ▼
               ┌──────────────────────┐
-              │  portal.ai (Next.js) │
+              │  kiko.ai (Next.js) │
               │  endurance-ai/portal │
               └──────────────────────┘
 ```
@@ -79,9 +79,9 @@ This makes each script independently debuggable and replaceable without affectin
         │  Supabase upserts (service-role)
         ▼
 [ Supabase ]
-        │  SELECT (anon or service-role from portal.ai)
+        │  SELECT (anon or service-role from kiko.ai)
         ▼
-[ portal.ai Next.js app ]
+[ kiko.ai Next.js app ]
         │  Rendered to end users
         ▼
 [ Browser / User ]
@@ -96,5 +96,5 @@ This repo sits entirely within the left half of the diagram. It has no inbound H
 | Separate engines for Cafe24 vs Shopify | The two platform types have fundamentally different access patterns: browser rendering vs JSON API. A single engine would require complex branching throughout. |
 | JSON file as intermediate cache | Decouples crawling (network-dependent, slow) from importing (Supabase-dependent, fast). Allows re-import without re-crawling. |
 | No framework | Scripts are glue code. A framework adds indirection without benefit at this scale. |
-| Write-only Supabase access | Schema migrations and DDL are the portal.ai repo's responsibility. Strict separation prevents schema drift caused by the crawler. |
+| Write-only Supabase access | Schema migrations and DDL are the kiko.ai repo's responsibility. Strict separation prevents schema drift caused by the crawler. |
 | Hardcoded FX rates | Real-time FX APIs add latency and an external dependency. Rates are updated manually on a quarterly cadence until a live API is justified by volume. |

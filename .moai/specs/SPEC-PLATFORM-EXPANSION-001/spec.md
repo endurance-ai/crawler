@@ -42,7 +42,7 @@ The following are explicitly out of scope for this SPEC. Items in this section M
 - **H&M**: `robots.txt` itself returns HTTP 403 from AkamaiGHost. Cannot read the bot policy without a real browser session. Deferred indefinitely. Re-evaluate only if upstream policy changes.
 - **Inditex sub-brands**: Bershka, Pull&Bear, Massimo Dutti, Stradivarius, Oysho, Zara Home all share the Inditex / Akamai parent infrastructure and inherit ZARA's deferral rationale. They are deferred-with-ZARA and will be re-evaluated only if SPEC-PLATFORM-002 ships successfully.
 - **H&M Group sub-brands**: COS, Weekday, Monki, Arket all share the H&M Group AkamaiGHost active-blocker configuration. They are deferred-indefinitely under the same rationale as H&M.
-- **Schema migration**: No portal.ai Supabase schema change. All Uniqlo response fields map onto existing `products` table columns. `productCode`, image arrays, color, gender, and category are already supported.
+- **Schema migration**: No kiko.ai Supabase schema change. All Uniqlo response fields map onto existing `products` table columns. `productCode`, image arrays, color, gender, and category are already supported.
 - **Cloudflare R2 image storage**: Already noted as future in `product.md` Out of Scope. Not part of this SPEC.
 - **Live FX rate API**: Uniqlo prices natively in KRW so no FX conversion is invoked. The hardcoded FX table in `shopify-engine.ts` remains unchanged.
 - **Linter / formatter introduction (ESLint, Biome, Prettier)**: Out of scope for this SPEC. `tsc --noEmit` remains the only static check.

@@ -5,7 +5,7 @@
 
 ## How to resume
 
-1. `cd /Users/hansangho/Desktop/portal/crawler`
+1. `cd /Users/hansangho/Desktop/kikoai/crawler`
 2. `git checkout feature/SPEC-PLATFORM-EXPANSION-004` (already on it if continuing)
 3. `/moai run SPEC-PLATFORM-EXPANSION-004`
 4. Read order: spec.md → plan.md → acceptance.md → research.md

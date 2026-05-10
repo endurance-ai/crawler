@@ -264,12 +264,12 @@ Verification methods used:
   - Source URL.
   - Verdict label (one of: `PERMITS`, `AMBIGUOUS-ACCEPTED-BY-OWNER`, `AMBIGUOUS-REJECTED`, `FORBIDS`).
   - SPEC-006 cross-reference.
-  - One-line summary of residual-risk conditions: portal.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS publication-date change OR Farfetch communication OR > 90 days elapsed.
+  - One-line summary of residual-risk conditions: kiko.ai-internal-use only; halt-on-cease-and-desist; re-verify on ToS publication-date change OR Farfetch communication OR > 90 days elapsed.
 - If captured text contains ANY clause that unambiguously forbids automated catalog access (e.g., naming "크롤러", "자동 수집", "자동화 도구", "no scraping" verbatim — analogous to SPEC-004 (29CM) which named "크롤러(Crawler)" verbatim in 제11조 §2.9호), operator:
   - Sets `disabled: true` on `farfetch-kr` SiteConfig.
   - Abandons engine activation.
   - Escalates to project owner with verbatim forbidding clause and recommendation:
-    - OWNER OVERRIDE pattern (analogous to SPEC-004 OWNER OVERRIDE): if owner accepts residual risk under portal.ai-internal-use only + halt-on-C&D + 90-day re-verification, override allowed. Verdict label changes to `FORBIDS-OWNER-OVERRIDE`.
+    - OWNER OVERRIDE pattern (analogous to SPEC-004 OWNER OVERRIDE): if owner accepts residual risk under kiko.ai-internal-use only + halt-on-C&D + 90-day re-verification, override allowed. Verdict label changes to `FORBIDS-OWNER-OVERRIDE`.
     - OR escalate for B2B partner-API conversation with Farfetch.
 - If captured text contains ambiguous clauses (e.g., IP rights analogous to ZARA KR §15 / ZARA US §17), operator classifies as AMBIGUOUS-ACCEPTED-BY-OWNER and proceeds, OR escalates if residual risk is qualitatively higher.
 

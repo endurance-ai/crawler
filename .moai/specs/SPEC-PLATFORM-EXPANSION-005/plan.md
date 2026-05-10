@@ -36,7 +36,7 @@ Add ZARA US storefront (`zara.com/us/en`) as the 36th registered platform in the
 - **Fingerprint-evasion libraries** — Forbidden by project HARD rules.
 - **Xvfb-in-CI for `headless: false` mode** — If `channel: "chrome"` proves insufficient for US (REQ-007 fails), introducing Xvfb is a separate SPEC. SPEC-005's rollback path is deferral or US-context tightening, not Xvfb workaround.
 - **IP rotation, residential proxy networks, CAPTCHA solving services, authenticated scraping** — Inherited HARD prohibitions from SPEC-001/002/003.
-- **Schema migration** — No portal.ai Supabase schema change. ZARA US fields map onto existing `Product` columns. No `price_usd` or `original_price_usd` column added.
+- **Schema migration** — No kiko.ai Supabase schema change. ZARA US fields map onto existing `Product` columns. No `price_usd` or `original_price_usd` column added.
 - **Live FX rate API** — Hardcoded `USD: 1430` in `src/lib/fx.ts` remains POC-grade. Out-of-scope.
 - **FX table extension** — `USD: 1430` already populated. No new currency entries.
 - **Linter / formatter introduction** — Inherited from SPEC-001/002/003. `tsc --noEmit` is the only static check.

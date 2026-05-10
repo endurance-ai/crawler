@@ -77,7 +77,7 @@ There is no automated test suite. Adding a platform or modifying an engine requi
 - Shopify stores: 10 sites, fetch-based `/products.json`, no browser required.
 - Uniqlo: KR + US storefronts, fetch-based `/api/commerce/v5/products`, region-parameterized.
 - ZARA: KR + US storefronts, Playwright `channel:'chrome'` required (Akamai bypass — bundled Chromium hard-403'd), XHR-interception of `/category/{id}/products?ajax=true`. Region-parameterized engine; US cache stores USD-native prices, `convertToKrw` applied at import time via `fx.ts`.
-- 29CM: KR storefront only, Playwright vanilla `headless: true` (Cloudflare-passive), XHR-interception of `display-bff-api.29cm.co.kr/api/v1/listing/items`. ToS verbatim-embedded with OWNER OVERRIDE (portal.ai-internal-use only, halt-on-cease-and-desist, 90-day re-verification).
+- 29CM: KR storefront only, Playwright vanilla `headless: true` (Cloudflare-passive), XHR-interception of `display-bff-api.29cm.co.kr/api/v1/listing/items`. ToS verbatim-embedded with OWNER OVERRIDE (kiko.ai-internal-use only, halt-on-cease-and-desist, 90-day re-verification).
 - All sites: Public-facing product catalog pages only. No authenticated endpoints.
 
 ## Environment Variables

@@ -32,7 +32,7 @@ Add ZARA (KR storefront) as the 35th registered platform in the crawler — the 
 - **Fingerprint-evasion libraries** (`puppeteer-extra-plugin-stealth`, `playwright-stealth`, `undici` JA3, etc.) — Forbidden by project HARD rule (research.md §3.4).
 - **Xvfb-in-CI for `headless: false` mode** — If `headless: "new"` proves insufficient against Akamai (REQ-007 verification fails), introducing Xvfb is a separate SPEC with its own operational dependency on the CI image. SPEC-003's rollback path on REQ-007 failure is deferral, not workaround.
 - **IP rotation, residential proxy networks, CAPTCHA solving services, authenticated scraping** — Inherited HARD prohibitions from SPEC-001 §2.3.
-- **Schema migration** — No portal.ai Supabase schema change. ZARA fields (name, price, image URL, product URL, color names, sizes, gender) all map onto existing `Product` columns.
+- **Schema migration** — No kiko.ai Supabase schema change. ZARA fields (name, price, image URL, product URL, color names, sizes, gender) all map onto existing `Product` columns.
 - **Live FX rate API** — ZARA KR is KRW-native. No FX conversion at engine OR import time. The `src/lib/fx.ts` table is untouched.
 - **Linter / formatter introduction** — Inherited from SPEC-001/002. `tsc --noEmit` is the only static check.
 - **Vitest framework introduction** — Inherited from SPEC-001/002. `node:test` is the runner.

@@ -125,7 +125,7 @@ The critical extension point: **`PlatformType = "cafe24" | "shopify"`** at `src/
 
 - **Entry**: `src/import-products.ts` — script that reads `data/*.json` and upserts to Supabase.
 - **Schema written** (line 162-188): `brand, name, category, price, original_price, sale_price, product_no, image_url, product_url, in_stock, platform, gender, style_node, crawled_at, description, color, material, subcategory, images, size_info, tags, product_code, last_seen_at, updated_at`. Conflict key: `product_url`. Batch size: 50.
-- **`product_no` extraction** (line 152-153): regex against `productUrl` matching `product_no=(\d+)` — Cafe24-specific. **For Uniqlo, `product_no` would extract from a different URL structure (e.g., `/E422992-000/`); a new regex or a `productCode` fallback path is required.** This is the only schema-touching concern, and it does NOT require a portal.ai migration because `product_no` accepts null.
+- **`product_no` extraction** (line 152-153): regex against `productUrl` matching `product_no=(\d+)` — Cafe24-specific. **For Uniqlo, `product_no` would extract from a different URL structure (e.g., `/E422992-000/`); a new regex or a `productCode` fallback path is required.** This is the only schema-touching concern, and it does NOT require a kiko.ai migration because `product_no` accepts null.
 
 ### 3.6 Minimum-LOC Estimates
 
@@ -154,7 +154,7 @@ The critical extension point: **`PlatformType = "cafe24" | "shopify"`** at `src/
 - **Rationale**: Of all 5 candidates, Uniqlo is the only one with (a) an openly-permitting robots.txt for product paths, (b) a live JSON API returning HTTP 200 to a plain curl call with realistic UA, (c) Akamai configured permissively for the API endpoint, (d) a manageable catalog scale (5–30k SKU), and (e) a well-defined response shape that maps cleanly onto our existing `Product` schema. The work is structurally identical to extending the existing Shopify engine — same fetch-pagination pattern, same currency normalization (KRW so no FX needed), same JSON-to-Product mapping. No browser needed, so it remains in the "fast" tier of crawlers.
 - **Engine strategy**: **New custom engine** (`src/lib/uniqlo-engine.ts`) — DO NOT shoehorn into Shopify engine. The Shopify engine validates `cdn.shopify.com` image hosts, parses `body_html`, uses Shopify-specific `variants[]` / `options[]` schema. Forcing Uniqlo's `aggregations.categories.l1l2l3l4` + `prices.base.value` shape into that codepath would corrupt both engines' invariants. A separate engine is cleaner, ~200 LOC, and isolates the schema risk.
 - **LOC estimate**: ~280 LOC total. Breakdown: new `uniqlo-engine.ts` ~200 LOC, type extension 1 LOC, dispatch in `crawl.ts` ~25 LOC, probe handler ~15 LOC, single platform entry in `platforms.ts` ~15 LOC, image host whitelist update ~5 LOC, optional category-discovery sitemap parser ~20 LOC.
-- **Schema impact**: **None**. All Uniqlo response fields map onto existing `Product` columns. `productCode` field already exists in schema (used by Cafe24 detail parser). No portal.ai migration needed.
+- **Schema impact**: **None**. All Uniqlo response fields map onto existing `Product` columns. `productCode` field already exists in schema (used by Cafe24 detail parser). No kiko.ai migration needed.
 
 ### 5.2 2순위 — **29CM**
 
@@ -202,7 +202,7 @@ The critical extension point: **`PlatformType = "cafe24" | "shopify"`** at `src/
 2. **H&M**: drop entirely, given robots.txt itself is 403-blocked?
 3. **ZARA**: defer indefinitely, or commit eventual Playwright-based engine after 29CM?
 4. **Uniqlo category discovery**: prefer (a) hardcoded `apiCategoryPaths: string[]` in config (simpler, more brittle), or (b) sitemap-driven discovery (parse `sitemap_kr-ko_l1l2_hreflang.xml`, derive path codes — slightly more code but adapts to catalog changes)?
-5. **Uniqlo schema**: any product field we want surfaced that isn't currently on `products` table? (Examples Uniqlo uses: `colors[].displayCode`, `flags` like "Limited Time Offer", `genderName`, `representativeFlag`.) If yes, this becomes a portal.ai migration first per HARD rule #5.
+5. **Uniqlo schema**: any product field we want surfaced that isn't currently on `products` table? (Examples Uniqlo uses: `colors[].displayCode`, `flags` like "Limited Time Offer", `genderName`, `representativeFlag`.) If yes, this becomes a kiko.ai migration first per HARD rule #5.
 6. **Akamai pacing**: confirm 1500ms `crawlDelay` is acceptable, or reduce/increase based on observed behavior in probe?
 
 ---
@@ -234,9 +234,9 @@ All URLs fetched 2026-05-05 from project working directory:
 
 Internal source files referenced:
 
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/types.ts:53` and `:97-134` (PlatformType, SiteConfig)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/shopify-engine.ts:11-16` (FX_TO_KRW), `:34-41` (convertToKrw), `:44` (SAFE_HANDLE), `:47-60` (isSafeImageUrl), `:98-280` (crawlShopify entry)
-- `/Users/hansangho/Desktop/portal/crawler/src/lib/cafe24-engine.ts:19-66` (DEFAULT_SELECTORS), `:139-350` (collectProductsFromPage), `:354-394` (crawlCategory), `:398-590` (crawlCafe24 entry)
-- `/Users/hansangho/Desktop/portal/crawler/src/configs/platforms.ts:10-761` (PLATFORMS array), `:763-776` (helpers)
-- `/Users/hansangho/Desktop/portal/crawler/src/crawl.ts:45-147` (probeSite), `:153-223` (runCrawl)
-- `/Users/hansangho/Desktop/portal/crawler/src/import-products.ts:148-212` (Supabase upsert mapping)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/types.ts:53` and `:97-134` (PlatformType, SiteConfig)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/shopify-engine.ts:11-16` (FX_TO_KRW), `:34-41` (convertToKrw), `:44` (SAFE_HANDLE), `:47-60` (isSafeImageUrl), `:98-280` (crawlShopify entry)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/lib/cafe24-engine.ts:19-66` (DEFAULT_SELECTORS), `:139-350` (collectProductsFromPage), `:354-394` (crawlCategory), `:398-590` (crawlCafe24 entry)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/configs/platforms.ts:10-761` (PLATFORMS array), `:763-776` (helpers)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/crawl.ts:45-147` (probeSite), `:153-223` (runCrawl)
+- `/Users/hansangho/Desktop/kikoai/crawler/src/import-products.ts:148-212` (Supabase upsert mapping)

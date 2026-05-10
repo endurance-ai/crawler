@@ -32,7 +32,7 @@ Add 29CM (KR storefront) as the 36th registered platform in the crawler — the 
 - **Fingerprint-evasion libraries** — `puppeteer-extra-plugin-stealth`, `playwright-stealth`, `undici` JA3, etc. are forbidden by project HARD rules. The engine MUST work with vanilla Playwright + realistic UA + locale + viewport + timezone (or `channel: "chrome"` if escalation required), OR not at all.
 - **Xvfb-in-CI for `headless: false` mode** — if vanilla `headless: "new"` AND `channel: "chrome"` both prove insufficient, introducing Xvfb is a separate SPEC. SPEC-004's rollback path on REQ-007 failure beyond `channel: "chrome"` is deferral, not workaround.
 - **IP rotation, residential proxy networks, CAPTCHA solving services, authenticated scraping** — inherited HARD prohibitions from SPEC-001 §2.3 and SPEC-003 §2.3.
-- **Schema migration** — no portal.ai Supabase schema change. 29CM fields map onto existing `Product` columns.
+- **Schema migration** — no kiko.ai Supabase schema change. 29CM fields map onto existing `Product` columns.
 - **Live FX rate API** — 29CM KR is KRW-native. No FX conversion. The `src/lib/fx.ts` table is untouched.
 - **Linter / formatter introduction** — inherited from SPEC-001/002/003. `tsc --noEmit` is the only static check.
 - **Vitest framework introduction** — inherited from SPEC-001/002/003. `node:test` is the runner.
