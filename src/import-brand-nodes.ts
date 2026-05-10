@@ -1,5 +1,5 @@
 /**
- * Fashion Genome v2 엑셀 Brand_DB → Supabase brand_nodes 적재
+ * Fashion Genome v2 엑셀 Brand_DB → brand_nodes 적재
  *
  * v2 변경사항:
  *   - brand_name_raw + brand_name_normalized (정규화)
@@ -14,17 +14,17 @@
 import * as fs from "fs"
 import * as XLSX from "xlsx"
 import * as path from "path"
-import {createClient} from "@supabase/supabase-js"
+import {createClient} from "@db/db-js"
 
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const dbUrl = process.env.DB_URL
+const dbToken = process.env.DB_TOKEN
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error("❌ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경변수 필요")
+if (!dbUrl || !dbToken) {
+  console.error("❌ DB_URL, DB_TOKEN 환경변수 필요")
   process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const db = createClient(dbUrl, dbToken)
 
 const EXCEL_PATH = path.resolve(
   process.argv[2] || path.join(process.cwd(), "data", "Fashion_genome_root_source_platforms_final.xlsx")
@@ -136,7 +136,7 @@ async function main() {
 
   for (let i = 0; i < brandNodes.length; i += BATCH) {
     const batch = brandNodes.slice(i, i + BATCH)
-    const {error} = await supabase.from("brand_nodes").upsert(batch, {
+    const {error} = await db.from("brand_nodes").upsert(batch, {
       onConflict: "brand_name_normalized",
       ignoreDuplicates: false,
     })
@@ -160,7 +160,7 @@ async function main() {
   let updated = 0
   for (const bn of brandNodes) {
     // brand_name_normalized로 매칭 시도
-    const {error: err1, count: c1} = await supabase
+    const {error: err1, count: c1} = await db
       .from("products")
       .update({style_node: bn.style_node})
       .ilike("brand", bn.brand_name_normalized)
@@ -170,7 +170,7 @@ async function main() {
 
     // fallback: brand_name(raw)으로 매칭
     if (bn.brand_name !== bn.brand_name_normalized) {
-      const {error: err2, count: c2} = await supabase
+      const {error: err2, count: c2} = await db
         .from("products")
         .update({style_node: bn.style_node})
         .ilike("brand", bn.brand_name)

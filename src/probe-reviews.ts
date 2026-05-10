@@ -14,8 +14,8 @@ import {getReviewParser} from "./lib/parsers/review"
 
 // ─── 환경 ────────────────────────────────────────────
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const DB_URL = process.env.DB_URL
+const DB_TOKEN = process.env.DB_TOKEN
 
 function parseArgs() {
   const args = process.argv.slice(2)
@@ -50,13 +50,13 @@ async function main() {
     productUrls = [directUrl]
   } else {
     // DB에서 해당 플랫폼의 상품 URL 가져오기
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
-      console.error("❌ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 필요 (dotenv -e .env.local 사용)")
+    if (!DB_URL || !DB_TOKEN) {
+      console.error("❌ DB_URL / DB_TOKEN 필요 (dotenv -e .env.local 사용)")
       process.exit(1)
     }
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const db = createClient(DB_URL, DB_TOKEN)
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("products")
       .select("product_url, brand, name")
       .eq("platform", site)

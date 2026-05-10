@@ -1,22 +1,22 @@
 /**
- * brand-db.json의 attributes → Supabase brand_nodes.attributes 컬럼에 임포트
+ * brand-db.json의 attributes → brand_nodes.attributes 컬럼에 임포트
  *
  * 실행: pnpm exec dotenv -e .env.local -- npx tsx scripts/import-attributes.ts
  */
 
 import * as fs from "fs"
 import * as path from "path"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@db/db-js"
 
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const dbUrl = process.env.DB_URL
+const dbToken = process.env.DB_TOKEN
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error("❌ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경변수 필요")
+if (!dbUrl || !dbToken) {
+  console.error("❌ DB_URL, DB_TOKEN 환경변수 필요")
   process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const db = createClient(dbUrl, dbToken)
 
 type BrandEntry = {
   name: string
@@ -44,7 +44,7 @@ async function main() {
   let errors = 0
 
   for (const brand of withAttrs) {
-    const { error, count } = await supabase
+    const { error, count } = await db
       .from("brand_nodes")
       .update({ attributes: brand.attributes })
       .ilike("brand_name_normalized", brand.name)
@@ -54,7 +54,7 @@ async function main() {
       errors++
     } else if (count === 0) {
       // fallback: nameRaw로 시도
-      const { count: c2 } = await supabase
+      const { count: c2 } = await db
         .from("brand_nodes")
         .update({ attributes: brand.attributes })
         .ilike("brand_name", brand.nameRaw)

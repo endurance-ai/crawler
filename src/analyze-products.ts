@@ -11,7 +11,7 @@
  *   npx tsx scripts/analyze-products.ts --version v1 --retry-failed
  */
 
-import {createClient} from "@supabase/supabase-js"
+import {createClient} from "@db/db-js"
 import * as fs from "fs"
 import * as path from "path"
 import {
@@ -24,14 +24,14 @@ import {
 
 // ─── 환경변수 ────────────────────────────────────────
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const DB_URL = process.env.DB_URL
+const DB_TOKEN = process.env.DB_TOKEN
 const LITELLM_BASE_URL = process.env.LITELLM_BASE_URL
 const LITELLM_API_KEY = process.env.LITELLM_API_KEY
 const LITELLM_MODEL = process.env.LITELLM_MODEL || "nova-lite"
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("❌ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 필요")
+if (!DB_URL || !DB_TOKEN) {
+  console.error("❌ DB_URL / DB_TOKEN 필요")
   process.exit(1)
 }
 if (!LITELLM_BASE_URL || !LITELLM_API_KEY) {
@@ -39,7 +39,7 @@ if (!LITELLM_BASE_URL || !LITELLM_API_KEY) {
   process.exit(1)
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+const db = createClient(DB_URL, DB_TOKEN)
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
 
@@ -216,7 +216,7 @@ async function main() {
 
   // ── 대상 상품 조회 ────────────────────────────────
 
-  let query = supabase
+  let query = db
     .from("products")
     .select("id, brand, name, category, image_url, description, material, color")
     .eq("in_stock", true)
@@ -235,7 +235,7 @@ async function main() {
   let aiDone = false
 
   while (!aiDone) {
-    const { data: batch } = await supabase
+    const { data: batch } = await db
       .from("product_ai_analysis")
       .select("product_id, error")
       .eq("version", version)
@@ -347,14 +347,14 @@ async function main() {
 
     if (output.success && output.result) {
       if (retryFailed) {
-        await supabase
+        await db
           .from("product_ai_analysis")
           .delete()
           .eq("product_id", product.id)
           .eq("version", version)
       }
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await db
         .from("product_ai_analysis")
         .insert({
           product_id: product.id,
@@ -373,14 +373,14 @@ async function main() {
       }
     } else {
       if (retryFailed) {
-        await supabase
+        await db
           .from("product_ai_analysis")
           .delete()
           .eq("product_id", product.id)
           .eq("version", version)
       }
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await db
         .from("product_ai_analysis")
         .insert({
           product_id: product.id,

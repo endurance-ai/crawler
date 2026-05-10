@@ -1,5 +1,5 @@
 /**
- * 크롤링 JSON → Supabase products 테이블 적재
+ * 크롤링 JSON → products 테이블 적재
  *
  * 사용법:
  *   npx dotenv -e .env.local -- npx tsx scripts/import-products.ts                  # data/ 내 전체
@@ -8,23 +8,23 @@
 
 import * as fs from "fs"
 import * as path from "path"
-import {createClient} from "@supabase/supabase-js"
+import {createClient} from "@db/db-js"
 // @MX:NOTE: Import-time USD→KRW conversion for caches whose source
 // currency is non-KRW (currently Uniqlo US). Cache stores native USD;
-// only the Supabase upsert payload sees post-conversion KRW.
+// only the DB upsert payload sees post-conversion KRW.
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
 import {convertToKrw} from "./lib/fx"
 
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const dbUrl = process.env.DB_URL
+const dbToken = process.env.DB_TOKEN
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error("❌ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 환경변수 필요")
+if (!dbUrl || !dbToken) {
+  console.error("❌ DB_URL, DB_TOKEN 환경변수 필요")
   console.error("   .env.local에서 로드하려면: npx dotenv -e .env.local -- npx tsx scripts/import-products.ts")
   process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const db = createClient(dbUrl, dbToken)
 
 interface CrawledReview {
   text: string
@@ -116,7 +116,7 @@ async function main() {
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
 
   // brand_nodes에서 브랜드 → 노드 매핑 가져오기 (normalized + raw 양쪽으로 조회)
-  const {data: brandNodes, error: bnError} = await supabase
+  const {data: brandNodes, error: bnError} = await db
     .from("brand_nodes")
     .select("brand_name, brand_name_normalized, style_node")
 
@@ -321,7 +321,7 @@ async function main() {
 
     for (let i = 0; i < deduped.length; i += BATCH) {
       const batch = deduped.slice(i, i + BATCH)
-      const {error} = await supabase.from("products").upsert(batch, {
+      const {error} = await db.from("products").upsert(batch, {
         onConflict: "product_url",
         ignoreDuplicates: false,
       })
@@ -354,7 +354,7 @@ async function main() {
 
       for (let i = 0; i < urls.length; i += URL_BATCH) {
         const batch = urls.slice(i, i + URL_BATCH)
-        const {data, error: lookupErr} = await supabase
+        const {data, error: lookupErr} = await db
           .from("products")
           .select("id, product_url")
           .in("product_url", batch)
@@ -400,7 +400,7 @@ async function main() {
         // 기존 리뷰 삭제 후 재삽입 (중복 방지)
         const productIds = [...new Set(reviewRows.map((r) => r.product_id))]
         if (productIds.length > 0) {
-          await supabase
+          await db
             .from("product_reviews")
             .delete()
             .in("product_id", productIds)
@@ -410,7 +410,7 @@ async function main() {
         let reviewInserted = 0
         for (let i = 0; i < reviewRows.length; i += BATCH) {
           const batch = reviewRows.slice(i, i + BATCH)
-          const {error: revErr} = await supabase
+          const {error: revErr} = await db
             .from("product_reviews")
             .insert(batch)
 
@@ -428,7 +428,7 @@ async function main() {
           const productId = urlToId.get(p.productUrl)
           if (!productId) continue
 
-          await supabase
+          await db
             .from("products")
             .update({ review_count: (p.reviews || []).length })
             .eq("id", productId)
