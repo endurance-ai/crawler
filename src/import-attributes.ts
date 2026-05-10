@@ -6,7 +6,7 @@
 
 import * as fs from "fs"
 import * as path from "path"
-import { createClient } from "@db/db-js"
+import { createClient } from "@supabase/supabase-js"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN

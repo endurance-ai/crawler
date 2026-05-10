@@ -8,7 +8,7 @@
 
 import * as fs from "fs"
 import * as path from "path"
-import {createClient} from "@db/db-js"
+import {createClient} from "@supabase/supabase-js"
 // @MX:NOTE: Import-time USD→KRW conversion for caches whose source
 // currency is non-KRW (currently Uniqlo US). Cache stores native USD;
 // only the DB upsert payload sees post-conversion KRW.
