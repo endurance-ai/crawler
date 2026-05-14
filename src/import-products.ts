@@ -87,6 +87,165 @@ const SELF_BRANDED: Record<string, string> = {
   chanceclothing: "Chance Clothing",
 }
 
+// ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
+//
+// 미존재 brand 발견 시 crawler 가 brand_nodes 에 신규 INSERT.
+// 기존 brand 와 trigram 유사도 >= 0.85 면 brand_node_review_queue
+// 에 reason='alias_candidate' 로 enqueue (admin merge 검토).
+// primary_node_id / secondary_node_id 등 노드 컬럼은 NULL —
+// SPEC-BRAND-NODE-001 P3 의 brand-VLM script 가 채운다.
+
+const FUZZY_ALIAS_THRESHOLD = 0.85
+
+interface BrandNodeRow {
+  id: number
+  brand_name: string
+  brand_name_normalized: string | null
+  style_node: string | null
+}
+
+function normalizeBrand(s: string): string {
+  return s.toLowerCase().trim().replace(/\s+/g, " ")
+}
+
+/** pg_trgm 호환 trigram set (with " " padding). */
+function trigrams(s: string): Set<string> {
+  const padded = `  ${s.toLowerCase().trim()} `
+  const out = new Set<string>()
+  for (let i = 0; i < padded.length - 2; i++) out.add(padded.slice(i, i + 3))
+  return out
+}
+
+/** Jaccard similarity over trigrams. pg_trgm similarity() 와 거의 동일. */
+function trigramSimilarity(a: string, b: string): number {
+  const ta = trigrams(a)
+  const tb = trigrams(b)
+  if (ta.size === 0 && tb.size === 0) return 0
+  let intersection = 0
+  for (const t of ta) if (tb.has(t)) intersection++
+  const union = ta.size + tb.size - intersection
+  return union === 0 ? 0 : intersection / union
+}
+
+async function loadBrandNodes(): Promise<{
+  rows: BrandNodeRow[]
+  idMap: Map<string, number>
+  nodeMap: Map<string, string>
+}> {
+  const idMap = new Map<string, number>()
+  const nodeMap = new Map<string, string>()
+
+  // PostgREST default 1000 row limit — paginate to fetch all brand_nodes (~2,100 rows).
+  const PAGE = 1000
+  const rows: BrandNodeRow[] = []
+  let offset = 0
+  for (;;) {
+    const {data, error} = await db
+      .from("brand_nodes")
+      .select("id, brand_name, brand_name_normalized, style_node")
+      .range(offset, offset + PAGE - 1)
+    if (error) {
+      console.warn("⚠️ brand_nodes 조회 실패:", error.message)
+      break
+    }
+    if (!data?.length) break
+    rows.push(...(data as BrandNodeRow[]))
+    if (data.length < PAGE) break
+    offset += PAGE
+  }
+
+  for (const bn of rows) {
+    if (bn.brand_name_normalized) {
+      idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
+      if (bn.style_node) nodeMap.set(bn.brand_name_normalized.toLowerCase(), bn.style_node)
+    }
+    idMap.set(bn.brand_name.toLowerCase(), bn.id)
+    if (bn.style_node) nodeMap.set(bn.brand_name.toLowerCase(), bn.style_node)
+  }
+  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
+  return {rows, idMap, nodeMap}
+}
+
+/**
+ * unknown brand 문자열에 대해
+ *   1) trigram 유사도 >= 0.85 인 기존 brand 검색
+ *   2) brand_nodes 에 신규 INSERT (노드 컬럼은 NULL)
+ *   3) 유사 brand 있으면 brand_node_review_queue 에 reason='alias_candidate'
+ *
+ * 결과로 idMap 을 in-place 업데이트.
+ */
+async function resolveUnknownBrands(
+  unknown: Array<{raw: string; platform: string}>,
+  known: BrandNodeRow[],
+  idMap: Map<string, number>,
+): Promise<{inserted: number; aliasFlagged: number; failed: number}> {
+  let inserted = 0
+  let aliasFlagged = 0
+  let failed = 0
+
+  for (const {raw, platform} of unknown) {
+    const normalized = normalizeBrand(raw)
+
+    // 1) Fuzzy match against existing brand_name_normalized (+ raw fallback).
+    let best: {id: number; name: string; sim: number} | null = null
+    for (const bn of known) {
+      const candidate = (bn.brand_name_normalized ?? bn.brand_name).toLowerCase().trim()
+      if (!candidate) continue
+      const sim = trigramSimilarity(normalized, candidate)
+      if (!best || sim > best.sim) {
+        best = {id: bn.id, name: bn.brand_name_normalized ?? bn.brand_name, sim}
+      }
+    }
+
+    // 2) Insert new brand_nodes row. id 는 bigserial 자동.
+    const {data: ins, error: insErr} = await db
+      .from("brand_nodes")
+      .insert({
+        brand_name: raw,
+        brand_name_normalized: normalized,
+        aliases: [],
+        brand_keywords: [],
+        gender_scope: [],
+        source_platforms: [platform],
+      })
+      .select("id")
+      .single()
+
+    if (insErr || !ins) {
+      console.warn(`   ⚠️ brand_nodes INSERT 실패 "${raw}": ${insErr?.message ?? "no data"}`)
+      failed++
+      continue
+    }
+
+    const newId = (ins as {id: number}).id
+    idMap.set(raw.toLowerCase(), newId)
+    idMap.set(normalized, newId)
+    inserted++
+
+    // 3) Alias candidate enqueue (best.sim >= threshold 일 때만).
+    if (best && best.sim >= FUZZY_ALIAS_THRESHOLD) {
+      const {error: rqErr} = await db
+        .from("brand_node_review_queue")
+        .insert({
+          brand_id: newId,
+          reason: "alias_candidate",
+          vlm_output: {
+            similar_to: {id: best.id, brand_name: best.name, similarity: best.sim},
+            new_brand: {brand_name: raw, brand_name_normalized: normalized},
+            source_platform: platform,
+          },
+        })
+      if (rqErr) {
+        console.warn(`   ⚠️ review_queue INSERT 실패 brand=${newId}: ${rqErr.message}`)
+      } else {
+        aliasFlagged++
+      }
+    }
+  }
+
+  return {inserted, aliasFlagged, failed}
+}
+
 async function main() {
   const dataDir = path.join(process.cwd(), "data")
 
@@ -115,24 +274,46 @@ async function main() {
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
 
-  // brand_nodes에서 브랜드 → 노드 매핑 가져오기 (normalized + raw 양쪽으로 조회)
-  const {data: brandNodes, error: bnError} = await db
-    .from("brand_nodes")
-    .select("brand_name, brand_name_normalized, style_node")
+  // ── brand_nodes 로드 (id_map + style_node legacy map) ─────
+  const {rows: brandRows, idMap: brandIdMap, nodeMap} = await loadBrandNodes()
 
-  const nodeMap = new Map<string, string>()
-  if (bnError) {
-    console.warn("⚠️ brand_nodes 조회 실패:", bnError.message)
-  } else if (brandNodes) {
-    for (const bn of brandNodes) {
-      // normalized name으로 매핑 (우선)
-      if (bn.brand_name_normalized) {
-        nodeMap.set(bn.brand_name_normalized.toLowerCase(), bn.style_node)
-      }
-      // raw name으로도 매핑 (호환)
-      nodeMap.set(bn.brand_name.toLowerCase(), bn.style_node)
+  // ── Pre-scan: 모든 파일에서 unique brand 문자열 수집 ──────
+  // 미존재 brand 는 한 번에 resolve (fuzzy + insert + alias_candidate enqueue).
+  // 파일 JSON 은 캐시해서 main loop 에서 재사용 (디스크 IO 1회).
+  const fileCache = new Map<string, CrawledProduct[]>()
+  const unknownBrands = new Map<string, string>() // brand → first-seen platform
+
+  for (const file of files) {
+    const platform = file.replace("-products.json", "")
+    const filePath = path.join(dataDir, file)
+    let raw: CrawledProduct[]
+    try {
+      raw = JSON.parse(fs.readFileSync(filePath, "utf-8"))
+    } catch {
+      continue // main loop 에서 에러 처리
     }
-    console.log(`🏷️ brand_nodes에서 ${nodeMap.size}개 매핑 로드\n`)
+    fileCache.set(file, raw)
+
+    for (const p of raw) {
+      const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
+      if (!brand) continue
+      const key = brand.toLowerCase()
+      if (!brandIdMap.has(key) && !unknownBrands.has(brand)) {
+        unknownBrands.set(brand, platform)
+      }
+    }
+  }
+
+  if (unknownBrands.size > 0) {
+    console.log(`🆕 미등록 brand ${unknownBrands.size}개 발견 — 자동 INSERT + alias 검사`)
+    const resolveResult = await resolveUnknownBrands(
+      [...unknownBrands.entries()].map(([raw, platform]) => ({raw, platform})),
+      brandRows,
+      brandIdMap,
+    )
+    console.log(
+      `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
+    )
   }
 
   let totalInserted = 0
@@ -140,17 +321,16 @@ async function main() {
   let totalReviews = 0
 
   for (const file of files) {
-    const filePath = path.join(dataDir, file)
     const platform = file.replace("-products.json", "")
 
-    let raw: CrawledProduct[]
-    try {
-      raw = JSON.parse(fs.readFileSync(filePath, "utf-8"))
-    } catch (parseErr) {
-      console.error(`   ❌ ${file} JSON 파싱 실패:`, (parseErr as Error).message)
+    const cached = fileCache.get(file)
+    if (!cached) {
+      // Pre-scan 단계에서 파싱 실패한 파일.
+      console.error(`   ❌ ${file} JSON 파싱 실패 (pre-scan)`)
       totalErrors++
       continue
     }
+    const raw: CrawledProduct[] = cached
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 
     // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
@@ -248,6 +428,7 @@ async function main() {
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
         gender: p.gender as string[],
+        brand_node_id: brandIdMap.get(brand.toLowerCase()) ?? null,
         style_node: nodeMap.get(brand.toLowerCase()) || null,
         crawled_at: p.crawledAt as string,
         description: p.description?.slice(0, 2000) || null,

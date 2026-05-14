@@ -17,6 +17,8 @@ import {STYLE_NODE_IDS} from "./fashion-genome"
 
 // ─── 타입 ────────────────────────────────────────────
 
+// SPEC-SEARCH-V6: mood_tags 제거. brand-VLM 의 primary/secondary_node 가 정체성 채널.
+// season/pattern 은 audit 용으로 유지 (검색 weight=0 이지만 admin 분석에 활용).
 export interface AnalysisResult {
   category: string
   subcategory: string | null
@@ -25,7 +27,6 @@ export interface AnalysisResult {
   color_family: string | null
   color_detail: string | null
   style_node: string | null
-  mood_tags: string[]
   keywords_ko: string[]
   keywords_en: string[]
   season: string | null
@@ -136,7 +137,6 @@ function validateAndNormalize(raw: Record<string, unknown>): AnalysisResult {
     color_detail: raw.color_detail ? String(raw.color_detail) : null,
     style_node: raw.style_node && (STYLE_NODE_IDS as readonly string[]).includes(String(raw.style_node))
       ? String(raw.style_node) : null,
-    mood_tags: Array.isArray(raw.mood_tags) ? raw.mood_tags.map(String) : [],
     keywords_ko: Array.isArray(raw.keywords_ko) ? raw.keywords_ko.map(String) : [],
     keywords_en: Array.isArray(raw.keywords_en) ? raw.keywords_en.map(String) : [],
     season: raw.season && isValidSeason(String(raw.season)) ? String(raw.season) : null,
