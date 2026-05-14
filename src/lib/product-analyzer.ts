@@ -6,11 +6,11 @@ import OpenAI from "openai"
 import {createHash} from "crypto"
 import {buildProductAnalyzeUser, PRODUCT_ANALYZE_SYSTEM} from "../configs/analyze-prompt"
 import {
-    isValidCategory,
-    isValidColorFamily,
-    isValidFabric,
-    isValidFit,
-    isValidSubcategory,
+  isValidCategory,
+  isValidColorFamily,
+  isValidFabric,
+  isValidFit,
+  isValidSubcategory,
 } from "./enums/product-enums"
 import {isValidPattern, isValidSeason} from "./enums/season-pattern"
 import {STYLE_NODE_IDS} from "./fashion-genome"
