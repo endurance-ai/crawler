@@ -92,7 +92,7 @@ const SELF_BRANDED: Record<string, string> = {
 // 미존재 brand 발견 시 crawler 가 brand_nodes 에 신규 INSERT.
 // 기존 brand 와 trigram 유사도 >= 0.85 면 brand_node_review_queue
 // 에 reason='alias_candidate' 로 enqueue (admin merge 검토).
-// primary_node_id / secondary_node_id 등 노드 컬럼은 NULL —
+// primary_style_node_id / secondary_style_node_id 등 노드 컬럼은 NULL —
 // SPEC-BRAND-NODE-001 P3 의 brand-VLM script 가 채운다.
 
 const FUZZY_ALIAS_THRESHOLD = 0.85
@@ -101,7 +101,6 @@ interface BrandNodeRow {
   id: number
   brand_name: string
   brand_name_normalized: string | null
-  style_node: string | null
 }
 
 function normalizeBrand(s: string): string {
@@ -130,19 +129,19 @@ function trigramSimilarity(a: string, b: string): number {
 async function loadBrandNodes(): Promise<{
   rows: BrandNodeRow[]
   idMap: Map<string, number>
-  nodeMap: Map<string, string>
 }> {
   const idMap = new Map<string, number>()
-  const nodeMap = new Map<string, string>()
 
   // PostgREST default 1000 row limit — paginate to fetch all brand_nodes (~2,100 rows).
+  // 062 마이그 이후 brand_nodes.style_node legacy text 컬럼 제거됨.
+  // 신규 분류는 primary_style_node_id FK → style_nodes 테이블 join 으로 얻음.
   const PAGE = 1000
   const rows: BrandNodeRow[] = []
   let offset = 0
   for (;;) {
     const {data, error} = await db
       .from("brand_nodes")
-      .select("id, brand_name, brand_name_normalized, style_node")
+      .select("id, brand_name, brand_name_normalized")
       .range(offset, offset + PAGE - 1)
     if (error) {
       console.warn("⚠️ brand_nodes 조회 실패:", error.message)
@@ -157,13 +156,11 @@ async function loadBrandNodes(): Promise<{
   for (const bn of rows) {
     if (bn.brand_name_normalized) {
       idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
-      if (bn.style_node) nodeMap.set(bn.brand_name_normalized.toLowerCase(), bn.style_node)
     }
     idMap.set(bn.brand_name.toLowerCase(), bn.id)
-    if (bn.style_node) nodeMap.set(bn.brand_name.toLowerCase(), bn.style_node)
   }
   console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
-  return {rows, idMap, nodeMap}
+  return {rows, idMap}
 }
 
 /**
@@ -274,8 +271,8 @@ async function main() {
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
 
-  // ── brand_nodes 로드 (id_map + style_node legacy map) ─────
-  const {rows: brandRows, idMap: brandIdMap, nodeMap} = await loadBrandNodes()
+  // ── brand_nodes 로드 (id_map only — legacy style_node text 컬럼 062에서 drop) ─
+  const {rows: brandRows, idMap: brandIdMap} = await loadBrandNodes()
 
   // ── Pre-scan: 모든 파일에서 unique brand 문자열 수집 ──────
   // 미존재 brand 는 한 번에 resolve (fuzzy + insert + alias_candidate enqueue).
@@ -429,7 +426,9 @@ async function main() {
         platform: (p.platform as string) || platform,
         gender: p.gender as string[],
         brand_node_id: brandIdMap.get(brand.toLowerCase()) ?? null,
-        style_node: nodeMap.get(brand.toLowerCase()) || null,
+        // products.style_node text 컬럼은 잔존 (003 마이그), v5 검색 axis. v6 cutover 후 폐기 예정.
+        // brand_nodes.style_node legacy 가 062 에서 drop 되어 매핑 source 사라짐 → NULL.
+        style_node: null,
         crawled_at: p.crawledAt as string,
         description: p.description?.slice(0, 2000) || null,
         color: p.color?.slice(0, 500) || null,

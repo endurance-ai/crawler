@@ -10,7 +10,7 @@ import {buildEnumReference} from "../lib/enums/product-enums"
 import {buildSeasonPatternReference} from "../lib/enums/season-pattern"
 
 // SPEC-SEARCH-V6: product_ai_analysis.mood_tags 는 검색 weight=0 으로 폐기.
-// brand 정체성은 brand_nodes.primary_node_id (brand-VLM) 가 담당하므로 product-level
+// brand 정체성은 brand_nodes.primary_style_node_id (brand-VLM) 가 담당하므로 product-level
 // mood 추출이 의미를 잃음. season/pattern 은 audit 용으로 유지.
 
 export const PRODUCT_ANALYZE_SYSTEM = `You are a fashion product image analyst. Given a single product image, extract structured attributes for product search matching.

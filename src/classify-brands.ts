@@ -331,6 +331,34 @@ async function fetchTargets(flags: Flags): Promise<BrandTarget[]> {
   }
 
   // --all
+  // products 가 1개 이상 있는 brand 만 대상 (product 0개 brand 는 분류 불가능).
+  // 엑셀에서 import 됐지만 crawler 가 적재 안 한 brand 가 다수 있음 (~2,395개).
+  // PostgREST 한방 쿼리로는 EXISTS 표현 어려워 RPC 또는 2-step. 여기선 2-step:
+  //   ① brand_node_id 별 product 카운트 조회 (id 만)
+  //   ② brand_nodes 조회 후 위 set 으로 필터
+  const productBrandIds = new Set<number>()
+  {
+    const PAGE = 1000
+    let offset = 0
+    for (;;) {
+      const {data, error} = await db
+        .from("products")
+        .select("brand_node_id")
+        .not("brand_node_id", "is", null)
+        .range(offset, offset + PAGE - 1)
+      if (error) {
+        console.error(`❌ products.brand_node_id 조회 실패: ${error.message}`)
+        process.exit(1)
+      }
+      if (!data?.length) break
+      for (const row of data) {
+        if (row.brand_node_id != null) productBrandIds.add(row.brand_node_id as number)
+      }
+      if (data.length < PAGE) break
+      offset += PAGE
+    }
+  }
+
   const targets: BrandTarget[] = []
   const PAGE = 1000
   let offset = 0
@@ -340,9 +368,9 @@ async function fetchTargets(flags: Flags): Promise<BrandTarget[]> {
       .select("id, brand_name")
       .order("id", {ascending: true})
       .range(offset, offset + PAGE - 1)
-    // force=false 면 미분류만 (primary_node_id IS NULL)
+    // force=false 면 미분류만 (primary_style_node_id IS NULL)
     if (!flags.force) {
-      query = query.is("primary_node_id", null)
+      query = query.is("primary_style_node_id", null)
     }
     const {data, error} = await query
     if (error) {
@@ -350,7 +378,10 @@ async function fetchTargets(flags: Flags): Promise<BrandTarget[]> {
       process.exit(1)
     }
     if (!data?.length) break
-    targets.push(...(data as BrandTarget[]))
+    // products 있는 brand 만 포함
+    for (const row of data as BrandTarget[]) {
+      if (productBrandIds.has(row.id)) targets.push(row)
+    }
     if (data.length < PAGE) break
     offset += PAGE
     if (flags.limit && targets.length >= flags.limit) break
