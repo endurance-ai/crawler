@@ -51,6 +51,7 @@ interface Flags {
   target: number
   dryRun: boolean
   onlyEmpty: boolean
+  limit?: number
 }
 
 function parseArgs(): Flags {
@@ -67,6 +68,8 @@ function parseArgs(): Flags {
     else if (a.startsWith("--brand-id=")) f.brandId = parseInt(a.slice("--brand-id=".length), 10)
     else if (a === "--target") f.target = parseInt(args[++i], 10)
     else if (a.startsWith("--target=")) f.target = parseInt(a.slice("--target=".length), 10)
+    else if (a === "--limit") f.limit = parseInt(args[++i], 10)
+    else if (a.startsWith("--limit=")) f.limit = parseInt(a.slice("--limit=".length), 10)
   }
   if (!f.all && !f.brand && !f.brandId) {
     console.error("❌ --all / --brand <name> / --brand-id <id> 중 하나 필요")
@@ -300,6 +303,12 @@ async function main() {
       if (data.length < PAGE) break
       offset += PAGE
     }
+  }
+
+  // --limit 적용 (DB fetch 후 메모리에서 자름)
+  if (flags.limit && brands.length > flags.limit) {
+    brands = brands.slice(0, flags.limit)
+    console.log(`   --limit ${flags.limit} 적용 후: ${brands.length}개`)
   }
 
   // --only-empty: 현재 representative 가 0개인 brand 로 좁힘
