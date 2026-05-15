@@ -26,3 +26,5 @@ output/
 .moai/logs/
 .moai/reports/
 .moai/cache/
+.app-database
+.app-src

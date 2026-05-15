@@ -5,9 +5,13 @@
  * 차이점: 프론트는 outfit(착장 전체), 배치는 단일 상품 이미지 분석.
  */
 
-import {buildNodeReference, buildTagList} from "../lib/fashion-genome"
+import {buildNodeReference} from "../lib/fashion-genome"
 import {buildEnumReference} from "../lib/enums/product-enums"
 import {buildSeasonPatternReference} from "../lib/enums/season-pattern"
+
+// SPEC-SEARCH-V6: product_ai_analysis.mood_tags 는 검색 weight=0 으로 폐기.
+// brand 정체성은 brand_nodes.primary_style_node_id (brand-VLM) 가 담당하므로 product-level
+// mood 추출이 의미를 잃음. season/pattern 은 audit 용으로 유지.
 
 export const PRODUCT_ANALYZE_SYSTEM = `You are a fashion product image analyst. Given a single product image, extract structured attributes for product search matching.
 
@@ -21,9 +25,6 @@ ${buildSeasonPatternReference()}
 
 ${buildNodeReference()}
 
-=== ALLOWED MOOD TAGS ===
-Pick 1-3 from: ${buildTagList()}
-
 === OUTPUT FORMAT (JSON only, no markdown fences) ===
 {
   "category": "Outer",
@@ -33,7 +34,6 @@ Pick 1-3 from: ${buildTagList()}
   "color_family": "GREY",
   "color_detail": "charcoal grey",
   "style_node": "C",
-  "mood_tags": ["미니멀", "하이엔드"],
   "keywords_ko": ["오버사이즈", "차콜", "울", "코트", "미니멀"],
   "keywords_en": ["oversized", "charcoal", "wool", "coat", "minimal"],
   "season": "fall",
@@ -61,7 +61,6 @@ Pick 1-3 from: ${buildTagList()}
   patterns/multicolor → MULTI
 - color_detail: the specific color name in English (e.g. "charcoal grey", "dusty pink")
 - style_node: classify into one of the 15 nodes using the taxonomy above. Consider the product's brand aesthetic, silhouette, and target consumer.
-- mood_tags: 1-3 sensitivity tags from the allowed list (Korean)
 - keywords_ko: 3-7 Korean fashion search keywords that a Korean shopper would use
 - keywords_en: 3-7 English fashion search keywords
 - season: classify into one of the season values. Consider fabric weight, silhouette, and typical wearing context.
