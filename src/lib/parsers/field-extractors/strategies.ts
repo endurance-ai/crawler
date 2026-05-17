@@ -316,13 +316,18 @@ const chanceclothingStrategy: Strategy = async (page, entry) => {
     .catch(() => "")
 
   if (additional) {
-    const matMatch = additional.match(/소재\s*\n\s*(.+)/)
-    if (matMatch?.[1]) {
+    // SPEC-CRAWLER-DETAIL-FIX-001 Type 2: Playwright innerText collapses
+    // the .xans-product-additional source newlines to spaces, so the old
+    // \n-anchored regexes never matched (material/description came back
+    // null). Whitespace-tolerant section segmentation: bound each value
+    // by the next known section label instead of a literal newline.
+    const matMatch = additional.match(/소재\s+([\s\S]*?)\s*(?:원산지|$)/)
+    if (matMatch?.[1]?.trim()) {
       result.material = matMatch[1].trim().slice(0, 500)
     }
 
-    const descMatch = additional.match(/상품\s*설명\s*\n([\s\S]+?)(?:더보기|$)/)
-    if (descMatch?.[1]) {
+    const descMatch = additional.match(/상품\s*설명\s+([\s\S]*?)\s*(?:더보기|$)/)
+    if (descMatch?.[1]?.trim()) {
       result.description = descMatch[1].trim().slice(0, 2000)
     }
 
@@ -632,15 +637,24 @@ const shopamomentoStrategy: Strategy = async (page) => {
     .catch(() => "")
 
   if (additional) {
+    // SPEC-CRAWLER-DETAIL-FIX-001 Type 2: innerText collapses the
+    // .xans-product-additional source newlines (and the blank line
+    // before "Linen 100%") into spaces, so the old \n-anchored regexes
+    // never matched (all 4 fields came back null). Whitespace-tolerant
+    // section segmentation bounded by the next known label. color and
+    // productCode genuinely have no source (no <select>, no product-code
+    // element) and stay null — REQ-DFIX-004, do not invent.
     const descMatch = additional.match(
-      /Product Note\s*\n([\s\S]+?)(?:Made In|Composition|Size Measurement|$)/,
+      /Product Note\s+([\s\S]*?)\s*(?:Made In|Composition|Size Measurement|$)/,
     )
-    if (descMatch?.[1]) {
+    if (descMatch?.[1]?.trim()) {
       result.description = descMatch[1].trim().slice(0, 2000)
     }
 
-    const matMatch = additional.match(/Composition\s*\n+\s*(.+)/)
-    if (matMatch?.[1]) {
+    const matMatch = additional.match(
+      /Composition\s+([\s\S]*?)\s*(?:Size Measurement|$)/,
+    )
+    if (matMatch?.[1]?.trim()) {
       result.material = matMatch[1].trim().slice(0, 500)
     }
   }
@@ -680,21 +694,20 @@ const slowsteadyclubStrategy: Strategy = async (page) => {
   const extracted = await page
     .$eval(".xans-product-additional", (el) => {
       const text = (el as HTMLElement).innerText?.trim() || ""
-      const lines = text
-        .split("\n")
-        .map((l) => l.trim())
-        .filter(Boolean)
 
-      const matStart = lines.findIndex((l) => l === "소재")
-      let matEnd = lines.findIndex((l, i) => i > matStart && /^(?:원산지|사이즈)/.test(l))
-      if (matEnd < 0) matEnd = lines.length
-      const matLines =
-        matStart >= 0 ? lines.slice(matStart + 1, matEnd).filter((l) => l.length > 3) : []
-      const material = matLines.length > 0 ? matLines.join("\n").slice(0, 500) : null
+      // SPEC-CRAWLER-DETAIL-FIX-001 Type 2: innerText collapses the
+      // source newlines to spaces, so split("\n") + exact-line equality
+      // (l === "소재") never matched (material/description came back
+      // null). Segment by known section labels with whitespace
+      // boundaries instead. Material kept as the raw space-joined
+      // substring (겉감 - ... 안감 - ...), no /-normalisation.
+      const matMatch = text.match(/소재\s+([\s\S]*?)\s*(?:원산지|사이즈|$)/)
+      const material = matMatch?.[1]?.trim() ? matMatch[1].trim().slice(0, 500) : null
 
-      const descIdx = lines.findIndex((l) => l === "상세설명")
-      const description =
-        descIdx >= 0 ? lines.slice(descIdx + 1).join("\n").slice(0, 2000) || null : null
+      const descMatch = text.match(/상세설명\s+([\s\S]+)$/)
+      const description = descMatch?.[1]?.trim()
+        ? descMatch[1].trim().slice(0, 2000)
+        : null
 
       const opts = Array.from(document.querySelectorAll('select[name*="option"] option'))
         .map((el2) => (el2 as HTMLElement).innerText?.trim())
