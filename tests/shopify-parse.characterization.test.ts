@@ -49,10 +49,21 @@ import type {Product} from "../src/lib/types"
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURE_PATH = path.join(__dirname, "fixtures", "shopify-products.fixture.json")
 const GOLDEN_PATH = path.join(__dirname, "fixtures", "shopify-parse.golden.json")
+const KRW_GOLDEN_PATH = path.join(__dirname, "fixtures", "shopify-parse.krw.golden.json")
 const BASE_URL = "https://shop.example-store.com"
 const KEY = "shopify-test"
 const PARSE_OPTIONS = {
   sourceCurrency: "USD" as const,
+  defaultGender: [] as string[],
+  brandFallback: "Example Store",
+}
+// Production shopify sites default to KRW (`config.sourceCurrency || "KRW"`
+// in crawlShopify). Same option values as the USD case — only the currency
+// differs — so the KRW `srcPrice.toLocaleString("ko-KR")` + ₩ branch (the
+// production-dominant path) is locked. Captured 2026-05-17 from the verbatim
+// extraction; do NOT regenerate on drift (must be byte-identical).
+const KRW_PARSE_OPTIONS = {
+  sourceCurrency: "KRW" as const,
   defaultGender: [] as string[],
   brandFallback: "Example Store",
 }
@@ -69,6 +80,10 @@ function loadFixture(): Parameters<typeof parseShopifyProducts>[0] {
 
 function loadGolden(): Product[] {
   return JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf-8")) as Product[]
+}
+
+function loadKrwGolden(): Product[] {
+  return JSON.parse(fs.readFileSync(KRW_GOLDEN_PATH, "utf-8")) as Product[]
 }
 
 /**
@@ -109,6 +124,27 @@ test("characterize_shopify_parseShopifyProducts_fixture_matches_golden", () => {
     "BEHAVIOR DRIFT: shopify parseShopifyProducts output diverged from the " +
       "SPEC-ARCH-CRAWLER-001 golden master. A parser-strategy refactor " +
       "must be byte-identical — do NOT regenerate the golden.",
+  )
+})
+
+test("characterize_shopify_parseShopifyProducts_KRW_fixture_matches_golden", () => {
+  const fixture = loadFixture()
+  const actual = normalize(parseShopifyProducts(fixture, BASE_URL, KEY, KRW_PARSE_OPTIONS))
+  const golden = loadKrwGolden()
+
+  assert.equal(
+    actual.length,
+    golden.length,
+    `product count drift: actual ${actual.length} vs golden ${golden.length}`,
+  )
+  assert.deepEqual(
+    actual,
+    golden,
+    "BEHAVIOR DRIFT: shopify parseShopifyProducts KRW output diverged from " +
+      "the SPEC-ARCH-CRAWLER-001 KRW golden master. KRW is the " +
+      "production-dominant path (config.sourceCurrency || \"KRW\"). A " +
+      "parser-strategy refactor must be byte-identical — do NOT regenerate " +
+      "the golden.",
   )
 })
 
