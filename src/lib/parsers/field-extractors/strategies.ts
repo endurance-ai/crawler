@@ -89,24 +89,30 @@ const baseStrategy: Strategy = async (page, entry) => {
         }
       }
 
-      // material (from description text) — material-pollution path
+      // material (from description text) — composition-only extraction.
+      // SPEC-CRAWLER-DETAIL-FIX-001 Type 1: inline twin of
+      // baseMaterialFromDescription (material.ts). Playwright innerText
+      // collapses source newlines to spaces, so the old split("\n")/
+      // ([^\n<]{3,80}) over-capture leaked trailing prose into material.
+      // Anchor on a material label or a bare <pct>% <fiber> token, then
+      // capture ONLY the composition run, stopping at the first
+      // non-composition token. MUST stay in sync with material.ts.
       let material: string | null = null
       if (description) {
-        const matMatch = description.match(new RegExp(args.matPattern, "i"))
-        if (matMatch?.[1]) {
-          material = matMatch[1].trim()
-        } else {
-          const lines = description.split("\n")
-          for (const line of lines) {
-            const lower = line.toLowerCase()
-            if (args.matKeywords.some((kw: string) => lower.includes(kw.toLowerCase()))) {
-              const cleaned = line.replace(/^\s*[-·•]\s*/, "").trim()
-              if (cleaned.length > 3 && cleaned.length < 200) {
-                material = cleaned
-                break
-              }
-            }
-          }
+        const compSrc =
+          "(?:\\d+\\s*%\\s*[A-Za-z가-힣]+|[A-Za-z가-힣]+\\s*\\d+\\s*%)" +
+          "(?:\\s*[,/]\\s*(?:\\d+\\s*%\\s*[A-Za-z가-힣]+|[A-Za-z가-힣]+\\s*\\d+\\s*%))*"
+        const compRe = new RegExp(compSrc)
+        const labelRe = /(?:소재|원단|Material|Fabric|Composition)\s*[:：]?\s*/i
+        const labelMatch = description.match(labelRe)
+        if (labelMatch && labelMatch.index !== undefined) {
+          const rest = description.slice(labelMatch.index + labelMatch[0].length)
+          const c = rest.match(compRe)
+          if (c) material = c[0].trim()
+        }
+        if (material === null) {
+          const bare = description.match(compRe)
+          if (bare) material = bare[0].trim()
         }
       }
 
@@ -153,14 +159,18 @@ const eightDivisionStrategy: Strategy = async (page) => {
       description = rawText.slice(startIdx, endIdx).trim().slice(0, 2000) || null
 
       if (description) {
-        const lines = description.split("\n")
-        for (const line of lines) {
-          const t = line.replace(/^-\s*/, "").trim()
-          if (/\d+%\s/.test(t) && !t.includes("할인") && !t.includes("배송")) {
-            material = t.slice(0, 200)
-            break
-          }
-        }
+        // SPEC-CRAWLER-DETAIL-FIX-001 Type 1: 8division has no material
+        // label in the 제품정보 segment, and innerText collapse defeats
+        // the old split("\n") + /\d+%\s/ whole-line capture (the segment
+        // is one space-joined line, so the entire prose became material).
+        // Apply the same composition-only rule as the base family:
+        // capture only the <pct>% <fiber> run, stopping at bullet prose.
+        const compRe = new RegExp(
+          "(?:\\d+\\s*%\\s*[A-Za-z가-힣]+|[A-Za-z가-힣]+\\s*\\d+\\s*%)" +
+            "(?:\\s*[,/]\\s*(?:\\d+\\s*%\\s*[A-Za-z가-힣]+|[A-Za-z가-힣]+\\s*\\d+\\s*%))*",
+        )
+        const cm = description.match(compRe)
+        if (cm) material = cm[0].trim().slice(0, 200)
       }
     }
 
