@@ -4,7 +4,7 @@
  *
  * SPEC-BRAND-NODE-001 PR-Y: brand-VLM 의 5장 입력 source 가
  * products.is_brand_representative=true 컬럼. 본 CLI 는 brand 별로
- * 다양성 휴리스틱으로 5~10 product 에 flag + brand_nodes.representative_image_urls
+ * 다양성 휴리스틱으로 최대 10 product 에 is_brand_representative=true flag (기본 target=10)
  * cache 동기화.
  *
  * SPEC 의 random.sample(5) 방식은 폐기 — diversity-aware 선택이 brand 정체성
@@ -56,7 +56,7 @@ interface Flags {
 
 function parseArgs(): Flags {
   const args = process.argv.slice(2)
-  const f: Flags = {all: false, target: 5, dryRun: false, onlyEmpty: false}
+  const f: Flags = {all: false, target: 10, dryRun: false, onlyEmpty: false}
   for (let i = 0; i < args.length; i++) {
     const a = args[i]
     if (a === "--all") f.all = true
@@ -248,14 +248,8 @@ async function processBrand(
     }
   }
 
-  // 5) brand_nodes.representative_image_urls cache 동기화
-  const {error: bnErr} = await db
-    .from("brand_nodes")
-    .update({representative_image_urls: imageUrls})
-    .eq("id", brand.id)
-  if (bnErr) {
-    console.warn(`   ⚠️ brand_nodes cache sync 실패 brand=${brand.id}: ${bnErr.message}`)
-  }
+  // brand_nodes.representative_image_urls 캐시는 SPEC-ARCH-CRAWLER-001 마이그에서
+  // 컬럼 제거됨 → 동기화 불필요. 대표 선정은 products.is_brand_representative 가 단일 소스.
 
   return {selected: newReps.length, cleared: toClear.length, imageUrls}
 }

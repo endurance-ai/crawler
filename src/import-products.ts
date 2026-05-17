@@ -201,8 +201,6 @@ async function resolveUnknownBrands(
       .insert({
         brand_name: raw,
         brand_name_normalized: normalized,
-        aliases: [],
-        brand_keywords: [],
         gender_scope: [],
         source_platforms: [platform],
       })

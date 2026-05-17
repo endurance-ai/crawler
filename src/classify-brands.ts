@@ -69,7 +69,7 @@ function parseArgs(): Flags {
     force: false,
     dryRun: false,
     concurrency: 1,
-    interval: 8000,
+    interval: 3000,
     retryFailed: false,
   }
   for (let i = 0; i < args.length; i++) {
@@ -96,6 +96,10 @@ function parseArgs(): Flags {
     console.error("❌ --concurrency 는 1~8 범위")
     process.exit(1)
   }
+  if (!Number.isFinite(f.interval) || f.interval < 1000) {
+    console.error("❌ --interval 은 1000ms 이상 (app 엔드포인트 self-DoS 방지)")
+    process.exit(1)
+  }
   return f
 }
 
@@ -118,8 +122,8 @@ interface ClassifyResponse {
 // ─── Token bucket (analyze-products.ts 패턴) ─────────
 
 const tokenBucket = {
-  interval: 8000,
-  batchSize: 1,
+  interval: 3000,
+  batchSize: 4,
   queue: [] as Array<() => void>,
   timer: null as ReturnType<typeof setInterval> | null,
   rateLimitHits: 0,

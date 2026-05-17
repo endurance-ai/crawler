@@ -124,6 +124,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "VISUAL AID",
     type: "cafe24",
     baseUrl: "https://visualaid.kr",
+    disabled: true, // 보류: 멀티브랜드 편집샵, 상품이 "[BRAND] 제품명" 형식 — [브랜드] 추출 미구현, OLD엔진 크롤 시 brand 오염
     paginate: true,
     maxPages: 300,
     defaultGender: ["women"],
@@ -289,6 +290,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "시엔느",
     type: "cafe24",
     baseUrl: "https://sienneboutique.com",
+    brand: "Sienne", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     defaultGender: ["women"],
@@ -311,6 +313,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "마르디메크르디",
     type: "cafe24",
     baseUrl: "https://mardimercredi.com",
+    brand: "Mardi Mercredi", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     defaultGender: ["women"],
@@ -515,6 +518,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "어나더오피스",
     type: "cafe24",
     baseUrl: "https://anotheroffice.co.kr",
+    brand: "Another Office", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     category: {

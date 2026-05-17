@@ -74,7 +74,7 @@ output/                        # gitignored (per-run cache)
 
 | Metric | Value (2026-05-07) |
 |--------|--------------------|
-| Platforms | 46 (20 Cafe24 KR + 17 Shopify global + 2 Uniqlo + 2 ZARA + 1 29CM + 1 Farfetch KR + 3 disabled) |
+| Platforms | 46 (20 Cafe24 KR + 17 Shopify global + 2 Uniqlo + 2 ZARA + 1 29CM + 1 Farfetch KR + 4 disabled) |
 | SKUs (cron, Cafe24 제외) | ~95,500 / day |
 | Unique brands | 2,400+ |
 
