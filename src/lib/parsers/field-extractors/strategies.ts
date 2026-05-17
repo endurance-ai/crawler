@@ -203,25 +203,32 @@ const adekuverStrategy: Strategy = async (page) => {
     const codes: string[] = []
 
     if (description) {
-      const lines = description
-        .split("\n")
+      // SPEC-CRAWLER-DETAIL-FIX-001 Type 3: innerText collapses the
+      // .item.open .content source newlines to spaces, so split("\n")
+      // yielded one line and none of the per-line tests matched
+      // (color/material/productCode null). Segment on the bullet
+      // delimiter that survives the collapse — the same /[-\n]/
+      // principle eastlogueStrategy already uses — and tokenise for
+      // product codes (which are not bullet-prefixed). description
+      // unchanged.
+      const segments = description
+        .split(/[-\n]/)
         .map((l) => l.trim())
         .filter((l) => l)
 
-      for (const line of lines) {
-        const clean = line.replace(/^-\s*/, "").trim()
-
-        if (!color && /컬러\s*$/.test(clean)) {
-          color = clean.replace(/\s*컬러\s*$/, "").trim() || null
+      for (const seg of segments) {
+        if (!color) {
+          const cm = seg.match(/^(.+?)\s*컬러\s*$/)
+          if (cm?.[1]?.trim()) color = cm[1].trim() || null
         }
 
-        if (!material && /^\d+%\s/.test(clean)) {
-          material = clean.slice(0, 200)
+        if (!material && /^\d+\s*%\s*[A-Za-z가-힣]/.test(seg)) {
+          material = seg.slice(0, 200)
         }
+      }
 
-        if (/^[A-Z0-9]{6,}$/.test(clean)) {
-          codes.push(clean)
-        }
+      for (const tok of description.split(/\s+/)) {
+        if (/^[A-Z0-9]{6,}$/.test(tok)) codes.push(tok)
       }
     }
 
@@ -764,20 +771,26 @@ const takeastreetStrategy: Strategy = async (page) => {
       const cutIdx = rawDesc.search(/MODEL SIZE|측정 기준|^\s*cm\s/m)
       description = (cutIdx > 0 ? rawDesc.slice(0, cutIdx).trim() : rawDesc).slice(0, 2000)
 
-      const lines = rawDesc.split("\n")
-      for (const line of lines) {
-        const t = line.trim()
+      // SPEC-CRAWLER-DETAIL-FIX-001 Type 3: innerText collapses the
+      // div.detail_left source newlines to spaces, so rawDesc is one
+      // line beginning with the product sentence; the old split("\n") +
+      // /^컬러/ /^소재/ line-start anchors never matched (color/material
+      // null). Match the labels mid-line with whitespace-tolerant
+      // boundaries instead. description cut at MODEL SIZE is unchanged;
+      // productCode has no source and stays null (REQ-DFIX-004).
+      const colorMatch = rawDesc.match(/컬러\s*[:：]\s*([\s\S]*?)\s*(?:소재|MODEL SIZE|$)/)
+      if (colorMatch?.[1]?.trim()) {
+        color = colorMatch[1].trim().slice(0, 200)
+      }
 
-        if (!color && /^컬러\s*[:：]/.test(t)) {
-          color = t.replace(/^컬러\s*[:：]\s*/, "").trim() || null
-        }
-
-        if (!material && /^소재\s*[:：]/.test(t)) {
-          material = t.replace(/^소재\s*[:：]\s*/, "").trim().slice(0, 200) || null
-        }
-
-        if (!material && /^Shell\s*[:：]/i.test(t)) {
-          material = t.slice(0, 200)
+      const matMatch = rawDesc.match(/소재\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/)
+      if (matMatch?.[1]?.trim()) {
+        material = matMatch[1].trim().slice(0, 200)
+      }
+      if (!material) {
+        const shellMatch = rawDesc.match(/Shell\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/i)
+        if (shellMatch?.[1]?.trim()) {
+          material = `Shell : ${shellMatch[1].trim()}`.slice(0, 200)
         }
       }
     }
