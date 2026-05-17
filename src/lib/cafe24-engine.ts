@@ -213,6 +213,8 @@ async function collectProductsFromPage(
             // displaynone 클래스가 있으면 건너뛰기
             if (ne.classList.contains("displaynone")) continue
             var txt = (ne.textContent || "").trim().replace(/\s+/g, " ")
+            // Cafe24 숨은 spec 블록 라벨이 앞에 붙는 사이트 대응: "상품명 : X" → "X"
+            txt = txt.replace(/^(상품명|제조사|판매가|브랜드|소비자가|적립금)\s*:\s*/, "")
             // ":" 또는 1~2글자 쓰레기값 건너뛰기
             if (txt.length > 2 && txt !== ":") { name = txt; break }
           }
@@ -244,7 +246,20 @@ async function collectProductsFromPage(
         const priceStr = priceMatch ? (priceMatch[1] || priceMatch[0]) : null
         const rawPrice = priceStr ? parseInt(priceStr.replace(/,/g, ""), 10) : null
         // ₩1,000 미만은 비정상 (상품명의 숫자가 파싱된 경우 — e.g. "26SS" → 26)
-        const price = rawPrice !== null && rawPrice >= 1000 ? rawPrice : null
+        let price = rawPrice !== null && rawPrice >= 1000 ? rawPrice : null
+
+        // Cafe24 표준 spec 블록(.xans-product-listitem) 폴백.
+        // 일부 테마는 가격을 .price 가 아닌 "판매가 : ₩X" 라벨 텍스트로만 노출 (beslow 등).
+        var specText = ""
+        var specEls = el.querySelectorAll(".xans-product-listitem")
+        for (var sx = 0; sx < specEls.length; sx++) specText += " " + (specEls[sx].textContent || "")
+        if (price === null && specText) {
+          var specClean = specText.replace(/,/g, "")
+          var saleM = specClean.match(/할인판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
+          var listM = specClean.match(/판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
+          var specPrice = saleM ? parseInt(saleM[1], 10) : (listM ? parseInt(listM[1], 10) : null)
+          if (specPrice !== null && specPrice >= 1000) price = specPrice
+        }
 
         // 이미지: 아이콘/로고가 아닌 실제 상품 이미지 찾기
         var imageUrl = ""
@@ -300,6 +315,11 @@ async function collectProductsFromPage(
         // 브랜드: 상품 텍스트에서 추출 (Cafe24 편집샵은 보통 브랜드명이 상품명 앞에 있음)
         const brandEl = el.querySelector(".brand, [class*=brand], .manufacturer, .mf_name, p.b, .b")
         let brand = brandEl ? (brandEl.textContent || "").trim() : ""
+        // Cafe24 spec 블록의 "브랜드 : X" 라벨 폴백 (멀티브랜드 편집샵 대응)
+        if (!brand && specText) {
+          var brandM = specText.match(/브랜드\s*:?\s*([^\n:]{2,40}?)(?:\s{2,}|상품명|제조사|판매가|$)/)
+          if (brandM) brand = brandM[1].trim()
+        }
         if (!brand && args.brandNameOverride) brand = args.brandNameOverride
         // 일부 사이트는 상품명 전체 텍스트 첫 줄이 브랜드
         if (!brand) {
@@ -374,7 +394,8 @@ async function crawlCategory(
         page,
         config,
         category.name,
-        category.gender
+        category.gender,
+        config.brand
       )
 
       if (products.length === 0) break // 빈 페이지면 중단
@@ -442,7 +463,7 @@ export async function crawlCafe24(
         timeout: 30000,
       })
       await page.waitForTimeout(1500)
-      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [])
+      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [], config.brand)
       allProducts.push(...products)
       console.log(`${tag} 📦 메인: ${products.length}개 상품`)
     } catch (err) {

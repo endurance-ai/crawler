@@ -49,6 +49,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "슬로우스테디클럽",
     type: "cafe24",
     baseUrl: "https://slowsteadyclub.com",
+    disabled: true, // 재고 파서 미스(전량 품절 오판) — 패치 전까지 크롤 제외
     paginate: true,
     maxPages: 300,
     category: {
@@ -397,6 +398,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "테이크어스트릿",
     type: "cafe24",
     baseUrl: "https://takeastreet.com",
+    disabled: true, // 셀렉터 전면 실패(name="상품명" price=5, brand 93% 결손) — 크롤 제외
     paginate: true,
     maxPages: 300,
     category: {
@@ -493,6 +495,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "비슬로우",
     type: "cafe24",
     baseUrl: "https://beslow.co.kr",
+    brand: "BESLOW", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     category: {
@@ -505,7 +508,7 @@ export const PLATFORMS: SiteConfig[] = [
       ],
     },
     disabled: true,
-    notes: "미니멀 클래식 남성복. 100% 이미지 기반 상세페이지 — 텍스트 추출 불가",
+    notes: "미니멀 클래식 남성복. 보류 사유: 가격이 .xans-product-listitem spec블록에 JS로 늦게 주입 → 엔진 2s 스냅샷 시점 미렌더, price 0% 정상(2026-05-17 검증). brand/name은 수정 후 정상. 렌더대기 로직 추가 전까지 제외",
   },
   {
     key: "anotheroffice",
@@ -536,6 +539,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "바스통",
     type: "cafe24",
     baseUrl: "https://bastong.co.kr",
+    brand: "BASTONG", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     category: {
@@ -551,6 +555,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "러프사이드",
     type: "cafe24",
     baseUrl: "https://roughside.co.kr",
+    brand: "ROUGHSIDE", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     category: {
@@ -580,6 +585,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "블랭크룸",
     type: "cafe24",
     baseUrl: "https://blankroom.house",
+    brand: "BLANKROOM", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
     category: {
