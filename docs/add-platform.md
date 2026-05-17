@@ -27,7 +27,7 @@ paste into the live files. That paste step is the deliberate human gate.
 
 | File | Role |
 |---|---|
-| `src/lib/parsers/detail/selector-registry.ts` | `DETAIL_REGISTRY`: per-site selectors + wait recipe + strategy id. 18 sites collapsed here (REQ-CRAWLER-003). |
+| `src/lib/parsers/detail/selector-registry.ts` | `DETAIL_REGISTRY`: per-site selectors + wait recipe + strategy id. All Cafe24-family sites collapsed here (REQ-CRAWLER-003). |
 | `src/lib/parsers/field-extractors/strategies.ts` | `STRATEGIES`: the per-strategy extraction algorithms the registry-driven parser dispatches into. |
 | `src/lib/parsers/field-extractors/` | Shared extraction primitives (`color`, `description`, `material`, `productCode`) — the single source of extraction logic. |
 | `src/lib/parsers/detail/registry-detail-parser.ts` | The ONE `IDetailParser` impl. `getDetailParser(key)` returns site-keyed subclasses of it. |
@@ -99,7 +99,7 @@ npm run typecheck # exit 0 (the new stub + wiring must typecheck)
   freezes the **current** output shape. A new platform must emit products
   that pass `ProductSchema` unchanged — it does not introduce new fields.
 - Behavior preservation is HARD: a new platform adds a new code path; it
-  must not alter any of the 18 existing sites' goldens.
+  must not alter any of the existing sites' goldens.
 - The scaffold tool is inert by design: dry-run by default, one
   clearly-namespaced stub file under `src/lib/parsers/scaffold/` on
   `--write`, and it refuses to overwrite an existing stub.
