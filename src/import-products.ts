@@ -14,6 +14,7 @@ import {createClient} from "@supabase/supabase-js"
 // only the DB upsert payload sees post-conversion KRW.
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
 import {convertToKrw} from "./lib/fx"
+import {applyValidationGate} from "./lib/core/validation-gate"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -327,7 +328,14 @@ async function main() {
       totalErrors++
       continue
     }
-    const raw: CrawledProduct[] = cached
+    const rawAll: CrawledProduct[] = cached
+    // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
+    // product before the DB upsert. Valid products pass through
+    // byte-identical into the existing .map(); invalid ones are excluded
+    // + a structured reject event is emitted (does not crash the import
+    // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
+    // false) → exact legacy behavior (no gate, all products imported).
+    const raw: CrawledProduct[] = applyValidationGate(rawAll, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 
     // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that

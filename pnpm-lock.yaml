@@ -13,13 +13,16 @@ importers:
         version: 2.105.3
       openai:
         specifier: ^6.32.0
-        version: 6.36.0(ws@8.20.0)
+        version: 6.36.0(ws@8.20.0)(zod@4.4.3)
       playwright:
         specifier: ^1.58.2
         version: 1.59.1
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -381,6 +384,9 @@ packages:
     engines: {node: '>=0.8'}
     hasBin: true
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@esbuild/aix-ppc64@0.27.7':
@@ -588,9 +594,10 @@ snapshots:
 
   minimist@1.2.8: {}
 
-  openai@6.36.0(ws@8.20.0):
+  openai@6.36.0(ws@8.20.0)(zod@4.4.3):
     optionalDependencies:
       ws: 8.20.0
+      zod: 4.4.3
 
   path-key@3.1.1: {}
 
@@ -646,3 +653,5 @@ snapshots:
       ssf: 0.11.2
       wmf: 1.0.2
       word: 0.3.0
+
+  zod@4.4.3: {}

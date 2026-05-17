@@ -43,6 +43,7 @@ import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, SiteConfig} from "./lib/types"
+import {applyValidationGate} from "./lib/core/validation-gate"
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
 
@@ -653,8 +654,16 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
 function saveResult(outDir: string, result: CrawlResult) {
   if (result.products.length === 0) return
 
+  // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
+  // product before it is written to JSON. Valid products pass through
+  // byte-identical; invalid ones are excluded + a structured reject
+  // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
+  // exact legacy behavior (all products written, no gate).
+  const products = applyValidationGate(result.products, result.platform)
+  if (products.length === 0) return
+
   const outPath = path.join(outDir, `${result.platform}-products.json`)
-  fs.writeFileSync(outPath, JSON.stringify(result.products, null, 2), "utf-8")
+  fs.writeFileSync(outPath, JSON.stringify(products, null, 2), "utf-8")
   console.log(`   💾 저장: ${outPath}`)
 }
 
