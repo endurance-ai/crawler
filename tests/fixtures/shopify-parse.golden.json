@@ -1,0 +1,111 @@
+[
+  {
+    "brand": "Acme Apparel",
+    "name": "Oxford Cotton Shirt",
+    "category": "Shirts",
+    "price": 59.9,
+    "originalPrice": 59.9,
+    "salePrice": null,
+    "priceFormatted": "$59.90",
+    "imageUrl": "https://cdn.shopify.com/s/files/1/0001/ocs-front.jpg",
+    "productUrl": "https://shop.example-store.com/products/oxford-cotton-shirt",
+    "inStock": true,
+    "gender": [
+      "women",
+      "men"
+    ],
+    "platform": "shopify-test",
+    "crawledAt": "<<NORMALIZED>>",
+    "description": "Crisp oxford cotton. Slim fit everyday wear. alert(1) 5 &lt; 10",
+    "color": "White, Blue",
+    "sizeInfo": "S, M, L",
+    "images": [
+      "https://cdn.shopify.com/s/files/1/0001/ocs-front.jpg",
+      "https://shop.example-store.com/img/ocs-back.jpg"
+    ],
+    "tags": [
+      "Womens",
+      "new-arrival",
+      "cotton"
+    ],
+    "sourceCurrency": "USD",
+    "sourcePrice": 59.9
+  },
+  {
+    "brand": "Example Store",
+    "name": "Sold Out Wool Coat",
+    "category": "Coats",
+    "price": 249,
+    "originalPrice": 249,
+    "salePrice": null,
+    "priceFormatted": "$249.00",
+    "imageUrl": "https://shop.example-store.com/img/coat.jpg",
+    "productUrl": "https://shop.example-store.com/products/sold-out-wool-coat",
+    "inStock": false,
+    "gender": [
+      "men"
+    ],
+    "platform": "shopify-test",
+    "crawledAt": "<<NORMALIZED>>",
+    "description": "Heavy wool coat for winter.",
+    "color": "Camel",
+    "images": [
+      "https://shop.example-store.com/img/coat.jpg"
+    ],
+    "tags": [
+      "Men",
+      "outerwear"
+    ],
+    "sourceCurrency": "USD",
+    "sourcePrice": 249
+  },
+  {
+    "brand": "Example Store",
+    "name": "Plain Basic Tee",
+    "category": "",
+    "price": 19.99,
+    "originalPrice": 19.99,
+    "salePrice": null,
+    "priceFormatted": "$19.99",
+    "imageUrl": "",
+    "productUrl": "https://shop.example-store.com/products/plain-basic-tee",
+    "inStock": true,
+    "gender": [],
+    "platform": "shopify-test",
+    "crawledAt": "<<NORMALIZED>>",
+    "sourceCurrency": "USD",
+    "sourcePrice": 19.99
+  },
+  {
+    "brand": "Summit Gear",
+    "name": "Trail Running Shoe",
+    "category": "Footwear",
+    "price": 129.95,
+    "originalPrice": 129.95,
+    "salePrice": null,
+    "priceFormatted": "$129.95",
+    "imageUrl": "https://acme.myshopify.com/cdn/trs-1.jpg",
+    "productUrl": "https://shop.example-store.com/products/trail-running-shoe",
+    "inStock": true,
+    "gender": [
+      "women",
+      "men"
+    ],
+    "platform": "shopify-test",
+    "crawledAt": "<<NORMALIZED>>",
+    "description": "Grippy trail shoe for men and women.",
+    "sizeInfo": "8, 9",
+    "images": [
+      "https://acme.myshopify.com/cdn/trs-1.jpg",
+      "https://files.shopifycdn.com/trs-2.jpg"
+    ],
+    "tags": [
+      "unisex",
+      "MALE",
+      "Female",
+      "footwear"
+    ],
+    "sourceCurrency": "USD",
+    "sourcePrice": 129.95
+  }
+]
