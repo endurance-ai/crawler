@@ -14,6 +14,10 @@
  * SPEC-CRAWLER-DETAIL-FIX-001 (Type 1 shared root cause). baseStrategy
  * in strategies.ts inlines the identical algorithm for the in-page
  * (page.evaluate) execution path and MUST stay in sync with this.
+ * Accepted narrowing: a material label with no <pct>% <fiber> segment
+ * (e.g. "소재: 면/나일론혼방") returns null by design (composition-only,
+ * REQ-DFIX-002); the base fallback path is the unknown-site fallback
+ * and is out of SPEC scope.
  * @MX:SPEC: SPEC-CRAWLER-DETAIL-FIX-001 REQ-DFIX-001/002
  */
 

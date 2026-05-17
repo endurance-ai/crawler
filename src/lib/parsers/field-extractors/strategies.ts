@@ -21,6 +21,13 @@ import {colorFromOptionList} from "./color"
 import {baseDescriptionInPage} from "./description"
 import {baseMaterialFromDescription} from "./material"
 
+/** SPEC-CRAWLER-DETAIL-FIX-001 review P1: ReDoS guard — bound untrusted section input before [\s\S]*? regexes */
+const MAX_SECTION_INPUT = 10_000
+
+function guardSectionInput(s: string): string {
+  return s.length > MAX_SECTION_INPUT ? s.slice(0, MAX_SECTION_INPUT) : s
+}
+
 type Strategy = (page: Page, entry: RegistryEntry) => Promise<DetailData>
 
 const empty = (): DetailData => ({
@@ -97,6 +104,10 @@ const baseStrategy: Strategy = async (page, entry) => {
       // Anchor on a material label or a bare <pct>% <fiber> token, then
       // capture ONLY the composition run, stopping at the first
       // non-composition token. MUST stay in sync with material.ts.
+      // Accepted narrowing: a material label with no <pct>% <fiber> segment
+      // (e.g. "소재: 면/나일론혼방") returns null by design (composition-only,
+      // REQ-DFIX-002); the base fallback path is the unknown-site fallback
+      // and is out of SPEC scope.
       let material: string | null = null
       if (description) {
         const compSrc =
@@ -318,9 +329,11 @@ const bastongStrategy: Strategy = async (page, entry) => {
 
 const chanceclothingStrategy: Strategy = async (page, entry) => {
   const result = empty()
-  const additional = await page
+  const additionalRaw = await page
     .$eval(".xans-product-additional", (el) => (el as HTMLElement).innerText?.trim() || "")
     .catch(() => "")
+  // SPEC-CRAWLER-DETAIL-FIX-001 review P1: ReDoS guard — bound untrusted section input before [\s\S]*? regexes
+  const additional = guardSectionInput(additionalRaw)
 
   if (additional) {
     // SPEC-CRAWLER-DETAIL-FIX-001 Type 2: Playwright innerText collapses
@@ -639,9 +652,11 @@ const sculpstoreStrategy: Strategy = async (page, entry) => {
 
 const shopamomentoStrategy: Strategy = async (page) => {
   const result = empty()
-  const additional = await page
+  const additionalRaw = await page
     .$eval(".xans-product-additional", (el) => (el as HTMLElement).innerText?.trim() || "")
     .catch(() => "")
+  // SPEC-CRAWLER-DETAIL-FIX-001 review P1: ReDoS guard — bound untrusted section input before [\s\S]*? regexes
+  const additional = guardSectionInput(additionalRaw)
 
   if (additional) {
     // SPEC-CRAWLER-DETAIL-FIX-001 Type 2: innerText collapses the
@@ -700,7 +715,9 @@ const slowsteadyclubStrategy: Strategy = async (page) => {
   const result = empty()
   const extracted = await page
     .$eval(".xans-product-additional", (el) => {
-      const text = (el as HTMLElement).innerText?.trim() || ""
+      const rawText = (el as HTMLElement).innerText?.trim() || ""
+      // SPEC-CRAWLER-DETAIL-FIX-001 review P1: ReDoS guard — bound untrusted section input before [\s\S]*? regexes
+      const text = rawText.length > 10000 ? rawText.slice(0, 10000) : rawText
 
       // SPEC-CRAWLER-DETAIL-FIX-001 Type 2: innerText collapses the
       // source newlines to spaces, so split("\n") + exact-line equality
@@ -768,8 +785,10 @@ const takeastreetStrategy: Strategy = async (page) => {
     let material: string | null = null
 
     if (rawDesc) {
-      const cutIdx = rawDesc.search(/MODEL SIZE|측정 기준|^\s*cm\s/m)
-      description = (cutIdx > 0 ? rawDesc.slice(0, cutIdx).trim() : rawDesc).slice(0, 2000)
+      // SPEC-CRAWLER-DETAIL-FIX-001 review P1: ReDoS guard — bound untrusted section input before [\s\S]*? regexes
+      const safeDesc = rawDesc.length > 10000 ? rawDesc.slice(0, 10000) : rawDesc
+      const cutIdx = safeDesc.search(/MODEL SIZE|측정 기준|^\s*cm\s/m)
+      description = (cutIdx > 0 ? safeDesc.slice(0, cutIdx).trim() : safeDesc).slice(0, 2000)
 
       // SPEC-CRAWLER-DETAIL-FIX-001 Type 3: innerText collapses the
       // div.detail_left source newlines to spaces, so rawDesc is one
@@ -778,17 +797,17 @@ const takeastreetStrategy: Strategy = async (page) => {
       // null). Match the labels mid-line with whitespace-tolerant
       // boundaries instead. description cut at MODEL SIZE is unchanged;
       // productCode has no source and stays null (REQ-DFIX-004).
-      const colorMatch = rawDesc.match(/컬러\s*[:：]\s*([\s\S]*?)\s*(?:소재|MODEL SIZE|$)/)
+      const colorMatch = safeDesc.match(/컬러\s*[:：]\s*([\s\S]*?)\s*(?:소재|MODEL SIZE|$)/)
       if (colorMatch?.[1]?.trim()) {
         color = colorMatch[1].trim().slice(0, 200)
       }
 
-      const matMatch = rawDesc.match(/소재\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/)
+      const matMatch = safeDesc.match(/소재\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/)
       if (matMatch?.[1]?.trim()) {
         material = matMatch[1].trim().slice(0, 200)
       }
       if (!material) {
-        const shellMatch = rawDesc.match(/Shell\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/i)
+        const shellMatch = safeDesc.match(/Shell\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/i)
         if (shellMatch?.[1]?.trim()) {
           material = `Shell : ${shellMatch[1].trim()}`.slice(0, 200)
         }
