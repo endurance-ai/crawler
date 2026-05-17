@@ -105,6 +105,8 @@ export interface SiteConfig {
   baseUrl: string
   /** 기본 성별 (사이트 전체 적용) */
   defaultGender?: string[]
+  /** 단일브랜드 자사몰의 하우스 브랜드명 (DOM에서 브랜드 추출 실패 시 폴백) */
+  brand?: string
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
   /** 카테고리 탐색 설정 */

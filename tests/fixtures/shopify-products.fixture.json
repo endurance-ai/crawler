@@ -1,0 +1,137 @@
+{
+  "products": [
+    {
+      "id": 1001,
+      "title": "Oxford Cotton Shirt",
+      "handle": "oxford-cotton-shirt",
+      "vendor": "Acme Apparel",
+      "product_type": "Shirts",
+      "body_html": "<p>Crisp <strong>oxford</strong> cotton.&nbsp;Slim&#8217;fit&#x2014;everyday wear.</p><script>alert(1)</script> 5 < 10",
+      "tags": ["Womens", "new-arrival", "cotton"],
+      "options": [
+        {"name": "Color", "position": 1, "values": ["White", "Blue"]},
+        {"name": "Size", "position": 2, "values": ["S", "M", "L"]}
+      ],
+      "variants": [
+        {"id": 11, "title": "White / S", "price": "59.90", "available": false, "sku": "OCS-W-S", "option1": "White", "option2": "S", "option3": null},
+        {"id": 12, "title": "White / M", "price": "59.90", "available": true, "sku": "OCS-W-M", "option1": "White", "option2": "M", "option3": null},
+        {"id": 13, "title": "Blue / L", "price": "59.90", "available": false, "sku": "OCS-B-L", "option1": "Blue", "option2": "L", "option3": null}
+      ],
+      "images": [
+        {"src": "https://cdn.shopify.com/s/files/1/0001/ocs-front.jpg"},
+        {"src": "https://shop.example-store.com/img/ocs-back.jpg"},
+        {"src": "http://cdn.shopify.com/s/files/1/0001/ocs-insecure.jpg"},
+        {"src": "https://evil.example.com/steal.jpg"}
+      ]
+    },
+    {
+      "id": 1002,
+      "title": "Sold Out Wool Coat",
+      "handle": "sold-out-wool-coat",
+      "vendor": "",
+      "product_type": "Coats",
+      "body_html": "<div>Heavy wool coat for winter.</div>",
+      "tags": ["Men", "outerwear"],
+      "options": [
+        {"name": "Colorway", "position": 1, "values": ["Camel"]}
+      ],
+      "variants": [
+        {"id": 21, "title": "Camel / One Size", "price": "249.00", "available": false, "sku": "SWC-C", "option1": "Camel", "option2": null, "option3": null}
+      ],
+      "images": [
+        {"src": "https://shop.example-store.com/img/coat.jpg"},
+        {"src": "https://attacker.test/x.jpg"}
+      ]
+    },
+    {
+      "id": 1003,
+      "title": "Lookbook SS25 Editorial",
+      "handle": "lookbook-ss25",
+      "vendor": "Acme Apparel",
+      "product_type": "Editorial",
+      "body_html": "<p>Lookbook only.</p>",
+      "tags": ["lookbook"],
+      "options": [],
+      "variants": [
+        {"id": 31, "title": "Default Title", "price": "0.00", "available": true, "sku": "LB-1", "option1": "Default Title", "option2": null, "option3": null}
+      ],
+      "images": [{"src": "https://cdn.shopify.com/s/files/1/0001/lb.jpg"}]
+    },
+    {
+      "id": 1004,
+      "title": "Store Credit",
+      "handle": "store-credit",
+      "vendor": "Acme Apparel",
+      "product_type": "Gift Card",
+      "body_html": "<p>Gift card.</p>",
+      "tags": ["gift"],
+      "options": [],
+      "variants": [
+        {"id": 41, "title": "50", "price": "50.00", "available": true, "sku": "GC-50", "option1": "50", "option2": null, "option3": null}
+      ],
+      "images": [{"src": "https://cdn.shopify.com/s/files/1/0001/gc.jpg"}]
+    },
+    {
+      "id": 1005,
+      "title": "Rewards Gift",
+      "handle": "rewards-gift",
+      "vendor": "Rise.ai",
+      "product_type": "Loyalty",
+      "body_html": "<p>Loyalty reward.</p>",
+      "tags": ["loyalty"],
+      "options": [],
+      "variants": [
+        {"id": 51, "title": "Default Title", "price": "10.00", "available": true, "sku": "RG-1", "option1": "Default Title", "option2": null, "option3": null}
+      ],
+      "images": [{"src": "https://cdn.shopify.com/s/files/1/0001/rg.jpg"}]
+    },
+    {
+      "id": 1006,
+      "title": "Bad Handle Product",
+      "handle": "Invalid Handle WITH Spaces",
+      "vendor": "Acme Apparel",
+      "product_type": "Shirts",
+      "body_html": "<p>Should be skipped due to unsafe handle.</p>",
+      "tags": ["women"],
+      "options": [],
+      "variants": [
+        {"id": 61, "title": "Default Title", "price": "30.00", "available": true, "sku": "BH-1", "option1": "Default Title", "option2": null, "option3": null}
+      ],
+      "images": [{"src": "https://cdn.shopify.com/s/files/1/0001/bh.jpg"}]
+    },
+    {
+      "id": 1007,
+      "title": "Plain Basic Tee",
+      "handle": "plain-basic-tee",
+      "vendor": "",
+      "product_type": "",
+      "body_html": "",
+      "tags": [],
+      "variants": [
+        {"id": 71, "title": "Default Title", "price": "19.99", "available": true, "sku": "PBT-1", "option1": "Default Title", "option2": null, "option3": null}
+      ],
+      "images": []
+    },
+    {
+      "id": 1008,
+      "title": "Trail Running Shoe",
+      "handle": "trail-running-shoe",
+      "vendor": "Summit Gear",
+      "product_type": "Footwear",
+      "body_html": "<p>Grippy trail shoe for men and women.</p>",
+      "tags": ["unisex", "MALE", "Female", "footwear"],
+      "options": [
+        {"name": "US Size", "position": 1, "values": ["8", "9", "10"]}
+      ],
+      "variants": [
+        {"id": 81, "title": "8", "price": "129.95", "available": true, "sku": "TRS-8", "option1": "8", "option2": null, "option3": null},
+        {"id": 82, "title": "9", "price": "129.95", "available": false, "sku": "TRS-9", "option1": "9", "option2": null, "option3": null},
+        {"id": 83, "title": "Default Title", "price": "129.95", "available": true, "sku": "TRS-X", "option1": "Default Title", "option2": null, "option3": null}
+      ],
+      "images": [
+        {"src": "https://acme.myshopify.com/cdn/trs-1.jpg"},
+        {"src": "https://files.shopifycdn.com/trs-2.jpg"}
+      ]
+    }
+  ]
+}

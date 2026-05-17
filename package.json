@@ -18,6 +18,7 @@
     "analyze:products": "dotenv -e .env -- tsx src/analyze-products.ts",
     "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
+    "scaffold:platform": "tsx tools/scaffold-platform.ts",
     "test": "sh -c 'node --test --import tsx ./tests/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
@@ -25,7 +26,8 @@
     "@supabase/supabase-js": "^2.100.1",
     "openai": "^6.32.0",
     "playwright": "^1.58.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
