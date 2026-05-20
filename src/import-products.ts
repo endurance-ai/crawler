@@ -438,7 +438,7 @@ async function main() {
         crawled_at: p.crawledAt as string,
         description: p.description?.slice(0, 2000) || null,
         color: p.color?.slice(0, 500) || null,
-        material: p.material?.slice(0, 200) || null,
+        // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
         subcategory: p.subcategory || null,
         images: p.images?.slice(0, 10) || null,
         size_info: p.sizeInfo?.slice(0, 2000) || null,
@@ -482,7 +482,6 @@ async function main() {
         sale_price: a.sale_price ?? b.sale_price,
         original_price: pickRicher("original_price"),
         color: pickRicher("color"),
-        material: pickRicher("material"),
         description: pickRicher("description"),
         gender: mergedGender,
         category: pickRicher("category"),
