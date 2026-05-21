@@ -1,0 +1,79 @@
+[
+  {
+    "label": "major_overseas",
+    "brand_id": 912,
+    "brand_name": "Kith",
+    "brand_name_normalized": "kith",
+    "source_platforms": [
+      "kith"
+    ],
+    "gender_scope": null,
+    "primary_style_node_id": 9,
+    "price_min_usd": 10.0,
+    "price_max_usd": 50000.0,
+    "sku_count": 2184
+  },
+  {
+    "label": "indie_overseas_ssense",
+    "brand_id": 428,
+    "brand_name": "SIR.",
+    "brand_name_normalized": "sir.",
+    "source_platforms": [
+      "SSENSE"
+    ],
+    "gender_scope": [
+      "women"
+    ],
+    "primary_style_node_id": 18,
+    "price_min_usd": 76.2,
+    "price_max_usd": 800.1,
+    "sku_count": 49
+  },
+  {
+    "label": "korean_cafe24_guess",
+    "brand_id": 787,
+    "brand_name": "Salomon",
+    "brand_name_normalized": "salomon",
+    "source_platforms": [
+      "AMOMENTO",
+      "SSENSE"
+    ],
+    "gender_scope": [
+      "unisex"
+    ],
+    "primary_style_node_id": 19,
+    "price_min_usd": 13.91,
+    "price_max_usd": 535.0,
+    "sku_count": 269
+  },
+  {
+    "label": "small_indie",
+    "brand_id": 2353,
+    "brand_name": "ALAIA",
+    "brand_name_normalized": "alaia",
+    "source_platforms": [
+      "antonioli"
+    ],
+    "gender_scope": [],
+    "primary_style_node_id": 4,
+    "price_min_usd": null,
+    "price_max_usd": null,
+    "sku_count": 29
+  },
+  {
+    "label": "sku_zero",
+    "brand_id": 1289,
+    "brand_name": "&Daughter",
+    "brand_name_normalized": "&daughter",
+    "source_platforms": [
+      "SSENSE"
+    ],
+    "gender_scope": [
+      "women"
+    ],
+    "primary_style_node_id": null,
+    "price_min_usd": null,
+    "price_max_usd": null,
+    "sku_count": 0
+  }
+]
