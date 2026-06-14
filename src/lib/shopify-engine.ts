@@ -7,6 +7,7 @@
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
+import {classifyShopifyCategory} from "./shopify-category-classifier"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
 //
@@ -242,7 +243,7 @@ export function parseShopifyProducts(
     allProducts.push({
       brand: sp.vendor || options.brandFallback || "",
       name: sp.title,
-      category: sp.product_type || "",
+      ...classifyShopifyCategory(sp.product_type || "", sp.title, sp.tags),
       price: srcPrice,
       originalPrice: srcPrice,
       salePrice: null,
