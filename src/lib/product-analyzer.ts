@@ -107,6 +107,9 @@ export async function analyzeProductImage(
     }
 
     const result = validateAndNormalize(parsed)
+    if (!result) {
+      return { productId, success: false, result: null, raw: parsed, error: "invalid_category" }
+    }
     return { productId, success: true, result, raw: parsed, error: null }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -121,16 +124,20 @@ export async function analyzeProductImage(
 
 // ─── 유효성 검증 + 보정 ─────────────────────────────
 
-function validateAndNormalize(raw: Record<string, unknown>): AnalysisResult {
+export function validateAndNormalize(raw: Record<string, unknown>): AnalysisResult | null {
   const category = String(raw.category || "")
+  // category 추출 실패는 위조(Accessories 강제 배정) 대신 분석 실패로 처리한다.
+  // 호출부가 재시도하고, 최종 실패 시 DB 저장을 건너뛰어 데이터 오염을 막는다.
+  if (!isValidCategory(category)) return null
+
   const subcategory = raw.subcategory ? String(raw.subcategory) : null
   const fit = raw.fit ? String(raw.fit) : null
   const fabric = raw.fabric ? String(raw.fabric) : null
   const colorFamily = raw.color_family ? String(raw.color_family) : null
 
   return {
-    category: isValidCategory(category) ? category : "Accessories",
-    subcategory: subcategory && isValidSubcategory(subcategory) ? subcategory : null,
+    category,
+    subcategory: subcategory && isValidSubcategory(subcategory, category) ? subcategory : null,
     fit: fit && isValidFit(fit) ? fit : null,
     fabric: fabric && isValidFabric(fabric) ? fabric : null,
     color_family: colorFamily && isValidColorFamily(colorFamily) ? colorFamily : null,

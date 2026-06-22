@@ -165,7 +165,14 @@ async function analyzeWithRetry(
       continue
     }
 
-    if (result.error?.includes("404") || result.error === "image_not_found") {
+    // 재시도해도 안 바뀌는 실패는 즉시 스킵 (rate-limit 예산 낭비 방지).
+    // invalid_category: 모델이 또렷한 JSON으로 enum 밖 카테고리를 답한 경우 —
+    // temperature 낮아 재호출해도 같은 답이 나오므로 재시도 무의미.
+    if (
+      result.error?.includes("404") ||
+      result.error === "image_not_found" ||
+      result.error === "invalid_category"
+    ) {
       return result
     }
 
