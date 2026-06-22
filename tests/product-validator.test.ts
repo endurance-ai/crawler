@@ -52,13 +52,14 @@ test("valid product passes through by reference (no transform)", () => {
   }
 })
 
-test("detail product with null/garbage detail fields still passes (policy A)", () => {
-  // preserve-findings: polluted material text + all-null detail fields are
-  // current (broken) behavior and MUST pass — the gate freezes reality.
-  const broken = {
+test("product with null color is rejected (policy A exception — migration 091)", () => {
+  // category and color are exceptions to Policy A: both require a non-empty
+  // string (z.string().min(1)) to match the products table NOT NULL contract.
+  // Products that cannot have color extracted must not be inserted (migration 091).
+  const noColor = {
     brand: "X",
     name: "n",
-    category: "c",
+    category: "Tops",
     price: null,
     originalPrice: null,
     salePrice: null,
@@ -71,10 +72,33 @@ test("detail product with null/garbage detail fields still passes (policy A)", (
     crawledAt: "2026-01-01",
     description: null,
     color: null,
-    material: "클래식한 실루엣의 캡입니다. - 70% Acrylic, 30% Wool - 데일리하게 착용 가능합니다.",
     productCode: null,
   }
-  assert.equal(validateProduct(broken).ok, true)
+  const r = validateProduct(noColor)
+  assert.equal(r.ok, false)
+  if (!r.ok) assert.equal(r.failedField, "color")
+})
+
+test("product with empty category is rejected (policy A exception — migration 091)", () => {
+  const noCategory = {
+    brand: "X",
+    name: "n",
+    category: "",
+    price: null,
+    originalPrice: null,
+    salePrice: null,
+    priceFormatted: "",
+    imageUrl: "",
+    productUrl: "https://x/y",
+    inStock: true,
+    gender: [],
+    platform: "8division",
+    crawledAt: "2026-01-01",
+    color: "Black",
+  }
+  const r = validateProduct(noCategory)
+  assert.equal(r.ok, false)
+  if (!r.ok) assert.equal(r.failedField, "category")
 })
 
 test("invalid product is rejected with failedField/rawValue", () => {
