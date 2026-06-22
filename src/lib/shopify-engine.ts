@@ -201,6 +201,7 @@ export function parseShopifyProducts(
     const firstVariant = sp.variants[0]
     const srcPrice = firstVariant ? parseFloat(firstVariant.price) : null
     const inStock = sp.variants.some((v) => v.available)
+    if (!inStock) continue  // 품절 상품 제외
 
     // gender 추론 (태그에서)
     const gender: string[] = [...(options.defaultGender || [])]
@@ -268,6 +269,8 @@ export function parseShopifyProducts(
           ? `${symbol}${srcPrice.toLocaleString("ko-KR")}`
           : `${symbol}${srcPrice.toFixed(2)}`)
       : ""
+    if (!inStock) continue  // 품절 상품 제외
+
     allProducts.push({
       brand: sp.vendor || options.brandFallback || "",
       name: sp.title,

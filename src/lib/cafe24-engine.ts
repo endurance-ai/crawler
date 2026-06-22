@@ -502,13 +502,13 @@ export async function crawlCafe24(
     await new Promise((r) => setTimeout(r, delay))
   }
 
-  // 중복 제거 (productUrl 기준)
+  // 중복 제거 + 품절 제외 (productUrl 기준)
   const seen = new Set<string>()
   const uniqueProducts = allProducts.filter((p) => {
     if (!p.productUrl || seen.has(p.productUrl)) return false
     seen.add(p.productUrl)
     return true
-  })
+  }).filter((p) => p.inStock)
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
   if (config.crawlDetails && detailParser) {
