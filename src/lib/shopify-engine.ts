@@ -8,7 +8,7 @@
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
-import {normalizeColorList, extractColorFromText} from "./parsers/field-extractors/color-normalizer"
+import {normalizeColorList, extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
 //
@@ -146,8 +146,9 @@ export function parseShopifyProducts(
   })()
 
   // options.name에서 색상/사이즈 포지션 식별 (Shopify는 옵션명이 store마다 다름)
+  // 1차: 옵션명 기반 (빠름, 확실할 때)
   const COLOR_NAMES = ["color", "colour", "colorway", "shade", "colore", "couleur", "farbe", "color option"]
-  const SIZE_NAMES = ["size", "length", "shoe size", "us size", "eu size", "uk size"]
+  const SIZE_NAMES = ["size", "length", "shoe size", "us size", "eu size", "uk size", "taille", "größe", "taglia"]
 
   const data: ShopifyResponse = productsJson
 
@@ -172,12 +173,29 @@ export function parseShopifyProducts(
       continue
     }
 
-    // 옵션 포지션 — 상품별로 options 스키마가 다를 수 있음
+    // 옵션 포지션 결정: 1차 이름 매칭 → 2차 값 기반 추론
+    // 2차: 스토어가 다국어 옵션명(Colore, Couleur, 색상 등)을 쓸 때
+    //   각 포지션 값의 50% 이상이 CANONICAL 색상 키워드면 color 포지션으로 판단.
     const optionPositions: {color?: number; size?: number} = {}
     for (const opt of sp.options ?? []) {
       const n = opt.name.toLowerCase()
       if (COLOR_NAMES.some((c) => n.includes(c))) optionPositions.color = opt.position
       else if (SIZE_NAMES.some((s) => n.includes(s))) optionPositions.size = opt.position
+    }
+    if (!optionPositions.color) {
+      for (const opt of sp.options ?? []) {
+        const pos = opt.position
+        if (pos === optionPositions.size) continue
+        const vals = [...new Set(
+          sp.variants.map((v) => pickOption(v, pos)).filter((x): x is string => !!x && x !== "Default Title")
+        )]
+        if (vals.length === 0) continue
+        const colorHits = vals.filter((v) => extractColorFromText(v) !== null || normalizeColor(v) !== v).length
+        if (colorHits / vals.length >= 0.5) {
+          optionPositions.color = pos
+          break
+        }
+      }
     }
 
     const firstVariant = sp.variants[0]
