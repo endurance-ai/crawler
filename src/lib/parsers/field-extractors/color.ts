@@ -8,6 +8,7 @@
  */
 
 import type {Page} from "playwright"
+import {normalizeColorList} from "./color-normalizer"
 
 /**
  * Collect <option> innerText from `select[name*="option"]`, filtered.
@@ -29,14 +30,14 @@ export async function colorFromOptionList(
   page: Page,
   mode: OptionColorMode,
 ): Promise<string | null> {
-  return page
+  const raw = await page
     .$$eval(
       'select[name*="option"] option',
       (els, m) => {
-        const raw = els.map((el) => (el as HTMLElement).innerText?.trim())
+        const texts = els.map((el) => (el as HTMLElement).innerText?.trim())
         if (m === "swallowlounge") {
           return (
-            raw
+            texts
               .filter(
                 (t) => t && t !== "empty" && !t.includes("선택") && !t.includes("Select") && t !== "*",
               )
@@ -46,7 +47,7 @@ export async function colorFromOptionList(
         }
         if (m === "anotheroffice") {
           return (
-            raw
+            texts
               .filter(
                 (t) => t && !t.startsWith("-") && t !== "empty" && !t.includes("선택") && t !== "*",
               )
@@ -55,19 +56,19 @@ export async function colorFromOptionList(
           )
         }
         if (m === "havati") {
-          const opts = raw.filter(
+          const opts = texts.filter(
             (t) => t && !t.startsWith("-") && t !== "empty" && !t.includes("선택") && t !== "*",
           )
           return opts.length > 0 ? opts.slice(0, 20).join(", ") : null
         }
         if (m === "bastong") {
-          const colors = raw.filter(
+          const colors = texts.filter(
             (t) => t && !t.includes("선택") && !t.includes("---") && t !== "*",
           )
           return colors.length > 0 ? [...new Set(colors)].slice(0, 20).join(", ") : null
         }
         if (m === "slowsteadyclub") {
-          const opts = raw.filter(
+          const opts = texts.filter(
             (t) => t && !t.startsWith("-") && t !== "empty" && !t.includes("선택") && t !== "*",
           )
           return opts.length > 0 ? [...new Set(opts)].slice(0, 20).join(", ") : null
@@ -85,4 +86,6 @@ export async function colorFromOptionList(
       mode,
     )
     .catch(() => null)
+
+  return raw ? normalizeColorList(raw) : null
 }

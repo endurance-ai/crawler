@@ -416,7 +416,7 @@ async function main() {
       return {
         brand,
         name: p.name as string,
-        category: (p.category as string) || null,
+        category: p.category as string,
         price: sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw),
         original_price: sanitizePrice(originalRaw) ?? sanitizePrice(priceRaw),
         sale_price: sanitizePrice(saleRaw),
@@ -437,7 +437,7 @@ async function main() {
         style_node: null,
         crawled_at: p.crawledAt as string,
         description: p.description?.slice(0, 2000) || null,
-        color: p.color?.slice(0, 500) || null,
+        color: (p.color as string).slice(0, 500),
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
         subcategory: p.subcategory || null,
         images: p.images?.slice(0, 10) || null,

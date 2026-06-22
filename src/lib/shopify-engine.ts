@@ -8,6 +8,7 @@
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
+import {normalizeColorList, extractColorFromText} from "./parsers/field-extractors/color-normalizer"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
 //
@@ -204,13 +205,22 @@ export function parseShopifyProducts(
       .trim()
       .slice(0, 2000) || undefined
 
-    // color: options 메타데이터로 정확한 포지션 사용
+    // color: options 메타데이터로 정확한 포지션 사용; 없으면 텍스트 fallback
     let color: string | undefined
     if (optionPositions.color) {
       const colors = [...new Set(
         sp.variants.map((v) => pickOption(v, optionPositions.color)).filter((x): x is string => !!x && x !== "Default Title")
       )]
-      if (colors.length > 0) color = colors.join(", ").slice(0, 500)
+      if (colors.length > 0) color = normalizeColorList(colors.join(", ").slice(0, 500))
+    }
+    if (!color) {
+      const searchText = [
+        sp.title,
+        sp.tags.join(" "),
+        bodyHtml.replace(/<[^>]+>/g, " "),
+      ].join(" ")
+      const found = extractColorFromText(searchText)
+      if (found) color = found
     }
 
     // sizeInfo: options 메타데이터로 정확한 포지션 사용

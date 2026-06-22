@@ -6,6 +6,10 @@
  * 규칙 도입도 하지 않는다. 유효 product 는 변형 없이 그대로 통과하고, 무효
  * product (필수 필드 누락 / 타입 불일치) 만 write 에서 차단된다.
  *
+ * 방침 A 예외 — category / color:
+ * products 테이블에 NOT NULL 제약 적용(migration 091) 에 따라 두 필드는
+ * 빈 문자열·null 모두 거부한다. 추출 불가 상품은 적재하지 않는다.
+ *
  * 스키마 결정 근거 (cross-check 소스):
  *  - `src/lib/types.ts` 의 `Product` 인터페이스 (현재 출력 형 계약).
  *  - `tests/fixtures/uniqlo-kr-parse.golden.json` (100개 실제 출력 product —
@@ -47,7 +51,7 @@ export const ProductSchema = z
   .object({
     brand: z.string(),
     name: z.string(),
-    category: z.string(),
+    category: z.string().min(1),
     price: z.number().nullable(),
     originalPrice: z.number().nullable(),
     salePrice: z.number().nullable(),
@@ -60,7 +64,7 @@ export const ProductSchema = z
     crawledAt: z.string(),
     // ── 상세 페이지 데이터 (선택) ──
     description: optionalStringOrNull,
-    color: optionalStringOrNull,
+    color: z.string().min(1),
     material: optionalStringOrNull,
     subcategory: optionalStringOrNull,
     images: z.array(z.string()).nullish(),

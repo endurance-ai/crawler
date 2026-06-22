@@ -13,6 +13,7 @@ import type {Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {IDetailParser} from "./parsers/detail"
 import type {IReviewParser} from "./parsers/review"
+import {extractColorFromText} from "./parsers/field-extractors/color-normalizer"
 
 // ─── 기본 셀렉터 (폴백 체인) ──────────────────────────
 
@@ -537,6 +538,7 @@ export async function crawlCafe24(
         if (!detail) continue
         if (detail.description) product.description = detail.description
         if (detail.color) product.color = detail.color
+        else if (product.name) product.color = extractColorFromText(product.name) ?? undefined
         if (detail.material) product.material = detail.material
         if (detail.productCode) product.productCode = detail.productCode
         if (detail.description || detail.color || detail.material) detailSuccess++
