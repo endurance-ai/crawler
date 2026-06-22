@@ -66,7 +66,7 @@ const CANONICAL: [RegExp, string][] = [
   [/\borange\b|오렌지|주황/i,                                  "Orange"],
 
   // Special
-  [/\bmulti/i,                                                 "Multi"],
+  [/\b(multicolor|multicolour|multicolore|multi-color|multi-colour)\b/i, "Multi"],
 ]
 
 // ---------------------------------------------------------------------------
