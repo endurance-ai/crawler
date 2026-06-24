@@ -98,6 +98,11 @@ npm run typecheck # exit 0 (the new stub + wiring must typecheck)
 - The validation gate (`src/lib/core/product-validator.ts`, REQ-CRAWLER-001)
   freezes the **current** output shape. A new platform must emit products
   that pass `ProductSchema` unchanged — it does not introduce new fields.
+  Note (2026-06): `category` and `color` are now **mandatory** (`z.string().min(1)`
+  + DB `NOT NULL`, migration 091). Products missing either are dropped at the
+  gate (`validation_reject`), not loaded. See
+  [`onboard-new-brand.md`](./onboard-new-brand.md) for the full
+  crawl → import → embed pipeline and what each step must verify.
 - Behavior preservation is HARD: a new platform adds a new code path; it
   must not alter any of the existing sites' goldens.
 - The scaffold tool is inert by design: dry-run by default, one

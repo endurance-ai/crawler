@@ -455,6 +455,20 @@ Resume interrupted agent work using agentId:
 
 ---
 
+## 18. Project-Specific Rules (kiko crawler)
+
+### Color Normalization
+
+색상 관련 작업 중 CANONICAL 맵에 없는 색상값이 발견되면 (`src/lib/parsers/field-extractors/color-normalizer.ts` 의 `CANONICAL` 배열) 즉시 해당 파일에 추가한다.
+
+- 실제 크롤링 결과나 golden 파일에서 정규화되지 않은 색상이 보이면 → CANONICAL에 엔트리 추가
+- 한글 색상명, 브랜드 고유 색상명(예: "Cobalt Strike", "Sahara"), 오타 변형(예: "Grreen") 발견 시 해당 canonical 색상으로 매핑
+- `\b` word boundary는 한글에 적용되지 않으므로, 한글 대안은 반드시 `\b()` 그룹 밖에 위치시킨다
+  - 올바름: `/\b(grey)\b|그레이/i`
+  - 잘못됨: `/\b(grey|그레이)\b/i`
+
+---
+
 ## 12. MCP Servers & Deep Analysis Modes
 
 MoAI-ADK integrates multiple MCP servers for specialized capabilities:
