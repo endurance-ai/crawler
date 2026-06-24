@@ -254,6 +254,13 @@ async function main() {
   const siteArg = process.argv.find((a) => a.startsWith("--site="))
   const targetSites = siteArg ? siteArg.split("=")[1].split(",") : null
 
+  // --no-new-brands: 미등록 brand를 brand_nodes에 INSERT하지 않고 해당 상품도 적재 제외
+  const noNewBrands = process.argv.includes("--no-new-brands")
+
+  // --in-stock-only: 품절(in_stock=false) 상품을 적재에서 제외.
+  // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
+  const inStockOnly = process.argv.includes("--in-stock-only")
+
   // data/ 내 *-products.json 파일 찾기
   const files = fs.readdirSync(dataDir)
     .filter((f) => f.endsWith("-products.json"))
@@ -301,15 +308,20 @@ async function main() {
   }
 
   if (unknownBrands.size > 0) {
-    console.log(`🆕 미등록 brand ${unknownBrands.size}개 발견 — 자동 INSERT + alias 검사`)
-    const resolveResult = await resolveUnknownBrands(
-      [...unknownBrands.entries()].map(([raw, platform]) => ({raw, platform})),
-      brandRows,
-      brandIdMap,
-    )
-    console.log(
-      `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
-    )
+    if (noNewBrands) {
+      console.log(`⚠️  미등록 brand ${unknownBrands.size}개 발견 — --no-new-brands 모드: INSERT 건너뜀, 해당 상품 적재 제외`)
+      console.log(`   제외 브랜드: ${[...unknownBrands.keys()].slice(0, 10).join(", ")}${unknownBrands.size > 10 ? ` 외 ${unknownBrands.size - 10}개` : ""}\n`)
+    } else {
+      console.log(`🆕 미등록 brand ${unknownBrands.size}개 발견 — 자동 INSERT + alias 검사`)
+      const resolveResult = await resolveUnknownBrands(
+        [...unknownBrands.entries()].map(([raw, platform]) => ({raw, platform})),
+        brandRows,
+        brandIdMap,
+      )
+      console.log(
+        `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
+      )
+    }
   }
 
   let totalInserted = 0
@@ -362,6 +374,11 @@ async function main() {
     const rows = raw.map((p: any) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       const productUrl = (p.productUrl as string) || ""
+
+      // --no-new-brands: 미등록 brand 상품 적재 제외
+      if (noNewBrands && brand && !brandIdMap.has(brand.toLowerCase())) return null
+      // --in-stock-only: 품절 상품 적재 제외
+      if (inStockOnly && p.inStock === false) return null
       // product_no 추출
       const pnoMatch = productUrl.match(/product_no=(\d+)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
@@ -432,9 +449,7 @@ async function main() {
         platform: (p.platform as string) || platform,
         gender: p.gender as string[],
         brand_node_id: brandIdMap.get(brand.toLowerCase()) ?? null,
-        // products.style_node text 컬럼은 잔존 (003 마이그), v5 검색 axis. v6 cutover 후 폐기 예정.
-        // brand_nodes.style_node legacy 가 062 에서 drop 되어 매핑 source 사라짐 → NULL.
-        style_node: null,
+        // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
         description: p.description?.slice(0, 2000) || null,
         color: (p.color as string).slice(0, 500),
