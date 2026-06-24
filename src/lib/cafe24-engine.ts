@@ -15,6 +15,16 @@ import type {IDetailParser} from "./parsers/detail"
 import type {IReviewParser} from "./parsers/review"
 import {extractColorFromText} from "./parsers/field-extractors/color-normalizer"
 
+// page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
+// with this to prevent indefinite hangs when page JS is stuck or network stalls.
+const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms)
+    ),
+  ])
+
 // ─── 기본 셀렉터 (폴백 체인) ──────────────────────────
 
 const DEFAULT_SELECTORS = {
@@ -94,8 +104,8 @@ async function discoverCategories(
   // Cafe24는 JS 렌더링이 필요한 경우가 많음
   await page.waitForTimeout(2000)
 
-  const categories = await page.evaluate(
-    ({sel, baseUrl}: {sel: string; baseUrl: string}) => {
+  const categories = await withTimeout(
+    page.evaluate(({sel, baseUrl}: {sel: string; baseUrl: string}) => {
       const links = document.querySelectorAll(sel)
       const catMap = new Map<number, {name: string; cateNo: number; gender: string[]; url: string}>()
 
@@ -123,8 +133,9 @@ async function discoverCategories(
       })
 
       return Array.from(catMap.values())
-    },
-    {sel: selector, baseUrl: config.baseUrl}
+    }, {sel: selector, baseUrl: config.baseUrl}),
+    20_000,
+    "discoverCategories"
   )
 
   // 필터링: 무시 패턴 + 기본 무시 목록
@@ -189,7 +200,8 @@ async function collectProductsFromPage(
   // NOTE: page.evaluate 블록 안에서는 var 사용 — tsx의 __name 변환이 let/const 선언을 브라우저에서 ReferenceError로 유발
   // eslint-disable-next-line no-eval
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const evalResult: {ok: boolean; products?: any[]; error?: string} = await page.evaluate((args) => {
+  const evalResult: {ok: boolean; products?: any[]; error?: string} = await withTimeout(
+    page.evaluate((args) => {
     /* eslint-disable no-var */
     try {
       let items: NodeListOf<Element> | null = null
@@ -360,7 +372,10 @@ async function collectProductsFromPage(
       return {ok: false as const, error: (e as Error).message}
     }
     /* eslint-enable no-var */
-  }, evalArgs)
+    }, evalArgs),
+    20_000,
+    "collectProductsFromPage"
+  ).catch((err: Error) => ({ok: false as const, error: err.message}))
 
   if (!evalResult.ok) {
     console.log(`      [eval-error] ${evalResult.error}`)
@@ -502,13 +517,13 @@ export async function crawlCafe24(
     await new Promise((r) => setTimeout(r, delay))
   }
 
-  // 중복 제거 (productUrl 기준)
+  // 중복 제거 + 품절 제외 (productUrl 기준)
   const seen = new Set<string>()
   const uniqueProducts = allProducts.filter((p) => {
     if (!p.productUrl || seen.has(p.productUrl)) return false
     seen.add(p.productUrl)
     return true
-  })
+  }).filter((p) => p.inStock)
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
   if (config.crawlDetails && detailParser) {
@@ -525,10 +540,16 @@ export async function crawlCafe24(
           await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
           const pg = await ctx.newPage()
           try {
-            return {product, detail: await detailParser.parse(pg, product.productUrl)}
+            const detail = await withTimeout(
+              detailParser.parse(pg, product.productUrl),
+              25_000,
+              `detail:${product.productUrl.slice(-50)}`
+            )
+            return {product, detail}
           } catch {
             return {product, detail: null}
           } finally {
+            // ctx.close() aborts any in-flight page.evaluate() on this context
             await ctx.close()
           }
         })

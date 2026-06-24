@@ -34,35 +34,6 @@
   },
   {
     "brand": "Example Store",
-    "name": "Sold Out Wool Coat",
-    "category": "Outer",
-    "subcategory": "overcoat",
-    "price": 249,
-    "originalPrice": 249,
-    "salePrice": null,
-    "priceFormatted": "₩249",
-    "imageUrl": "https://shop.example-store.com/img/coat.jpg",
-    "productUrl": "https://shop.example-store.com/products/sold-out-wool-coat",
-    "inStock": false,
-    "gender": [
-      "men"
-    ],
-    "platform": "shopify-test",
-    "crawledAt": "<<NORMALIZED>>",
-    "description": "Heavy wool coat for winter.",
-    "color": "Camel",
-    "images": [
-      "https://shop.example-store.com/img/coat.jpg"
-    ],
-    "tags": [
-      "Men",
-      "outerwear"
-    ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 249
-  },
-  {
-    "brand": "Example Store",
     "name": "Plain Basic Tee",
     "category": "Top",
     "subcategory": "t-shirt",

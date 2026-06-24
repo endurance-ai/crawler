@@ -224,12 +224,12 @@ test("characterize: shopify skip-rules exclude lookbook/gift-card/Rise.ai/unsafe
   const fixture = loadFixture()
   const products = parseShopifyProducts(fixture, BASE_URL, KEY, PARSE_OPTIONS)
 
-  // 8 fixture products → 4 survive (lookbook, gift card, Rise.ai, and the
-  // unsafe-handle product are all dropped). This locks the exclusion set.
+  // 8 fixture products → 3 survive (lookbook, gift card, Rise.ai, unsafe-handle,
+  // and the fully-sold-out product are all dropped). This locks the exclusion set.
   const handles = products.map((p) => p.productUrl.split("/products/")[1])
   assert.deepEqual(
     handles,
-    ["oxford-cotton-shirt", "sold-out-wool-coat", "plain-basic-tee", "trail-running-shoe"],
-    "skip-rule set drift: expected lookbook/gift-card/Rise.ai/unsafe-handle excluded",
+    ["oxford-cotton-shirt", "plain-basic-tee", "trail-running-shoe"],
+    "skip-rule set drift: expected lookbook/gift-card/Rise.ai/unsafe-handle/sold-out excluded",
   )
 })
