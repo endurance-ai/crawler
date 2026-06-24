@@ -444,6 +444,22 @@ async function probeSite(config: SiteConfig) {
 
 const PARALLEL_LIMIT = 3 // 동시 브라우저 수
 
+// 사이트 전체 크롤 상한 — 한 사이트가 어딘가에서 멈춰도(무한 hang) 배치 전체가
+// 얼어붙지 않도록 강제 중단한다. crawlCafe24 내부에는 evaluate/detail 단위
+// timeout이 있지만, 사이트 단위 전체 안전망이 별도로 필요하다.
+const SITE_TIMEOUT_MS = 20 * 60_000 // 20분
+
+const withSiteTimeout = <T>(promise: Promise<T>, site: string): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`site timeout after ${SITE_TIMEOUT_MS / 60_000}min: ${site}`)),
+        SITE_TIMEOUT_MS,
+      ),
+    ),
+  ])
+
 async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   const results: CrawlResult[] = []
   const outDir = path.join(process.cwd(), "data")
@@ -630,7 +646,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
             }
             const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
             const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
-            const result = await crawlCafe24(page, config, dp, rp)
+            const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
             saveResult(outDir, result)
             return result
           } catch (err) {
