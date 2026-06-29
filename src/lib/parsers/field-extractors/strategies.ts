@@ -456,7 +456,15 @@ const etcseoulStrategy: Strategy = async (page) => {
     }
 
     const colorLine = lines.find((l) => /^색상\s*[-–]\s*.+/.test(l))
-    const color = colorLine ? colorLine.replace(/^색상\s*[-–]\s*/, "").trim() : null
+    let color = colorLine ? colorLine.replace(/^색상\s*[-–]\s*/, "").trim() : null
+
+    // fallback: extract [COLOR] from product title (og:title)
+    if (!color) {
+      const ogTitle = document.querySelector('meta[property="og:title"]')
+      const title = (ogTitle as HTMLMetaElement | null)?.content || ""
+      const m = title.match(/\[([^\]]+)\]\s*$/)
+      if (m?.[1]) color = m[1].trim()
+    }
 
     return {description, material, color}
   })
