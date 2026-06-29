@@ -379,6 +379,8 @@ async function main() {
       if (noNewBrands && brand && !brandIdMap.has(brand.toLowerCase())) return null
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
+      // color NOT NULL — color 없는 상품은 스킵
+      if (!p.color) return null
       // product_no 추출
       const pnoMatch = productUrl.match(/product_no=(\d+)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
