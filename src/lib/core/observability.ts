@@ -42,6 +42,45 @@ export interface ValidationRejectEvent {
 
 export type CrawlerEvent = ValidationSuccessEvent | ValidationRejectEvent
 
+// ─── 사이트별 reject 집계 (요약 리포트용) ─────────────────────────────
+// emit() 를 통과하는 모든 validation_reject 를 site → 실패필드 별로 누적한다.
+// crawl.ts printSummary 가 getValidationReport() 로 읽어 드롭 사유 표를 출력.
+
+/** 한 사이트의 reject 집계. */
+export interface SiteRejectStat {
+  /** 총 reject 수. */
+  total: number
+  /** 실패 필드(color/gender/category/…) 별 카운트. */
+  byField: Record<string, number>
+  /** 실패 필드 별 샘플 sku(최대 3개) — 원인 상품을 바로 열어볼 수 있게. */
+  samples: Record<string, string[]>
+}
+
+const rejectReport = new Map<string, SiteRejectStat>()
+
+function recordReject(ev: ValidationRejectEvent): void {
+  let stat = rejectReport.get(ev.site)
+  if (!stat) {
+    stat = {total: 0, byField: {}, samples: {}}
+    rejectReport.set(ev.site, stat)
+  }
+  stat.total++
+  const field = ev.failedField || "(unknown)"
+  stat.byField[field] = (stat.byField[field] || 0) + 1
+  const bucket = (stat.samples[field] ??= [])
+  if (bucket.length < 3 && ev.sku) bucket.push(ev.sku)
+}
+
+/** 누적된 사이트별 reject 집계 스냅샷. */
+export function getValidationReport(): Map<string, SiteRejectStat> {
+  return rejectReport
+}
+
+/** 집계 초기화 (테스트 격리 / 재실행 시). */
+export function resetValidationReport(): void {
+  rejectReport.clear()
+}
+
 /**
  * 구조화 이벤트 단일 진입점.
  *
@@ -52,6 +91,7 @@ export type CrawlerEvent = ValidationSuccessEvent | ValidationRejectEvent
 export function emit(event: CrawlerEvent): void {
   try {
     if (event.kind === "validation_reject") {
+      recordReject(event)
       console.warn(`[crawler-event] ${JSON.stringify(event)}`)
     } else {
       console.log(`[crawler-event] ${JSON.stringify(event)}`)
