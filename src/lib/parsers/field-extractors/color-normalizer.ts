@@ -39,11 +39,12 @@ const CANONICAL: [RegExp, string][] = [
   [/\b(burgundy|wine|maroon)\b|버건디|와인/i,                  "Burgundy"],
 
   // Blues
-  [/\bnavy\b|네이비/i,                                         "Navy"],
+  [/\bnavy\b|네이비|곤색|감색/i,                               "Navy"],
   [/\b(cobalt|royal\s*blue)\b/i,                               "Cobalt"],
-  [/\bblue\b|블루|파랑/i,                                      "Blue"],
+  [/\b(sky\s*blue|skyblue)\b|블루|파랑|소라|하늘색|스카이/i,   "Blue"],
+  [/\bblue\b/i,                                                "Blue"],
   [/\b(teal|turquoise|aqua)\b/i,                               "Teal"],
-  [/\bmint\b/i,                                                "Mint"],
+  [/\bmint\b|민트/i,                                           "Mint"],
 
   // Greens
   [/\b(olive)\b|올리브/i,                                      "Olive"],
@@ -51,19 +52,23 @@ const CANONICAL: [RegExp, string][] = [
   [/\bgreen\b|그린|녹색/i,                                     "Green"],
 
   // Reds / Pinks
-  [/\b(burgundy|crimson|scarlet)\b/i,                          "Burgundy"],
-  [/\bred\b|레드|빨강/i,                                       "Red"],
+  [/\b(burgundy|crimson|scarlet)\b|자주/i,                     "Burgundy"],
+  [/\bred\b|레드|빨강|다홍/i,                                  "Red"],
   [/\b(pink|blush|rose)\b|핑크|분홍/i,                        "Pink"],
-  [/\b(coral)\b/i,                                             "Coral"],
+  [/\b(coral)\b|코랄/i,                                        "Coral"],
 
   // Purples
-  [/\b(purple|lavender|violet|lilac)\b|퍼플|보라/i,           "Purple"],
+  [/\b(purple|lavender|violet|lilac)\b|퍼플|보라|라벤더/i,    "Purple"],
 
   // Yellows / Oranges
   [/\b(mustard)\b/i,                                           "Mustard"],
   [/\byellow\b|옐로|노랑/i,                                    "Yellow"],
   [/\b(rust|terracotta|burnt\s*orange)\b/i,                    "Rust"],
   [/\borange\b|오렌지|주황/i,                                  "Orange"],
+
+  // Metallics
+  [/\b(silver)\b|실버|은색/i,                                  "Silver"],
+  [/\b(gold)\b|골드|금색/i,                                    "Gold"],
 
   // Special
   [/\b(multicolor|multicolour|multicolore|multi-color|multi-colour)\b/i, "Multi"],
