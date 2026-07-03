@@ -77,7 +77,7 @@ export class BaseDetailParser implements IDetailParser {
             const colors: string[] = []
             options.forEach((opt) => {
               const t = (opt as HTMLElement).innerText?.trim() || ""
-              if (t && !t.includes("선택") && !t.includes("Select") && t !== "*") colors.push(t)
+              if (t && !t.includes("선택") && !t.includes("Select") && t !== "*" && !/^-{3,}$/.test(t)) colors.push(t)
             })
             if (colors.length > 0) { color = colors.slice(0, 20).join(", ").slice(0, 500); break }
           } catch { /* next */ }

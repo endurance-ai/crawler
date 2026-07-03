@@ -145,8 +145,22 @@ export const BASE_DESCRIPTION_SELECTORS = [
 export const DETAIL_REGISTRY: Record<string, RegistryEntry> = {
   // ── base family: genuine 3→1 collapse (params only) ──
   // blankroom/visualaid keep the BaseDetailParser material-pollution path.
-  blankroom: baseEntry([".product-description"]),
+  // blankroom: option1 = SIZE (not color). Color is in .color-name span (JS-rendered).
+  // dom-then-selector waits up to 5s for the span; .catch(null) lets it fall through
+  // to cafe24-engine name-based extraction when the span is absent.
+  blankroom: {
+    ...baseEntry([".product-description"]),
+    colorSelectors: [".color-name"],
+    wait: {kind: "dom-then-selector", timeout: 15000, selector: ".color-name", selectorTimeout: 5000},
+  },
   visualaid: baseEntry([".tab_wrap"]),
+
+  // 2026-07-02 온보딩: ojos/goyowear 둘 다 option1 = SIZE (색상 셀렉트 없음).
+  // 실제 색상은 상품명에 있음 (ojos: "Name / Color", goyowear: "Name (COLOR)").
+  // colorSelectors: [] → BaseDetailParser가 null 반환 → cafe24-engine.ts의
+  // extractColorFromText 상품명 기반 폴백으로 자연스럽게 넘어감.
+  ojos: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
+  goyowear: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
 
   // ── per-site algorithms (verbatim, selectors externalized) ──
   "8division": {strategy: "8division", wait: DOM_DEFAULT},

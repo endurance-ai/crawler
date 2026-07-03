@@ -18,6 +18,7 @@ import type {Page} from "playwright"
 import type {DetailData} from "../detail/types"
 import type {RegistryEntry, StrategyId} from "../detail/selector-registry"
 import {colorFromOptionList} from "./color"
+import {normalizeColor} from "./color-normalizer"
 import {baseDescriptionInPage} from "./description"
 import {baseMaterialFromDescription} from "./material"
 
@@ -702,6 +703,20 @@ const sienneboutiqueStrategy: Strategy = async (page, entry) => {
       return text && text.length > 10 ? text.slice(0, 2000) : null
     })
     .catch(() => null)
+
+  // sienneboutique has no dedicated color <select> — option1 is always
+  // "Size" (e.g. FREE(2차)). colorFromOptionList("swallowlounge") was
+  // grabbing that size select and mislabeling it as color. The real color
+  // is appended to the product title in parens, e.g.
+  // og:title="Camellia Cardigan (Cream)". Parse it from there instead.
+  result.color = await page
+    .$eval('meta[property="og:title"]', (el) => el.getAttribute("content") ?? null)
+    .catch(() => null)
+    .then((title) => {
+      if (!title) return null
+      const m = title.match(/\(([^()]+)\)\s*$/)
+      return m?.[1]?.trim() ? normalizeColor(m[1].trim()) : null
+    })
 
   result.material = await page
     .$$eval(".tabs-content", (els) => {

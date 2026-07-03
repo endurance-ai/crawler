@@ -29,7 +29,7 @@ const CANONICAL: [RegExp, string][] = [
   [/\b(charcoal)\b|차콜/i,                                     "Charcoal"],
   [/\b(gr[ae]y)\b|그레이|회색/i,                               "Grey"],
   [/\bbeige\b|베이지/i,                                        "Beige"],
-  [/\b(sand|stone|oatmeal)\b/i,                                "Sand"],
+  [/\b(sand|stone|oatmeal|oat)\b/i,                            "Sand"],
   [/\b(camel)\b|카멜/i,                                        "Camel"],
   [/\b(tan)\b/i,                                               "Tan"],
   [/\b(khaki)\b|카키/i,                                        "Khaki"],
@@ -40,6 +40,7 @@ const CANONICAL: [RegExp, string][] = [
 
   // Blues
   [/\bnavy\b|네이비/i,                                         "Navy"],
+  [/\bindigo\b|인디고/i,                                       "Indigo"],
   [/\b(cobalt|royal\s*blue)\b/i,                               "Cobalt"],
   [/\bblue\b|블루|파랑/i,                                      "Blue"],
   [/\b(teal|turquoise|aqua)\b/i,                               "Teal"],

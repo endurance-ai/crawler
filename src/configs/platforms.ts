@@ -17,6 +17,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://shopamomento.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     pricePattern: /KRW\s*([\d,]+)/,
     priceCurrency: "₩",
     category: {
@@ -73,6 +74,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://adekuver.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -102,6 +104,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://etcseoul.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -152,6 +155,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://www.8division.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -176,6 +180,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://sculpstore.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -208,6 +213,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://fr8ight.co.kr",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -259,6 +265,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://eastlogue.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -293,6 +300,7 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "Sienne", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     defaultGender: ["women"],
     category: {
       discovery: "manual",
@@ -316,6 +324,7 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "Mardi Mercredi", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     defaultGender: ["women"],
     category: {
       discovery: "manual",
@@ -336,6 +345,30 @@ export const PLATFORMS: SiteConfig[] = [
     notes: "프렌치 데일리 캐주얼 여성복. WOMEN 11개 카테고리 (KIDS/PET 제외). 5~25만원대",
   },
 
+  {
+    key: "matteveil",
+    name: "Matteveil",
+    type: "cafe24",
+    baseUrl: "https://matteveil.kr",
+    brand: "Matteveil", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    pricePattern: /KRW\s*([\d,]+)/,
+    priceCurrency: "₩",
+    defaultGender: ["women"],
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Top",         cateNo: 43, gender: ["women"]},
+        {name: "Accessories", cateNo: 44, gender: ["women"]},
+        {name: "Bottom",      cateNo: 46, gender: ["women"]},
+        {name: "Dress",       cateNo: 47, gender: ["women"]},
+      ],
+    },
+    notes: "여성 자사 브랜드몰. Top/Acc/Bottom/Dress 4개 카테고리. 4~6만원대",
+  },
+
   // ─── 캐주얼/스트릿 편집샵 (2차 확장) ──────────────
 
   {
@@ -345,6 +378,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://triplestore.co.kr",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -392,7 +426,12 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://swallowlounge.co.kr",
     paginate: true,
     maxPages: 300,
-    category: { discovery: "auto" },
+    crawlDetails: true,
+    // "모두 보기"(1152)에 전 브랜드 상품이 포함됨. 브랜드별 서브카테고리(1153+)는 중복이므로 제외.
+    category: {
+      discovery: "manual",
+      categories: [{ name: "모두 보기", cateNo: 1152, gender: ["unisex"] }],
+    },
     defaultGender: ["unisex"],
     notes: "성수동 편집샵. Crepuscule, Toga, Blurhms, Aton 등 50+ 브랜드. 10~50만원대",
   },
@@ -425,6 +464,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://chanceclothing.co.kr",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -446,6 +486,7 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://havatishop.com",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -521,6 +562,7 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "Another Office", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -546,6 +588,7 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "BASTONG", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -562,6 +605,7 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "ROUGHSIDE", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
@@ -592,6 +636,7 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "BLANKROOM", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
     paginate: true,
     maxPages: 300,
+    crawlDetails: true, // color는 .color-name span (JS-rendered) — list page에 없음
     category: {
       discovery: "manual",
       categories: [
@@ -1194,6 +1239,84 @@ export const PLATFORMS: SiteConfig[] = [
       "https://www.farfetch.com/shopping/women/accessories-all-1/items.aspx",
     ],
     notes: "Farfetch US Playwright engine. Shares src/lib/farfetch-engine.ts with KR via region:'US' (SPEC-006 user-extension 2026-05-07). USD-native cache, USD→KRW import-time conversion via SPEC-002 fx.ts hook. KR §13 ToS body applies (Farfetch /terms-and-conditions/ serves Korean text with 'currently only available in Korean' notice; same legal entity). channel:'chrome' real Chrome required, 3-sec pacing, 5-UA rotation, robots-check enforced. REQ-007/009 NOT empirically verified from KR-resident IP (geo-routing forced); production deployment from US-routable infrastructure should re-run `pnpm crawl --probe=farfetch-us`. Set disabled:true if production probe fails. portal.ai-internal-use only; halt-on-cease-and-desist.",
+  },
+
+  // ─── 4차 확장: brand_nodes 미크롤 KR 자사몰 (2026-07-02 온보딩) ───
+  // 후보 선정: brand_nodes 중 origin_country=KR + wiki.homepage_url 존재 +
+  // products 테이블에 brand_node_id 매칭 0건(미크롤) 브랜드를 스캔 후,
+  // 실제 홈페이지가 cafe24인지(응답 HTML의 "cafe24" 시그니처) + robots.txt
+  // 허용 여부를 curl로 직접 검증해서 골랐다. moif.co.kr도 후보였으나 홈페이지
+  // nav가 단일 "STORE"(cate_no=256) 플랫 리스트뿐이라 타입별 카테고리를
+  // 못 뽑아 제외 — goyowear로 대체.
+
+  {
+    key: "yuse",
+    name: "유즈",
+    type: "cafe24",
+    baseUrl: "https://yuse.co.kr",
+    brand: "YUSE", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    defaultGender: ["unisex"],
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Top", cateNo: 290, gender: ["unisex"]},
+        {name: "Knitwear", cateNo: 59, gender: ["unisex"]},
+        {name: "Outer", cateNo: 47, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 291, gender: ["unisex"]},
+        {name: "Dress", cateNo: 28, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 43, gender: ["unisex"]},
+      ],
+    },
+    notes: "brand_nodes id=258, gender_scope=unisex. 홈 nav 확인: NEW/BEST/REFURB/SAMPLE SALE 등 컬렉션성 cate_no는 타입 카테고리와 중복이라 제외.",
+  },
+  {
+    key: "ojos",
+    name: "오호스",
+    type: "cafe24",
+    baseUrl: "https://www.ojos.kr",
+    brand: "OJOS", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    defaultGender: ["women"],
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Outer", cateNo: 260, gender: ["women"]},
+        {name: "Top", cateNo: 261, gender: ["women"]},
+        {name: "Dress", cateNo: 262, gender: ["women"]},
+        {name: "Bottom", cateNo: 263, gender: ["women"]},
+        {name: "Shoes", cateNo: 264, gender: ["women"]},
+      ],
+    },
+    notes: "brand_nodes id=844 gender_scope 태그는 unisex였지만 wiki.category=['womenswear','streetwear']와 실제 카테고리(Dress/Skirt 포함, 남성 카테고리 없음)가 women을 가리켜 여기서는 women으로 설정.",
+  },
+  {
+    key: "goyowear",
+    name: "고요웨어",
+    type: "cafe24",
+    baseUrl: "https://goyowear.kr",
+    brand: "GOYOWEAR", // 단일브랜드 자사몰 — DOM 브랜드 추출 실패 폴백 (.description 폴백이 "상품명 :" 숨김 라벨을 잘못 주움)
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    defaultGender: ["unisex"],
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Top", cateNo: 36, gender: ["unisex"]},
+        {name: "Outer", cateNo: 28, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 38, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 43, gender: ["unisex"]},
+        {name: "Bag", cateNo: 42, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 44, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 39, gender: ["unisex"]}, // HEAD GEAR
+      ],
+    },
+    notes: "brand_nodes id=3841, gender_scope 비어있음, wiki.category=['menswear','womenswear','outerwear'] → unisex. 홈 nav 자체엔 타입 카테고리가 없고 /product/list.html?cate_no=29(ALL) 페이지 내부 서브필터에서 발견.",
   },
 ]
 
