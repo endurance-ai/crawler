@@ -1,13 +1,13 @@
 #!/usr/bin/env npx tsx
 /**
- * Product collection target queue CLI.
+ * Brand-node product crawl state CLI.
  *
  * Examples:
- *   pnpm product-targets -- list --planner-status=product_collection_requested
- *   pnpm product-targets -- add --brand="Matteveil" --url=https://matteveil.kr --gender=women --price-band=mid
- *   pnpm product-targets -- request --id=1
- *   pnpm product-targets -- detect --requested
- *   pnpm product-targets -- qc --id=1
+ *   pnpm brand-crawl -- list --status=not_started
+ *   pnpm brand-crawl -- detect --brand-id=123
+ *   pnpm brand-crawl -- detect --status=not_started --url=present --limit=20
+ *   pnpm brand-crawl -- qc --brand-id=123 --site=matteveil
+ *   pnpm brand-crawl -- mark --brand-id=123 --status=crawl_ready --platform-key=matteveil
  */
 
 import * as crypto from "node:crypto"
@@ -17,10 +17,11 @@ import * as path from "node:path"
 import {
   createProductCollectionClient,
   finishProductRun,
-  loadProductTarget,
+  loadProductCrawlBrand,
   startProductRun,
-  updateProductTarget,
-  type ProductCollectionTarget,
+  upsertProductCrawlStatus,
+  type ProductCollectionClient,
+  type ProductCrawlBrand,
 } from "./lib/product-collection"
 
 type Flags = Record<string, string | boolean>
@@ -35,26 +36,33 @@ interface DetectResult {
 
 interface CrawledProduct {
   category?: unknown
+  categories?: unknown
   color?: unknown
+  colors?: unknown
   price?: unknown
+  source_price?: unknown
   imageUrl?: unknown
+  image_url?: unknown
   images?: unknown
   inStock?: unknown
+  in_stock?: unknown
 }
 
 function parseArgs(argv: string[]): {command: string; flags: Flags} {
-  const [command = "help", ...rest] = argv
+  const args = [...argv]
+  while (args[0] === "--") args.shift()
+  const [command = "help", ...rest] = args
   const flags: Flags = {}
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i]
-    if (!arg.startsWith("--")) continue
+    if (arg === "--" || !arg.startsWith("--")) continue
     const eq = arg.indexOf("=")
     if (eq >= 0) {
       flags[arg.slice(2, eq)] = arg.slice(eq + 1)
     } else {
       const key = arg.slice(2)
       const next = rest[i + 1]
-      if (next && !next.startsWith("--")) {
+      if (next && next !== "--" && !next.startsWith("--")) {
         flags[key] = next
         i++
       } else {
@@ -74,21 +82,26 @@ function numberFlag(flags: Flags, key: string): number | null {
   const value = stringFlag(flags, key)
   if (!value) return null
   const num = Number(value)
-  return Number.isFinite(num) ? num : null
+  return Number.isInteger(num) && num > 0 ? num : null
 }
 
-function splitFlag(flags: Flags, key: string): string[] {
-  const value = stringFlag(flags, key)
-  return value ? value.split(",").map((s) => s.trim()).filter(Boolean) : []
+function cleanSearch(value: string): string {
+  return value.replace(/[,%]/g, " ").trim().slice(0, 100)
 }
 
 function normalizeHomepageUrl(raw: string): string {
   const url = new URL(raw)
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("--url must be http(s)")
+    throw new Error("homepage_url must be http(s)")
   }
   url.hash = ""
   return url.toString().replace(/\/$/, "")
+}
+
+function homepageUrl(brand: ProductCrawlBrand): string | null {
+  if (brand.homepage_url?.trim()) return brand.homepage_url.trim()
+  const wikiUrl = brand.wiki?.homepage_url
+  return typeof wikiUrl === "string" && wikiUrl.trim() ? wikiUrl.trim() : null
 }
 
 function keyFromUrl(raw: string): string {
@@ -101,7 +114,7 @@ function keyFromUrl(raw: string): string {
 async function fetchText(url: string): Promise<{status: number; text: string; finalUrl: string}> {
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 kiko.ai product target detector",
+      "User-Agent": "Mozilla/5.0 kiko.ai brand-node product crawl detector",
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
     signal: AbortSignal.timeout(15000),
@@ -113,7 +126,7 @@ async function probeShopifyProductsJson(baseUrl: string): Promise<boolean> {
   try {
     const url = new URL("/products.json?limit=1", baseUrl)
     const res = await fetch(url, {
-      headers: {"User-Agent": "Mozilla/5.0 kiko.ai product target detector", Accept: "application/json"},
+      headers: {"User-Agent": "Mozilla/5.0 kiko.ai brand-node product crawl detector", Accept: "application/json"},
       signal: AbortSignal.timeout(10000),
     })
     if (!res.ok) return false
@@ -124,8 +137,11 @@ async function probeShopifyProductsJson(baseUrl: string): Promise<boolean> {
   }
 }
 
-async function detectTarget(target: ProductCollectionTarget): Promise<DetectResult> {
-  const homepage = normalizeHomepageUrl(target.homepage_url)
+async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
+  const rawHomepage = homepageUrl(brand)
+  if (!rawHomepage) throw new Error("brand_nodes.wiki.homepage_url is required before product crawling")
+
+  const homepage = normalizeHomepageUrl(rawHomepage)
   const [htmlResult, shopifyJsonOk] = await Promise.all([
     fetchText(homepage),
     probeShopifyProductsJson(homepage),
@@ -155,17 +171,20 @@ async function detectTarget(target: ProductCollectionTarget): Promise<DetectResu
   const uniqueCateNos = [...new Set(cateNos)].slice(0, 80)
   const categories = uniqueCateNos.map((cateNo) => ({
     cateNo,
-    gender: target.gender_scope.length > 0 ? target.gender_scope : undefined,
+    gender: brand.gender_scope && brand.gender_scope.length > 0 ? brand.gender_scope : undefined,
   }))
 
   const categoryDiscovery = platformType === "cafe24" && categories.length > 0 ? "manual" : "auto"
   return {
     platform_type: platformType,
     category_discovery: categoryDiscovery,
-    platform_key: target.platform_key ?? keyFromUrl(homepage),
+    platform_key: brand.platform_key ?? keyFromUrl(homepage),
     categories,
     detection: {
       detected_at: new Date().toISOString(),
+      brand_node_id: brand.brand_node_id,
+      brand_name: brand.brand_name,
+      homepage_url: homepage,
       homepage_status: htmlResult.status,
       final_url: htmlResult.finalUrl,
       html_bytes: html.length,
@@ -193,11 +212,11 @@ function analyzeArtifact(filePath: string): {metrics: Record<string, unknown>; p
   if (!Array.isArray(products)) throw new Error("artifact JSON must be an array")
 
   const total = products.length
-  const categoryPresent = products.filter((p) => hasValue(p.category)).length
-  const colorPresent = products.filter((p) => hasValue(p.color)).length
-  const pricePresent = products.filter((p) => hasValue(p.price)).length
-  const imagePresent = products.filter((p) => hasValue(p.imageUrl) || hasValue(p.images)).length
-  const inStock = products.filter((p) => p.inStock !== false).length
+  const categoryPresent = products.filter((p) => hasValue(p.category) || hasValue(p.categories)).length
+  const colorPresent = products.filter((p) => hasValue(p.color) || hasValue(p.colors)).length
+  const pricePresent = products.filter((p) => hasValue(p.price) || hasValue(p.source_price)).length
+  const imagePresent = products.filter((p) => hasValue(p.imageUrl) || hasValue(p.image_url) || hasValue(p.images)).length
+  const inStock = products.filter((p) => p.inStock !== false && p.in_stock !== false).length
 
   const pct = (count: number): number => (total === 0 ? 0 : Math.round((10000 * count) / total) / 100)
   const metrics = {
@@ -219,104 +238,81 @@ function analyzeArtifact(filePath: string): {metrics: Record<string, unknown>; p
   }
 }
 
-async function selectTargets(flags: Flags): Promise<ProductCollectionTarget[]> {
-  const db = createProductCollectionClient()
-  const id = numberFlag(flags, "id")
+async function selectBrands(db: ProductCollectionClient, flags: Flags): Promise<ProductCrawlBrand[]> {
+  const id = numberFlag(flags, "brand-id") ?? numberFlag(flags, "id")
   if (id) {
-    const target = await loadProductTarget(db, id)
-    return target ? [target] : []
+    const brand = await loadProductCrawlBrand(db, id)
+    return brand ? [brand] : []
   }
 
-  let query = db.from("product_collection_targets").select("*").order("priority", {ascending: true})
-  if (flags.requested) query = query.eq("planner_status", "product_collection_requested")
-  const plannerStatus = stringFlag(flags, "planner-status")
-  const techStatus = stringFlag(flags, "tech-status")
-  if (plannerStatus) query = query.eq("planner_status", plannerStatus)
-  if (techStatus) query = query.eq("tech_status", techStatus)
-  const limit = numberFlag(flags, "limit")
-  if (limit) query = query.limit(limit)
+  let query = db
+    .from("product_crawl_brands")
+    .select("*")
+    .order("brand_updated_at", {ascending: false, nullsFirst: false})
+    .limit(numberFlag(flags, "limit") ?? 50)
+
+  const status = stringFlag(flags, "status") ?? stringFlag(flags, "tech-status")
+  const platformType = stringFlag(flags, "platform-type")
+  const urlFilter = stringFlag(flags, "url")
+  const q = cleanSearch(stringFlag(flags, "q") ?? "")
+  if (status) query = query.eq("status", status)
+  if (platformType) query = query.eq("platform_type", platformType)
+  if (urlFilter === "missing") query = query.is("homepage_url", null)
+  else if (urlFilter === "present") query = query.not("homepage_url", "is", null)
+  if (q) {
+    const like = `%${q}%`
+    query = query.or(
+      `brand_name.ilike.${like},brand_name_normalized.ilike.${like},homepage_url.ilike.${like},platform_key.ilike.${like}`,
+    )
+  }
 
   const {data, error} = await query
   if (error) throw new Error(error.message)
-  return (data ?? []) as ProductCollectionTarget[]
+  return (data ?? []) as ProductCrawlBrand[]
 }
 
-async function addTarget(flags: Flags): Promise<void> {
-  const brand = stringFlag(flags, "brand")
-  const url = stringFlag(flags, "url")
-  if (!brand || !url) throw new Error("add requires --brand and --url")
-
+async function listBrands(flags: Flags): Promise<void> {
   const db = createProductCollectionClient()
-  const {data, error} = await db
-    .from("product_collection_targets")
-    .insert({
-      brand_name: brand,
-      homepage_url: normalizeHomepageUrl(url),
-      gender_scope: splitFlag(flags, "gender"),
-      price_band: stringFlag(flags, "price-band") ?? "unknown",
-      priority: numberFlag(flags, "priority") ?? 3,
-      planner_status: stringFlag(flags, "planner-status") ?? "planner_classified",
-      planner_notes: stringFlag(flags, "notes"),
-      created_by: "crawler-cli",
-      updated_by: "crawler-cli",
-    })
-    .select("id, brand_name")
-    .single()
-  if (error) throw new Error(error.message)
-  console.log(`created target #${(data as {id: number}).id} ${(data as {brand_name: string}).brand_name}`)
-}
-
-async function listTargets(flags: Flags): Promise<void> {
-  const targets = await selectTargets(flags)
-  for (const target of targets) {
+  const brands = await selectBrands(db, flags)
+  for (const brand of brands) {
     console.log(
       [
-        `#${target.id}`,
-        target.brand_name,
-        target.planner_status,
-        target.tech_status,
-        target.platform_type,
-        target.platform_key ?? "-",
-        target.homepage_url,
+        `#${brand.brand_node_id}`,
+        brand.brand_name,
+        brand.status,
+        `config=${brand.config_status}`,
+        brand.platform_type,
+        brand.platform_key ?? "-",
+        homepageUrl(brand) ?? "URL_MISSING",
       ].join(" | "),
     )
   }
-  console.log(`total=${targets.length}`)
+  console.log(`total=${brands.length}`)
 }
 
-async function requestTarget(flags: Flags): Promise<void> {
-  const id = numberFlag(flags, "id")
-  if (!id) throw new Error("request requires --id")
+async function detectBrands(flags: Flags): Promise<void> {
   const db = createProductCollectionClient()
-  await updateProductTarget(db, id, {
-    planner_status: "product_collection_requested",
-    requested_at: new Date().toISOString(),
-  })
-  console.log(`target #${id} requested`)
-}
-
-async function detectTargets(flags: Flags): Promise<void> {
-  const db = createProductCollectionClient()
-  const targets = await selectTargets(flags)
-  for (const target of targets) {
+  const brands = await selectBrands(db, flags)
+  for (const brand of brands) {
     const startedAt = Date.now()
     const runId = await startProductRun(db, {
-      targetId: target.id,
+      brandNodeId: brand.brand_node_id,
       stage: "detect",
-      platformKey: target.platform_key,
+      platformKey: brand.platform_key,
     })
     try {
-      const result = await detectTarget(target)
-      await updateProductTarget(db, target.id, {
+      const result = await detectBrand(brand)
+      await upsertProductCrawlStatus(db, brand.brand_node_id, {
         platform_key: result.platform_key,
         platform_type: result.platform_type,
         category_discovery: result.category_discovery,
         categories: result.categories,
         detection: result.detection,
-        tech_status: "tech_detected",
+        status: "tech_detected",
         config_status: "needed",
         detected_at: new Date().toISOString(),
         last_error: null,
+        blocked_reason: null,
       })
       await finishProductRun(db, runId, {
         status: "success",
@@ -328,99 +324,120 @@ async function detectTargets(flags: Flags): Promise<void> {
         },
         startedAt,
       })
-      console.log(`#${target.id} ${target.brand_name}: ${result.platform_type} (${result.platform_key})`)
+      console.log(`#${brand.brand_node_id} ${brand.brand_name}: ${result.platform_type} (${result.platform_key})`)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      await updateProductTarget(db, target.id, {tech_status: "blocked", last_error: message})
+      await upsertProductCrawlStatus(db, brand.brand_node_id, {
+        status: "blocked",
+        config_status: "blocked",
+        last_error: message,
+        blocked_reason: message,
+      })
       await finishProductRun(db, runId, {status: "failed", errorMessage: message, startedAt})
-      console.error(`#${target.id} ${target.brand_name}: ${message}`)
+      console.error(`#${brand.brand_node_id} ${brand.brand_name}: ${message}`)
     }
   }
 }
 
-async function qcTarget(flags: Flags): Promise<void> {
+async function qcBrand(flags: Flags): Promise<void> {
   const db = createProductCollectionClient()
-  const id = numberFlag(flags, "id")
-  const site = stringFlag(flags, "site")
-  const target = id ? await loadProductTarget(db, id) : null
-  const platformKey = site ?? target?.platform_key
-  if (!platformKey) throw new Error("qc requires --site or target with platform_key")
-  const targetId = target?.id ?? id
-  if (!targetId) throw new Error("qc requires --id when --site is not linked to a target")
+  const brandNodeId = numberFlag(flags, "brand-id") ?? numberFlag(flags, "id")
+  if (!brandNodeId) throw new Error("qc requires --brand-id")
 
-  const artifactPath = stringFlag(flags, "file") ?? path.join(process.cwd(), "data", `${platformKey}-products.json`)
+  const brand = await loadProductCrawlBrand(db, brandNodeId)
+  if (!brand) throw new Error(`brand_node ${brandNodeId} not found`)
+
+  const platformKey = stringFlag(flags, "site") ?? brand.platform_key
+  if (!platformKey) throw new Error("qc requires --site or a status row with platform_key")
+
+  const artifactPath = path.resolve(
+    stringFlag(flags, "file") ?? path.join(process.cwd(), "data", `${platformKey}-products.json`),
+  )
+  const artifactRelPath = path.relative(process.cwd(), artifactPath)
   const startedAt = Date.now()
   const runId = await startProductRun(db, {
-    targetId,
+    brandNodeId,
     stage: "qc",
     platformKey,
   })
   try {
     const {metrics, passed, sha256} = analyzeArtifact(artifactPath)
-    await updateProductTarget(db, targetId, {
-      latest_artifact_path: path.relative(process.cwd(), artifactPath),
+    await upsertProductCrawlStatus(db, brandNodeId, {
+      latest_artifact_path: artifactRelPath,
       latest_artifact_sha256: sha256,
       qc_summary: {...metrics, passed},
-      tech_status: passed ? "import_ready" : "qc_failed",
+      status: passed ? "import_ready" : "qc_failed",
       last_error: passed ? null : "QC failed: category/color fill must be 100%",
     })
     await finishProductRun(db, runId, {
       status: passed ? "success" : "failed",
       metrics: {...metrics, passed},
-      artifactPath: path.relative(process.cwd(), artifactPath),
+      artifactPath: artifactRelPath,
       errorMessage: passed ? null : "category/color fill below threshold",
       startedAt,
     })
-    console.log(`${platformKey}: qc ${passed ? "passed" : "failed"} ${JSON.stringify(metrics)}`)
+    console.log(`#${brandNodeId} ${platformKey}: qc ${passed ? "passed" : "failed"} ${JSON.stringify(metrics)}`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    await updateProductTarget(db, targetId, {tech_status: "qc_failed", last_error: message})
+    await upsertProductCrawlStatus(db, brandNodeId, {status: "qc_failed", last_error: message})
     await finishProductRun(db, runId, {status: "failed", errorMessage: message, startedAt})
     throw err
   }
 }
 
-async function markTarget(flags: Flags): Promise<void> {
-  const id = numberFlag(flags, "id")
-  if (!id) throw new Error("mark requires --id")
+function statusTimestamps(patch: Record<string, unknown>): void {
+  const nowIso = new Date().toISOString()
+  if (patch.status === "tech_detected") patch.detected_at = nowIso
+  if (patch.status === "crawl_ready") patch.crawl_ready_at = nowIso
+  if (patch.status === "imported") patch.imported_at = nowIso
+  if (patch.status === "embedded" || patch.status === "active") patch.embedded_at = nowIso
+}
+
+async function markBrand(flags: Flags): Promise<void> {
+  const brandNodeId = numberFlag(flags, "brand-id") ?? numberFlag(flags, "id")
+  if (!brandNodeId) throw new Error("mark requires --brand-id")
+
   const patch: Record<string, unknown> = {}
   for (const [flag, column] of [
-    ["planner-status", "planner_status"],
-    ["tech-status", "tech_status"],
+    ["status", "status"],
+    ["tech-status", "status"],
     ["config-status", "config_status"],
     ["platform-key", "platform_key"],
     ["platform-type", "platform_type"],
+    ["category-discovery", "category_discovery"],
     ["blocked-reason", "blocked_reason"],
     ["error", "last_error"],
-    ["tech-notes", "tech_notes"],
+    ["notes", "notes"],
   ] as const) {
     const value = stringFlag(flags, flag)
     if (value !== null) patch[column] = value
   }
+  statusTimestamps(patch)
   if (Object.keys(patch).length === 0) throw new Error("mark requires at least one update flag")
+
   const db = createProductCollectionClient()
-  const runId = await startProductRun(db, {targetId: id, stage: "manual", status: "running"})
-  await updateProductTarget(db, id, patch)
+  const runId = await startProductRun(db, {brandNodeId, stage: "manual", status: "running"})
+  await upsertProductCrawlStatus(db, brandNodeId, patch)
   await finishProductRun(db, runId, {status: "success", metrics: {patch}, startedAt: Date.now()})
-  console.log(`target #${id} updated`)
+  console.log(`brand_node #${brandNodeId} updated`)
 }
 
 async function listRuns(flags: Flags): Promise<void> {
   const db = createProductCollectionClient()
   let query = db
-    .from("product_collection_runs")
+    .from("product_crawl_runs")
     .select("*")
     .order("created_at", {ascending: false})
     .limit(numberFlag(flags, "limit") ?? 30)
-  const id = numberFlag(flags, "id")
-  if (id) query = query.eq("target_id", id)
+  const brandNodeId = numberFlag(flags, "brand-id") ?? numberFlag(flags, "id")
+  if (brandNodeId) query = query.eq("brand_node_id", brandNodeId)
   const {data, error} = await query
   if (error) throw new Error(error.message)
   for (const run of data ?? []) {
     console.log(
       [
         `#${run.id}`,
-        `target=${run.target_id ?? "-"}`,
+        `brand_node=${run.brand_node_id}`,
         run.stage,
         run.status,
         run.platform_key ?? "-",
@@ -432,28 +449,24 @@ async function listRuns(flags: Flags): Promise<void> {
 
 function printHelp(): void {
   console.log(`
-Product collection target queue
+Brand-node product crawl state
 
 Commands:
-  add       --brand=NAME --url=URL [--gender=women,men] [--price-band=mid] [--priority=3]
-  list      [--planner-status=...] [--tech-status=...] [--limit=50]
-  request   --id=ID
-  detect    --id=ID | --requested [--limit=20]
-  qc        --id=ID [--site=KEY] [--file=data/KEY-products.json]
-  mark      --id=ID [--planner-status=...] [--tech-status=...] [--platform-key=...]
-  runs      [--id=ID] [--limit=30]
+  list      [--status=...] [--platform-type=...] [--url=present|missing] [--q=...] [--limit=50]
+  detect    --brand-id=ID | [--status=not_started] [--url=present] [--limit=20]
+  qc        --brand-id=ID [--site=KEY] [--file=data/KEY-products.json]
+  mark      --brand-id=ID [--status=...] [--config-status=...] [--platform-key=...]
+  runs      [--brand-id=ID] [--limit=30]
 `)
 }
 
 async function main(): Promise<void> {
   const {command, flags} = parseArgs(process.argv.slice(2))
   if (command === "help" || command === "--help") return printHelp()
-  if (command === "add") return addTarget(flags)
-  if (command === "list") return listTargets(flags)
-  if (command === "request") return requestTarget(flags)
-  if (command === "detect") return detectTargets(flags)
-  if (command === "qc") return qcTarget(flags)
-  if (command === "mark") return markTarget(flags)
+  if (command === "list") return listBrands(flags)
+  if (command === "detect") return detectBrands(flags)
+  if (command === "qc") return qcBrand(flags)
+  if (command === "mark") return markBrand(flags)
   if (command === "runs") return listRuns(flags)
   throw new Error(`unknown command: ${command}`)
 }
