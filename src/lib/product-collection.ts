@@ -3,29 +3,38 @@ import {createClient, type SupabaseClient} from "@supabase/supabase-js"
 export type ProductCollectionStage = "detect" | "config" | "crawl" | "qc" | "import" | "embed" | "manual"
 export type ProductCollectionRunStatus = "queued" | "running" | "success" | "failed" | "skipped"
 
-export interface ProductCollectionTarget {
-  id: number
+export interface ProductCrawlBrand {
+  brand_node_id: number
   brand_name: string
-  homepage_url: string
-  gender_scope: string[]
-  price_band: string
-  priority: number
-  planner_status: string
-  planner_notes: string | null
+  brand_name_normalized: string | null
+  gender_scope: string[] | null
+  source_platforms: string[] | null
+  price_min_usd: number | string | null
+  price_max_usd: number | string | null
+  wiki: Record<string, unknown> | null
+  homepage_url: string | null
+  wiki_status: string | null
+  brand_updated_at: string | null
+  status_created_at: string | null
+  status_updated_at: string | null
+  has_status_row: boolean
+  status: string
+  config_status: string
   platform_key: string | null
   platform_type: string
   category_discovery: string
   categories: unknown[]
   detection: Record<string, unknown>
-  tech_status: string
-  config_status: string
   latest_artifact_path: string | null
   latest_artifact_sha256: string | null
   qc_summary: Record<string, unknown>
   last_error: string | null
   blocked_reason: string | null
-  tech_notes: string | null
-  updated_at: string
+  notes: string | null
+  detected_at: string | null
+  crawl_ready_at: string | null
+  imported_at: string | null
+  embedded_at: string | null
 }
 
 export type ProductCollectionClient = SupabaseClient
@@ -39,10 +48,23 @@ export function createProductCollectionClient(): ProductCollectionClient {
   return createClient(dbUrl, dbToken)
 }
 
+export async function loadProductCrawlBrand(
+  db: ProductCollectionClient,
+  brandNodeId: number,
+): Promise<ProductCrawlBrand | null> {
+  const {data, error} = await db
+    .from("product_crawl_brands")
+    .select("*")
+    .eq("brand_node_id", brandNodeId)
+    .maybeSingle()
+  if (error) throw new Error(`failed to load brand_node ${brandNodeId}: ${error.message}`)
+  return (data as ProductCrawlBrand | null) ?? null
+}
+
 export async function startProductRun(
   db: ProductCollectionClient,
   input: {
-    targetId: number
+    brandNodeId: number
     stage: ProductCollectionStage
     command?: string
     actor?: string
@@ -51,9 +73,9 @@ export async function startProductRun(
   },
 ): Promise<number> {
   const {data, error} = await db
-    .from("product_collection_runs")
+    .from("product_crawl_runs")
     .insert({
-      target_id: input.targetId,
+      brand_node_id: input.brandNodeId,
       stage: input.stage,
       status: input.status ?? "running",
       command: input.command ?? process.argv.join(" "),
@@ -90,31 +112,17 @@ export async function finishProductRun(
   }
   if (patch.startedAt) update.duration_ms = Date.now() - patch.startedAt
 
-  const {error} = await db.from("product_collection_runs").update(update).eq("id", runId)
+  const {error} = await db.from("product_crawl_runs").update(update).eq("id", runId)
   if (error) throw new Error(`failed to finish product run: ${error.message}`)
 }
 
-export async function updateProductTarget(
+export async function upsertProductCrawlStatus(
   db: ProductCollectionClient,
-  targetId: number,
+  brandNodeId: number,
   patch: Record<string, unknown>,
 ): Promise<void> {
   const {error} = await db
-    .from("product_collection_targets")
-    .update({...patch, updated_by: patch.updated_by ?? "crawler-cli"})
-    .eq("id", targetId)
-  if (error) throw new Error(`failed to update product target ${targetId}: ${error.message}`)
-}
-
-export async function loadProductTarget(
-  db: ProductCollectionClient,
-  targetId: number,
-): Promise<ProductCollectionTarget | null> {
-  const {data, error} = await db
-    .from("product_collection_targets")
-    .select("*")
-    .eq("id", targetId)
-    .maybeSingle()
-  if (error) throw new Error(`failed to load product target ${targetId}: ${error.message}`)
-  return (data as ProductCollectionTarget | null) ?? null
+    .from("product_crawl_status")
+    .upsert({brand_node_id: brandNodeId, ...patch}, {onConflict: "brand_node_id"})
+  if (error) throw new Error(`failed to update product crawl status ${brandNodeId}: ${error.message}`)
 }
