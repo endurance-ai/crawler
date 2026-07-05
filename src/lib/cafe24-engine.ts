@@ -346,7 +346,7 @@ async function collectProductsFromPage(
         // 아예 건너뛴다. DOM 기반 추측은 멀티브랜드 편집샵에서만 의미가 있고,
         // 자사몰 테마에서는 "상품명 :" 같은 숨김 라벨을 .description 폴백이
         // 잘못 주워오는 경우가 있다(goyowear: .name의 displaynone 라벨 텍스트가
-        // .description 첫 줄로 새어 들어옴).
+        // .description 첫 줄로 새어 들어옴, taats에서도 동일 패턴 확인).
         let brand = args.brandNameOverride || ""
         if (!brand) {
           // 상품 텍스트에서 추출 (Cafe24 편집샵은 보통 브랜드명이 상품명 앞에 있음)

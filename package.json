@@ -10,7 +10,7 @@
   },
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "crawl": "dotenv -e .env -- tsx src/crawl.ts",
+    "crawl": "dotenv -e .env -e .env.local -- tsx src/crawl.ts",
     "import:products": "dotenv -e .env -- tsx src/import-products.ts",
     "import:attributes": "dotenv -e .env -- tsx src/import-attributes.ts",
     "import:brand-nodes": "dotenv -e .env -- tsx src/import-brand-nodes.ts",

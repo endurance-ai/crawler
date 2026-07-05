@@ -107,6 +107,64 @@ interface BrandNodeRow {
   brand_name_normalized: string | null
 }
 
+// platform_key → brand_node_id 해석. product_crawl_status(091) 는 brand_node_id 가 PK 이고
+// admin 페이지(product_crawl_brands 뷰)가 이걸 읽는다. 이미 platform_key 가 채워진 status 행이
+// 있으면 그걸로 resolve, 없으면 brand_nodes 를 brand_name 으로 매칭해 폴백한다.
+async function resolveBrandNodeId(platform: string, brandName: string | null): Promise<number | null> {
+  const {data: statusRow} = await db
+    .from("product_crawl_status")
+    .select("brand_node_id")
+    .eq("platform_key", platform)
+    .maybeSingle()
+  if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
+
+  if (brandName) {
+    const {data: node} = await db
+      .from("brand_nodes")
+      .select("id")
+      .ilike("brand_name", brandName)
+      .maybeSingle()
+    if (node) return (node as {id: number}).id
+  }
+  return null
+}
+
+// import 성공/실패를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다.
+// 배포 admin 페이지가 읽는 product_crawl_brands 뷰의 소스가 이 테이블이다.
+// brand_node_id 해석 실패 시 no-op(신규 브랜드는 brand_nodes 등록 후 반영됨).
+async function syncProductCrawlStatus(
+  platform: string,
+  brandName: string | null,
+  result: {inserted: number; errors: number; total: number},
+): Promise<void> {
+  const brandNodeId = await resolveBrandNodeId(platform, brandName)
+  if (!brandNodeId) return
+
+  const success = result.errors === 0 && result.inserted > 0
+  const status = success ? "imported" : "qc_failed"
+
+  await db.from("product_crawl_status").upsert(
+    {
+      brand_node_id: brandNodeId,
+      status,
+      platform_key: platform,
+      imported_at: success ? new Date().toISOString() : null,
+      qc_summary: {rows_total: result.total, rows_upserted: result.inserted, errors: result.errors},
+    },
+    {onConflict: "brand_node_id"},
+  )
+
+  await db.from("product_crawl_runs").insert({
+    brand_node_id: brandNodeId,
+    stage: "import",
+    status: success ? "success" : "failed",
+    platform_key: platform,
+    actor: "import-products-auto",
+    command: `import-products --site=${platform}`,
+    metrics: {rows_total: result.total, rows_upserted: result.inserted, errors: result.errors},
+  })
+}
+
 function normalizeBrand(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, " ")
 }
@@ -541,6 +599,12 @@ async function main() {
     }
 
     console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
+    // 단일브랜드 자사몰: 파일의 대표 브랜드명으로 brand_node 해석 폴백에 사용
+    const dominantBrand =
+      (rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand as string | undefined) ??
+      SELF_BRANDED[platform] ??
+      null
+    await syncProductCrawlStatus(platform, dominantBrand, {inserted, errors, total: deduped.length})
     totalInserted += inserted
     totalErrors += errors
 

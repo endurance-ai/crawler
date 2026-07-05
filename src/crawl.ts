@@ -17,6 +17,7 @@
 import {chromium} from "playwright"
 import * as fs from "fs"
 import * as path from "path"
+import {createClient} from "@supabase/supabase-js"
 import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlShopify} from "./lib/shopify-engine"
@@ -45,6 +46,74 @@ import {getReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, SiteConfig} from "./lib/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
+
+// 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
+// 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
+// 미설정이면 조용히 스킵 — crawl.ts는 큐와 무관한 40+ 기존 플랫폼에도 쓰이므로 필수 아님.
+const queueDb =
+  process.env.DB_URL && process.env.DB_TOKEN
+    ? createClient(process.env.DB_URL, process.env.DB_TOKEN)
+    : null
+
+// platform_key → brand_node_id. 기존 status 행의 platform_key 로 resolve, 없으면
+// SiteConfig.brand 로 brand_nodes 를 매칭해 폴백.
+async function resolveBrandNodeId(platform: string): Promise<number | null> {
+  if (!queueDb) return null
+  const {data: statusRow} = await queueDb
+    .from("product_crawl_status")
+    .select("brand_node_id")
+    .eq("platform_key", platform)
+    .maybeSingle()
+  if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
+
+  const brandName = getSiteConfig(platform)?.brand
+  if (brandName) {
+    const {data: node} = await queueDb
+      .from("brand_nodes")
+      .select("id")
+      .ilike("brand_name", brandName)
+      .maybeSingle()
+    if (node) return (node as {id: number}).id
+  }
+  return null
+}
+
+async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
+  if (!queueDb) return
+  const brandNodeId = await resolveBrandNodeId(result.platform)
+  if (!brandNodeId) return // brand_node 해석 실패 — no-op
+
+  const success = result.errors.length === 0 && result.stats.totalProducts > 0
+  const status = success ? "crawled" : "qc_failed"
+
+  await queueDb.from("product_crawl_status").upsert(
+    {
+      brand_node_id: brandNodeId,
+      status,
+      platform_key: result.platform,
+      crawl_ready_at: success ? new Date().toISOString() : null,
+      last_error: result.errors[0] ?? null,
+    },
+    {onConflict: "brand_node_id"},
+  )
+
+  await queueDb.from("product_crawl_runs").insert({
+    brand_node_id: brandNodeId,
+    stage: "crawl",
+    status: success ? "success" : "failed",
+    platform_key: result.platform,
+    actor: "crawl-auto",
+    command: `crawl --site=${result.platform}`,
+    duration_ms: result.stats.duration,
+    error_message: result.errors[0] ?? null,
+    metrics: {
+      total_products: result.stats.totalProducts,
+      in_stock: result.stats.inStock,
+      unique_brands: result.stats.uniqueBrands,
+      errors: result.errors,
+    },
+  })
+}
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
 
@@ -657,7 +726,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   }
 
   if (!dryRun && results.length > 0) {
-    printSummary(results)
+    await printSummary(results)
   }
 }
 
@@ -686,7 +755,11 @@ function saveResultAndTrim(outDir: string, result: CrawlResult): CrawlResult {
   return {...result, products: []}
 }
 
-function printSummary(results: CrawlResult[]) {
+async function printSummary(results: CrawlResult[]) {
+  for (const r of results) {
+    await syncCrawlResultToQueue(r)
+  }
+
   console.log("\n" + "═".repeat(60))
   console.log("🏁 전체 크롤링 완료")
   console.log("═".repeat(60))
@@ -937,4 +1010,14 @@ function lintGenderConfig(targets: SiteConfig[]) {
   }
 }
 
-main().catch(console.error)
+main()
+  .then(() => {
+    // queueDb(supabase-js) 사용 시 내부 keep-alive 핸들이 남아 프로세스가
+    // 자연 종료되지 않는다. 모든 크롤/큐 write 는 main() 완료 시점에 이미
+    // await 로 끝났으므로 명시적으로 종료한다.
+    process.exit(0)
+  })
+  .catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
