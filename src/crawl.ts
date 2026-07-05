@@ -448,7 +448,7 @@ const PARALLEL_LIMIT = 3 // 동시 브라우저 수
 // 사이트 전체 크롤 상한 — 한 사이트가 어딘가에서 멈춰도(무한 hang) 배치 전체가
 // 얼어붙지 않도록 강제 중단한다. crawlCafe24 내부에는 evaluate/detail 단위
 // timeout이 있지만, 사이트 단위 전체 안전망이 별도로 필요하다.
-const SITE_TIMEOUT_MS = 20 * 60_000 // 20분
+const SITE_TIMEOUT_MS = 120 * 60_000 // 120분 — 대형 카탈로그(1000+ 상품, 상세 크롤 포함) 완주 여유
 
 const withSiteTimeout = <T>(promise: Promise<T>, site: string): Promise<T> =>
   Promise.race([
@@ -497,8 +497,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
             return null
           }
           const result = await crawlUniqlo(config)
-          saveResult(outDir, result)
-          return result
+          return saveResultAndTrim(outDir, result)
         } catch (err) {
           console.error(`❌ ${config.name} 크롤 실패:`, err)
           return null
@@ -529,8 +528,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlZara(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -557,8 +555,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawl29cm(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -585,8 +582,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlFarfetch(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -613,54 +609,51 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlShopify(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
     }
   }
 
-  // Cafe24 — 사이트별 병렬 (PARALLEL_LIMIT개씩)
+  // Cafe24 — 사이트별 병렬 (워커 풀: PARALLEL_LIMIT개 동시, 하나 끝나면 큐에서 바로 다음 투입)
   if (cafe24Sites.length > 0) {
-    console.log(`\n⚡ 병렬 크롤링: ${cafe24Sites.length}개 사이트, ${PARALLEL_LIMIT}개 동시\n`)
+    console.log(`\n⚡ 병렬 크롤링: ${cafe24Sites.length}개 사이트, ${PARALLEL_LIMIT}개 동시 (큐 방식)\n`)
 
-    for (let i = 0; i < cafe24Sites.length; i += PARALLEL_LIMIT) {
-      const batch = cafe24Sites.slice(i, i + PARALLEL_LIMIT)
-      const batchNames = batch.map((c) => c.name).join(", ")
-      console.log(`\n🔄 배치 ${Math.floor(i / PARALLEL_LIMIT) + 1}: ${batchNames}`)
+    let nextIndex = 0
+    const worker = async () => {
+      while (nextIndex < cafe24Sites.length) {
+        const config = cafe24Sites[nextIndex++]!
+        console.log(`\n🔄 시작 (${nextIndex}/${cafe24Sites.length}): ${config.name}`)
 
-      const batchResults = await Promise.all(
-        batch.map(async (config) => {
-          // 사이트마다 독립 브라우저
-          const browser = await chromium.launch({headless: true})
-          const context = await browser.newContext({
-            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            locale: "ko-KR",
-          })
-          const page = await context.newPage()
-
-          try {
-            if (dryRun) {
-              await probeSite(config)
-              return null
-            }
-            const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
-            const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
-            const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
-            saveResult(outDir, result)
-            return result
-          } catch (err) {
-            console.error(`❌ ${config.name} 크롤 실패:`, err)
-            return null
-          } finally {
-            await browser.close()
-          }
+        // 사이트마다 독립 브라우저
+        const browser = await chromium.launch({headless: true})
+        const context = await browser.newContext({
+          userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          locale: "ko-KR",
         })
-      )
+        const page = await context.newPage()
 
-      results.push(...batchResults.filter((r): r is CrawlResult => r !== null))
+        try {
+          if (dryRun) {
+            await probeSite(config)
+            continue
+          }
+          const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
+          const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
+          const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
+          results.push(saveResultAndTrim(outDir, result))
+        } catch (err) {
+          console.error(`❌ ${config.name} 크롤 실패:`, err)
+        } finally {
+          await browser.close()
+        }
+      }
     }
+
+    await Promise.all(
+      Array.from({length: Math.min(PARALLEL_LIMIT, cafe24Sites.length)}, () => worker())
+    )
   }
 
   if (!dryRun && results.length > 0) {
@@ -682,6 +675,15 @@ function saveResult(outDir: string, result: CrawlResult) {
   const outPath = path.join(outDir, `${result.platform}-products.json`)
   fs.writeFileSync(outPath, JSON.stringify(products, null, 2), "utf-8")
   console.log(`   💾 저장: ${outPath}`)
+}
+
+// `results`는 printSummary까지 사이트별 stats/errors 를 보존해야 하지만,
+// products 배열(description/images/reviews 포함)까지 전체 런 끝까지 들고
+// 있을 필요는 없다 — 31개 cafe24 사이트 detail 크롤 시 heap OOM 유발 확인
+// (2026-07-05). 디스크에 쓴 직후 products 를 비워서 GC가 회수하게 한다.
+function saveResultAndTrim(outDir: string, result: CrawlResult): CrawlResult {
+  saveResult(outDir, result)
+  return {...result, products: []}
 }
 
 function printSummary(results: CrawlResult[]) {
