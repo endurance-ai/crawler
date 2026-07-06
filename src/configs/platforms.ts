@@ -1597,7 +1597,8 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "AGOW",
     paginate: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    disabled: true,
+    notes: "BLOCKED — 2026-07-06 dry-run: 기본 상품 셀렉터로 상품을 찾지 못함(커스텀 테마, 셀렉터 오버라이드 필요). 커스텀 셀렉터 작업 후 활성화.",
   },
   {
     key: "mausoleum",
@@ -1677,7 +1678,8 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "ROYAL OAK",
     paginate: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    disabled: true,
+    notes: "BLOCKED — 2026-07-06 dry-run: 기본 상품 셀렉터로 상품을 찾지 못함(d1-wrap/d2-wrap 커스텀 테마, 셀렉터 오버라이드 필요). 커스텀 셀렉터 작업 후 활성화.",
   },
   {
     key: "kupidomovingwear",
@@ -1857,7 +1859,8 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "CLaddA",
     paginate: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    disabled: true,
+    notes: "BLOCKED — 2026-07-06 dry-run: 기본 상품 셀렉터로 상품을 찾지 못함(커스텀 테마, 셀렉터 오버라이드 필요). 커스텀 셀렉터 작업 후 활성화.",
   },
   {
     key: "khakipoint",
@@ -2077,7 +2080,8 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "TONSE",
     paginate: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    disabled: true,
+    notes: "BLOCKED — 2026-07-06 dry-run: 기본 상품 셀렉터로 상품을 찾지 못함(커스텀 테마, 셀렉터 오버라이드 필요). 커스텀 셀렉터 작업 후 활성화.",
   },
   {
     key: "miuki",
