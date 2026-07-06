@@ -466,6 +466,12 @@ Resume interrupted agent work using agentId:
 - `\b` word boundary는 한글에 적용되지 않으므로, 한글 대안은 반드시 `\b()` 그룹 밖에 위치시킨다
   - 올바름: `/\b(grey)\b|그레이/i`
   - 잘못됨: `/\b(grey|그레이)\b/i`
+- 신규 사이트 온보딩 시 color 필드에 사이즈(`ONE SIZE`, `S/M/L`)나 재고상태(`품절`,
+  `sold out`)가 들어오면 → 색상 매핑 문제가 아니라 `isNonColorOptionText()`
+  (같은 파일) 로 걸러야 할 노이즈다. 단일브랜드몰이 색상 전용 select 없이 option1을
+  사이즈/재고 텍스트로 채우는 경우 흔히 발생 (2026-07-06: demoshop/franksupply/
+  hamsaseyo/nnpcs/piscess/seygun 온보딩에서 확인). CANONICAL에 추가하지 말고
+  `isNonColorOptionText()`의 패턴 목록에 추가할 것.
 
 ### Product Crawl Status Sync (admin 동기화)
 
