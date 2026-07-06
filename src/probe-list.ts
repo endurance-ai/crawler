@@ -219,7 +219,7 @@ async function main() {
       const cats = await page.evaluate(function() {
         /* eslint-disable no-var */
         var links = document.querySelectorAll('a[href*="cate_no="]')
-        var catMap = {}
+        var catMap: Record<number, string> = {}
         for (var i = 0; i < links.length; i++) {
           var a = links[i]
           var href = a.getAttribute("href") || ""
