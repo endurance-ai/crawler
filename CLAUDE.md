@@ -467,6 +467,49 @@ Resume interrupted agent work using agentId:
   - 올바름: `/\b(grey)\b|그레이/i`
   - 잘못됨: `/\b(grey|그레이)\b/i`
 
+### Product Crawl Status Sync (admin 동기화)
+
+`kiko.ai-app`의 `/admin/product-collection` 은 `product_crawl_brands` 뷰(마이그레이션
+`091_brand_node_product_crawl_status.sql`) 만 읽는다. 이 뷰는 `brand_nodes` 를
+`product_crawl_status`(PK: `brand_node_id`)와 LEFT JOIN한 것이므로, **크롤/임포트가
+끝날 때마다 `product_crawl_status` + `product_crawl_runs` 를 자동 upsert 해야 admin이
+수기 mark 없이 최신 상태를 보여준다.**
+
+- 패턴: platform_key로 기존 `product_crawl_status` 행을 조회해 `brand_node_id` 를
+  resolve → 없으면 `brand_nodes.brand_name` ilike 매칭으로 폴백 (`resolveBrandNodeId`,
+  `src/crawl.ts`/`src/import-products.ts`에 각 스테이지별로 구현되어 있음, 같은 이름의
+  헬퍼가 `src/lib/product-collection.ts`에도 있으니 신규 코드는 그쪽을 재사용할 것)
+  → `product_crawl_status.upsert({..., onConflict: "brand_node_id"})` → `product_crawl_runs.insert({stage, status, metrics, ...})`
+- 새 크롤/임포트/임베딩 스테이지를 추가할 때는 반드시 이 패턴을 따른다. admin 페이지를
+  손으로 고쳐야만 상태가 맞는 상황이 생기면 동기화가 깨진 것이다.
+- `DB_URL`/`DB_TOKEN` 미설정 시 조용히 스킵한다 — `crawl.ts`/`import-products.ts` 는
+  큐와 무관한 기존 40+ 플랫폼에도 쓰이므로 큐 연동은 필수가 아니라 선택적 부가 기능이다.
+- CLI 도구(`src/brand-crawl.ts`)는 같은 스키마의 수동 조작 창구(`detect`/`qc`/`mark`)다.
+  새로운 큐 관련 CLI/스크립트는 반드시 `product_crawl_status`/`product_crawl_runs`
+  (brand_node_id 기준)를 사용해야 하며, 폐기된 `product_collection_targets`/
+  `product_collection_runs`(구 090 스키마, planner_status 기반) 를 절대 참조하지 않는다 —
+  091 마이그레이션이 이 테이블들을 DROP했다.
+
+### Brand Name Fixing (브랜드명 고정)
+
+사이트 `SiteConfig.brand`(하우스 브랜드)가 설정된 단일브랜드 자사몰은 크롤링 시
+**DOM 기반 브랜드 추출을 시도하지 않는다** — `config.brand` 가 항상 우선이고, DOM
+추출(`.brand`/`.manufacturer`/spec 라벨 등)은 상품마다 브랜드가 달라지는 멀티브랜드
+편집샵 전용 폴백이다.
+
+- 이유: 단일브랜드몰 테마는 "상품명 :" 같은 숨김 접근성 라벨을 `.description` 폴백이
+  브랜드로 잘못 주워오는 경우가 실제로 있었다 (예: goyowear, taats). `config.brand` 가
+  있는데도 DOM을 먼저 시도하면 이런 오인식이 조용히 섞여 들어간다.
+- 구현 위치: `src/lib/cafe24-engine.ts` `collectProductsFromPage` 의 브랜드 추출 블록 —
+  `let brand = args.brandNameOverride || ""` 다음에만 DOM 폴백 체인(`.brand` 셀렉터 →
+  spec 블록 "브랜드 : X" 라벨 → 상품명 첫 줄)이 실행된다.
+- Shopify 엔진(`src/lib/shopify-engine.ts`)은 이미 `product.vendor`(Shopify 실제 데이터
+  필드) 를 우선하고 `config.name` 은 vendor가 비어있을 때만 폴백으로 쓰므로 동일한
+  문제가 없다 — 새 엔진을 추가할 때도 "실제 데이터 필드 우선, DOM 텍스트 스크래핑은
+  최후 폴백" 원칙을 따른다.
+- 신규 브랜드 온보딩 체크리스트: `platforms.ts`에 항목 추가 시 단일브랜드 자사몰이면
+  반드시 `brand` 필드를 채운다. 비워두면 DOM 오인식 리스크를 그대로 안고 크롤링하게 된다.
+
 ---
 
 ## 12. MCP Servers & Deep Analysis Modes
