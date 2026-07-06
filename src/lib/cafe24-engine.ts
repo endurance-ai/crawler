@@ -621,6 +621,10 @@ export async function crawlCafe24(
           const ctx = await browser.newContext()
           await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
           const pg = await ctx.newPage()
+          // JS 팝업을 즉시 닫는다 — 안 닫으면 ctx.close() 시 Playwright의 dialog
+          // 핸들링이 uncaught rejection을 던져 프로세스 전체가 죽을 수 있다
+          // (2026-07-06, kupido-movingwear/hagamos 상세크롤 중 확인).
+          pg.on("dialog", (d) => d.dismiss().catch(() => {}))
           try {
             const detail = await withTimeout(
               detailParser.parse(pg, product.productUrl),

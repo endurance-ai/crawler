@@ -703,6 +703,10 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           locale: "ko-KR",
         })
         const page = await context.newPage()
+        // JS 팝업(alert/confirm 등)을 즉시 닫는다 — 안 닫고 두면 브라우저 종료 시
+        // Playwright 내부 dialog 핸들링이 uncaught rejection을 던져 전체 배치
+        // 프로세스가 죽는다 (2026-07-06, kupido-movingwear/hagamos 크롤 중 확인).
+        page.on("dialog", (d) => d.dismiss().catch(() => {}))
 
         try {
           if (dryRun) {
@@ -1057,6 +1061,15 @@ function lintGenderConfig(targets: SiteConfig[]) {
     for (const w of warnings) console.log(w)
   }
 }
+
+// 안전망: 개별 사이트 크롤은 각자 try/catch로 감싸져 있지만, Playwright의 내부
+// CDP 이벤트 핸들링(예: dialog 처리 중 context가 닫히는 경우) 은 그 바깥에서
+// unhandledRejection 으로 터질 수 있다 — 이게 전체 배치를 죽인 사고가 있었음
+// (2026-07-06, 50개 배치 크롤 중 kupido-movingwear/hagamos 에서 발생).
+// 로그만 남기고 배치는 계속 진행한다.
+process.on("unhandledRejection", (reason) => {
+  console.error(`\n⚠️ unhandledRejection (배치 계속 진행):`, reason)
+})
 
 main()
   .then(() => {
