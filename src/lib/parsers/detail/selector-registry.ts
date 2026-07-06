@@ -162,6 +162,15 @@ export const DETAIL_REGISTRY: Record<string, RegistryEntry> = {
   ojos: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
   goyowear: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
 
+  // 2026-07-06 검증: taats도 동일 패턴. option1 select에 SIZE만 있고(S/M/L/XL)
+  // 별도 색상 옵션/스와치가 없음 — 색상별로 아예 다른 상품 페이지("Name (Color)",
+  // 예: "Washed Cotton Pajama Set (Dark Navy)")로 분리되어 있다. colorSelectors: []
+  // 로 option1(사이즈) 오염을 막고 cafe24-engine.ts의 extractColorFromText
+  // 상품명 폴백으로 넘긴다. .xans-product-detaildesign은 텍스트 설명이 아니라
+  // "판매가\n129,000원"만 담고 있어(실제 설명은 이미지 배너) description은
+  // 개선 대상에서 제외 — 우선순위 낮음.
+  taats: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
+
   // ── per-site algorithms (verbatim, selectors externalized) ──
   "8division": {strategy: "8division", wait: DOM_DEFAULT},
   adekuver: {strategy: "adekuver", wait: DOM_DEFAULT},
