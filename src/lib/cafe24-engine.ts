@@ -607,77 +607,90 @@ export async function crawlCafe24(
     const CHECKPOINT_EVERY = 30
     let sinceCheckpoint = 0
 
-    for (let i = 0; i < uniqueProducts.length; i += DETAIL_CONCURRENCY) {
-      const batch = uniqueProducts.slice(i, i + DETAIL_CONCURRENCY)
-      const results = await Promise.all(
-        batch.map(async (product) => {
-          // 재시작 스킵: 이전 체크포인트/결과 파일에 이미 색상까지 확보된 상품이면
-          // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
-          // 상세크롤을 반복하지 않기 위함).
-          const known = existingDetails?.get(product.productUrl)
-          if (known && known.color) {
-            return {product, detail: known}
-          }
-          const ctx = await browser.newContext()
-          await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
-          const pg = await ctx.newPage()
-          // JS 팝업을 즉시 닫는다 — 안 닫으면 ctx.close() 시 Playwright의 dialog
-          // 핸들링이 uncaught rejection을 던져 프로세스 전체가 죽을 수 있다
-          // (2026-07-06, kupido-movingwear/hagamos 상세크롤 중 확인).
-          pg.on("dialog", (d) => d.dismiss().catch(() => {}))
-          try {
-            const detail = await withTimeout(
-              detailParser.parse(pg, product.productUrl),
-              25_000,
-              `detail:${product.productUrl.slice(-50)}`
-            )
-            // 사이트별 전략이 color 를 못 뽑았을 때만 범용 폴백 발동 (golden 무영향).
-            // ctx.close() 전, 로드된 pg 에서 옵션/스와치/스펙표를 범용 스캔한다.
-            if (!detail.color) {
-              detail.color = await genericCafe24Color(pg).catch(() => null)
+    // 상품마다 browser.newContext()를 새로 만들고 닫는 대신, DETAIL_CONCURRENCY개의
+    // 컨텍스트/페이지를 한 번만 만들어 사이트 전체 상세크롤 동안 재사용한다.
+    // 대형 카탈로그(bergwerk 1344개 등)에서 상품당 컨텍스트 생성/종료를 반복하니
+    // OS 프로세스가 점진적으로 쌓여(체크: 79개 chrome/node) 크롤이 극도로 느려지고
+    // 결국 리소스 고갈로 프로세스가 죽는 사고가 있었다 (2026-07-06).
+    const workerPages: Page[] = []
+    for (let w = 0; w < DETAIL_CONCURRENCY; w++) {
+      const ctx = await browser.newContext()
+      await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
+      const pg = await ctx.newPage()
+      // JS 팝업을 즉시 닫는다 — 안 닫으면 context 종료 시 Playwright의 dialog
+      // 핸들링이 uncaught rejection을 던져 프로세스 전체가 죽을 수 있다
+      // (2026-07-06, kupido-movingwear/hagamos 상세크롤 중 확인).
+      pg.on("dialog", (d) => d.dismiss().catch(() => {}))
+      workerPages.push(pg)
+    }
+
+    try {
+      for (let i = 0; i < uniqueProducts.length; i += DETAIL_CONCURRENCY) {
+        const batch = uniqueProducts.slice(i, i + DETAIL_CONCURRENCY)
+        const results = await Promise.all(
+          batch.map(async (product, slot) => {
+            // 재시작 스킵: 이전 체크포인트/결과 파일에 이미 색상까지 확보된 상품이면
+            // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
+            // 상세크롤을 반복하지 않기 위함).
+            const known = existingDetails?.get(product.productUrl)
+            if (known && known.color) {
+              return {product, detail: known}
             }
-            return {product, detail}
-          } catch {
-            return {product, detail: null}
-          } finally {
-            // ctx.close() aborts any in-flight page.evaluate() on this context
-            await ctx.close()
-          }
-        })
-      )
+            const pg = workerPages[slot]!
+            try {
+              const detail = await withTimeout(
+                detailParser.parse(pg, product.productUrl),
+                25_000,
+                `detail:${product.productUrl.slice(-50)}`
+              )
+              // 사이트별 전략이 color 를 못 뽑았을 때만 범용 폴백 발동 (golden 무영향).
+              if (!detail.color) {
+                detail.color = await genericCafe24Color(pg).catch(() => null)
+              }
+              return {product, detail}
+            } catch {
+              return {product, detail: null}
+            }
+          })
+        )
 
-      for (const {product, detail} of results) {
-        if (!detail) continue
-        if (detail.description) product.description = detail.description
-        // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명 → "_COLOR"/"[COLOR]" 패턴.
-        if (detail.color) {
-          product.color = detail.color
-        } else if (!product.color && product.name) {
-          const nameColor = extractColorFromText(product.name)
-          if (nameColor) {
-            product.color = nameColor
-          } else {
-            const m =
-              product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
-              product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)
-            // Bracket/suffix content isn't guaranteed to be a color — e.g. hamsaseyo
-            // prefixes out-of-stock items with "[soldout]", which normalizeColor()
-            // would otherwise Title-Case into a fake "Soldout" color (2026-07-06).
-            if (m && !isNonColorOptionText(m[1].trim())) product.color = normalizeColor(m[1].trim())
+        for (const {product, detail} of results) {
+          if (!detail) continue
+          if (detail.description) product.description = detail.description
+          // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명 → "_COLOR"/"[COLOR]" 패턴.
+          if (detail.color) {
+            product.color = detail.color
+          } else if (!product.color && product.name) {
+            const nameColor = extractColorFromText(product.name)
+            if (nameColor) {
+              product.color = nameColor
+            } else {
+              const m =
+                product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
+                product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)
+              // Bracket/suffix content isn't guaranteed to be a color — e.g. hamsaseyo
+              // prefixes out-of-stock items with "[soldout]", which normalizeColor()
+              // would otherwise Title-Case into a fake "Soldout" color (2026-07-06).
+              if (m && !isNonColorOptionText(m[1].trim())) product.color = normalizeColor(m[1].trim())
+            }
           }
+          if (detail.material) product.material = detail.material
+          if (detail.productCode) product.productCode = detail.productCode
+          if (detail.description || detail.color || detail.material) detailSuccess++
         }
-        if (detail.material) product.material = detail.material
-        if (detail.productCode) product.productCode = detail.productCode
-        if (detail.description || detail.color || detail.material) detailSuccess++
+
+        const done = Math.min(i + DETAIL_CONCURRENCY, uniqueProducts.length)
+        process.stdout.write(`\r${tag}    📖 ${done}/${uniqueProducts.length} (성공: ${detailSuccess})`)
+
+        sinceCheckpoint += batch.length
+        if (onDetailProgress && sinceCheckpoint >= CHECKPOINT_EVERY) {
+          sinceCheckpoint = 0
+          onDetailProgress(uniqueProducts)
+        }
       }
-
-      const done = Math.min(i + DETAIL_CONCURRENCY, uniqueProducts.length)
-      process.stdout.write(`\r${tag}    📖 ${done}/${uniqueProducts.length} (성공: ${detailSuccess})`)
-
-      sinceCheckpoint += batch.length
-      if (onDetailProgress && sinceCheckpoint >= CHECKPOINT_EVERY) {
-        sinceCheckpoint = 0
-        onDetailProgress(uniqueProducts)
+    } finally {
+      for (const pg of workerPages) {
+        await pg.context().close().catch(() => {})
       }
     }
 
