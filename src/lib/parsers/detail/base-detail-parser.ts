@@ -69,22 +69,13 @@ export class BaseDetailParser implements IDetailParser {
         }
 
         // color
-        // Noise check mirrors isNonColorOptionText() in field-extractors/color-normalizer.ts
-        // (inlined because this runs inside page.evaluate — no access to Node imports).
+        // Noise check mirrors isNonColorOptionText() in field-extractors/color-normalizer.ts,
+        // inlined directly into the condition below (no helper function/const declared here) —
+        // see the NOTE in cafe24-engine.ts's collectProductsFromPage: page.evaluate 안에
+        // function/const 선언 금지, tsx의 __name 변환이 브라우저에서 ReferenceError 유발.
         // Single-brand malls without a dedicated color <select> reuse option1 for
         // size/stock-status/price-adjustment values; without this filter those get
         // scraped as "color" (e.g. "ONE SIZE", "1(low in stock) [sold out]", "2 (+₩5,000)").
-        const isNonColorOptionText = (t: string): boolean => {
-          if (!t) return true
-          if (/^\d+$/.test(t)) return true
-          if (/^\d+\s*(size|사이즈)$/i.test(t)) return true
-          if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t)) return true
-          if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t)) return true
-          if (/사이즈\s*기준/.test(t)) return true
-          if (/품절|sold\s*out|재고|low in stock/i.test(t)) return true
-          if (/[+-]\s*₩[\d,]+/.test(t)) return true
-          return false
-        }
         let color: string | null = null
         for (const sel of args.colorSels) {
           try {
@@ -99,7 +90,13 @@ export class BaseDetailParser implements IDetailParser {
                 !t.includes("Select") &&
                 t !== "*" &&
                 !/^-{3,}$/.test(t) &&
-                !isNonColorOptionText(t)
+                !/^\d+$/.test(t) &&
+                !/^\d+\s*(size|사이즈)$/i.test(t) &&
+                !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t) &&
+                !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t) &&
+                !/사이즈\s*기준/.test(t) &&
+                !/품절|sold\s*out|재고|low in stock/i.test(t) &&
+                !/[+-]\s*₩[\d,]+/.test(t)
               )
                 colors.push(t)
             })
