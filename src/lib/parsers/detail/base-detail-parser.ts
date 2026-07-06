@@ -53,7 +53,14 @@ export class BaseDetailParser implements IDetailParser {
     }
 
     try {
-      await page.goto(productUrl, { waitUntil: "domcontentloaded", timeout: 15000 })
+      try {
+        await page.goto(productUrl, { waitUntil: "domcontentloaded", timeout: 15000 })
+      } catch {
+        // 일시적 지연과 진짜 다운을 구분하기 위해 더 긴 타임아웃으로 1회만 재시도
+        // (2026-07-06: hippiedippy/lossyrow 처럼 응답이 느린 사이트에서 15초 컷으로
+        // 색상/설명 데이터가 불필요하게 누락되는 경우가 많았음).
+        await page.goto(productUrl, { waitUntil: "domcontentloaded", timeout: 30000 })
+      }
       await page.waitForTimeout(800)
 
       const extracted = await page.evaluate((args) => {

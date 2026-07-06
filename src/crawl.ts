@@ -43,7 +43,8 @@ import {
 import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
-import type {CrawlResult, SiteConfig} from "./lib/types"
+import type {CrawlResult, Product, SiteConfig} from "./lib/types"
+import type {DetailData} from "./lib/parsers/detail/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
 
@@ -710,7 +711,15 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           }
           const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
           const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
-          const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
+          const existingDetails = config.crawlDetails ? loadExistingDetails(outDir, config.key) : undefined
+          if (existingDetails && existingDetails.size > 0) {
+            console.log(`[${config.name}] ⏭️  이전 체크포인트 재사용 — ${existingDetails.size}개 상품 상세 스킵`)
+          }
+          const onDetailProgress = (products: Product[]) => saveCheckpoint(outDir, config.key, products)
+          const result = await withSiteTimeout(
+            crawlCafe24(page, config, dp, rp, onDetailProgress, existingDetails),
+            config.key,
+          )
           results.push(saveResultAndTrim(outDir, result))
         } catch (err) {
           console.error(`❌ ${config.name} 크롤 실패:`, err)
@@ -730,20 +739,59 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   }
 }
 
-function saveResult(outDir: string, result: CrawlResult) {
-  if (result.products.length === 0) return
+function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
+  if (rawProducts.length === 0) return
 
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
   // product before it is written to JSON. Valid products pass through
   // byte-identical; invalid ones are excluded + a structured reject
   // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
   // exact legacy behavior (all products written, no gate).
-  const products = applyValidationGate(result.products, result.platform)
+  const products = applyValidationGate(rawProducts, platform)
   if (products.length === 0) return
 
-  const outPath = path.join(outDir, `${result.platform}-products.json`)
+  const outPath = path.join(outDir, `${platform}-products.json`)
   fs.writeFileSync(outPath, JSON.stringify(products, null, 2), "utf-8")
   console.log(`   💾 저장: ${outPath}`)
+}
+
+function saveResult(outDir: string, result: CrawlResult) {
+  writeProductsFile(outDir, result.platform, result.products)
+}
+
+// 상세크롤 도중 주기적으로 지금까지의 진행 상황을 디스크에 반영한다 — 대형
+// 카탈로그(1000+ 상품) 크롤 도중 프로세스가 죽어도 이미 끝낸 작업이 통째로
+// 유실되지 않도록 함 (2026-07-06, hippiedippy 1511개 중 795개 완료 상태에서
+// 유실된 사고). crawlCafe24()가 아직 반환하기 전에 호출되므로 saveResultAndTrim
+// 의 "사이트 완료 시 products 비움" 불변식과는 무관 — 별개의 중간 저장일 뿐이다.
+function saveCheckpoint(outDir: string, platform: string, products: Product[]) {
+  writeProductsFile(outDir, platform, products)
+}
+
+// 재시작 스킵: 이전 실행(체크포인트든 정상 완료든)의 결과 파일이 있으면
+// productUrl → 상세정보(색상 등)만 가벼운 Map으로 뽑아온다. 전체 Product 객체를
+// 복제해서 들고 있지 않음 — 사이트당 최대 한 벌의 전체 배열만 메모리에 존재하도록
+// (2026-07-06).
+function loadExistingDetails(outDir: string, platform: string): Map<string, DetailData> {
+  const map = new Map<string, DetailData>()
+  const outPath = path.join(outDir, `${platform}-products.json`)
+  if (!fs.existsSync(outPath)) return map
+  try {
+    const prior = JSON.parse(fs.readFileSync(outPath, "utf-8")) as Product[]
+    for (const p of prior) {
+      if (p.productUrl && p.color) {
+        map.set(p.productUrl, {
+          color: p.color,
+          description: p.description ?? null,
+          material: p.material ?? null,
+          productCode: p.productCode ?? null,
+        })
+      }
+    }
+  } catch {
+    // 손상된 이전 파일 — 그냥 처음부터 크롤
+  }
+  return map
 }
 
 // `results`는 printSummary까지 사이트별 stats/errors 를 보존해야 하지만,

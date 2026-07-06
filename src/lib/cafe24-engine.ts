@@ -12,6 +12,7 @@
 import type {Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {IDetailParser} from "./parsers/detail"
+import type {DetailData} from "./parsers/detail/types"
 import type {IReviewParser} from "./parsers/review"
 import {extractColorFromText, isNonColorOptionText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
@@ -504,6 +505,8 @@ export async function crawlCafe24(
   config: SiteConfig,
   detailParser?: IDetailParser,
   reviewParser?: IReviewParser,
+  onDetailProgress?: (products: Product[]) => void,
+  existingDetails?: Map<string, DetailData>,
 ): Promise<CrawlResult> {
   const startTime = Date.now()
   const errors: string[] = []
@@ -598,11 +601,23 @@ export async function crawlCafe24(
     let detailSuccess = 0
     const DETAIL_CONCURRENCY = 3
     const browser = page.context().browser()!
+    // 체크포인트: 대형 카탈로그(1000+ 상품) 상세크롤 도중 프로세스가 죽어도
+    // 이미 끝낸 작업이 통째로 유실되지 않도록 30개 상품마다 디스크에 반영한다
+    // (2026-07-06, hippiedippy 1511개 중 795개 완료 상태에서 유실된 사고).
+    const CHECKPOINT_EVERY = 30
+    let sinceCheckpoint = 0
 
     for (let i = 0; i < uniqueProducts.length; i += DETAIL_CONCURRENCY) {
       const batch = uniqueProducts.slice(i, i + DETAIL_CONCURRENCY)
       const results = await Promise.all(
         batch.map(async (product) => {
+          // 재시작 스킵: 이전 체크포인트/결과 파일에 이미 색상까지 확보된 상품이면
+          // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
+          // 상세크롤을 반복하지 않기 위함).
+          const known = existingDetails?.get(product.productUrl)
+          if (known && known.color) {
+            return {product, detail: known}
+          }
           const ctx = await browser.newContext()
           await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
           const pg = await ctx.newPage()
@@ -654,6 +669,12 @@ export async function crawlCafe24(
 
       const done = Math.min(i + DETAIL_CONCURRENCY, uniqueProducts.length)
       process.stdout.write(`\r${tag}    📖 ${done}/${uniqueProducts.length} (성공: ${detailSuccess})`)
+
+      sinceCheckpoint += batch.length
+      if (onDetailProgress && sinceCheckpoint >= CHECKPOINT_EVERY) {
+        sinceCheckpoint = 0
+        onDetailProgress(uniqueProducts)
+      }
     }
 
     console.log(`\n${tag} ✅ 상세 크롤링 완료 — ${detailSuccess}/${uniqueProducts.length}개 데이터 수집`)
