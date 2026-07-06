@@ -649,6 +649,12 @@ export async function crawlCafe24(
               }
               return {product, detail}
             } catch {
+              // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서
+              // 계속 진행 중일 수 있다 — 페이지를 재사용하므로, 다음 배치가 같은
+              // 슬롯에서 새 URL로 goto할 때 "interrupted by another navigation"
+              // 에러가 나는 걸 막기 위해 about:blank로 강제 리셋해 정리한다
+              // (2026-07-06, 페이지 재사용 도입 후 A.R.U 등에서 확인된 회귀).
+              await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
               return {product, detail: null}
             }
           })
