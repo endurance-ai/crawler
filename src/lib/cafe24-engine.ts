@@ -13,7 +13,7 @@ import type {Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {IDetailParser} from "./parsers/detail"
 import type {IReviewParser} from "./parsers/review"
-import {extractColorFromText} from "./parsers/field-extractors/color-normalizer"
+import {extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
@@ -34,6 +34,9 @@ const DEFAULT_SELECTORS = {
     'li[id^="anchorBoxId"]',
     "ul.thumbnail > li",
     "ul.prdList > li",
+    // li.xans-record- 는 Cafe24 AJAX 로드 완료 후에만 생기는 클래스.
+    // .xans-product li보다 앞에 두어야 skeleton(<a href="">) 오판을 막는다.
+    "li.xans-record-",
     ".xans-product li",           // LLUD 등 minishop 패턴
     ".product-list .item",
     ".product_listnormal_list > li",
@@ -51,6 +54,7 @@ const DEFAULT_SELECTORS = {
     ".product-name",
     ".tit",
     "strong.title a",
+    "div.img img",        // img alt 폴백 (swallowlounge 등 img에만 상품명이 있는 테마)
   ],
   productPrice: [
     ".price .sale_price",
@@ -174,7 +178,7 @@ async function collectProductsFromPage(
 
   for (const sel of itemSelectorList) {
     try {
-      await page.waitForSelector(sel, {timeout: 8000})
+      await page.waitForSelector(sel, {timeout: 3000})
       break
     } catch {
       // 다음 셀렉터 시도
@@ -235,7 +239,10 @@ async function collectProductsFromPage(
             var ne = nameEls[ni]
             // displaynone 클래스가 있으면 건너뛰기
             if (ne.classList.contains("displaynone")) continue
-            var txt = (ne.textContent || "").trim().replace(/\s+/g, " ")
+            // img 태그는 textContent가 없으므로 alt attribute를 사용
+            var txt = ne.tagName === "IMG"
+              ? (ne.getAttribute("alt") || "").trim()
+              : (ne.textContent || "").trim().replace(/\s+/g, " ")
             // Cafe24 숨은 spec 블록 라벨이 앞에 붙는 사이트 대응: "상품명 : X" → "X"
             txt = txt.replace(/^(상품명|제조사|판매가|브랜드|소비자가|적립금)\s*:\s*/, "")
             // ":" 또는 1~2글자 쓰레기값 건너뛰기
@@ -313,8 +320,8 @@ async function collectProductsFromPage(
           : href ? args.baseUrl + (href.startsWith("/") ? "" : "/") + href : ""
 
         // 재고: soldout 요소가 보이면 품절, 숨겨져 있으면 재고 있음
-        var soldoutEl = el.querySelector('[class*="soldout"], .sold, .sold-out, .icon-soldout')
         var inStock = true
+        var soldoutEl = el.querySelector('[class*="soldout"], .sold, .sold-out, .icon-soldout')
         if (soldoutEl) {
           // 방법 1: "displaynone" 클래스 (일부 Cafe24 테마)
           // 방법 2: CSS computed display: none (슬로우스테디클럽 등)
@@ -335,15 +342,22 @@ async function collectProductsFromPage(
           inStock = !stockText.includes("out of stock") && !stockText.includes("품절") && !stockText.includes("sold out")
         }
 
-        // 브랜드: 상품 텍스트에서 추출 (Cafe24 편집샵은 보통 브랜드명이 상품명 앞에 있음)
-        const brandEl = el.querySelector(".brand, [class*=brand], .manufacturer, .mf_name, p.b, .b")
-        let brand = brandEl ? (brandEl.textContent || "").trim() : ""
+        // 브랜드: 단일브랜드 자사몰은 config.brand로 명시 선언된 경우 DOM 추측을
+        // 아예 건너뛴다. DOM 기반 추측은 멀티브랜드 편집샵에서만 의미가 있고,
+        // 자사몰 테마에서는 "상품명 :" 같은 숨김 라벨을 .description 폴백이
+        // 잘못 주워오는 경우가 있다(goyowear: .name의 displaynone 라벨 텍스트가
+        // .description 첫 줄로 새어 들어옴).
+        let brand = args.brandNameOverride || ""
+        if (!brand) {
+          // 상품 텍스트에서 추출 (Cafe24 편집샵은 보통 브랜드명이 상품명 앞에 있음)
+          const brandEl = el.querySelector(".brand, [class*=brand], .manufacturer, .mf_name, p.b, .b")
+          brand = brandEl ? (brandEl.textContent || "").trim() : ""
+        }
         // Cafe24 spec 블록의 "브랜드 : X" 라벨 폴백 (멀티브랜드 편집샵 대응)
         if (!brand && specText) {
           var brandM = specText.match(/브랜드\s*:?\s*([^\n:]{2,40}?)(?:\s{2,}|상품명|제조사|판매가|$)/)
           if (brandM) brand = brandM[1].trim()
         }
-        if (!brand && args.brandNameOverride) brand = args.brandNameOverride
         // 일부 사이트는 상품명 전체 텍스트 첫 줄이 브랜드
         if (!brand) {
           const firstText = el.querySelector(".description, .spec, .summary")
@@ -437,6 +451,7 @@ async function crawlCategory(
   const allProducts: Product[] = []
   const maxPages = config.maxPages || 10
   const delay = config.crawlDelay || 2000
+  const seenUrls = new Set<string>()
 
   for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
     const separator = category.url.includes("?") ? "&" : "?"
@@ -446,7 +461,7 @@ async function crawlCategory(
 
     try {
       await page.goto(url, {waitUntil: "domcontentloaded", timeout: 60000})
-      await page.waitForTimeout(2000) // JS 렌더링 대기
+      await page.waitForTimeout(3000) // JS 렌더링 대기
 
       const products = await collectProductsFromPage(
         page,
@@ -457,6 +472,16 @@ async function crawlCategory(
       )
 
       if (products.length === 0) break // 빈 페이지면 중단
+
+      // 중복 페이지 감지: 이전 페이지와 URL이 동일하면 페이지네이션 루프 방지
+      if (pageNum > 1) {
+        const newUrls = products.map((p) => p.productUrl).filter(Boolean)
+        const hasNew = newUrls.some((u) => !seenUrls.has(u))
+        if (!hasNew) break
+      }
+      for (const p of products) {
+        if (p.productUrl) seenUrls.add(p.productUrl)
+      }
 
       allProducts.push(...products)
 
@@ -605,9 +630,20 @@ export async function crawlCafe24(
       for (const {product, detail} of results) {
         if (!detail) continue
         if (detail.description) product.description = detail.description
-        // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명.
-        if (detail.color) product.color = detail.color
-        else if (!product.color && product.name) product.color = extractColorFromText(product.name) ?? undefined
+        // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명 → "_COLOR"/"[COLOR]" 패턴.
+        if (detail.color) {
+          product.color = detail.color
+        } else if (!product.color && product.name) {
+          const nameColor = extractColorFromText(product.name)
+          if (nameColor) {
+            product.color = nameColor
+          } else {
+            const m =
+              product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
+              product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)
+            if (m) product.color = normalizeColor(m[1].trim())
+          }
+        }
         if (detail.material) product.material = detail.material
         if (detail.productCode) product.productCode = detail.productCode
         if (detail.description || detail.color || detail.material) detailSuccess++

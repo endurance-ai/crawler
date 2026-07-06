@@ -119,6 +119,16 @@ export class SienneboutiqueDetailParser extends RegistryDetailParser {
     super("sienneboutique")
   }
 }
+export class OjosDetailParser extends RegistryDetailParser {
+  constructor() {
+    super("ojos")
+  }
+}
+export class GoyowearDetailParser extends RegistryDetailParser {
+  constructor() {
+    super("goyowear")
+  }
+}
 
 import {TriplestoreDetailParser} from "./triplestore-parser"
 
@@ -142,6 +152,8 @@ const DETAIL_PARSERS: Record<string, () => IDetailParser> = {
   shopamomento: () => new ShopamomentoDetailParser(),
   bastong: () => new BastongDetailParser(),
   sienneboutique: () => new SienneboutiqueDetailParser(),
+  ojos: () => new OjosDetailParser(),
+  goyowear: () => new GoyowearDetailParser(),
 }
 
 export function getDetailParser(platformKey: string): IDetailParser {

@@ -86,6 +86,9 @@ const SELF_BRANDED: Record<string, string> = {
   beslow: "Beslow",
   steadyeverywear: "Steady Everywear",
   chanceclothing: "Chance Clothing",
+  yuse: "YUSE",
+  ojos: "OJOS",
+  goyowear: "GOYOWEAR",
 }
 
 // ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
