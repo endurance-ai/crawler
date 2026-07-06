@@ -94,6 +94,11 @@ export class BaseDetailParser implements IDetailParser {
                 !/^\d+\s*(size|사이즈)$/i.test(t) &&
                 !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t) &&
                 !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t) &&
+                // "SIZE" / "Size, 43cm, 45cm" / "Size, US 5.5, US 6.5" — the literal
+                // word "size" (any case) as the whole token or leading token, not
+                // just abbreviations like S/M/L (2026-07-06: rollingstudios/enlowool/
+                // leete/waineke/jungdo onboarding).
+                !/^(size|사이즈)\b/i.test(t) &&
                 !/사이즈\s*기준/.test(t) &&
                 !/품절|sold\s*out|재고|low in stock/i.test(t) &&
                 !/[+-]\s*₩[\d,]+/.test(t)
