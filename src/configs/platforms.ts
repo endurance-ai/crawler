@@ -1529,7 +1529,8 @@ export const PLATFORMS: SiteConfig[] = [
     name: "CCQ",
     type: "shopify",
     baseUrl: "https://ccqstore.com",
-    notes: "Shopify, /products.json 가격이 이미 KRW(예: 38000) — sourceCurrency 생략(기본값 KRW)",
+    defaultGender: ["unisex"],
+    notes: "Shopify, /products.json 가격이 이미 KRW(예: 38000) — sourceCurrency 생략(기본값 KRW). 2026-07-06: gender_scope/wiki 미완료라 상품군(반다나/캡 등 액세서리) 기준 unisex로 시드.",
   },
   // BLOCKED — 아래 3개는 PlatformType(cafe24/shopify/uniqlo/zara/29cm/farfetch)에 없는
   // 미지원 플랫폼이라 SiteConfig 자체를 만들 수 없음(엔진 부재). 신규 파서 구현 필요:
@@ -1546,8 +1547,9 @@ export const PLATFORMS: SiteConfig[] = [
     baseUrl: "https://hamsaseyo.com",
     brand: "HAM",
     paginate: true,
+    defaultGender: ["men"],
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    notes: "3차 배치 draft — dry-run 필요. 2026-07-06: menswear(chino/shirts 등) 확인되어 defaultGender=men 시드.",
   },
   {
     key: "lossyrow",
