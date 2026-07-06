@@ -13,7 +13,7 @@ import type {Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {IDetailParser} from "./parsers/detail"
 import type {IReviewParser} from "./parsers/review"
-import {extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
+import {extractColorFromText, isNonColorOptionText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
@@ -641,7 +641,10 @@ export async function crawlCafe24(
             const m =
               product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
               product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)
-            if (m) product.color = normalizeColor(m[1].trim())
+            // Bracket/suffix content isn't guaranteed to be a color — e.g. hamsaseyo
+            // prefixes out-of-stock items with "[soldout]", which normalizeColor()
+            // would otherwise Title-Case into a fake "Soldout" color (2026-07-06).
+            if (m && !isNonColorOptionText(m[1].trim())) product.color = normalizeColor(m[1].trim())
           }
         }
         if (detail.material) product.material = detail.material
