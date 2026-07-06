@@ -44,6 +44,7 @@ import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, SiteConfig} from "./lib/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
+import {getValidationReport} from "./lib/core/observability"
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
 
@@ -720,7 +721,37 @@ function printSummary(results: CrawlResult[]) {
     }
   }
 
+  printDropReport()
+
   console.log("\n" + "═".repeat(60))
+}
+
+/**
+ * validation 게이트에서 드롭된 상품을 사이트별·사유별로 요약 출력.
+ * "왜 안 적재됐지"를 로그를 뒤지지 않고 한눈에 보게 한다 (color/gender/category 공백 추적).
+ */
+function printDropReport() {
+  const report = getValidationReport()
+  if (report.size === 0) return
+
+  console.log("\n" + "─".repeat(60))
+  console.log("🚫 적재 제외(validation 드롭) 요약")
+  console.log("─".repeat(60))
+
+  for (const [site, stat] of report) {
+    const config = getSiteConfig(site)
+    const name = config?.name || site
+    const fields = Object.entries(stat.byField)
+      .sort((a, b) => b[1] - a[1])
+      .map(([f, n]) => `${f}=${n}`)
+      .join(", ")
+    console.log(`\n[${name}] 총 ${stat.total}개 드롭 — ${fields}`)
+    for (const [field, skus] of Object.entries(stat.samples)) {
+      if (skus.length === 0) continue
+      console.log(`   ${field} 샘플:`)
+      for (const sku of skus) console.log(`     - ${sku}`)
+    }
+  }
 }
 
 // ─── 엔트리 ──────────────────────────────────────────
@@ -871,10 +902,37 @@ async function main() {
     }
   }
 
+  lintGenderConfig(targets)
+
   console.log(`\n🚀 크롤링 시작: ${targets.map((t) => t.name).join(", ")}`)
   if (dryRun) console.log("   (dry-run 모드 — 카테고리 탐색만)")
 
   await runCrawl(targets, dryRun)
+}
+
+/**
+ * 크롤 전 gender config 린트: manual 카테고리인데 gender 가 비어 있고
+ * defaultGender 도 없는 사이트를 경고한다. 이런 상품은 gender=[] 로 나와
+ * validation 에서 전량 드롭되므로, 크롤을 돌리기 전에 한 번만 설정하도록 유도.
+ */
+function lintGenderConfig(targets: SiteConfig[]) {
+  const warnings: string[] = []
+  for (const c of targets) {
+    if (c.type !== "cafe24") continue
+    if (c.category?.discovery !== "manual" || !c.category.categories) continue
+    if (c.defaultGender && c.defaultGender.length > 0) continue
+    const missing = c.category.categories.filter((cat) => !cat.gender || cat.gender.length === 0)
+    if (missing.length > 0) {
+      const sample = missing.slice(0, 3).map((m) => `${m.name}(cate_no=${m.cateNo})`).join(", ")
+      warnings.push(
+        `   [${c.name}] gender 미지정 카테고리 ${missing.length}개 (예: ${sample}) — defaultGender 또는 각 카테고리 gender 설정 권장`
+      )
+    }
+  }
+  if (warnings.length > 0) {
+    console.log("\n⚠️ gender config 점검 (미설정 시 해당 상품 전량 적재 제외):")
+    for (const w of warnings) console.log(w)
+  }
 }
 
 main().catch(console.error)

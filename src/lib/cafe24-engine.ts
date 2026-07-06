@@ -14,6 +14,7 @@ import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {IDetailParser} from "./parsers/detail"
 import type {IReviewParser} from "./parsers/review"
 import {extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
+import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
 // with this to prevent indefinite hangs when page JS is stuck or network stalls.
@@ -123,11 +124,20 @@ async function discoverCategories(
         const className = (a.className || "").toLowerCase()
         const parentClass = (a.parentElement?.className || "").toLowerCase()
 
-        // gender 추론
-        const allClasses = `${className} ${parentClass}`
+        // gender 추론: CSS 클래스 + 카테고리 이름 텍스트(영/한 키워드) 병행.
+        // "women" 이 "men" 을 포함하므로, women 매칭 토큰을 먼저 제거한 뒤 men 을 본다.
+        // 한글 키워드는 \b(word boundary)가 안 먹으므로 단순 substring 매칭.
+        const hay = `${className} ${parentClass} ${name}`.toLowerCase()
         const gender: string[] = []
-        if (allClasses.includes("women") || allClasses.includes("female")) gender.push("women")
-        if (allClasses.includes("men") || allClasses.includes("male")) gender.push("men")
+        if (/unisex|유니섹스|공용|남녀/.test(hay)) {
+          gender.push("unisex")
+        } else {
+          const isWomen = /women|woman|female|우먼|여성|여자/.test(hay)
+          const menHay = hay.replace(/wom[ae]n|우먼/g, " ")
+          const isMen = /\bmen\b|men'|man'|\bmale\b|맨즈|남성|남자/.test(menHay)
+          if (isWomen) gender.push("women")
+          if (isMen) gender.push("men")
+        }
 
         const fullUrl = href.startsWith("http") ? href : `${baseUrl}${href.startsWith("/") ? "" : "/"}${href}`
 
@@ -354,6 +364,26 @@ async function collectProductsFromPage(
           brand = firstText ? (firstText.textContent || "").trim().split("\n")[0].trim() : ""
         }
 
+        // 색상 후보 원문: 목록 카드의 옵션/스와치 이미지 alt·title + 색상 칩 링크 title.
+        // Node 측에서 extractColorFromText 로 정규화한다(브라우저 컨텍스트에서는 import 불가).
+        var swatchParts: string[] = []
+        var swatchSel = [
+          ".xans-product-option img",
+          "[class*=color] img",
+          "[class*=Color] img",
+          "li[class*=color] a",
+          ".chips img",
+          ".swatch img",
+        ]
+        for (var ci = 0; ci < swatchSel.length; ci++) {
+          var chips = el.querySelectorAll(swatchSel[ci])
+          for (var cj = 0; cj < chips.length; cj++) {
+            var chipTxt = (chips[cj].getAttribute("alt") || chips[cj].getAttribute("title") || "").trim()
+            if (chipTxt) swatchParts.push(chipTxt)
+          }
+        }
+        var swatchText = swatchParts.slice(0, 20).join(", ")
+
         // 세일가: price2 div 체크
         const price2El = el.querySelector(".price2, .sale_price, [class*=sale]")
         let originalPrice = price
@@ -378,6 +408,7 @@ async function collectProductsFromPage(
           priceFormatted: price ? "₩" + price.toLocaleString() : "",
           imageUrl, productUrl, inStock,
           gender: args.gender, platform: args.platformKey,
+          swatchText,
           crawledAt: new Date().toISOString(),
         })
       }
@@ -396,7 +427,18 @@ async function collectProductsFromPage(
     return []
   }
 
-  return evalResult.products || []
+  // 목록 단계 color 확정: 스와치/옵션 alt·title 우선, 없으면 상품명 키워드.
+  // swatchText 는 전송용 임시 필드 → Product 로 넘기기 전 제거한다.
+  const products = (evalResult.products || []) as Array<Record<string, unknown>>
+  for (const p of products) {
+    const swatch = typeof p.swatchText === "string" ? p.swatchText : ""
+    const nm = typeof p.name === "string" ? p.name : ""
+    const color = extractColorFromText(swatch) ?? extractColorFromText(nm)
+    if (color) p.color = color
+    delete p.swatchText
+  }
+
+  return products as unknown as Product[]
 }
 
 // ─── 카테고리 크롤 (페이지네이션 포함) ────────────────
@@ -570,6 +612,11 @@ export async function crawlCafe24(
               25_000,
               `detail:${product.productUrl.slice(-50)}`
             )
+            // 사이트별 전략이 color 를 못 뽑았을 때만 범용 폴백 발동 (golden 무영향).
+            // ctx.close() 전, 로드된 pg 에서 옵션/스와치/스펙표를 범용 스캔한다.
+            if (!detail.color) {
+              detail.color = await genericCafe24Color(pg).catch(() => null)
+            }
             return {product, detail}
           } catch {
             return {product, detail: null}
@@ -583,14 +630,14 @@ export async function crawlCafe24(
       for (const {product, detail} of results) {
         if (!detail) continue
         if (detail.description) product.description = detail.description
+        // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명 → "_COLOR"/"[COLOR]" 패턴.
         if (detail.color) {
           product.color = detail.color
-        } else {
-          const nameColor = product.name ? extractColorFromText(product.name) : null
+        } else if (!product.color && product.name) {
+          const nameColor = extractColorFromText(product.name)
           if (nameColor) {
             product.color = nameColor
-          } else if (product.name) {
-            // 상품명 색상 패턴: "_COLOR" 접미사 또는 "[COLOR]" 브라켓
+          } else {
             const m =
               product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
               product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)

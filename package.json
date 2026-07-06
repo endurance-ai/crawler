@@ -18,6 +18,7 @@
     "analyze:products": "dotenv -e .env -- tsx src/analyze-products.ts",
     "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
+    "brand-crawl": "dotenv -e .env.local -- tsx src/brand-crawl.ts",
     "scaffold:platform": "tsx tools/scaffold-platform.ts",
     "test": "sh -c 'node --test --import tsx ./tests/*.test.ts'",
     "typecheck": "tsc --noEmit"
