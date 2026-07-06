@@ -69,6 +69,13 @@ export class BaseDetailParser implements IDetailParser {
         }
 
         // color
+        // Noise check mirrors isNonColorOptionText() in field-extractors/color-normalizer.ts,
+        // inlined directly into the condition below (no helper function/const declared here) —
+        // see the NOTE in cafe24-engine.ts's collectProductsFromPage: page.evaluate 안에
+        // function/const 선언 금지, tsx의 __name 변환이 브라우저에서 ReferenceError 유발.
+        // Single-brand malls without a dedicated color <select> reuse option1 for
+        // size/stock-status/price-adjustment values; without this filter those get
+        // scraped as "color" (e.g. "ONE SIZE", "1(low in stock) [sold out]", "2 (+₩5,000)").
         let color: string | null = null
         for (const sel of args.colorSels) {
           try {
@@ -77,7 +84,21 @@ export class BaseDetailParser implements IDetailParser {
             const colors: string[] = []
             options.forEach((opt) => {
               const t = (opt as HTMLElement).innerText?.trim() || ""
-              if (t && !t.includes("선택") && !t.includes("Select") && t !== "*" && !/^-{3,}$/.test(t)) colors.push(t)
+              if (
+                t &&
+                !t.includes("선택") &&
+                !t.includes("Select") &&
+                t !== "*" &&
+                !/^-{3,}$/.test(t) &&
+                !/^\d+$/.test(t) &&
+                !/^\d+\s*(size|사이즈)$/i.test(t) &&
+                !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t) &&
+                !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t) &&
+                !/사이즈\s*기준/.test(t) &&
+                !/품절|sold\s*out|재고|low in stock/i.test(t) &&
+                !/[+-]\s*₩[\d,]+/.test(t)
+              )
+                colors.push(t)
             })
             if (colors.length > 0) { color = colors.slice(0, 20).join(", ").slice(0, 500); break }
           } catch { /* next */ }

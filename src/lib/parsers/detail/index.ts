@@ -129,6 +129,11 @@ export class GoyowearDetailParser extends RegistryDetailParser {
     super("goyowear")
   }
 }
+export class TaatsDetailParser extends RegistryDetailParser {
+  constructor() {
+    super("taats")
+  }
+}
 
 import {TriplestoreDetailParser} from "./triplestore-parser"
 
@@ -154,6 +159,7 @@ const DETAIL_PARSERS: Record<string, () => IDetailParser> = {
   sienneboutique: () => new SienneboutiqueDetailParser(),
   ojos: () => new OjosDetailParser(),
   goyowear: () => new GoyowearDetailParser(),
+  taats: () => new TaatsDetailParser(),
 }
 
 export function getDetailParser(platformKey: string): IDetailParser {

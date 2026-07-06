@@ -13,7 +13,7 @@ import type {Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {IDetailParser} from "./parsers/detail"
 import type {IReviewParser} from "./parsers/review"
-import {extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
+import {extractColorFromText, isNonColorOptionText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
@@ -346,7 +346,7 @@ async function collectProductsFromPage(
         // 아예 건너뛴다. DOM 기반 추측은 멀티브랜드 편집샵에서만 의미가 있고,
         // 자사몰 테마에서는 "상품명 :" 같은 숨김 라벨을 .description 폴백이
         // 잘못 주워오는 경우가 있다(goyowear: .name의 displaynone 라벨 텍스트가
-        // .description 첫 줄로 새어 들어옴).
+        // .description 첫 줄로 새어 들어옴, taats에서도 동일 패턴 확인).
         let brand = args.brandNameOverride || ""
         if (!brand) {
           // 상품 텍스트에서 추출 (Cafe24 편집샵은 보통 브랜드명이 상품명 앞에 있음)
@@ -641,7 +641,10 @@ export async function crawlCafe24(
             const m =
               product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
               product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)
-            if (m) product.color = normalizeColor(m[1].trim())
+            // Bracket/suffix content isn't guaranteed to be a color — e.g. hamsaseyo
+            // prefixes out-of-stock items with "[soldout]", which normalizeColor()
+            // would otherwise Title-Case into a fake "Soldout" color (2026-07-06).
+            if (m && !isNonColorOptionText(m[1].trim())) product.color = normalizeColor(m[1].trim())
           }
         }
         if (detail.material) product.material = detail.material

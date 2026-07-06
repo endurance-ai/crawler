@@ -122,6 +122,36 @@ export function normalizeColorList(raw: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// isNonColorOptionText
+// ---------------------------------------------------------------------------
+
+/**
+ * True when a scraped option/select token is clearly SIZE, stock-status, or
+ * price-adjustment noise rather than a color — e.g. "ONE SIZE", "1(low in
+ * stock) [sold out]", "2 (+₩5,000)", "M", "품절". Single-brand Cafe24 malls
+ * without a dedicated color <select> reuse option1 for these, and the
+ * default color-option scraper (base-detail-parser.ts) was mistaking them
+ * for color values (2026-07-06: demoshop/franksupply/hamsaseyo/piscess/
+ * seygun onboarding).
+ *
+ * Used to reject noise tokens *before* accepting a scraped option list as
+ * color, so extraction falls through to the next selector / product-name
+ * fallback instead of writing garbage into the color field.
+ */
+export function isNonColorOptionText(text: string): boolean {
+  const t = text.trim()
+  if (!t) return true
+  if (/^\d+$/.test(t)) return true
+  if (/^\d+\s*(size|사이즈)$/i.test(t)) return true
+  if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t)) return true
+  if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t)) return true
+  if (/사이즈\s*기준/.test(t)) return true
+  if (/품절|sold\s*out|재고|low in stock/i.test(t)) return true
+  if (/[+-]\s*₩[\d,]+/.test(t)) return true
+  return false
+}
+
+// ---------------------------------------------------------------------------
 // extractColorFromText
 // ---------------------------------------------------------------------------
 

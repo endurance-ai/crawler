@@ -17,6 +17,7 @@
 import {chromium} from "playwright"
 import * as fs from "fs"
 import * as path from "path"
+import {createClient} from "@supabase/supabase-js"
 import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlShopify} from "./lib/shopify-engine"
@@ -45,6 +46,74 @@ import {getReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, SiteConfig} from "./lib/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
+
+// 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
+// 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
+// 미설정이면 조용히 스킵 — crawl.ts는 큐와 무관한 40+ 기존 플랫폼에도 쓰이므로 필수 아님.
+const queueDb =
+  process.env.DB_URL && process.env.DB_TOKEN
+    ? createClient(process.env.DB_URL, process.env.DB_TOKEN)
+    : null
+
+// platform_key → brand_node_id. 기존 status 행의 platform_key 로 resolve, 없으면
+// SiteConfig.brand 로 brand_nodes 를 매칭해 폴백.
+async function resolveBrandNodeId(platform: string): Promise<number | null> {
+  if (!queueDb) return null
+  const {data: statusRow} = await queueDb
+    .from("product_crawl_status")
+    .select("brand_node_id")
+    .eq("platform_key", platform)
+    .maybeSingle()
+  if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
+
+  const brandName = getSiteConfig(platform)?.brand
+  if (brandName) {
+    const {data: node} = await queueDb
+      .from("brand_nodes")
+      .select("id")
+      .ilike("brand_name", brandName)
+      .maybeSingle()
+    if (node) return (node as {id: number}).id
+  }
+  return null
+}
+
+async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
+  if (!queueDb) return
+  const brandNodeId = await resolveBrandNodeId(result.platform)
+  if (!brandNodeId) return // brand_node 해석 실패 — no-op
+
+  const success = result.errors.length === 0 && result.stats.totalProducts > 0
+  const status = success ? "crawled" : "qc_failed"
+
+  await queueDb.from("product_crawl_status").upsert(
+    {
+      brand_node_id: brandNodeId,
+      status,
+      platform_key: result.platform,
+      crawl_ready_at: success ? new Date().toISOString() : null,
+      last_error: result.errors[0] ?? null,
+    },
+    {onConflict: "brand_node_id"},
+  )
+
+  await queueDb.from("product_crawl_runs").insert({
+    brand_node_id: brandNodeId,
+    stage: "crawl",
+    status: success ? "success" : "failed",
+    platform_key: result.platform,
+    actor: "crawl-auto",
+    command: `crawl --site=${result.platform}`,
+    duration_ms: result.stats.duration,
+    error_message: result.errors[0] ?? null,
+    metrics: {
+      total_products: result.stats.totalProducts,
+      in_stock: result.stats.inStock,
+      unique_brands: result.stats.uniqueBrands,
+      errors: result.errors,
+    },
+  })
+}
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
 
@@ -448,7 +517,7 @@ const PARALLEL_LIMIT = 3 // 동시 브라우저 수
 // 사이트 전체 크롤 상한 — 한 사이트가 어딘가에서 멈춰도(무한 hang) 배치 전체가
 // 얼어붙지 않도록 강제 중단한다. crawlCafe24 내부에는 evaluate/detail 단위
 // timeout이 있지만, 사이트 단위 전체 안전망이 별도로 필요하다.
-const SITE_TIMEOUT_MS = 20 * 60_000 // 20분
+const SITE_TIMEOUT_MS = 120 * 60_000 // 120분 — 대형 카탈로그(1000+ 상품, 상세 크롤 포함) 완주 여유
 
 const withSiteTimeout = <T>(promise: Promise<T>, site: string): Promise<T> =>
   Promise.race([
@@ -497,8 +566,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
             return null
           }
           const result = await crawlUniqlo(config)
-          saveResult(outDir, result)
-          return result
+          return saveResultAndTrim(outDir, result)
         } catch (err) {
           console.error(`❌ ${config.name} 크롤 실패:`, err)
           return null
@@ -529,8 +597,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlZara(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -557,8 +624,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawl29cm(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -585,8 +651,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlFarfetch(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -613,58 +678,55 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlShopify(config)
-        saveResult(outDir, result)
-        results.push(result)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
     }
   }
 
-  // Cafe24 — 사이트별 병렬 (PARALLEL_LIMIT개씩)
+  // Cafe24 — 사이트별 병렬 (워커 풀: PARALLEL_LIMIT개 동시, 하나 끝나면 큐에서 바로 다음 투입)
   if (cafe24Sites.length > 0) {
-    console.log(`\n⚡ 병렬 크롤링: ${cafe24Sites.length}개 사이트, ${PARALLEL_LIMIT}개 동시\n`)
+    console.log(`\n⚡ 병렬 크롤링: ${cafe24Sites.length}개 사이트, ${PARALLEL_LIMIT}개 동시 (큐 방식)\n`)
 
-    for (let i = 0; i < cafe24Sites.length; i += PARALLEL_LIMIT) {
-      const batch = cafe24Sites.slice(i, i + PARALLEL_LIMIT)
-      const batchNames = batch.map((c) => c.name).join(", ")
-      console.log(`\n🔄 배치 ${Math.floor(i / PARALLEL_LIMIT) + 1}: ${batchNames}`)
+    let nextIndex = 0
+    const worker = async () => {
+      while (nextIndex < cafe24Sites.length) {
+        const config = cafe24Sites[nextIndex++]!
+        console.log(`\n🔄 시작 (${nextIndex}/${cafe24Sites.length}): ${config.name}`)
 
-      const batchResults = await Promise.all(
-        batch.map(async (config) => {
-          // 사이트마다 독립 브라우저
-          const browser = await chromium.launch({headless: true})
-          const context = await browser.newContext({
-            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            locale: "ko-KR",
-          })
-          const page = await context.newPage()
-
-          try {
-            if (dryRun) {
-              await probeSite(config)
-              return null
-            }
-            const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
-            const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
-            const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
-            saveResult(outDir, result)
-            return result
-          } catch (err) {
-            console.error(`❌ ${config.name} 크롤 실패:`, err)
-            return null
-          } finally {
-            await browser.close()
-          }
+        // 사이트마다 독립 브라우저
+        const browser = await chromium.launch({headless: true})
+        const context = await browser.newContext({
+          userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          locale: "ko-KR",
         })
-      )
+        const page = await context.newPage()
 
-      results.push(...batchResults.filter((r): r is CrawlResult => r !== null))
+        try {
+          if (dryRun) {
+            await probeSite(config)
+            continue
+          }
+          const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
+          const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
+          const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
+          results.push(saveResultAndTrim(outDir, result))
+        } catch (err) {
+          console.error(`❌ ${config.name} 크롤 실패:`, err)
+        } finally {
+          await browser.close()
+        }
+      }
     }
+
+    await Promise.all(
+      Array.from({length: Math.min(PARALLEL_LIMIT, cafe24Sites.length)}, () => worker())
+    )
   }
 
   if (!dryRun && results.length > 0) {
-    printSummary(results)
+    await printSummary(results)
   }
 }
 
@@ -684,7 +746,20 @@ function saveResult(outDir: string, result: CrawlResult) {
   console.log(`   💾 저장: ${outPath}`)
 }
 
-function printSummary(results: CrawlResult[]) {
+// `results`는 printSummary까지 사이트별 stats/errors 를 보존해야 하지만,
+// products 배열(description/images/reviews 포함)까지 전체 런 끝까지 들고
+// 있을 필요는 없다 — 31개 cafe24 사이트 detail 크롤 시 heap OOM 유발 확인
+// (2026-07-05). 디스크에 쓴 직후 products 를 비워서 GC가 회수하게 한다.
+function saveResultAndTrim(outDir: string, result: CrawlResult): CrawlResult {
+  saveResult(outDir, result)
+  return {...result, products: []}
+}
+
+async function printSummary(results: CrawlResult[]) {
+  for (const r of results) {
+    await syncCrawlResultToQueue(r)
+  }
+
   console.log("\n" + "═".repeat(60))
   console.log("🏁 전체 크롤링 완료")
   console.log("═".repeat(60))
@@ -935,4 +1010,14 @@ function lintGenderConfig(targets: SiteConfig[]) {
   }
 }
 
-main().catch(console.error)
+main()
+  .then(() => {
+    // queueDb(supabase-js) 사용 시 내부 keep-alive 핸들이 남아 프로세스가
+    // 자연 종료되지 않는다. 모든 크롤/큐 write 는 main() 완료 시점에 이미
+    // await 로 끝났으므로 명시적으로 종료한다.
+    process.exit(0)
+  })
+  .catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
