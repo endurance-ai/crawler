@@ -7,7 +7,7 @@
  *   pnpm brand-crawl -- detect --brand-id=123
  *   pnpm brand-crawl -- detect --status=not_started --url=present --limit=20
  *   pnpm brand-crawl -- qc --brand-id=123 --site=matteveil
- *   pnpm brand-crawl -- mark --brand-id=123 --status=crawl_ready --platform-key=matteveil
+ *   pnpm brand-crawl -- mark --brand-id=123 --status=crawled --platform-key=matteveil
  */
 
 import * as crypto from "node:crypto"
@@ -362,12 +362,16 @@ async function qcBrand(flags: Flags): Promise<void> {
   })
   try {
     const {metrics, passed, sha256} = analyzeArtifact(artifactPath)
+    // Manual QC gate no longer promotes status — crawl.ts/import-products.ts auto-sync
+    // (2026-07-06) already carries crawled -> imported. A pass just records the diagnostic;
+    // a fail still downgrades to qc_failed.
     await upsertProductCrawlStatus(db, brandNodeId, {
       latest_artifact_path: artifactRelPath,
       latest_artifact_sha256: sha256,
       qc_summary: {...metrics, passed},
-      status: passed ? "import_ready" : "qc_failed",
-      last_error: passed ? null : "QC failed: category/color fill must be 100%",
+      ...(passed
+        ? {last_error: null}
+        : {status: "qc_failed", last_error: "QC failed: category/color fill must be 100%"}),
     })
     await finishProductRun(db, runId, {
       status: passed ? "success" : "failed",
@@ -388,7 +392,7 @@ async function qcBrand(flags: Flags): Promise<void> {
 function statusTimestamps(patch: Record<string, unknown>): void {
   const nowIso = new Date().toISOString()
   if (patch.status === "tech_detected") patch.detected_at = nowIso
-  if (patch.status === "crawl_ready") patch.crawl_ready_at = nowIso
+  if (patch.status === "crawled") patch.crawled_at = nowIso
   if (patch.status === "imported") patch.imported_at = nowIso
   if (patch.status === "embedded" || patch.status === "active") patch.embedded_at = nowIso
 }

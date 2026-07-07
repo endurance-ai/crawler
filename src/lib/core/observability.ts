@@ -40,7 +40,17 @@ export interface ValidationRejectEvent {
   message: string
 }
 
-export type CrawlerEvent = ValidationSuccessEvent | ValidationRejectEvent
+export interface ProductQcReviewEvent {
+  kind: "product_qc_review"
+  site: string
+  sku: string
+  action: "review" | "reject"
+  reason: string
+  confidence: number
+  changes: unknown[]
+}
+
+export type CrawlerEvent = ValidationSuccessEvent | ValidationRejectEvent | ProductQcReviewEvent
 
 // ─── 사이트별 reject 집계 (요약 리포트용) ─────────────────────────────
 // emit() 를 통과하는 모든 validation_reject 를 site → 실패필드 별로 누적한다.
@@ -92,6 +102,8 @@ export function emit(event: CrawlerEvent): void {
   try {
     if (event.kind === "validation_reject") {
       recordReject(event)
+      console.warn(`[crawler-event] ${JSON.stringify(event)}`)
+    } else if (event.kind === "product_qc_review") {
       console.warn(`[crawler-event] ${JSON.stringify(event)}`)
     } else {
       console.log(`[crawler-event] ${JSON.stringify(event)}`)

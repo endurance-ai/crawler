@@ -43,9 +43,11 @@ import {
 import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
-import type {CrawlResult, SiteConfig} from "./lib/types"
+import type {CrawlResult, Product, SiteConfig} from "./lib/types"
+import type {DetailData} from "./lib/parsers/detail/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
+import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 
 // 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
 // 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
@@ -91,7 +93,7 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
       brand_node_id: brandNodeId,
       status,
       platform_key: result.platform,
-      crawl_ready_at: success ? new Date().toISOString() : null,
+      crawled_at: success ? new Date().toISOString() : null,
       last_error: result.errors[0] ?? null,
     },
     {onConflict: "brand_node_id"},
@@ -702,6 +704,10 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           locale: "ko-KR",
         })
         const page = await context.newPage()
+        // JS 팝업(alert/confirm 등)을 즉시 닫는다 — 안 닫고 두면 브라우저 종료 시
+        // Playwright 내부 dialog 핸들링이 uncaught rejection을 던져 전체 배치
+        // 프로세스가 죽는다 (2026-07-06, kupido-movingwear/hagamos 크롤 중 확인).
+        page.on("dialog", (d) => d.dismiss().catch(() => {}))
 
         try {
           if (dryRun) {
@@ -710,7 +716,15 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           }
           const dp = config.crawlDetails ? getDetailParser(config.key) : undefined
           const rp = config.crawlReviews ? getReviewParser(config.key) : undefined
-          const result = await withSiteTimeout(crawlCafe24(page, config, dp, rp), config.key)
+          const existingDetails = config.crawlDetails ? loadExistingDetails(outDir, config.key) : undefined
+          if (existingDetails && existingDetails.size > 0) {
+            console.log(`[${config.name}] ⏭️  이전 체크포인트 재사용 — ${existingDetails.size}개 상품 상세 스킵`)
+          }
+          const onDetailProgress = (products: Product[]) => saveCheckpoint(outDir, config.key, products)
+          const result = await withSiteTimeout(
+            crawlCafe24(page, config, dp, rp, onDetailProgress, existingDetails),
+            config.key,
+          )
           results.push(saveResultAndTrim(outDir, result))
         } catch (err) {
           console.error(`❌ ${config.name} 크롤 실패:`, err)
@@ -730,20 +744,60 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   }
 }
 
-function saveResult(outDir: string, result: CrawlResult) {
-  if (result.products.length === 0) return
+function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
+  if (rawProducts.length === 0) return
 
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
   // product before it is written to JSON. Valid products pass through
   // byte-identical; invalid ones are excluded + a structured reject
   // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
   // exact legacy behavior (all products written, no gate).
-  const products = applyValidationGate(result.products, result.platform)
+  const qcProducts = applyProductQcGate(rawProducts, platform)
+  const products = applyValidationGate(qcProducts, platform)
   if (products.length === 0) return
 
-  const outPath = path.join(outDir, `${result.platform}-products.json`)
+  const outPath = path.join(outDir, `${platform}-products.json`)
   fs.writeFileSync(outPath, JSON.stringify(products, null, 2), "utf-8")
   console.log(`   💾 저장: ${outPath}`)
+}
+
+function saveResult(outDir: string, result: CrawlResult) {
+  writeProductsFile(outDir, result.platform, result.products)
+}
+
+// 상세크롤 도중 주기적으로 지금까지의 진행 상황을 디스크에 반영한다 — 대형
+// 카탈로그(1000+ 상품) 크롤 도중 프로세스가 죽어도 이미 끝낸 작업이 통째로
+// 유실되지 않도록 함 (2026-07-06, hippiedippy 1511개 중 795개 완료 상태에서
+// 유실된 사고). crawlCafe24()가 아직 반환하기 전에 호출되므로 saveResultAndTrim
+// 의 "사이트 완료 시 products 비움" 불변식과는 무관 — 별개의 중간 저장일 뿐이다.
+function saveCheckpoint(outDir: string, platform: string, products: Product[]) {
+  writeProductsFile(outDir, platform, products)
+}
+
+// 재시작 스킵: 이전 실행(체크포인트든 정상 완료든)의 결과 파일이 있으면
+// productUrl → 상세정보(색상 등)만 가벼운 Map으로 뽑아온다. 전체 Product 객체를
+// 복제해서 들고 있지 않음 — 사이트당 최대 한 벌의 전체 배열만 메모리에 존재하도록
+// (2026-07-06).
+function loadExistingDetails(outDir: string, platform: string): Map<string, DetailData> {
+  const map = new Map<string, DetailData>()
+  const outPath = path.join(outDir, `${platform}-products.json`)
+  if (!fs.existsSync(outPath)) return map
+  try {
+    const prior = JSON.parse(fs.readFileSync(outPath, "utf-8")) as Product[]
+    for (const p of prior) {
+      if (p.productUrl && p.color) {
+        map.set(p.productUrl, {
+          color: p.color,
+          description: p.description ?? null,
+          material: p.material ?? null,
+          productCode: p.productCode ?? null,
+        })
+      }
+    }
+  } catch {
+    // 손상된 이전 파일 — 그냥 처음부터 크롤
+  }
+  return map
 }
 
 // `results`는 printSummary까지 사이트별 stats/errors 를 보존해야 하지만,
@@ -796,8 +850,8 @@ async function printSummary(results: CrawlResult[]) {
     }
   }
 
+  printProductQcReport()
   printTimingReport(results)
-
   printDropReport()
 
   console.log("\n" + "═".repeat(60))
@@ -855,6 +909,33 @@ function printDropReport() {
     for (const [field, skus] of Object.entries(stat.samples)) {
       if (skus.length === 0) continue
       console.log(`   ${field} 샘플:`)
+      for (const sku of skus) console.log(`     - ${sku}`)
+    }
+  }
+}
+
+function printProductQcReport() {
+  const report = getProductQcReport()
+  if (report.size === 0) return
+
+  console.log("\n" + "-".repeat(60))
+  console.log("Product QC summary")
+  console.log("-".repeat(60))
+
+  for (const [site, stat] of report) {
+    const config = getSiteConfig(site)
+    const name = config?.name || site
+    const reasons = Object.entries(stat.byReason)
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => `${reason}=${count}`)
+      .join(", ")
+    console.log(
+      `\n[${name}] total=${stat.total}, keep=${stat.kept}, auto_fix=${stat.autoFixed}, review=${stat.review}, reject=${stat.rejected}`,
+    )
+    if (reasons) console.log(`   reasons: ${reasons}`)
+    for (const [reason, skus] of Object.entries(stat.samples)) {
+      if (skus.length === 0) continue
+      console.log(`   ${reason} samples:`)
       for (const sku of skus) console.log(`     - ${sku}`)
     }
   }
@@ -1040,6 +1121,23 @@ function lintGenderConfig(targets: SiteConfig[]) {
     for (const w of warnings) console.log(w)
   }
 }
+
+// 안전망: 개별 사이트 크롤은 각자 try/catch로 감싸져 있지만, Playwright의 내부
+// CDP 이벤트 핸들링(예: dialog 처리 중 context가 닫히는 경우) 은 그 바깥에서
+// unhandledRejection 으로 터질 수 있다 — 이게 전체 배치를 죽인 사고가 있었음
+// (2026-07-06, 50개 배치 크롤 중 kupido-movingwear/hagamos 에서 발생).
+// 로그만 남기고 배치는 계속 진행한다.
+process.on("unhandledRejection", (reason) => {
+  console.error(`\n⚠️ unhandledRejection (배치 계속 진행):`, reason)
+})
+
+// Playwright의 dialog 정리 로직(DialogManager)이 페이지/컨텍스트가 이미 닫힌
+// 뒤에도 CDP로 dismiss를 시도하면 uncaughtException(ProtocolError)으로 터진다 —
+// 이는 unhandledRejection이 아니라 별개 이벤트라 위 핸들러로 못 막는다
+// (2026-07-07, 10개 배치 크롤 중 THE MYSTERIOUS HOTEL/SUNDAY CEREMONY 진행 중 확인).
+process.on("uncaughtException", (err) => {
+  console.error(`\n⚠️ uncaughtException (배치 계속 진행):`, err)
+})
 
 main()
   .then(() => {

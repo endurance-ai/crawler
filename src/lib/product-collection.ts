@@ -32,7 +32,7 @@ export interface ProductCrawlBrand {
   blocked_reason: string | null
   notes: string | null
   detected_at: string | null
-  crawl_ready_at: string | null
+  crawled_at: string | null
   imported_at: string | null
   embedded_at: string | null
 }
