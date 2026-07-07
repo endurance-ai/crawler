@@ -22,6 +22,24 @@ import type {DetailData, IDetailParser} from "./types"
 import {DETAIL_REGISTRY, type RegistryEntry} from "./selector-registry"
 import {STRATEGIES} from "../field-extractors/strategies"
 
+// 일시적 지연과 진짜 다운을 구분하기 위해 최초 goto 타임아웃 실패 시 1회만 더 긴
+// 타임아웃(+15초)으로 재시도한다 (2026-07-06: hippiedippy/lossyrow 처럼 응답이
+// 느린 사이트에서 기본 타임아웃 컷으로 색상/설명 데이터가 불필요하게 누락되던 문제).
+// golden 픽스처는 page.route로 즉시 응답하는 정적 HTML이라 재시도 경로 자체가
+// 트리거되지 않음 — 18-site 골든 마스터 byte-identical 보장에 영향 없음.
+async function gotoWithRetry(
+  page: Page,
+  url: string,
+  waitUntil: "domcontentloaded" | "commit",
+  timeout: number,
+): Promise<void> {
+  try {
+    await page.goto(url, {waitUntil, timeout})
+  } catch {
+    await page.goto(url, {waitUntil, timeout: timeout + 15_000})
+  }
+}
+
 export class RegistryDetailParser implements IDetailParser {
   private readonly entry: RegistryEntry
 
@@ -44,16 +62,16 @@ export class RegistryDetailParser implements IDetailParser {
     try {
       const w = this.entry.wait
       if (w.kind === "dom") {
-        await page.goto(productUrl, {waitUntil: "domcontentloaded", timeout: w.timeout})
+        await gotoWithRetry(page, productUrl, "domcontentloaded", w.timeout)
         await page.waitForTimeout(w.pauseMs)
       } else if (w.kind === "dom-then-selector") {
-        await page.goto(productUrl, {waitUntil: "domcontentloaded", timeout: w.timeout})
+        await gotoWithRetry(page, productUrl, "domcontentloaded", w.timeout)
         await page
           .waitForSelector(w.selector, {timeout: w.selectorTimeout})
           .catch(() => null)
       } else {
         // commit-then-selector (shopamomento)
-        await page.goto(productUrl, {waitUntil: "commit", timeout: w.timeout})
+        await gotoWithRetry(page, productUrl, "commit", w.timeout)
         await page
           .waitForSelector(w.selector, {timeout: w.selectorTimeout})
           .catch(() => null)
