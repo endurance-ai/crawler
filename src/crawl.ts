@@ -851,9 +851,39 @@ async function printSummary(results: CrawlResult[]) {
   }
 
   printProductQcReport()
+  printTimingReport(results)
   printDropReport()
 
   console.log("\n" + "═".repeat(60))
+}
+
+/**
+ * 성능 계측 요약 — 리스트 대기 / 상세 크롤 시간을 사이트별로 출력.
+ * "공통화(폴백) vs 속도" 판단과 증분 크롤 설계의 근거 데이터.
+ * stats.listWaitMs 등을 채우는 엔진(현재 cafe24)에만 해당하며, 값이 없으면 스킵한다.
+ */
+function printTimingReport(results: CrawlResult[]) {
+  const timed = results.filter((r) => r.stats.listWaitMs !== undefined)
+  if (timed.length === 0) return
+
+  console.log("\n" + "─".repeat(60))
+  console.log("⏱️  성능 계측 (리스트 대기 / 상세 크롤)")
+  console.log("─".repeat(60))
+  console.log(
+    `${"플랫폼".padEnd(20)} ${"리스트대기".padStart(9)} ${"상세시간".padStart(9)} ${"상세건수".padStart(7)} ${"건당".padStart(7)}`
+  )
+
+  for (const r of timed) {
+    const config = getSiteConfig(r.platform)
+    const name = config?.name || r.platform
+    const listWait = ((r.stats.listWaitMs ?? 0) / 1000).toFixed(1)
+    const detail = ((r.stats.detailMs ?? 0) / 1000).toFixed(1)
+    const nav = r.stats.detailNavCount ?? 0
+    const perNav = nav > 0 ? ((r.stats.detailMs ?? 0) / nav / 1000).toFixed(2) : "-"
+    console.log(
+      `${name.padEnd(20)} ${(listWait + "s").padStart(9)} ${(detail + "s").padStart(9)} ${String(nav).padStart(7)} ${(perNav + "s").padStart(7)}`
+    )
+  }
 }
 
 /**
