@@ -143,6 +143,12 @@ export function isNonColorOptionText(text: string): boolean {
   if (!t) return true
   if (/^\d+$/.test(t)) return true
   if (/^\d+\s*(size|사이즈)$/i.test(t)) return true
+  // Numeric value + size unit: "36 EU", "38 eu", "US 6.5", "UK 9", "43cm", "270mm".
+  // Shopify stores using a non-recognized size-option name (e.g. Spanish "Talla")
+  // otherwise leak these into the color field (2026-07-07: becay onboarding —
+  // "36 Eu, 38 Eu, ..." captured as color on jeans whose real color is in the name).
+  if (/^\d+(\.\d+)?\s*(eu|us|uk|cm|mm|inch|in)\b/i.test(t)) return true
+  if (/^(us|uk|eu)\s*\d/i.test(t)) return true
   if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t)) return true
   if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t)) return true
   // "SIZE" / "Size, 43cm, 45cm" / "Size, US 5.5, US 6.5" — the literal word "size"

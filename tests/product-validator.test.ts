@@ -23,7 +23,12 @@ import {fileURLToPath} from "node:url"
 
 import {validateProduct, ProductSchema} from "../src/lib/core/product-validator"
 import {applyValidationGate, isValidationEnabled} from "../src/lib/core/validation-gate"
-import {normalizeColor, normalizeColorList, extractColorFromText} from "../src/lib/parsers/field-extractors/color-normalizer"
+import {
+  normalizeColor,
+  normalizeColorList,
+  extractColorFromText,
+  isNonColorOptionText,
+} from "../src/lib/parsers/field-extractors/color-normalizer"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -236,4 +241,16 @@ test("extractColorFromText: finds color keyword in product name", () => {
 test("extractColorFromText: returns null when no keyword found", () => {
   assert.equal(extractColorFromText("Regular Fit Trousers"), null)
   assert.equal(extractColorFromText(""), null)
+})
+
+test("isNonColorOptionText: numeric size + unit is not a color (becay 'Talla' leak)", () => {
+  // A Shopify size option named "Talla" (Spanish) is not recognized as size,
+  // so its values leaked into the color field. These must read as non-color.
+  for (const v of ["36 EU", "38 eu", "40 Eu", "US 6.5", "UK 9", "43cm", "270mm"]) {
+    assert.equal(isNonColorOptionText(v), true, `${v} should be non-color`)
+  }
+  // Real colors must still pass through as colors.
+  for (const v of ["Cream", "Burgundy", "Olive", "Navy"]) {
+    assert.equal(isNonColorOptionText(v), false, `${v} should be a color`)
+  }
 })
