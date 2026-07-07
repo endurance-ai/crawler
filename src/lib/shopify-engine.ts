@@ -8,7 +8,7 @@
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
-import {normalizeColorList, extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
+import {normalizeColorList, extractColorFromText, normalizeColor, isNonColorOptionText} from "./parsers/field-extractors/color-normalizer"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
 //
@@ -148,7 +148,7 @@ export function parseShopifyProducts(
   // options.name에서 색상/사이즈 포지션 식별 (Shopify는 옵션명이 store마다 다름)
   // 1차: 옵션명 기반 (빠름, 확실할 때)
   const COLOR_NAMES = ["color", "colour", "colorway", "shade", "colore", "couleur", "farbe", "color option"]
-  const SIZE_NAMES = ["size", "length", "shoe size", "us size", "eu size", "uk size", "taille", "größe", "taglia"]
+  const SIZE_NAMES = ["size", "length", "shoe size", "us size", "eu size", "uk size", "taille", "größe", "taglia", "talla"]
 
   const data: ShopifyResponse = productsJson
 
@@ -190,7 +190,13 @@ export function parseShopifyProducts(
           sp.variants.map((v) => pickOption(v, pos)).filter((x): x is string => !!x && x !== "Default Title")
         )]
         if (vals.length === 0) continue
-        const colorHits = vals.filter((v) => extractColorFromText(v) !== null || normalizeColor(v) !== v).length
+        // Reject size/stock/price noise before the value-based heuristic: the
+        // `normalizeColor(v) !== v` check fires on any case-reformatted token
+        // (e.g. "36 EU" → "36 Eu"), which would misclassify a size option as
+        // color when its name is unrecognized (2026-07-07: becay "Talla").
+        const colorHits = vals.filter(
+          (v) => !isNonColorOptionText(v) && (extractColorFromText(v) !== null || normalizeColor(v) !== v),
+        ).length
         if (colorHits / vals.length >= 0.5) {
           optionPositions.color = pos
           break
