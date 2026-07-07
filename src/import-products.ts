@@ -15,6 +15,7 @@ import {createClient} from "@supabase/supabase-js"
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
+import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -406,7 +407,8 @@ async function main() {
     // + a structured reject event is emitted (does not crash the import
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
-    const raw: CrawledProduct[] = applyValidationGate(rawAll, platform)
+    const qcRaw = applyProductQcGate(rawAll, platform)
+    const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 
     // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
@@ -708,10 +710,35 @@ async function main() {
 
   console.log("\n" + "═".repeat(50))
   console.log(`🏁 전체 적재 완료: ${totalInserted}개 성공, ${totalErrors}건 에러`)
+  printProductQcReport()
   if (totalReviews > 0) {
     console.log(`📝 리뷰 적재: ${totalReviews}건`)
   }
   console.log("═".repeat(50))
+}
+
+function printProductQcReport() {
+  const report = getProductQcReport()
+  if (report.size === 0) return
+
+  console.log("\n" + "-".repeat(50))
+  console.log("Product QC summary")
+  console.log("-".repeat(50))
+  for (const [site, stat] of report) {
+    const reasons = Object.entries(stat.byReason)
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => `${reason}=${count}`)
+      .join(", ")
+    console.log(
+      `[${site}] total=${stat.total}, keep=${stat.kept}, auto_fix=${stat.autoFixed}, review=${stat.review}, reject=${stat.rejected}`,
+    )
+    if (reasons) console.log(`   reasons: ${reasons}`)
+    for (const [reason, skus] of Object.entries(stat.samples)) {
+      if (skus.length === 0) continue
+      console.log(`   ${reason} samples:`)
+      for (const sku of skus) console.log(`     - ${sku}`)
+    }
+  }
 }
 
 main().catch(console.error)

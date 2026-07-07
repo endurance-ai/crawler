@@ -46,6 +46,7 @@ import {getReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, SiteConfig} from "./lib/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
+import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 
 // 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
 // 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
@@ -738,7 +739,8 @@ function saveResult(outDir: string, result: CrawlResult) {
   // byte-identical; invalid ones are excluded + a structured reject
   // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
   // exact legacy behavior (all products written, no gate).
-  const products = applyValidationGate(result.products, result.platform)
+  const qcProducts = applyProductQcGate(result.products, result.platform)
+  const products = applyValidationGate(qcProducts, result.platform)
   if (products.length === 0) return
 
   const outPath = path.join(outDir, `${result.platform}-products.json`)
@@ -796,6 +798,7 @@ async function printSummary(results: CrawlResult[]) {
     }
   }
 
+  printProductQcReport()
   printDropReport()
 
   console.log("\n" + "═".repeat(60))
@@ -824,6 +827,33 @@ function printDropReport() {
     for (const [field, skus] of Object.entries(stat.samples)) {
       if (skus.length === 0) continue
       console.log(`   ${field} 샘플:`)
+      for (const sku of skus) console.log(`     - ${sku}`)
+    }
+  }
+}
+
+function printProductQcReport() {
+  const report = getProductQcReport()
+  if (report.size === 0) return
+
+  console.log("\n" + "-".repeat(60))
+  console.log("Product QC summary")
+  console.log("-".repeat(60))
+
+  for (const [site, stat] of report) {
+    const config = getSiteConfig(site)
+    const name = config?.name || site
+    const reasons = Object.entries(stat.byReason)
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => `${reason}=${count}`)
+      .join(", ")
+    console.log(
+      `\n[${name}] total=${stat.total}, keep=${stat.kept}, auto_fix=${stat.autoFixed}, review=${stat.review}, reject=${stat.rejected}`,
+    )
+    if (reasons) console.log(`   reasons: ${reasons}`)
+    for (const [reason, skus] of Object.entries(stat.samples)) {
+      if (skus.length === 0) continue
+      console.log(`   ${reason} samples:`)
       for (const sku of skus) console.log(`     - ${sku}`)
     }
   }
