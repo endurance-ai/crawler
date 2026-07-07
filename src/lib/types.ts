@@ -185,6 +185,13 @@ export interface CrawlResult {
     uniqueBrands: number
     avgPrice: number
     duration: number
+    // ── 성능 계측 (선택) — 엔진이 채우지 않으면 undefined ──
+    /** 리스트 아이템 셀렉터 대기에 쓴 누적 시간(ms). */
+    listWaitMs?: number
+    /** 상세 크롤 단계 전체 wall-time(ms). */
+    detailMs?: number
+    /** 상세 페이지 내비게이션 시도 횟수(증분 크롤이 제거할 대상 비용). */
+    detailNavCount?: number
   }
   errors: string[]
 }

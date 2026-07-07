@@ -90,6 +90,11 @@ interface DiscoveredCategory {
   url: string
 }
 
+/** 사이트별 성능 계측 누적기 (crawlCafe24 1회 호출당 하나 — 병렬 사이트 간 공유 없음). */
+interface CrawlTiming {
+  listWaitMs: number
+}
+
 async function discoverCategories(
   page: Page,
   config: SiteConfig
@@ -167,23 +172,24 @@ async function collectProductsFromPage(
   config: SiteConfig,
   categoryName: string,
   categoryGender: string[],
-  brandOverride?: string
+  brandOverride?: string,
+  timing?: CrawlTiming
 ): Promise<Product[]> {
   const selectors = config.selectors || {}
 
-  // 상품 셀렉터가 나타날 때까지 대기 (최대 8초)
+  // 상품 셀렉터가 나타날 때까지 대기 (최대 3초)
   const itemSelectorList = selectors.productItem
     ? [selectors.productItem, ...DEFAULT_SELECTORS.productItem]
     : DEFAULT_SELECTORS.productItem
 
-  for (const sel of itemSelectorList) {
-    try {
-      await page.waitForSelector(sel, {timeout: 3000})
-      break
-    } catch {
-      // 다음 셀렉터 시도
-    }
-  }
+  // 리스트 아이템이 렌더될 때까지 1회 대기 (OR 셀렉터, 총 상한 3초).
+  // 개별 후보를 순차로 기다리면(후보당 3초) 미스마다 3초×N을 스크래핑 전에
+  // 낭비하므로, CSS 셀렉터 리스트로 합쳐 "아무거나 먼저 나타나면 즉시 진행"한다.
+  // 순서 의존 추출은 이 대기가 아니라 아래 page.evaluate 의 querySelectorAll
+  // 루프(첫 non-empty 셀렉터 채택)에 있으며 이 변경과 무관하다.
+  const listWaitStart = Date.now()
+  await page.waitForSelector(itemSelectorList.join(", "), {timeout: 3000}).catch(() => null)
+  if (timing) timing.listWaitMs += Date.now() - listWaitStart
 
   // 폴백 셀렉터로 상품 아이템 찾기
   // NOTE: page.evaluate 안에 function/const 선언 금지 — tsx의 __name 변환이 브라우저에서 ReferenceError 유발
@@ -446,7 +452,8 @@ async function collectProductsFromPage(
 async function crawlCategory(
   page: Page,
   config: SiteConfig,
-  category: DiscoveredCategory
+  category: DiscoveredCategory,
+  timing?: CrawlTiming
 ): Promise<Product[]> {
   const allProducts: Product[] = []
   const maxPages = config.maxPages || 10
@@ -468,7 +475,8 @@ async function crawlCategory(
         config,
         category.name,
         category.gender,
-        config.brand
+        config.brand,
+        timing
       )
 
       if (products.length === 0) break // 빈 페이지면 중단
@@ -508,6 +516,9 @@ export async function crawlCafe24(
   const startTime = Date.now()
   const errors: string[] = []
   const allProducts: Product[] = []
+  const timing: CrawlTiming = {listWaitMs: 0}
+  let detailMs = 0
+  let detailNavCount = 0
 
   const tag = `[${config.name}]`
 
@@ -546,7 +557,7 @@ export async function crawlCafe24(
         timeout: 30000,
       })
       await page.waitForTimeout(1500)
-      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [], config.brand)
+      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [], config.brand, timing)
       allProducts.push(...products)
       console.log(`${tag} 📦 메인: ${products.length}개 상품`)
     } catch (err) {
@@ -561,7 +572,7 @@ export async function crawlCafe24(
     const gender = cat.gender.length > 0 ? cat.gender.join("/") : "all"
 
     try {
-      const products = await crawlCategory(page, config, cat)
+      const products = await crawlCategory(page, config, cat, timing)
       allProducts.push(...products)
 
       const inStockCount = products.filter((p) => p.inStock).length
@@ -595,6 +606,8 @@ export async function crawlCafe24(
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
   if (config.crawlDetails && detailParser) {
     console.log(`\n${tag} 🔍 상세 크롤링 시작 — ${uniqueProducts.length}개 상품`)
+    const detailStart = Date.now()
+    detailNavCount = uniqueProducts.length
     let detailSuccess = 0
     const DETAIL_CONCURRENCY = 3
     const browser = page.context().browser()!
@@ -656,6 +669,7 @@ export async function crawlCafe24(
       process.stdout.write(`\r${tag}    📖 ${done}/${uniqueProducts.length} (성공: ${detailSuccess})`)
     }
 
+    detailMs = Date.now() - detailStart
     console.log(`\n${tag} ✅ 상세 크롤링 완료 — ${detailSuccess}/${uniqueProducts.length}개 데이터 수집`)
   }
 
@@ -711,6 +725,9 @@ export async function crawlCafe24(
       uniqueBrands: uniqueBrands.size,
       avgPrice,
       duration: Date.now() - startTime,
+      listWaitMs: timing.listWaitMs,
+      detailMs,
+      detailNavCount,
     },
     errors,
   }
