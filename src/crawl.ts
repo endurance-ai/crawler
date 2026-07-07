@@ -1101,6 +1101,14 @@ process.on("unhandledRejection", (reason) => {
   console.error(`\n⚠️ unhandledRejection (배치 계속 진행):`, reason)
 })
 
+// Playwright의 dialog 정리 로직(DialogManager)이 페이지/컨텍스트가 이미 닫힌
+// 뒤에도 CDP로 dismiss를 시도하면 uncaughtException(ProtocolError)으로 터진다 —
+// 이는 unhandledRejection이 아니라 별개 이벤트라 위 핸들러로 못 막는다
+// (2026-07-07, 10개 배치 크롤 중 THE MYSTERIOUS HOTEL/SUNDAY CEREMONY 진행 중 확인).
+process.on("uncaughtException", (err) => {
+  console.error(`\n⚠️ uncaughtException (배치 계속 진행):`, err)
+})
+
 main()
   .then(() => {
     // queueDb(supabase-js) 사용 시 내부 keep-alive 핸들이 남아 프로세스가
