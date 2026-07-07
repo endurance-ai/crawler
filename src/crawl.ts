@@ -91,7 +91,7 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
       brand_node_id: brandNodeId,
       status,
       platform_key: result.platform,
-      crawl_ready_at: success ? new Date().toISOString() : null,
+      crawled_at: success ? new Date().toISOString() : null,
       last_error: result.errors[0] ?? null,
     },
     {onConflict: "brand_node_id"},
