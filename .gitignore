@@ -10,6 +10,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# lightpanda spike binary (downloaded via scripts/install-lightpanda.sh)
+/bin/lightpanda
+
 # crawler output
 output/
 *.log

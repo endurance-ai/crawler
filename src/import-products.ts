@@ -16,6 +16,7 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
+import {cleanGenderScope, resolveProductGender} from "./lib/product-gender"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -106,9 +107,10 @@ interface BrandNodeRow {
   id: number
   brand_name: string
   brand_name_normalized: string | null
+  gender_scope: string[] | null
 }
 
-// platform_key → brand_node_id 해석. product_crawl_status(091) 는 brand_node_id 가 PK 이고
+// platform_key → brand_node_id 해석. product_crawl_status(090) 는 brand_node_id 가 PK 이고
 // admin 페이지(product_crawl_brands 뷰)가 이걸 읽는다. 이미 platform_key 가 채워진 status 행이
 // 있으면 그걸로 resolve, 없으면 brand_nodes 를 brand_name 으로 매칭해 폴백한다.
 async function resolveBrandNodeId(platform: string, brandName: string | null): Promise<number | null> {
@@ -130,7 +132,7 @@ async function resolveBrandNodeId(platform: string, brandName: string | null): P
   return null
 }
 
-// import 성공/실패를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다.
+// import 성공/실패를 product_crawl_status(090, brand_node_id 기준)에 자동 반영한다.
 // 배포 admin 페이지가 읽는 product_crawl_brands 뷰의 소스가 이 테이블이다.
 // brand_node_id 해석 실패 시 no-op(신규 브랜드는 brand_nodes 등록 후 반영됨).
 async function syncProductCrawlStatus(
@@ -192,8 +194,10 @@ function trigramSimilarity(a: string, b: string): number {
 async function loadBrandNodes(): Promise<{
   rows: BrandNodeRow[]
   idMap: Map<string, number>
+  genderById: Map<number, string[]>
 }> {
   const idMap = new Map<string, number>()
+  const genderById = new Map<number, string[]>()
 
   // PostgREST default 1000 row limit — paginate to fetch all brand_nodes (~2,100 rows).
   // 062 마이그 이후 brand_nodes.style_node legacy text 컬럼 제거됨.
@@ -204,7 +208,7 @@ async function loadBrandNodes(): Promise<{
   for (;;) {
     const {data, error} = await db
       .from("brand_nodes")
-      .select("id, brand_name, brand_name_normalized")
+      .select("id, brand_name, brand_name_normalized, gender_scope")
       .range(offset, offset + PAGE - 1)
     if (error) {
       console.warn("⚠️ brand_nodes 조회 실패:", error.message)
@@ -221,9 +225,45 @@ async function loadBrandNodes(): Promise<{
       idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
     }
     idMap.set(bn.brand_name.toLowerCase(), bn.id)
+    const genderScope = cleanGenderScope(bn.gender_scope)
+    if (genderScope.length > 0) genderById.set(bn.id, genderScope)
   }
-  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
-  return {rows, idMap}
+  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size}, gender_scope=${genderById.size})`)
+  return {rows, idMap, genderById}
+}
+
+async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  const PAGE = 1000
+  let offset = 0
+  for (;;) {
+    const {data, error} = await db
+      .from("product_crawl_status")
+      .select("platform_key, brand_node_id")
+      .range(offset, offset + PAGE - 1)
+    if (error) {
+      console.warn("⚠️ product_crawl_status 조회 실패:", error.message)
+      return out
+    }
+    if (!data?.length) break
+    for (const row of data) {
+      const platformKey = (row as {platform_key: string | null}).platform_key
+      const brandNodeId = (row as {brand_node_id: number | null}).brand_node_id
+      if (platformKey && typeof brandNodeId === "number") out.set(platformKey, brandNodeId)
+    }
+    if (data.length < PAGE) break
+    offset += PAGE
+  }
+  return out
+}
+
+function resolveProductBrandNodeId(
+  brand: string,
+  platform: string,
+  brandIdMap: Map<string, number>,
+  platformBrandIdMap: Map<string, number>,
+): number | null {
+  return brandIdMap.get(brand.toLowerCase()) ?? platformBrandIdMap.get(platform) ?? null
 }
 
 /**
@@ -339,8 +379,9 @@ async function main() {
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
 
-  // ── brand_nodes 로드 (id_map only — legacy style_node text 컬럼 062에서 drop) ─
-  const {rows: brandRows, idMap: brandIdMap} = await loadBrandNodes()
+  // ── brand_nodes 로드 (id_map + gender_scope — legacy style_node text 컬럼 062에서 drop) ─
+  const {rows: brandRows, idMap: brandIdMap, genderById: brandGenderById} = await loadBrandNodes()
+  const platformBrandIdMap = await loadPlatformBrandNodeMap()
 
   // ── Pre-scan: 모든 파일에서 unique brand 문자열 수집 ──────
   // 미존재 brand 는 한 번에 resolve (fuzzy + insert + alias_candidate enqueue).
@@ -362,8 +403,8 @@ async function main() {
     for (const p of raw) {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       if (!brand) continue
-      const key = brand.toLowerCase()
-      if (!brandIdMap.has(key) && !unknownBrands.has(brand)) {
+      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
+      if (brandNodeId === null && !unknownBrands.has(brand)) {
         unknownBrands.set(brand, platform)
       }
     }
@@ -401,13 +442,22 @@ async function main() {
       continue
     }
     const rawAll: CrawledProduct[] = cached
+    const rawWithGenderFallback: CrawledProduct[] = rawAll.map((p) => {
+      const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
+      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
+      const gender = resolveProductGender(
+        p.gender,
+        brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
+      )
+      return gender.length > 0 ? {...p, gender} : p
+    })
     // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
     // product before the DB upsert. Valid products pass through
     // byte-identical into the existing .map(); invalid ones are excluded
     // + a structured reject event is emitted (does not crash the import
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
-    const qcRaw = applyProductQcGate(rawAll, platform)
+    const qcRaw = applyProductQcGate(rawWithGenderFallback, platform)
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 
@@ -437,13 +487,20 @@ async function main() {
     const rows = raw.map((p: any) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       const productUrl = (p.productUrl as string) || ""
+      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
+      const gender = resolveProductGender(
+        p.gender,
+        brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
+      )
 
       // --no-new-brands: 미등록 brand 상품 적재 제외
-      if (noNewBrands && brand && !brandIdMap.has(brand.toLowerCase())) return null
+      if (noNewBrands && brand && brandNodeId === null) return null
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
       // color NOT NULL — color 없는 상품은 스킵
       if (!p.color) return null
+      // gender required — product value first, brand_nodes.gender_scope fallback.
+      if (gender.length === 0) return null
       // product_no 추출
       const pnoMatch = productUrl.match(/product_no=(\d+)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
@@ -512,8 +569,8 @@ async function main() {
         product_url: productUrl,
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
-        gender: p.gender as string[],
-        brand_node_id: brandIdMap.get(brand.toLowerCase()) ?? null,
+        gender,
+        brand_node_id: brandNodeId,
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
         description: p.description?.slice(0, 2000) || null,

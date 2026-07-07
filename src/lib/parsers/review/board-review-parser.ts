@@ -8,12 +8,12 @@
  * 5. 상세 페이지 방문하여 체형 정보 추출
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {IReviewParser, Review, ReviewData, ReviewerBody} from "./types"
 import {BODY_INFO_PATTERNS} from "../../body-info-extractor"
 
 export class BoardReviewParser implements IReviewParser {
-  async parse(page: Page, maxReviews: number): Promise<ReviewData> {
+  async parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData> {
     const result: ReviewData = { reviewCount: 0, reviews: [] }
 
     try {
@@ -97,7 +97,7 @@ export class BoardReviewParser implements IReviewParser {
   }
 
   /** 보드 페이지에서 리뷰 기본 정보 + 상세 링크 추출 후, 상세 페이지에서 체형 정보 수집 */
-  private async parseBoardReviewsWithDetail(page: Page, boardUrl: string, max: number): Promise<Review[]> {
+  private async parseBoardReviewsWithDetail(page: Cafe24Page, boardUrl: string, max: number): Promise<Review[]> {
     // Step 1: 보드 목록에서 기본 정보 + 상세 링크 추출
     const rawReviews = await page.evaluate((maxReviews) => {
       const rows = document.querySelectorAll("table tr")

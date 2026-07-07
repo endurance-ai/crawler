@@ -7,7 +7,7 @@
  * purpose (see .moai/specs/SPEC-ARCH-CRAWLER-001/preserve-findings.md).
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import {normalizeColorList} from "./color-normalizer"
 
 /**
@@ -27,7 +27,7 @@ export type OptionColorMode =
   | "slowsteadyclub" // startsWith('-')/empty/선택/* filter, Set dedupe
 
 export async function colorFromOptionList(
-  page: Page,
+  page: Cafe24Page,
   mode: OptionColorMode,
 ): Promise<string | null> {
   const raw = await page

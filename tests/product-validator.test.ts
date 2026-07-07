@@ -23,8 +23,10 @@ import {fileURLToPath} from "node:url"
 
 import {validateProduct, ProductSchema} from "../src/lib/core/product-validator"
 import {applyValidationGate, isValidationEnabled} from "../src/lib/core/validation-gate"
+import {cleanGenderScope, resolveProductGender} from "../src/lib/product-gender"
 import {
   normalizeColor,
+  normalizeCafe24DetailColorList,
   normalizeColorList,
   extractColorFromText,
   isNonColorOptionText,
@@ -73,7 +75,7 @@ test("product with null color is rejected (policy A exception — migration 091)
     imageUrl: "",
     productUrl: "https://x/y",
     inStock: true,
-    gender: [],
+    gender: ["unisex"],
     platform: "8division",
     crawledAt: "2026-01-01",
     description: null,
@@ -97,7 +99,7 @@ test("product with empty category is rejected (policy A exception — migration 
     imageUrl: "",
     productUrl: "https://x/y",
     inStock: true,
-    gender: [],
+    gender: ["unisex"],
     platform: "8division",
     crawledAt: "2026-01-01",
     color: "Black",
@@ -119,7 +121,7 @@ test("invalid product is rejected with failedField/rawValue", () => {
     imageUrl: "",
     productUrl: "https://x/y",
     inStock: true,
-    gender: [],
+    gender: ["unisex"],
     platform: "p",
     crawledAt: "t",
   }
@@ -137,6 +139,28 @@ test("type mismatch is rejected (gender not an array)", () => {
   const r = validateProduct(bad)
   assert.equal(r.ok, false)
   if (!r.ok) assert.equal(r.failedField, "gender")
+})
+
+test("product with empty gender is rejected (policy A exception — migration 091)", () => {
+  const noGender = {...(golden[0] as Record<string, unknown>), gender: []}
+  const r = validateProduct(noGender)
+  assert.equal(r.ok, false)
+  if (!r.ok) assert.equal(r.failedField, "gender")
+})
+
+test("product with unsupported gender value is rejected", () => {
+  const badGender = {...(golden[0] as Record<string, unknown>), gender: ["female"]}
+  const r = validateProduct(badGender)
+  assert.equal(r.ok, false)
+  if (!r.ok) assert.equal(r.failedField, "gender.0")
+})
+
+test("resolveProductGender prefers product value and falls back to brand gender_scope", () => {
+  assert.deepEqual(resolveProductGender(["women"], ["men"]), ["women"])
+  assert.deepEqual(resolveProductGender([], ["men", "men", "unknown"]), ["men"])
+  assert.deepEqual(resolveProductGender(undefined, ["unisex"]), ["unisex"])
+  assert.deepEqual(resolveProductGender([], []), [])
+  assert.deepEqual(cleanGenderScope(["Women", "MEN", "kids", "women"]), ["women", "men"])
 })
 
 test("gate excludes invalid + emits a structured reject event", () => {
@@ -233,6 +257,14 @@ test("normalizeColorList: comma-separated multi-color", () => {
   assert.equal(normalizeColorList("gray,   YELLOW"), "Grey, Yellow")
 })
 
+test("normalizeCafe24DetailColorList: strips Cafe24 option headers and size suffixes", () => {
+  assert.equal(
+    normalizeCafe24DetailColorList("색상-사이즈, off white-FREE, natural cream-FREE"),
+    "White, Cream",
+  )
+  assert.equal(normalizeCafe24DetailColorList("empty"), "")
+})
+
 test("extractColorFromText: finds color keyword in product name", () => {
   assert.equal(extractColorFromText("Black Cotton Trousers"), "Black")
   assert.equal(extractColorFromText("Navy Blue Bomber Jacket"), "Navy")
@@ -247,6 +279,9 @@ test("isNonColorOptionText: numeric size + unit is not a color (becay 'Talla' le
   // A Shopify size option named "Talla" (Spanish) is not recognized as size,
   // so its values leaked into the color field. These must read as non-color.
   for (const v of ["36 EU", "38 eu", "40 Eu", "US 6.5", "UK 9", "43cm", "270mm"]) {
+    assert.equal(isNonColorOptionText(v), true, `${v} should be non-color`)
+  }
+  for (const v of ["empty", "색상-사이즈", "Color/Size"]) {
     assert.equal(isNonColorOptionText(v), true, `${v} should be non-color`)
   }
   // Real colors must still pass through as colors.

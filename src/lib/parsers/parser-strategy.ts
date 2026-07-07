@@ -47,8 +47,7 @@
  * @MX:SPEC: SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-004
  */
 
-import type {Page} from "playwright"
-
+import type {Cafe24Page} from "../cafe24-page"
 import type {Product} from "../types"
 import type {DetailData, IDetailParser} from "./detail"
 import {getDetailParser} from "./detail"
@@ -109,7 +108,7 @@ export interface UniqloParseInput {
 export interface Cafe24DetailInput {
   /** Site key, exactly as passed to `getDetailParser` today. */
   site: string
-  page: Page
+  page: Cafe24Page
   productUrl: string
 }
 

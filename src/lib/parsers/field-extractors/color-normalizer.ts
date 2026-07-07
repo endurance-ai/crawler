@@ -121,6 +121,37 @@ export function normalizeColorList(raw: string): string {
     .join(", ")
 }
 
+/**
+ * Normalize live Cafe24 detail option text before assigning it to Product.color.
+ *
+ * Kept separate from normalizeColorList() because the characterization goldens
+ * intentionally preserve legacy parser outputs like "Free" / "One Size".
+ */
+export function normalizeCafe24DetailColorList(raw: string): string {
+  return raw
+    .split(",")
+    .map((s) => cleanColorOptionToken(s))
+    .filter((s) => s && !isNonColorOptionText(s))
+    .map((s) => normalizeColor(s))
+    .filter(Boolean)
+    .join(", ")
+}
+
+function cleanColorOptionToken(raw: string): string {
+  let t = raw.trim().replace(/\s+/g, " ")
+  if (!t) return t
+
+  // Cafe24 option headers are often concatenated into the option list as
+  // "색상-사이즈, off white-FREE"; keep only the actual color tokens.
+  t = t.replace(/^(?:색상|컬러|color|colour)\s*[-/:：]?\s*(?:사이즈|size)?\s*$/i, "")
+  t = t.replace(/^(?:색상|컬러|color|colour)\s*[-/:：]\s*/i, "")
+  t = t.replace(
+    /\s*[-/]\s*(?:free|one\s*size|os|f|xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*(?:\[[^\]]*\]|\([^)]*\))?\s*$/i,
+    "",
+  )
+  return t.trim()
+}
+
 // ---------------------------------------------------------------------------
 // isNonColorOptionText
 // ---------------------------------------------------------------------------
@@ -141,6 +172,8 @@ export function normalizeColorList(raw: string): string {
 export function isNonColorOptionText(text: string): boolean {
   const t = text.trim()
   if (!t) return true
+  if (/^empty$/i.test(t)) return true
+  if (/^(?:color|colour|색상|컬러)\s*[-/:：]?\s*(?:size|사이즈)?$/i.test(t)) return true
   if (/^\d+$/.test(t)) return true
   if (/^\d+\s*(size|사이즈)$/i.test(t)) return true
   // Numeric value + size unit: "36 EU", "38 eu", "US 6.5", "UK 9", "43cm", "270mm".
