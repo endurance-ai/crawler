@@ -172,6 +172,18 @@ function normalizeBrand(s: string): string {
   return s.toLowerCase().trim().replace(/\s+/g, " ")
 }
 
+function extractCafe24ProductNo(productUrl: string): number | null {
+  const queryMatch = productUrl.match(/[?&]product_no=(\d+)/i)
+  if (queryMatch) return parseInt(queryMatch[1], 10)
+  const pathMatch = productUrl.match(/\/product\/[^/]+\/(\d+)(?:\/|$)/i)
+  return pathMatch ? parseInt(pathMatch[1], 10) : null
+}
+
+function importDedupKey(platform: string, productUrl: string, productNo: number | null): string {
+  if (productNo !== null) return `${platform}:product_no:${productNo}`
+  return productUrl
+}
+
 /** pg_trgm 호환 trigram set (with " " padding). */
 function trigrams(s: string): Set<string> {
   const padded = `  ${s.toLowerCase().trim()} `
@@ -502,8 +514,7 @@ async function main() {
       // gender required — product value first, brand_nodes.gender_scope fallback.
       if (gender.length === 0) return null
       // product_no 추출
-      const pnoMatch = productUrl.match(/product_no=(\d+)/)
-      const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
+      const productNo = extractCafe24ProductNo(productUrl)
 
       // 가격 정합성: integer 범위(2^31) 초과 or 비현실적 값 제거
       const MAX_PRICE = 100_000_000 // 1억원
@@ -589,11 +600,9 @@ async function main() {
       console.log(`   ⚠️  ${fxSkipped} product(s) skipped due to unknown source currency`)
     }
 
-    // Dedup by product_url — Postgres rejects ON CONFLICT batches that
-    // contain the same conflict key twice ("cannot affect row a second
-    // time"). ZARA in particular surfaces the same product across
-    // multiple category landings (e.g. new-in + outerwear + dresses),
-    // so the raw cache can carry a product_url 10+ times.
+    // Dedup by Cafe24 product_no when available, otherwise by product_url.
+    // Cafe24 path-style detail URLs include category/display segments, so the
+    // same product can appear as multiple URLs across category landings.
     //
     // Merge strategy (SPEC-005 P1 review 2026-05-06): instead of last-
     // wins, prefer non-null values when merging — sale_price, original_
@@ -625,13 +634,14 @@ async function main() {
         subcategory: pickRicher("subcategory"),
       }
     }
-    const dedupedByUrl = new Map<string, Row>()
+    const dedupedByIdentity = new Map<string, Row>()
     for (const r of rows) {
-      const existing = dedupedByUrl.get(r.product_url)
-      dedupedByUrl.set(r.product_url, existing ? merge(existing, r) : r)
+      const key = importDedupKey(r.platform, r.product_url, r.product_no)
+      const existing = dedupedByIdentity.get(key)
+      dedupedByIdentity.set(key, existing ? merge(existing, r) : r)
     }
     const beforeDedup = rows.length
-    const deduped = [...dedupedByUrl.values()]
+    const deduped = [...dedupedByIdentity.values()]
     if (beforeDedup !== deduped.length) {
       console.log(`   🧹 dedup: ${beforeDedup} → ${deduped.length} (${beforeDedup - deduped.length} duplicate product_url merged)`)
     }

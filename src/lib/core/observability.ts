@@ -68,6 +68,10 @@ export interface SiteRejectStat {
 
 const rejectReport = new Map<string, SiteRejectStat>()
 
+function shouldLogProductQcReviewEvents(): boolean {
+  return process.env.CRAWLER_LOG_PRODUCT_QC_EVENTS === "1"
+}
+
 function recordReject(ev: ValidationRejectEvent): void {
   let stat = rejectReport.get(ev.site)
   if (!stat) {
@@ -104,7 +108,7 @@ export function emit(event: CrawlerEvent): void {
       recordReject(event)
       console.warn(`[crawler-event] ${JSON.stringify(event)}`)
     } else if (event.kind === "product_qc_review") {
-      console.warn(`[crawler-event] ${JSON.stringify(event)}`)
+      if (shouldLogProductQcReviewEvents()) console.warn(`[crawler-event] ${JSON.stringify(event)}`)
     } else {
       console.log(`[crawler-event] ${JSON.stringify(event)}`)
     }

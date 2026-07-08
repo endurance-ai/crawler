@@ -16,6 +16,7 @@ export interface ProductQcInput {
   category?: string | null
   color?: string | null
   gender?: string[] | null
+  price?: number | null
   description?: string | null
   subcategory?: string | null
   tags?: string[] | null
@@ -44,13 +45,13 @@ export interface ProductQcStats {
 const qcReport = new Map<string, ProductQcStats>()
 
 const SIZE_TOKEN_RE =
-  /^(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size|size|[0-9]{1,3}(?:\.[0-9])?|us\s*[0-9.]+|eu\s*[0-9.]+)$/i
+  /^(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one|one\s*size|size|[0-9]{1,3}(?:\.[0-9])?|us\s*[0-9.]+|eu\s*[0-9.]+)$/i
 
 const SIZE_SUFFIX_RE =
   /(?:[-_\s/]+(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|free|os|one\s*size|[0-9]{1,3}(?:\.[0-9])?))$/i
 
 const NON_COLOR_RE =
-  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|select|choose|option|\+|-?\s*(?:krw|usd|eur|gbp|jpy|cny)?\s*[0-9,]+\s*(?:won|원)?)/i
+  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|select|choose|option|earrings?|earcuff|pierce|necklace|bracelet|ring|hairpin|choker|keyring|stud|cuff|bangle|pin|pendant|swatch|jewel|parts|환불|교환|반품|불가|주문제작|불량|단순변심|\+|-?\s*(?:krw|usd|eur|gbp|jpy|cny)?\s*[0-9,]+\s*(?:won|원)?)/i
 
 const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: string[]}> = [
   {
@@ -79,8 +80,16 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
     contains: ["\uadf8\ub808\uc774", "\ud68c\uc0c9", "\uc7bf\ube5b"],
   },
   {
+    canonical: "Melange",
+    patterns: [/\b(melange|m\u00e9lange|mellange)\b/i],
+  },
+  {
+    canonical: "Steel",
+    patterns: [/\b(steel)\b/i],
+  },
+  {
     canonical: "Charcoal",
-    patterns: [/\b(charcoal|anthracite|antracita)\b/i],
+    patterns: [/\b(charcoal|chacoal|chatrcoal|anthracite|antracita)\b/i],
     contains: ["\ucc28\ucf5c"],
   },
   {
@@ -89,9 +98,31 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
     contains: ["\ub124\uc774\ube44", "\uac10\uc0c9"],
   },
   {
+    canonical: "Indigo",
+    patterns: [/\b(indigo)\b/i],
+    contains: ["\uc778\ub514\uace0"],
+  },
+  {
     canonical: "Blue",
     patterns: [/\b(blue|bleu|azul|blu|blau|sky\s*blue|cobalt|royal\s*blue)\b/i],
     contains: ["\ube14\ub8e8", "\ud30c\ub791", "\ud30c\ub780\uc0c9", "\ud558\ub298\uc0c9", "\uc18c\ub77c"],
+  },
+  {
+    canonical: "Water",
+    patterns: [/\b(water)\b/i],
+  },
+  {
+    canonical: "Ice",
+    patterns: [/\b(ice)\b/i],
+  },
+  {
+    canonical: "Mint",
+    patterns: [/\b(mint)\b/i],
+    contains: ["\ubbfc\ud2b8"],
+  },
+  {
+    canonical: "Teal",
+    patterns: [/\b(teal|turquoise|aqua)\b/i],
   },
   {
     canonical: "Beige",
@@ -100,7 +131,7 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
   },
   {
     canonical: "Sand",
-    patterns: [/\b(sand|stone|oatmeal|oat)\b/i],
+    patterns: [/\b(sand|oatmeal|oat)\b/i],
     contains: ["\uc0cc\ub4dc"],
   },
   {
@@ -134,9 +165,17 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
     contains: ["\ub808\ub4dc", "\ube68\uac15", "\ube68\uac04\uc0c9", "\uc801\uc0c9"],
   },
   {
+    canonical: "Magenta",
+    patterns: [/\b(magenta)\b/i],
+  },
+  {
     canonical: "Pink",
     patterns: [/\b(pink|rose|rosa|blush)\b/i],
     contains: ["\ud551\ud06c", "\ubd84\ud64d"],
+  },
+  {
+    canonical: "Peach",
+    patterns: [/\b(peach)\b/i],
   },
   {
     canonical: "Purple",
@@ -147,6 +186,10 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
     canonical: "Green",
     patterns: [/\b(green|vert|verde|grun|gr\u00fcn|sage|forest|hunter)\b/i],
     contains: ["\uadf8\ub9b0", "\ub179\uc0c9", "\ucd08\ub85d"],
+  },
+  {
+    canonical: "Camo",
+    patterns: [/\b(camo|camouflage)\b/i],
   },
   {
     canonical: "Olive",
@@ -216,6 +259,37 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
     patterns: [/\b(top|tee|t[-\s]?shirt|shirt|blouse|polo|sweater|knit|tank|camisole|sweatshirt|hoodie)\b/i],
     contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ub2c8\ud2b8", "\uc2a4\uc6e8\ud130", "\ud6c4\ub4dc"],
   },
+]
+
+const URL_COLOR_SUFFIXES: Array<{canonical: string; suffixes: string[]}> = [
+  {canonical: "Charcoal", suffixes: ["charcoal", "chacoal", "chatrcoal"]},
+  {canonical: "Melange", suffixes: ["melange", "mellange"]},
+  {canonical: "Magenta", suffixes: ["magenta"]},
+  {canonical: "Burgundy", suffixes: ["burgundy"]},
+  {canonical: "Indigo", suffixes: ["indigo"]},
+  {canonical: "Purple", suffixes: ["purple"]},
+  {canonical: "Yellow", suffixes: ["yellow"]},
+  {canonical: "Orange", suffixes: ["orange"]},
+  {canonical: "Silver", suffixes: ["silver"]},
+  {canonical: "Ivory", suffixes: ["ivory"]},
+  {canonical: "Cream", suffixes: ["cream"]},
+  {canonical: "Beige", suffixes: ["beige"]},
+  {canonical: "Brown", suffixes: ["brown"]},
+  {canonical: "White", suffixes: ["white"]},
+  {canonical: "Black", suffixes: ["black"]},
+  {canonical: "Green", suffixes: ["green"]},
+  {canonical: "Peach", suffixes: ["peach"]},
+  {canonical: "Water", suffixes: ["water"]},
+  {canonical: "Olive", suffixes: ["olive"]},
+  {canonical: "Khaki", suffixes: ["khaki"]},
+  {canonical: "Camo", suffixes: ["camouflage", "camo"]},
+  {canonical: "Mint", suffixes: ["mint"]},
+  {canonical: "Navy", suffixes: ["navy"]},
+  {canonical: "Grey", suffixes: ["grey", "gray"]},
+  {canonical: "Blue", suffixes: ["skyblue", "blue"]},
+  {canonical: "Pink", suffixes: ["pink"]},
+  {canonical: "Gold", suffixes: ["gold"]},
+  {canonical: "Ice", suffixes: ["ice"]},
 ]
 
 const CATEGORY_COMPAT: Record<string, Category> = {
@@ -334,13 +408,68 @@ function canonicalColorFromText(text: string): string | null {
   return null
 }
 
+function nonProductReason(product: ProductQcInput): string | null {
+  const name = normalizeForMatch(product.name)
+  const category = normalizeForMatch(product.category ?? "")
+  const likelyAccessoryBucket = /\b(acc|accessor(?:y|ies)|etc|obj)\b/.test(category)
+  const magazineTitle = /\b(vogue|elle|the face|magazine)\b/.test(name)
+  const magazineIssue = /\b(edition|cover|19\d{2}|20\d{2})\b/.test(name)
+  const suspiciousLowPrice = typeof product.price === "number" && product.price > 0 && product.price < 5000
+
+  if (likelyAccessoryBucket && magazineTitle && (magazineIssue || suspiciousLowPrice)) return "non_product_magazine"
+  return null
+}
+
 function isNonColorToken(token: string): boolean {
+  const raw = token.trim()
   const t = normalizeForMatch(token)
   if (!t) return true
+  if (canonicalColorFromText(token)) return false
+  if (/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*(?:\ub77c\uc9c0|\ubbf8\ub514\uc6c0|\uc2a4\ubab0|\ub300|\uc911|\uc18c)$/i.test(raw)) return true
   if (SIZE_TOKEN_RE.test(t)) return true
-  if (NON_COLOR_RE.test(t)) return true
+  if (/\b[a-z0-9][a-z0-9\s.'-]*\s+x\s+[a-z0-9][a-z0-9\s.'-]*\b/i.test(raw)) return true
+  if (NON_COLOR_RE.test(raw) || NON_COLOR_RE.test(t)) return true
   if (/^\*+$/.test(t)) return true
   return false
+}
+
+function cafe24SlugSegment(productUrl?: string | null): string | null {
+  if (!productUrl) return null
+  let pathname = productUrl
+  try {
+    pathname = new URL(productUrl).pathname
+  } catch {
+    // Keep the raw value for relative or malformed-but-useful paths.
+  }
+
+  const parts = pathname.split("/").filter(Boolean)
+  const productIndex = parts.findIndex((part) => part.toLowerCase() === "product")
+  if (productIndex === -1) return null
+  const slug = parts[productIndex + 1]
+  if (!slug || /^detail\.html$/i.test(slug)) return null
+  try {
+    return decodeURIComponent(slug)
+  } catch {
+    return slug
+  }
+}
+
+function canonicalColorFromCafe24Slug(productUrl?: string | null): string | null {
+  const slug = cafe24SlugSegment(productUrl)
+  if (!slug) return null
+
+  const normalized = normalizeForMatch(slug).replace(/[^a-z0-9]+/g, "")
+  if (!normalized) return null
+
+  for (const rule of URL_COLOR_SUFFIXES) {
+    for (const suffix of rule.suffixes) {
+      if (normalized.endsWith(suffix) && normalized.length >= suffix.length + 4) {
+        return rule.canonical
+      }
+    }
+  }
+
+  return null
 }
 
 function colorCandidates(raw: string): string[] {
@@ -372,14 +501,34 @@ function normalizeColorField(product: ProductQcInput): {
   if (!raw) {
     const fallback = canonicalColorFromText(textFallback)
     if (fallback) return {value: fallback, reason: "color_missing_text_fallback", confidence: 0.86, needsReview: false}
+    const urlFallback = canonicalColorFromCafe24Slug(product.productUrl)
+    if (urlFallback) return {value: urlFallback, reason: "color_missing_url_fallback", confidence: 0.82, needsReview: false}
     return {value: null, reason: "color_missing", confidence: 0, needsReview: true}
   }
 
   const candidates = colorCandidates(raw)
   const nonNoise = candidates.filter((candidate) => !isNonColorToken(candidate))
   const canonical = [...new Set(nonNoise.map(canonicalColorFromText).filter((v): v is string => Boolean(v)))]
+  const nameFallback = canonicalColorFromText(product.name)
+  const urlFallback = canonicalColorFromCafe24Slug(product.productUrl)
 
   if (canonical.length > 0) {
+    if (canonical.length === 1 && urlFallback && canonical[0] !== urlFallback) {
+      return {
+        value: urlFallback,
+        reason: "color_single_option_url_fallback",
+        confidence: 0.88,
+        needsReview: false,
+      }
+    }
+    if (canonical.length > 1 && nameFallback && canonical.includes(nameFallback)) {
+      return {
+        value: nameFallback,
+        reason: "color_multi_option_name_fallback",
+        confidence: 0.9,
+        needsReview: false,
+      }
+    }
     return {
       value: canonical.slice(0, 5).join(", "),
       reason: "color_canonicalized",
@@ -391,6 +540,7 @@ function normalizeColorField(product: ProductQcInput): {
   if (nonNoise.length === 0) {
     const fallback = canonicalColorFromText(textFallback)
     if (fallback) return {value: fallback, reason: "color_noise_text_fallback", confidence: 0.88, needsReview: false}
+    if (urlFallback) return {value: urlFallback, reason: "color_noise_url_fallback", confidence: 0.84, needsReview: false}
     return {value: null, reason: "color_non_color_unresolved", confidence: 0.1, needsReview: true}
   }
 
@@ -476,6 +626,17 @@ function normalizeGenderField(product: ProductQcInput): {
 }
 
 export function normalizeProductTextFields<T extends ProductQcInput>(product: T): ProductQcResult<T> {
+  const nonProduct = nonProductReason(product)
+  if (nonProduct) {
+    return {
+      action: "reject",
+      product,
+      changes: [],
+      reasons: [nonProduct],
+      confidence: 0.98,
+    }
+  }
+
   const next = {...product} as T
   const changes: ProductQcFieldChange[] = []
   const reasons: string[] = []

@@ -26,10 +26,13 @@ const CANONICAL: [RegExp, string][] = [
   [/\bwhite\b|화이트|흰/i,                                     "White"],
   [/\b(off[-\s]white|offwhite|ivory|ecru)\b|아이보리|크림/i,   "Ivory"],
   [/\b(cream)\b/i,                                             "Cream"],
-  [/\b(charcoal)\b|차콜/i,                                     "Charcoal"],
+  [/\b(charcoal|chacoal|chatrcoal)\b|차콜/i,                   "Charcoal"],
   [/\b(gr[ae]y)\b|그레이|회색/i,                               "Grey"],
+  [/\b(melange|mélange|mellange)\b/i,                          "Melange"],
+  [/\b(steel)\b/i,                                             "Steel"],
   [/\bbeige\b|베이지/i,                                        "Beige"],
-  [/\b(sand|stone|oatmeal|oat)\b/i,                            "Sand"],
+  [/\b(taupe|greige)\b/i,                                      "Taupe"],
+  [/\b(sand|oatmeal|oat)\b/i,                                  "Sand"],
   [/\b(camel)\b|카멜/i,                                        "Camel"],
   [/\b(tan)\b/i,                                               "Tan"],
   [/\b(khaki)\b|카키/i,                                        "Khaki"],
@@ -44,8 +47,11 @@ const CANONICAL: [RegExp, string][] = [
   [/\b(cobalt|royal\s*blue)\b/i,                               "Cobalt"],
   [/\b(sky\s*blue|skyblue)\b|블루|파랑|소라|하늘색|스카이/i,   "Blue"],
   [/\bblue\b/i,                                                "Blue"],
+  [/\b(water)\b/i,                                             "Water"],
+  [/\b(ice)\b/i,                                               "Ice"],
   [/\b(teal|turquoise|aqua)\b/i,                               "Teal"],
   [/\bmint\b|민트/i,                                           "Mint"],
+  [/\b(camo|camouflage)\b/i,                                   "Camo"],
 
   // Greens
   [/\b(olive)\b|올리브/i,                                      "Olive"],
@@ -55,7 +61,9 @@ const CANONICAL: [RegExp, string][] = [
   // Reds / Pinks
   [/\b(burgundy|crimson|scarlet)\b|자주/i,                     "Burgundy"],
   [/\bred\b|레드|빨강|다홍/i,                                  "Red"],
+  [/\b(magenta)\b/i,                                           "Magenta"],
   [/\b(pink|blush|rose)\b|핑크|분홍/i,                        "Pink"],
+  [/\b(peach)\b/i,                                             "Peach"],
   [/\b(coral)\b|코랄/i,                                        "Coral"],
 
   // Purples
@@ -183,6 +191,7 @@ export function isNonColorOptionText(text: string): boolean {
   if (/^\d+(\.\d+)?\s*(eu|us|uk|cm|mm|inch|in)\b/i.test(t)) return true
   if (/^(us|uk|eu)\s*\d/i.test(t)) return true
   if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t)) return true
+  if (/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*(?:라지|미디움|스몰|대|중|소)$/i.test(t)) return true
   if (/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t)) return true
   // "SIZE" / "Size, 43cm, 45cm" / "Size, US 5.5, US 6.5" — the literal word "size"
   // (any case) as the whole token or leading token, not just abbreviations like
@@ -206,8 +215,9 @@ export function isNonColorOptionText(text: string): boolean {
  */
 export function extractColorFromText(text: string): string | null {
   if (!text) return null
+  const normalized = text.replace(/[_-]+/g, " ")
   for (const [re, canonical] of CANONICAL) {
-    if (re.test(text)) return canonical
+    if (re.test(text) || re.test(normalized)) return canonical
   }
   return null
 }

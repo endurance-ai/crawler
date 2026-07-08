@@ -22,6 +22,7 @@ import {
   cleanCafe24ProductName,
   dedupeAndFilterCafe24Categories,
   extractCafe24DetailFallbacks,
+  isCafe24ProductDetailUrl,
   parseCafe24CategoryHref,
   runFirstUsefulCafe24Step,
   type Cafe24CategoryCandidate,
@@ -36,6 +37,22 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise
       setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms)
     ),
   ])
+
+function cafe24ProductIdentity(productUrl: string): string {
+  try {
+    const url = new URL(productUrl)
+    const productNo = url.searchParams.get("product_no")
+    if (productNo) return `${url.origin}/product_no/${productNo}`
+    const pathMatch = url.pathname.match(/\/product\/[^/]+\/(\d+)(?:\/|$)/i)
+    if (pathMatch) return `${url.origin}/product_no/${pathMatch[1]}`
+  } catch {
+    const queryMatch = productUrl.match(/[?&]product_no=(\d+)/i)
+    if (queryMatch) return `product_no/${queryMatch[1]}`
+    const pathMatch = productUrl.match(/\/product\/[^/]+\/(\d+)(?:\/|$)/i)
+    if (pathMatch) return `product_no/${pathMatch[1]}`
+  }
+  return productUrl
+}
 
 // ─── 기본 셀렉터 (폴백 체인) ──────────────────────────
 
@@ -631,13 +648,22 @@ export async function crawlCafe24(
     await new Promise((r) => setTimeout(r, delay))
   }
 
-  // 중복 제거 + 품절 제외 (productUrl 기준)
-  const seen = new Set<string>()
-  const uniqueProducts = allProducts.filter((p) => {
-    if (!p.productUrl || seen.has(p.productUrl)) return false
-    seen.add(p.productUrl)
-    return true
-  }).filter((p) => p.inStock)
+  // 중복 제거 + 품절 제외. Cafe24 path-style URL은 같은 product_no라도 category/display
+  // segment가 달라질 수 있어 상품번호 정규화 키를 우선 사용한다.
+  const byUrl = new Map<string, Product>()
+  for (const product of allProducts) {
+    if (!product.productUrl) continue
+    const key = cafe24ProductIdentity(product.productUrl)
+    const existing = byUrl.get(key)
+    if (!existing) {
+      byUrl.set(key, product)
+      continue
+    }
+    mergeCafe24DuplicateProduct(existing, product, config.defaultGender || [])
+  }
+  const uniqueProducts = [...byUrl.values()].filter((p) => {
+    return p.inStock && isCafe24ProductDetailUrl(p.productUrl)
+  })
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
   if (config.crawlDetails && detailParser) {
@@ -669,7 +695,13 @@ export async function crawlCafe24(
             // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
             // 상세크롤을 반복하지 않기 위함).
             const known = options.existingDetails?.get(product.productUrl)
-            if (known && known.color) {
+            if (known && known.color && typeof known.price === "number") {
+              product.color = product.color || known.color
+              if (product.price === null) {
+                product.price = known.price
+                product.originalPrice = product.originalPrice ?? known.price
+                product.priceFormatted = product.priceFormatted || `₩${known.price.toLocaleString()}`
+              }
               return {product, detail: known, detailFallbacks: null}
             }
             const pg = workerLeases[slot]!.page
@@ -826,4 +858,46 @@ export async function crawlCafe24(
   console.log(`\n${tag} ✅ 완료: ${result.stats.totalProducts}개 상품 | 재고 ${result.stats.inStock}개 | ${result.stats.uniqueBrands}개 브랜드 | ${(result.stats.duration / 1000).toFixed(1)}s`)
 
   return result
+}
+
+function mergeCafe24DuplicateProduct(target: Product, source: Product, defaultGender: string[]): void {
+  if (target.price === null && source.price !== null) target.price = source.price
+  if (target.originalPrice === null && source.originalPrice !== null) target.originalPrice = source.originalPrice
+  if (target.salePrice === null && source.salePrice !== null) target.salePrice = source.salePrice
+  if (!target.priceFormatted && source.priceFormatted) target.priceFormatted = source.priceFormatted
+  if (!target.imageUrl && source.imageUrl) target.imageUrl = source.imageUrl
+  if (!target.color && source.color) target.color = source.color
+  if (!target.description && source.description) target.description = source.description
+  if (!target.material && source.material) target.material = source.material
+  if (!target.productCode && source.productCode) target.productCode = source.productCode
+  target.inStock = target.inStock || source.inStock
+
+  if (shouldPreferCafe24Gender(source.gender, target.gender, defaultGender)) {
+    target.gender = source.gender
+    target.category = source.category || target.category
+  }
+}
+
+function shouldPreferCafe24Gender(
+  candidate: string[],
+  current: string[],
+  defaultGender: string[],
+): boolean {
+  if (candidate.length === 0) return false
+  const candidateSpecific = hasSpecificCafe24Gender(candidate)
+  const currentSpecific = hasSpecificCafe24Gender(current)
+  if (candidateSpecific && !currentSpecific) return true
+
+  const currentKey = genderKey(current)
+  const defaultKey = genderKey(defaultGender)
+  const candidateKey = genderKey(candidate)
+  return currentKey === defaultKey && candidateKey !== defaultKey
+}
+
+function hasSpecificCafe24Gender(gender: string[]): boolean {
+  return gender.some((value) => value === "men" || value === "women")
+}
+
+function genderKey(gender: string[]): string {
+  return [...new Set(gender)].sort().join("|")
 }

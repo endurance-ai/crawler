@@ -61,6 +61,74 @@ export async function genericCafe24Color(page: Cafe24Page): Promise<string | nul
         if (m && m[1]) out.push(m[1].trim())
       }
 
+      // 4. Cafe24 option JS payload. Some themes do not render option
+      // <select> elements until client scripts finish, but expose stock data as
+      // globals such as option_stock_data / option_value_mapper.
+      var win = window as unknown as Record<string, unknown>
+      var optionNames = String(win.option_name_mapper || "")
+        .split("#$%")
+        .map(function (s) { return s.trim().toLowerCase() })
+      var colorIndex = optionNames.findIndex(function (s) {
+        return /^(?:color|colour|색상|컬러)$/.test(s)
+      })
+
+      var pushOptionColors = function (raw: unknown) {
+        if (!raw) return
+        var data = raw
+        if (typeof raw === "string") {
+          try {
+            data = JSON.parse(raw)
+          } catch {
+            return
+          }
+        }
+        if (!data || typeof data !== "object") return
+
+        var entries = Array.isArray(data)
+          ? data
+          : Object.keys(data as Record<string, unknown>).map(function (key) {
+            return (data as Record<string, unknown>)[key]
+          })
+
+        for (var oi = 0; oi < entries.length; oi++) {
+          var entry = entries[oi] as Record<string, unknown>
+          if (!entry || typeof entry !== "object") continue
+
+          var names = Array.isArray(entry.option_name_original)
+            ? entry.option_name_original.map(function (v) { return String(v).trim().toLowerCase() })
+            : optionNames
+          var idx = names.findIndex(function (s) {
+            return /^(?:color|colour|색상|컬러)$/.test(s)
+          })
+          if (idx < 0) idx = colorIndex
+
+          var values = Array.isArray(entry.option_value_orginal)
+            ? entry.option_value_orginal.map(function (v) { return String(v).trim() })
+            : String(entry.option_value || "").split("#$%")
+          if (idx >= 0 && values[idx]) {
+            out.push(values[idx])
+          } else if (typeof entry.option_value === "string") {
+            out.push(entry.option_value)
+          }
+        }
+      }
+
+      pushOptionColors(win.option_stock_data)
+
+      if (typeof win.option_value_mapper === "string") {
+        try {
+          var mapper = JSON.parse(win.option_value_mapper)
+          var keys = Object.keys(mapper)
+          for (var mk = 0; mk < keys.length; mk++) {
+            var parts = keys[mk].split("#$%")
+            if (colorIndex >= 0 && parts[colorIndex]) out.push(parts[colorIndex])
+            else if (parts[0]) out.push(parts[0])
+          }
+        } catch {
+          // ignore malformed theme data
+        }
+      }
+
       return out.slice(0, 40).join(", ")
       /* eslint-enable no-var */
     })

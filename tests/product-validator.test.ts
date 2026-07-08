@@ -250,6 +250,7 @@ test("normalizeColor: Korean → English canonical", () => {
 
 test("normalizeColor: compound color keyword (Pigment Charcoal → Charcoal)", () => {
   assert.equal(normalizeColor("Pigment Charcoal"), "Charcoal")
+  assert.equal(normalizeColor("CHACOAL"), "Charcoal")
 })
 
 test("normalizeColorList: comma-separated multi-color", () => {
@@ -268,6 +269,13 @@ test("normalizeCafe24DetailColorList: strips Cafe24 option headers and size suff
 test("extractColorFromText: finds color keyword in product name", () => {
   assert.equal(extractColorFromText("Black Cotton Trousers"), "Black")
   assert.equal(extractColorFromText("Navy Blue Bomber Jacket"), "Navy")
+  assert.equal(extractColorFromText("Halter Hood Sleeveless Top - CHACOAL"), "Charcoal")
+  assert.equal(extractColorFromText("Pencil Graphic Logo One Shoulder_Chatrcoal"), "Charcoal")
+  assert.equal(extractColorFromText("MMM Signature Logo Sweat Shirts_Mellange"), "Melange")
+  assert.equal(extractColorFromText("Raw Lettering Pants / Steel"), "Steel")
+  assert.equal(extractColorFromText("Cut-out Shaper Shorts - CAMO"), "Camo")
+  assert.equal(extractColorFromText("TBD Fleece Camp Cap_MAGENTA"), "Magenta")
+  assert.equal(extractColorFromText("Western Washed Long Sleeve T-Shirt_PEACH"), "Peach")
 })
 
 test("extractColorFromText: returns null when no keyword found", () => {

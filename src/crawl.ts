@@ -882,10 +882,11 @@ function loadExistingDetails(outDir: string, platform: string): Map<string, Deta
   try {
     const prior = JSON.parse(fs.readFileSync(outPath, "utf-8")) as Product[]
     for (const p of prior) {
-      if (p.productUrl && p.color) {
+      if (p.productUrl && p.color && p.price !== null) {
         map.set(p.productUrl, {
           color: p.color,
           description: p.description ?? null,
+          price: p.price,
           material: p.material ?? null,
           productCode: p.productCode ?? null,
         })

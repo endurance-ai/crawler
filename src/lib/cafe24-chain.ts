@@ -56,6 +56,7 @@ export function parseCafe24CategoryHref(
   const isProductDetail =
     /\/product\//i.test(pathname) && !/\/product\/list\.html$/i.test(pathname)
   if (isProductDetail) return null
+  if (/\/(?:lookbook|collection|collections|project|portfolio|gallery)\//i.test(pathname)) return null
   if (/\/(?:board|member|order|myshop|article)\//i.test(pathname)) return null
 
   const queryCateNo = url.searchParams.get("cate_no")
@@ -114,6 +115,10 @@ export function isNoisyCafe24CategoryName(name: string, ignorePatterns: string[]
     "shop home",
     "login",
     "member",
+    "more",
+    "more >",
+    "gift zone",
+    "premium gift zone",
     "cart",
     "order",
     "mypage",
@@ -162,6 +167,45 @@ export function isNoisyCafe24CategoryName(name: string, ignorePatterns: string[]
   return ignorePatterns.some((pattern) => lower === pattern.toLowerCase())
 }
 
+function isAggregateCafe24CategoryName(name: string): boolean {
+  const lower = cleanCategoryName(name).toLowerCase()
+  if (!lower) return true
+
+  const exact = new Set([
+    "all",
+    "all product",
+    "all products",
+    "archive",
+    "archives",
+    "best",
+    "best item",
+    "best items",
+    "best seller",
+    "best sellers",
+    "collection",
+    "collections",
+    "continue shopping",
+    "men",
+    "mens",
+    "new",
+    "new arrival",
+    "new arrivals",
+    "new in",
+    "restock",
+    "restocked",
+    "see all",
+    "shop",
+    "shop all",
+    "shop now",
+    "women",
+    "womens",
+  ])
+  if (exact.has(lower)) return true
+
+  if (lower.startsWith("find your")) return true
+  return /^(?:\d{2,4}\s*)?(?:s\/s|f\/w|spring|summer|fall|winter)\b/i.test(lower)
+}
+
 export function dedupeAndFilterCafe24Categories(
   categories: Cafe24CategoryCandidate[],
   ignorePatterns: string[] = [],
@@ -174,7 +218,20 @@ export function dedupeAndFilterCafe24Categories(
     if (isNoisyCafe24CategoryName(category.name, ignorePatterns)) continue
     out.push(category)
   }
-  return out
+  const specific = out.filter((category) => !isAggregateCafe24CategoryName(category.name))
+  return specific.length > 0 ? specific : out
+}
+
+export function isCafe24ProductDetailUrl(rawUrl: string | null | undefined): boolean {
+  if (!rawUrl) return false
+  try {
+    const url = new URL(rawUrl)
+    const pathname = url.pathname
+    if (/\/product\/list\.html$/i.test(pathname)) return false
+    return /\/product\//i.test(pathname)
+  } catch {
+    return false
+  }
 }
 
 export function cleanCafe24ProductName(raw: string | null | undefined): string {
@@ -232,13 +289,50 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       }
 
       var priceText = ""
-      var rowEls = document.querySelectorAll("tr, li, .xans-product-detaildesign, .infoArea, .price, [class*=price], [class*=Price]")
+      var rowEls = document.querySelectorAll("tr, li, .xans-product-detaildesign, .infoArea, .price, [class*=price], [class*=Price], .cont_detail, #prdDetail, .product-detail")
       for (var r = 0; r < rowEls.length; r++) {
         var rowText = (rowEls[r].textContent || "").replace(/\s+/g, " ").trim()
         if (!rowText) continue
-        if (/할인판매가|판매가|price|KRW|₩|￦/i.test(rowText)) {
+        if (/할인판매가|판매가|price|KRW|₩|￦|\bwon\b/i.test(rowText)) {
           priceText += " " + rowText
         }
+      }
+
+      var directPriceEls = document.querySelectorAll([
+        "#span_product_price_sale",
+        "#span_product_price_text",
+        "#ec-product-price-info",
+        "meta[property='product:sale_price:amount']",
+        "meta[property='product:price:amount']",
+        "meta[itemprop='price']",
+      ].join(","))
+      for (var pr = 0; pr < directPriceEls.length; pr++) {
+        var priceEl = directPriceEls[pr]
+        var attrPrice =
+          priceEl.getAttribute("content") ||
+          priceEl.getAttribute("ec-data-price") ||
+          priceEl.getAttribute("ec-data-custom") ||
+          priceEl.getAttribute("value") ||
+          ""
+        var directText = ((priceEl as HTMLElement).innerText || priceEl.textContent || attrPrice || "")
+          .replace(/\s+/g, " ")
+          .trim()
+        if (directText) priceText += " " + directText
+        if (attrPrice && attrPrice !== directText) priceText += " " + attrPrice
+      }
+
+      var win = window as typeof window & Record<string, unknown>
+      var salePrice = win.product_sale_price
+      var productPrice = win.product_price
+      var mobilePrice = win.product_price_mobile
+      if (typeof salePrice === "number" || typeof salePrice === "string") {
+        priceText += " sale_price " + String(salePrice)
+      }
+      if (typeof productPrice === "number" || typeof productPrice === "string") {
+        priceText += " product_price " + String(productPrice)
+      }
+      if (typeof mobilePrice === "number" || typeof mobilePrice === "string") {
+        priceText += " product_price_mobile " + String(mobilePrice)
       }
 
       var descFirstLine = ""
@@ -305,13 +399,19 @@ function parseCafe24Price(text: string): number | null {
   const clean = text.replace(/,/g, "")
   const preferred =
     clean.match(/할인판매가\s*[:：]?\s*[₩￦]?\s*(\d{4,})/) ??
+    clean.match(/(?:sale_price|span_product_price_sale|product:sale_price:amount)\D{0,40}(\d{4,})/i) ??
     clean.match(/판매가\s*[:：]?\s*[₩￦]?\s*(\d{4,})/) ??
+    clean.match(/(?:product_price|span_product_price_text|product:price:amount)\D{0,40}(\d{4,})/i) ??
+    clean.match(/"price"\s*:\s*"?(\d{4,})/i) ??
     clean.match(/price\s*[:：]?\s*(?:KRW)?\s*[₩￦]?\s*(\d{4,})/i) ??
     clean.match(/[₩￦]\s*(\d{4,})/) ??
     clean.match(/KRW\s*(\d{4,})/i)
 
-  if (!preferred?.[1]) return null
-  const price = Number(preferred[1])
+  const wonMatches = [...clean.matchAll(/(\d{4,})\s*won\b/gi)].map((m) => Number(m[1]))
+  const price = preferred?.[1]
+    ? Number(preferred[1])
+    : (wonMatches.length > 0 ? wonMatches[wonMatches.length - 1] : null)
+  if (price === null) return null
   return Number.isFinite(price) && price >= 1000 ? price : null
 }
 
