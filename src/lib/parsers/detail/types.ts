@@ -1,4 +1,4 @@
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 
 export interface DetailData {
   description: string | null
@@ -8,5 +8,5 @@ export interface DetailData {
 }
 
 export interface IDetailParser {
-  parse(page: Page, productUrl: string): Promise<DetailData>
+  parse(page: Cafe24Page, productUrl: string): Promise<DetailData>
 }

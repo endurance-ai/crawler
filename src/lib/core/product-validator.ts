@@ -6,8 +6,8 @@
  * 규칙 도입도 하지 않는다. 유효 product 는 변형 없이 그대로 통과하고, 무효
  * product (필수 필드 누락 / 타입 불일치) 만 write 에서 차단된다.
  *
- * 방침 A 예외 — category / color:
- * products 테이블에 NOT NULL 제약 적용(migration 091) 에 따라 두 필드는
+ * 방침 A 예외 — category / color / gender:
+ * products 테이블에 필수 제약 적용(migration 091) 에 따라 세 필드는
  * 빈 문자열·null 모두 거부한다. 추출 불가 상품은 적재하지 않는다.
  *
  * 스키마 결정 근거 (cross-check 소스):
@@ -24,6 +24,7 @@
 
 import {z} from "zod"
 import type {Product} from "../types.js"
+import {PRODUCT_GENDER_VALUES} from "../product-gender.js"
 
 // @MX:ANCHOR: [AUTO] validateProduct() is the crawler write-boundary contract —
 //   every product crossing into JSON output or DB upsert passes through here.
@@ -41,7 +42,7 @@ const optionalStringOrNull = z.string().nullish()
  *
  * - base 필드: golden 상 100% 존재. 단 `Product` 타입상 price 3종은
  *   `number | null`, salePrice 는 null 빈번 → number|null 수용.
- * - gender: `string[]` (항상 배열로 출력).
+ * - gender: `men|women|unisex` 중 하나 이상 (recommendation 필수 신호).
  * - detail/리뷰 필드: 모두 선택. 현재 출력에서 null 또는 잡텍스트가 나올 수
  *   있으므로 reject 하지 않는다 (방침 A — 깨진 동작 보존).
  * - passthrough: 알 수 없는 추가 키가 있어도 reject 하지 않고 그대로 통과
@@ -59,7 +60,7 @@ export const ProductSchema = z
     imageUrl: z.string(),
     productUrl: z.string(),
     inStock: z.boolean(),
-    gender: z.array(z.string()),
+    gender: z.array(z.enum(PRODUCT_GENDER_VALUES)).min(1),
     platform: z.string(),
     crawledAt: z.string(),
     // ── 상세 페이지 데이터 (선택) ──

@@ -24,7 +24,7 @@ import * as assert from "node:assert/strict"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import {fileURLToPath} from "node:url"
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../src/lib/cafe24-page"
 
 import {
   ParserRegistry,
@@ -203,7 +203,7 @@ test("REQ-004 Cafe24DetailParserStrategy.parse delegates verbatim to getDetailPa
     goto: async () => {
       throw new Error("stub: navigation suppressed (deterministic delegation probe)")
     },
-  } as unknown as Page
+  } as unknown as Cafe24Page
 
   const site = "eastlogue"
   const url = "https://example.test/product/1"

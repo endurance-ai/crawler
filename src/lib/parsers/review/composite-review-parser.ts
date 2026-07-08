@@ -4,7 +4,7 @@
  * Board 파서를 먼저 시도하고, 리뷰가 없으면 원래 URL로 돌아가서 Inline을 시도한다.
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {IReviewParser, ReviewData} from "./types"
 import {BoardReviewParser} from "./board-review-parser"
 import {InlineReviewParser} from "./inline-review-parser"
@@ -19,7 +19,7 @@ export class CompositeReviewParser implements IReviewParser {
     ]
   }
 
-  async parse(page: Page, maxReviews: number): Promise<ReviewData> {
+  async parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData> {
     const currentUrl = page.url()
 
     for (const strategy of this.strategies) {
