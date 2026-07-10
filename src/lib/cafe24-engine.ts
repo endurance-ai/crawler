@@ -96,6 +96,22 @@ interface CrawlTiming {
   listWaitMs: number
 }
 
+export interface Cafe24CrawlOptions {
+  /** POC-only cap for list/detail work; omitted in production crawl paths. */
+  sampleLimit?: number
+}
+
+function countUniqueInStockProducts(products: Product[]): number {
+  const seen = new Set<string>()
+  let count = 0
+  for (const p of products) {
+    if (!p.inStock || !p.productUrl || seen.has(p.productUrl)) continue
+    seen.add(p.productUrl)
+    count++
+  }
+  return count
+}
+
 async function discoverCategories(
   page: Page,
   config: SiteConfig
@@ -515,6 +531,7 @@ export async function crawlCafe24(
   reviewParser?: IReviewParser,
   onDetailProgress?: (products: Product[]) => void,
   existingDetails?: Map<string, DetailData>,
+  options: Cafe24CrawlOptions = {},
 ): Promise<CrawlResult> {
   const startTime = Date.now()
   const errors: string[] = []
@@ -589,6 +606,11 @@ export async function crawlCafe24(
           `${tag}    ${p.priceFormatted || "가격없음"} — ${p.brand || "?"} | ${p.name.slice(0, 50)}${stock}`
         )
       }
+
+      if (options.sampleLimit && countUniqueInStockProducts(allProducts) >= options.sampleLimit) {
+        console.log(`${tag} POC sampleLimit=${options.sampleLimit} reached; stopping category crawl`)
+        break
+      }
     } catch (err) {
       const msg = `${cat.name} 수집 실패: ${err}`
       console.error(`${tag} ❌ ${msg}`)
@@ -600,11 +622,14 @@ export async function crawlCafe24(
 
   // 중복 제거 + 품절 제외 (productUrl 기준)
   const seen = new Set<string>()
-  const uniqueProducts = allProducts.filter((p) => {
+  const dedupedProducts = allProducts.filter((p) => {
     if (!p.productUrl || seen.has(p.productUrl)) return false
     seen.add(p.productUrl)
     return true
   }).filter((p) => p.inStock)
+  const uniqueProducts = options.sampleLimit
+    ? dedupedProducts.slice(0, options.sampleLimit)
+    : dedupedProducts
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
   if (config.crawlDetails && detailParser) {
