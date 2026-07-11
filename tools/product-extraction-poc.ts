@@ -1,10 +1,11 @@
 #!/usr/bin/env npx tsx
 
-import {createHash} from "crypto"
 import {promises as fs} from "fs"
 import * as path from "path"
 import {fileURLToPath} from "url"
-import OpenAI from "openai"
+import {openai} from "@ai-sdk/openai"
+import {Output, wrapLanguageModel} from "ai"
+import LLMScraper from "llm-scraper"
 import {chromium, type Page} from "playwright"
 import {z} from "zod"
 import {getSiteConfig} from "../src/configs/platforms"
@@ -13,13 +14,21 @@ import {crawlShopify} from "../src/lib/shopify-engine"
 import {getDetailParser} from "../src/lib/parsers/detail"
 import type {CrawlResult, Product, SiteConfig} from "../src/lib/types"
 
-type Variant = "existing" | "firecrawl" | "llm-scraper"
+type Variant = "existing" | "firecrawl" | "llm-scraper" | "hybrid"
+type ScrapeFormat = "markdown" | "html" | "raw_html"
 
 const DEFAULT_BRANDS = ["shopamomento", "pottery", "hamsaseyo", "rollingstudios", "becay"]
-const DEFAULT_VARIANTS: Variant[] = ["existing", "firecrawl", "llm-scraper"]
+const DEFAULT_VARIANTS: Variant[] = ["existing", "llm-scraper"]
+const DEFAULT_FORMAT: ScrapeFormat = "markdown"
 const CRAWLER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const REQUIRED_FIELDS = ["product_key", "name", "price", "currency", "image_url", "product_url", "in_stock"] as const
+// Graded separately: `existing` fills every REQUIRED_FIELD on 4/5 brands, so the
+// real quality signal lives here (raw nav labels leaking into category, null colors).
+const CLASSIFICATION_FIELDS = ["category", "subcategory", "color", "description"] as const
 const LOW_CONFIDENCE_THRESHOLD = 0.7
+// Existing crawler is list-page driven; crawl a wider pool so the eval set can be
+// drawn from the intersection of what it finds and what the sitemap advertises.
+const DEFAULT_POOL_LIMIT = 40
 
 const HARD_LIMITS = {
   maxBrands: 5,
@@ -36,11 +45,20 @@ interface CliOptions {
   brands: string[]
   variants: Variant[]
   limit: number
+  poolLimit: number
+  format: ScrapeFormat
   outRoot: string
   runId: string
   strictFirecrawlUrls: boolean
   allowExistingUrlFallback: boolean
   help: boolean
+}
+
+interface EvalUrl {
+  url: string
+  productId: string
+  /** intersection = existing crawler + sitemap agree; sitemap_only / existing_only = single-source top-up */
+  source: "intersection" | "sitemap_only" | "existing_only"
 }
 
 interface TokenUsage {
@@ -180,6 +198,24 @@ const EXTRACTION_SYSTEM = [
   "Use ISO currency codes. Use canonical category names when possible.",
 ].join(" ")
 
+// Hybrid variant: existing crawler owns the transactional fields (name/price/stock/
+// image) which it reads reliably; the LLM only classifies. This needs a tiny compact
+// context (name + breadcrumb + description snippet), not the whole page markdown.
+const ClassificationSchema = z.object({
+  category: z.string().nullable().describe("Canonical category, one of: Outer, Top, Knitwear, Shirts, Bottom, Dress, Shoes, Bag, Accessories"),
+  subcategory: z.string().nullable().describe("Specific product type, e.g. hoodie, chino, blazer, ringer tee"),
+  color: z.string().nullable().describe("Normalized primary color name, e.g. Black, Navy, Olive. Null if not shown."),
+  description: z.string().nullable().describe("Concise product description. Return null if the context shows none; never invent one."),
+  gender: z.array(z.string()).nullable().describe("Audience labels: men, women, unisex"),
+})
+
+const CLASSIFY_SYSTEM = [
+  "You classify one fashion product from the compact context provided (name, breadcrumb, metadata, description).",
+  "Return only JSON matching the schema.",
+  "category MUST be one of the canonical names.",
+  "Do not invent a description: if the context contains none, return null.",
+].join(" ")
+
 function usage(): string {
   return `
 3-way product extraction POC
@@ -244,17 +280,25 @@ function parseArgs(argv = process.argv.slice(2)): CliOptions {
   })
   const limit = Math.min(numberFlag(flags, "limit") ?? HARD_LIMITS.maxProductsPerBrand, HARD_LIMITS.maxProductsPerBrand)
   const strict = Boolean(flags["strict-firecrawl-urls"]) || Boolean(flags["no-existing-url-fallback"])
+  const format = stringFlag(flags, "format") ?? DEFAULT_FORMAT
+  if (!isScrapeFormat(format)) throw new Error(`Unknown format: ${format}`)
 
   return {
     brands,
     variants,
     limit,
+    poolLimit: Math.max(numberFlag(flags, "pool-limit") ?? DEFAULT_POOL_LIMIT, limit),
+    format,
     outRoot: stringFlag(flags, "out-root") ?? "poc-runs",
     runId: stringFlag(flags, "run-id") ?? timestampId(),
     strictFirecrawlUrls: strict,
     allowExistingUrlFallback: !strict,
     help: Boolean(flags.help),
   }
+}
+
+function isScrapeFormat(value: string): value is ScrapeFormat {
+  return value === "markdown" || value === "html" || value === "raw_html"
 }
 
 function stringFlag(flags: Record<string, string | boolean>, key: string): string | null {
@@ -275,7 +319,7 @@ function splitList(value: string): string[] {
 }
 
 function isVariant(value: string): value is Variant {
-  return value === "existing" || value === "firecrawl" || value === "llm-scraper"
+  return value === "existing" || value === "firecrawl" || value === "llm-scraper" || value === "hybrid"
 }
 
 function timestampId(): string {
@@ -283,6 +327,9 @@ function timestampId(): string {
 }
 
 function assertHardLimits(options: CliOptions): void {
+  // Scale-validation escape hatch: the 100-brand end-to-end test intentionally
+  // exceeds the per-run POC guard rails. Only bypasses count checks, not correctness.
+  if (process.env.POC_UNSAFE_SCALE === "1") return
   if (options.brands.length > HARD_LIMITS.maxBrands) {
     throw new Error(`Brand count ${options.brands.length} exceeds hard limit ${HARD_LIMITS.maxBrands}`)
   }
@@ -385,7 +432,7 @@ function existingProductToPoc(product: Product, config: SiteConfig, elapsedMs: n
   const productUrl = absolutizeUrl(product.productUrl, config.baseUrl) ?? product.productUrl
   const currency = product.sourceCurrency ?? config.sourceCurrency ?? "KRW"
   const row: PocProduct = {
-    product_key: stableProductKey(config.key, productUrl || product.productUrl || product.name),
+    product_key: stableProductKey(config.key, productUrl || product.productUrl || product.name, config),
     name: cleanString(product.name),
     price: product.price,
     currency,
@@ -629,7 +676,8 @@ function extractFirecrawlJson(body: unknown): unknown {
 
 async function runLlmScraperVariant(
   config: SiteConfig,
-  selectedUrls: SelectedUrl[],
+  evalUrls: EvalUrl[],
+  options: CliOptions,
   stats: RuntimeStats,
 ): Promise<PocProduct[]> {
   const model = process.env.LLM_SCRAPER_MODEL
@@ -637,46 +685,60 @@ async function runLlmScraperVariant(
     stats.errors.push("LLM_SCRAPER_MODEL is not set")
     return []
   }
-  if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    stats.errors.push("OPENAI_API_KEY or ANTHROPIC_API_KEY is required")
+  if (!process.env.OPENAI_API_KEY) {
+    stats.errors.push("OPENAI_API_KEY is required")
     return []
   }
+  stats.llmAdapter = `llm-scraper/${model}/${options.format}`
 
   const browser = await chromium.launch({headless: true})
   const rows: PocProduct[] = []
   try {
     const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
-    await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
+    // Images/fonts are never read by the LLM; blocking them cuts page load time.
+    // CSS is kept: `markdown` preprocessing walks the rendered DOM.
+    await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2}", (route) => route.abort())
     const page = await context.newPage()
     page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
 
-    for (const selected of selectedUrls) {
+    for (const target of evalUrls) {
       const started = Date.now()
+      // Per-call usage sink: llm-scraper's run() returns only {data, url}, so the
+      // only place token counts are observable is inside the model middleware.
+      const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
+      const scraper = new LLMScraper(usageCapturingModel(model, usage))
       try {
-        await page.goto(selected.url, {waitUntil: "domcontentloaded", timeout: 60000})
+        await page.goto(target.url, {waitUntil: "domcontentloaded", timeout: 60000})
         await page.waitForTimeout(1200)
-        const result = await extractWithLlmScraper(page, model)
+        const result = await scraper.run(page, Output.object({schema: NativeLlmProductSchema}), {
+          format: options.format,
+          system: EXTRACTION_SYSTEM,
+          temperature: 0,
+        })
         stats.requests += 1
-        stats.llmAdapter ??= result.adapter
-        addTokenUsage(stats.tokenUsage, result.usage)
+        addTokenUsage(stats.tokenUsage, usage)
         const row = extractionToPocProduct({
           variant: "llm-scraper",
           brandKey: config.key,
           config,
-          sourceUrl: selected.url,
+          sourceUrl: target.url,
           extracted: result.data,
           elapsedMs: Date.now() - started,
-          estimatedCost: estimateLlmCost(result.usage),
+          estimatedCost: estimateLlmCost(usage),
           error: null,
-          audit: {urlSource: selected.source, adapter: result.adapter},
+          audit: {urlSource: target.source, format: options.format, model, usage},
         })
         if (row.error?.includes("schema_validation_failed")) stats.jsonValidationFailures += 1
         rows.push(row)
       } catch (err) {
         stats.requests += 1
+        addTokenUsage(stats.tokenUsage, usage)
         stats.jsonValidationFailures += messageOf(err).includes("validation") ? 1 : 0
-        rows.push(errorPocProduct("llm-scraper", config, selected.url, Date.now() - started, messageOf(err), {
-          urlSource: selected.source,
+        rows.push(errorPocProduct("llm-scraper", config, target.url, Date.now() - started, messageOf(err), {
+          urlSource: target.source,
+          format: options.format,
+          model,
+          usage,
         }))
       } finally {
         await page.goto("about:blank", {timeout: 5000}).catch(() => {})
@@ -687,175 +749,165 @@ async function runLlmScraperVariant(
     await browser.close().catch(() => {})
   }
 
-  stats.selectedProductUrls = selectedUrls.length
-  stats.discoveredProductUrls = selectedUrls.length
+  stats.selectedProductUrls = evalUrls.length
+  stats.discoveredProductUrls = evalUrls.length
   stats.elapsedMs += rows.reduce((sum, row) => sum + row.elapsed_ms, 0)
   stats.estimatedCost = sumNullable(rows.map((r) => r.estimated_cost))
   return rows
 }
 
-interface LlmExtractionResult {
-  data: unknown
-  usage: TokenUsage
-  adapter: string
-}
-
-interface PageSnapshot {
-  url: string
-  title: string
-  canonical: string | null
-  metaDescription: string | null
-  text: string
-  images: string[]
-  jsonLd: unknown[]
-}
-
-async function extractWithLlmScraper(page: Page, model: string): Promise<LlmExtractionResult> {
-  const native = await tryNativeLlmScraper(page, model)
-  if (native) return native
-
-  const snapshot = await readPageSnapshot(page)
-  if (process.env.OPENAI_API_KEY) {
-    return extractWithOpenAi(snapshot, model)
-  }
-  return extractWithAnthropic(snapshot, model)
-}
-
-let nativeUnavailable = false
-
-async function tryNativeLlmScraper(page: Page, model: string): Promise<LlmExtractionResult | null> {
-  if (nativeUnavailable || process.env.LLM_SCRAPER_FORCE_DIRECT === "true") return null
-  try {
-    const dynamicImport = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<Record<string, unknown>>
-    const llmScraperMod = await dynamicImport("llm-scraper")
-    const aiMod = await dynamicImport("ai")
-    const providerMod = process.env.OPENAI_API_KEY
-      ? await dynamicImport("@ai-sdk/openai")
-      : await dynamicImport("@ai-sdk/anthropic")
-
-    const LLMScraper = (llmScraperMod.default ?? llmScraperMod.LLMScraper) as new (llm: unknown) => {
-      run: (page: Page, output: unknown, options: {format: "html"}) => Promise<{data?: unknown; usage?: unknown}>
-    }
-    const Output = (aiMod.Output ?? aiMod.output) as {object: (args: {schema: typeof NativeLlmProductSchema}) => unknown}
-    const providerFactory = process.env.OPENAI_API_KEY ? providerMod.openai : providerMod.anthropic
-    if (typeof providerFactory !== "function") throw new Error("AI SDK provider factory not found")
-
-    const scraper = new LLMScraper(providerFactory(model))
-    const result = await scraper.run(page, Output.object({schema: NativeLlmProductSchema}), {format: "html"})
-    return {
-      data: result.data,
-      usage: normalizeUnknownUsage(result.usage),
-      adapter: "llm-scraper",
-    }
-  } catch (err) {
-    if (process.env.LLM_SCRAPER_REQUIRE_NATIVE === "true") throw err
-    nativeUnavailable = true
-    return null
-  }
-}
-
-async function readPageSnapshot(page: Page): Promise<PageSnapshot> {
-  return page.evaluate(() => {
-    const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href ?? null
-    const metaDescription = document.querySelector<HTMLMetaElement>('meta[name="description"], meta[property="og:description"]')?.content ?? null
-    const images = Array.from(document.images)
-      .map((img) => img.currentSrc || img.src || img.getAttribute("data-src") || "")
-      .filter(Boolean)
-      .slice(0, 30)
-    const jsonLd = Array.from(document.querySelectorAll<HTMLScriptElement>('script[type="application/ld+json"]'))
-      .map((script) => {
-        try {
-          return JSON.parse(script.textContent || "null")
-        } catch {
-          return null
-        }
-      })
-      .filter((value) => value !== null)
-
-    return {
-      url: location.href,
-      title: document.title || "",
-      canonical,
-      metaDescription,
-      text: (document.body?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 30000),
-      images,
-      jsonLd,
-    }
-  })
-}
-
-let openAiClient: OpenAI | null = null
-
-async function extractWithOpenAi(snapshot: PageSnapshot, model: string): Promise<LlmExtractionResult> {
-  openAiClient ??= new OpenAI({apiKey: process.env.OPENAI_API_KEY})
-  const response = await openAiClient.chat.completions.create({
-    model,
-    temperature: 0,
-    max_tokens: 1000,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "product_extraction",
-        schema: PRODUCT_JSON_SCHEMA,
-        strict: false,
+/**
+ * llm-scraper calls `generateText()` internally and returns only `{data, url}` --
+ * `usage` is discarded (see llm-scraper/dist/models.js). Wrapping the model is the
+ * only way to observe token counts, and without them every cost number is zero.
+ */
+function usageCapturingModel(model: string, sink: TokenUsage) {
+  return wrapLanguageModel({
+    model: openai(model),
+    middleware: {
+      specificationVersion: "v3",
+      wrapGenerate: async ({doGenerate}) => {
+        const result = await doGenerate()
+        addTokenUsage(sink, normalizeUnknownUsage(result.usage))
+        return result
       },
     },
-    messages: [
-      {role: "system", content: EXTRACTION_SYSTEM},
-      {role: "user", content: buildSnapshotPrompt(snapshot)},
-    ],
   })
-  const content = response.choices[0]?.message?.content
-  if (!content) throw new Error("empty_openai_response")
-  return {
-    data: parseJsonLoose(content),
-    usage: {
-      input_tokens: response.usage?.prompt_tokens ?? 0,
-      output_tokens: response.usage?.completion_tokens ?? 0,
-      total_tokens: response.usage?.total_tokens ?? 0,
-    },
-    adapter: "openai-direct",
-  }
 }
 
-async function extractWithAnthropic(snapshot: PageSnapshot, model: string): Promise<LlmExtractionResult> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY ?? "",
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1000,
-      temperature: 0,
-      system: `${EXTRACTION_SYSTEM} Return only raw JSON. Schema: ${JSON.stringify(PRODUCT_JSON_SCHEMA)}`,
-      messages: [{role: "user", content: buildSnapshotPrompt(snapshot)}],
-    }),
-  })
-  const body = await res.json() as {
-    content?: Array<{type?: string; text?: string}>
-    usage?: {input_tokens?: number; output_tokens?: number}
-    error?: {message?: string}
-  }
-  if (!res.ok) throw new Error(`anthropic_http_${res.status}: ${body.error?.message ?? "unknown error"}`)
-  const text = body.content?.map((part) => part.text ?? "").join("\n").trim()
-  if (!text) throw new Error("empty_anthropic_response")
-  const input = body.usage?.input_tokens ?? 0
-  const output = body.usage?.output_tokens ?? 0
-  return {
-    data: parseJsonLoose(text),
-    usage: {input_tokens: input, output_tokens: output, total_tokens: input + output},
-    adapter: "anthropic-direct",
-  }
+/**
+ * Compact classification context. Instead of the whole page (becay markdown = 267k
+ * chars / ~92k tokens), send just the signals a classifier needs: title, breadcrumb,
+ * og metadata, JSON-LD, and a bounded description snippet. Typically <8k chars.
+ * NOTE: the page.evaluate callback uses only expressions (no inner const/function) --
+ * tsx's __name transform breaks named declarations inside the browser context.
+ */
+async function readCompactContext(page: Page): Promise<string> {
+  const compact = await page.evaluate(() => ({
+    title: document.title || "",
+    ogTitle: (document.querySelector('meta[property="og:title"]') as HTMLMetaElement | null)?.content || "",
+    ogDescription:
+      (document.querySelector('meta[property="og:description"]') as HTMLMetaElement | null)?.content || "",
+    ogType: (document.querySelector('meta[property="og:type"]') as HTMLMetaElement | null)?.content || "",
+    breadcrumb: Array.from(
+      document.querySelectorAll('[class*="crumb" i] a, [class*="path" i] a, .xans-layout-category a, nav a'),
+    )
+      .map((a) => (a.textContent || "").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .slice(0, 15)
+      .join(" > "),
+    jsonLd: Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
+      .map((s) => (s.textContent || "").replace(/\s+/g, " ").trim())
+      .join("\n")
+      .slice(0, 4000),
+    // Cafe24/Shopify themes scatter the description across many container names. Take
+    // the longest text block among the common ones rather than the first that matches.
+    description: (
+      Array.from(
+        document.querySelectorAll(
+          '#prdDetail, .xans-product-detail, .xans-product-additional, .cont, .detailArea, #prdInfo, .goods_description, [class*="product-info" i], [class*="detail" i], [id*="detail" i]',
+        ),
+      )
+        .map((el) => ((el as HTMLElement).innerText || "").replace(/\s+/g, " ").trim())
+        .filter((t) => t.length > 40)
+        .sort((a, b) => b.length - a.length)[0] || ""
+    ).slice(0, 2500),
+  }))
+  return JSON.stringify(compact)
 }
 
-function buildSnapshotPrompt(snapshot: PageSnapshot): string {
-  return JSON.stringify({
-    instruction: "Extract the product represented by this product detail page.",
-    page: snapshot,
-  })
+/**
+ * Hybrid: existing crawler provides name/price/currency/image/in_stock/color; the LLM,
+ * fed only the compact context, fills the fields existing is weak at (category,
+ * subcategory, description, gender). Inherits existing's discovery -- so pottery,
+ * where existing finds nothing, produces no hybrid rows either.
+ */
+async function runHybridVariant(
+  config: SiteConfig,
+  baseProducts: Product[],
+  options: CliOptions,
+  stats: RuntimeStats,
+): Promise<PocProduct[]> {
+  const model = process.env.LLM_SCRAPER_MODEL
+  if (!model) {
+    stats.errors.push("LLM_SCRAPER_MODEL is not set")
+    return []
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    stats.errors.push("OPENAI_API_KEY is required")
+    return []
+  }
+  stats.llmAdapter = `hybrid/${model}/compact`
+
+  const browser = await chromium.launch({headless: true})
+  const rows: PocProduct[] = []
+  try {
+    const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
+    await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2}", (route) => route.abort())
+    const page = await context.newPage()
+    page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
+
+    for (const product of baseProducts) {
+      const base = existingProductToPoc(product, config, 0)
+      const started = Date.now()
+      const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
+      const scraper = new LLMScraper(usageCapturingModel(model, usage))
+      try {
+        await page.goto(base.product_url ?? product.productUrl, {waitUntil: "domcontentloaded", timeout: 60000})
+        await page.waitForTimeout(800)
+        const existingName = base.name ?? ""
+        const result = await scraper.run(page, Output.object({schema: ClassificationSchema}), {
+          format: "custom",
+          formatFunction: async (p: Page) => JSON.stringify({name: existingName, page: JSON.parse(await readCompactContext(p))}),
+          system: CLASSIFY_SYSTEM,
+          temperature: 0,
+        })
+        stats.requests += 1
+        addTokenUsage(stats.tokenUsage, usage)
+        const cls = ClassificationSchema.partial().safeParse(result.data)
+        const c = cls.success ? cls.data : {}
+        rows.push({
+          ...base,
+          variant: "hybrid",
+          category: cleanString(c.category) ?? base.category,
+          subcategory: cleanString(c.subcategory) ?? base.subcategory,
+          // Existing reads color from option <select>s reliably; let the LLM fill only
+          // the gaps. Same for description: keep real page copy, LLM covers when absent.
+          color: base.color ?? cleanString(c.color),
+          description: base.description ?? cleanString(c.description),
+          gender: normalizeGender(c.gender) ?? base.gender,
+          confidence: null,
+          elapsed_ms: Date.now() - started,
+          estimated_cost: estimateLlmCost(usage),
+          error: cls.success ? null : `schema_validation_failed: ${cls.error.message}`,
+          audit: {source: "hybrid", model, format: "compact", usage},
+        })
+      } catch (err) {
+        stats.requests += 1
+        addTokenUsage(stats.tokenUsage, usage)
+        // On LLM failure, keep the existing fields -- hybrid degrades to existing, not to nothing.
+        rows.push({
+          ...base,
+          variant: "hybrid",
+          elapsed_ms: Date.now() - started,
+          estimated_cost: estimateLlmCost(usage),
+          error: messageOf(err),
+          audit: {source: "hybrid_fallback_to_existing", model, usage},
+        })
+      } finally {
+        await page.goto("about:blank", {timeout: 5000}).catch(() => {})
+      }
+    }
+    await context.close().catch(() => {})
+  } finally {
+    await browser.close().catch(() => {})
+  }
+
+  stats.selectedProductUrls = baseProducts.length
+  stats.discoveredProductUrls = baseProducts.length
+  stats.elapsedMs += rows.reduce((sum, row) => sum + row.elapsed_ms, 0)
+  stats.estimatedCost = sumNullable(rows.map((r) => r.estimated_cost))
+  return rows
 }
 
 function extractionToPocProduct(args: {
@@ -880,7 +932,7 @@ function extractionToPocProduct(args: {
   const currency = normalizeCurrency(data.currency, args.config.sourceCurrency ?? inferCurrencyFromPrice(data.price) ?? "KRW")
 
   const row: PocProduct = {
-    product_key: stableProductKey(args.brandKey, args.sourceUrl),
+    product_key: stableProductKey(args.brandKey, args.sourceUrl, args.config),
     name: cleanString(data.name),
     price,
     currency,
@@ -917,7 +969,7 @@ function errorPocProduct(
   audit?: Record<string, unknown>,
 ): PocProduct {
   return {
-    product_key: stableProductKey(config.key, sourceUrl),
+    product_key: stableProductKey(config.key, sourceUrl, config),
     name: null,
     price: null,
     currency: config.sourceCurrency ?? "KRW",
@@ -942,10 +994,33 @@ function errorPocProduct(
   }
 }
 
-function stableProductKey(brandKey: string, urlOrFallback: string): string {
-  const canonical = canonicalProductUrl(urlOrFallback) ?? urlOrFallback
-  const hash = createHash("sha1").update(canonical).digest("hex").slice(0, 12)
-  return `${brandKey}:${hash}`
+/**
+ * Join key across variants. A hash of the canonical URL does NOT work: the same
+ * Cafe24 product is reachable as `/product/detail.html?product_no=47`, as
+ * `/product/<slug>/47/category/27/display/1/`, and as `/product/<slug>/47/`.
+ * All three must collapse to the same key or `existing` and `llm-scraper` rows
+ * never line up in diff.csv.
+ */
+function productIdOf(raw: string | null | undefined, config: SiteConfig): string | null {
+  if (!raw) return null
+  try {
+    const url = new URL(raw, config.baseUrl)
+    if (config.type === "shopify") {
+      const m = url.pathname.match(/\/products\/([^/?#]+)/i)
+      return m ? decodeURIComponent(m[1]).toLowerCase() : null
+    }
+    const productNo = url.searchParams.get("product_no")
+    if (productNo && /^\d+$/.test(productNo)) return productNo
+    const m = url.pathname.match(/^\/product\/[^/]+\/(\d+)(?:\/|$)/)
+    return m ? m[1] : null
+  } catch {
+    return null
+  }
+}
+
+function stableProductKey(brandKey: string, urlOrFallback: string, config?: SiteConfig): string {
+  const id = config ? productIdOf(urlOrFallback, config) : null
+  return `${brandKey}:${id ?? (canonicalProductUrl(urlOrFallback) ?? urlOrFallback)}`
 }
 
 function canonicalProductUrl(raw: string | null | undefined): string | null {
@@ -966,17 +1041,109 @@ function canonicalProductUrl(raw: string | null | undefined): string | null {
   }
 }
 
+/**
+ * A product DETAIL page. `pathname.includes("/product/")` is far too loose: it also
+ * matches Cafe24's `/product/list.html?cate_no=125` (category grid) and
+ * `/product/post-news.html?product_no=29217` (Q&A board), both of which were being
+ * fed in as products.
+ */
+/** `www.ptry.co.kr` and `ptry.co.kr` are the same shop; sitemap.xml often uses the apex. */
+function sameSite(a: string, b: string): boolean {
+  const strip = (h: string) => h.replace(/^www\./i, "").toLowerCase()
+  const ha = strip(a)
+  const hb = strip(b)
+  return ha === hb || ha.endsWith(`.${hb}`) || hb.endsWith(`.${ha}`)
+}
+
 function looksLikeProductUrl(raw: string, config: SiteConfig): boolean {
   try {
-    const url = new URL(raw)
+    const url = new URL(raw, config.baseUrl)
     const base = new URL(config.baseUrl)
-    if (url.hostname !== base.hostname && !url.hostname.endsWith(`.${base.hostname}`)) return false
+    if (!sameSite(url.hostname, base.hostname)) return false
     const pathname = url.pathname.toLowerCase()
     if (config.type === "shopify") return /^\/products\/[^/]+/.test(pathname)
-    return pathname.includes("/product/") || url.searchParams.has("product_no")
+    // detail.html is the only *.html page under /product/ that is a real detail page
+    if (/\/product\/(list|search|review|post-news|board|write)\.html/.test(pathname)) return false
+    return productIdOf(url.toString(), config) !== null
   } catch {
     return false
   }
+}
+
+/** Detail URLs straight from sitemap.xml (Cafe24) or /products.json (Shopify). Free, no Firecrawl credits. */
+async function discoverDetailUrls(config: SiteConfig, max: number): Promise<Array<{url: string; productId: string}>> {
+  const base = config.baseUrl.replace(/\/+$/, "")
+  const out: Array<{url: string; productId: string}> = []
+  const seen = new Set<string>()
+
+  const push = (url: string) => {
+    const productId = productIdOf(url, config)
+    if (!productId || seen.has(productId)) return
+    if (!looksLikeProductUrl(url, config)) return
+    seen.add(productId)
+    out.push({url, productId})
+  }
+
+  if (config.type === "shopify") {
+    const res = await fetch(`${base}/products.json?limit=${Math.min(250, max * 3)}`, {
+      headers: {"User-Agent": USER_AGENT},
+    })
+    if (!res.ok) throw new Error(`products.json HTTP ${res.status}`)
+    const body = (await res.json()) as {products?: Array<{handle?: string}>}
+    for (const p of body.products ?? []) {
+      if (p.handle) push(`${base}/products/${p.handle}`)
+      if (out.length >= max) break
+    }
+    return out
+  }
+
+  const res = await fetch(`${base}/sitemap.xml`, {headers: {"User-Agent": USER_AGENT}})
+  if (!res.ok) throw new Error(`sitemap.xml HTTP ${res.status}`)
+  const xml = await res.text()
+  for (const m of xml.matchAll(/<loc>([^<]+)<\/loc>/gi)) {
+    push(m[1].trim())
+    if (out.length >= max) break
+  }
+  return out
+}
+
+/**
+ * Eval set = the same products for every variant. Prefer products the existing crawler
+ * actually returned (so field-level diffs are on identical items); top up from the
+ * sitemap when the intersection is short (e.g. pottery, where existing finds nothing).
+ */
+function buildEvalSet(
+  candidates: Array<{url: string; productId: string}>,
+  existingProducts: Product[],
+  config: SiteConfig,
+  limit: number,
+): EvalUrl[] {
+  // Existing products are also candidate URLs. Critical for brands whose sitemap is
+  // missing/broken (e.g. parmika returns an HTML placeholder): without this, the eval
+  // set would be empty even though the existing crawler found products.
+  const existingCandidates = existingProducts
+    .map((p) => ({url: absolutizeUrl(p.productUrl, config.baseUrl) ?? p.productUrl, productId: productIdOf(p.productUrl, config)}))
+    .filter((c): c is {url: string; productId: string} => isString(c.productId))
+  const existingIds = new Set(existingCandidates.map((c) => c.productId))
+
+  const result: EvalUrl[] = candidates
+    .filter((c) => existingIds.has(c.productId))
+    .slice(0, limit)
+    .map((c): EvalUrl => ({...c, source: "intersection"}))
+  const taken = new Set(result.map((c) => c.productId))
+
+  const addFrom = (pool: Array<{url: string; productId: string}>, source: EvalUrl["source"]) => {
+    for (const c of pool) {
+      if (result.length >= limit) return
+      if (taken.has(c.productId)) continue
+      taken.add(c.productId)
+      result.push({...c, source})
+    }
+  }
+  addFrom(candidates, "sitemap_only") // top up from sitemap
+  addFrom(existingCandidates, "existing_only") // fall back to existing-found URLs (broken sitemap)
+
+  return result
 }
 
 function cleanString(value: unknown): string | null {
@@ -1040,10 +1207,15 @@ function clampConfidence(value: unknown): number | null {
 }
 
 function hasRequiredField(row: PocProduct, field: (typeof REQUIRED_FIELDS)[number]): boolean {
+  return hasField(row, field)
+}
+
+function hasField(row: PocProduct, field: keyof PocProduct): boolean {
   const value = row[field]
   if (typeof value === "string") return value.trim().length > 0
   if (typeof value === "number") return Number.isFinite(value)
   if (typeof value === "boolean") return true
+  if (Array.isArray(value)) return value.length > 0
   return value !== null && value !== undefined
 }
 
@@ -1074,8 +1246,18 @@ function normalizeUnknownUsage(value: unknown): TokenUsage {
   return {input_tokens: input, output_tokens: output, total_tokens: total}
 }
 
+/**
+ * At the AI SDK v6 provider layer, usage counters are `{total, noCache, cacheRead}`
+ * objects rather than plain numbers; only the top-level `generateText` result flattens
+ * them. Accept both so token capture survives either call site.
+ */
 function numberValue(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (value && typeof value === "object") {
+    const total = (value as {total?: unknown}).total
+    if (typeof total === "number" && Number.isFinite(total)) return total
+  }
+  return null
 }
 
 function parseJsonLoose(text: string): unknown {
@@ -1189,11 +1371,16 @@ function buildVariantMetrics(rows: PocProduct[], runtime: RuntimeStats): unknown
     field,
     rows.length === 0 ? 0 : round(rows.filter((row) => hasRequiredField(row, field)).length / rows.length),
   ]))
+  const classificationFillRates = Object.fromEntries(CLASSIFICATION_FIELDS.map((field) => [
+    field,
+    rows.length === 0 ? 0 : round(rows.filter((row) => hasField(row, field)).length / rows.length),
+  ]))
   return {
     discovered_product_url_count: runtime.discoveredProductUrls,
     selected_product_url_count: runtime.selectedProductUrls,
     final_success_product_count: successRows.length,
     required_field_fill_rate: fillRates,
+    classification_field_fill_rate: classificationFillRates,
     low_confidence_or_held_ratio: rows.length === 0
       ? 0
       : round(rows.filter((row) => row.error || (row.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD).length / rows.length),
@@ -1370,63 +1557,101 @@ async function main(): Promise<void> {
   const runDir = resolveRunDir(options)
   const stats: RuntimeStatsByBrand = {}
   const rows: PocProduct[] = []
-  const firecrawlSelections = new Map<string, SelectedUrl[]>()
-  const baselineProducts = new Map<string, Product[]>()
+  const evalSets: Record<string, EvalUrl[]> = {}
+
+  // Ad-hoc brand configs not in platforms.ts (new-brand onboarding test). Path via
+  // POC_EXTRA_BRANDS env; each entry is a minimal SiteConfig (key/name/type/baseUrl).
+  const extraConfigs = new Map<string, SiteConfig>()
+  if (process.env.POC_EXTRA_BRANDS) {
+    const raw = JSON.parse(await fs.readFile(process.env.POC_EXTRA_BRANDS, "utf8")) as SiteConfig[]
+    for (const c of raw) extraConfigs.set(c.key, c)
+    console.log(`Extra brands loaded: ${[...extraConfigs.keys()].join(", ")}`)
+  }
 
   console.log(`POC run: ${options.runId}`)
   console.log(`Brands: ${options.brands.join(", ")}`)
   console.log(`Variants: ${options.variants.join(", ")}`)
+  console.log(`Format: ${options.format} | model: ${process.env.LLM_SCRAPER_MODEL ?? "(unset)"}`)
   console.log(`Output: ${runDir}`)
 
   for (const brandKey of options.brands) {
-    const config = getSiteConfig(brandKey)
+    const config = extraConfigs.get(brandKey) ?? getSiteConfig(brandKey)
     if (!config) throw new Error(`Unknown brand key: ${brandKey}`)
 
     console.log(`\n[${brandKey}] starting`)
-    let products = baselineProducts.get(brandKey) ?? []
-    const needsExistingSeed =
-      options.variants.includes("existing") ||
-      (options.variants.includes("firecrawl") && options.allowExistingUrlFallback) ||
-      (options.variants.includes("llm-scraper") && !options.variants.includes("firecrawl"))
-    if (needsExistingSeed) {
-      const runtime = getRuntime(stats, brandKey, "existing")
-      try {
-        products = await runExistingVariant(config, options.limit, runtime)
-        baselineProducts.set(brandKey, products)
-        const elapsedPerProduct = products.length > 0 ? Math.round(runtime.elapsedMs / products.length) : runtime.elapsedMs
-        if (options.variants.includes("existing")) {
-          rows.push(...products.map((product) => existingProductToPoc(product, config, elapsedPerProduct)))
-        }
-      } catch (err) {
-        runtime.errors.push(messageOf(err))
-        if (options.variants.includes("existing")) {
-          rows.push(errorPocProduct("existing", config, config.baseUrl, runtime.elapsedMs, messageOf(err)))
-        }
+    const existingRuntime = getRuntime(stats, brandKey, "existing")
+
+    // 1. Wide pool from the existing crawler (its own list-page discovery).
+    let pool: Product[] = []
+    try {
+      pool = await runExistingVariant(config, options.poolLimit, existingRuntime)
+    } catch (err) {
+      existingRuntime.errors.push(messageOf(err))
+    }
+
+    // 2. Candidate detail URLs from sitemap.xml / products.json. Scan the whole sitemap:
+    //    shopamomento lists 2253 products and the existing crawler samples one category,
+    //    so a low cap makes the intersection spuriously empty.
+    let candidates: Array<{url: string; productId: string}> = []
+    try {
+      candidates = await discoverDetailUrls(config, 5000)
+    } catch (err) {
+      existingRuntime.errors.push(`discovery_failed: ${messageOf(err)}`)
+    }
+
+    // 3. Same products for every variant.
+    const evalSet = buildEvalSet(candidates, pool, config, options.limit)
+    evalSets[brandKey] = evalSet
+    const intersectionCount = evalSet.filter((e) => e.source === "intersection").length
+    console.log(
+      `[${brandKey}] pool=${pool.length} sitemap=${candidates.length} eval=${evalSet.length} (intersection=${intersectionCount})`,
+    )
+
+    // 4. Products the existing crawler found that are in the eval set. `existing` and
+    //    `hybrid` both build on these (hybrid re-classifies them via the LLM).
+    const evalIds = new Set(evalSet.map((e) => e.productId))
+    const matched = pool.filter((p) => {
+      const id = productIdOf(p.productUrl, config)
+      return id !== null && evalIds.has(id)
+    })
+
+    if (options.variants.includes("existing")) {
+      existingRuntime.selectedProductUrls = matched.length
+      const perProduct = pool.length > 0 ? Math.round(existingRuntime.elapsedMs / pool.length) : existingRuntime.elapsedMs
+      rows.push(...matched.map((product) => existingProductToPoc(product, config, perProduct)))
+      if (matched.length === 0) {
+        console.log(`[${brandKey}] existing produced 0 rows for the eval set`)
       }
     }
 
     if (options.variants.includes("firecrawl")) {
       const runtime = getRuntime(stats, brandKey, "firecrawl")
-      const result = await runFirecrawlVariant(config, products, options, runtime)
-      firecrawlSelections.set(brandKey, result.selectedUrls)
+      const result = await runFirecrawlVariant(config, pool, options, runtime)
       rows.push(...result.rows)
     }
 
     if (options.variants.includes("llm-scraper")) {
-      const selected = firecrawlSelections.get(brandKey)
-        ?? products.slice(0, options.limit).map((product): SelectedUrl => ({url: product.productUrl, source: "existing_seed"}))
       const runtime = getRuntime(stats, brandKey, "llm-scraper")
-      const llmRows = await runLlmScraperVariant(config, selected.slice(0, options.limit), runtime)
-      rows.push(...llmRows)
+      rows.push(...(await runLlmScraperVariant(config, evalSet, options, runtime)))
+    }
+
+    if (options.variants.includes("hybrid")) {
+      const runtime = getRuntime(stats, brandKey, "hybrid")
+      rows.push(...(await runHybridVariant(config, matched, options, runtime)))
+      if (matched.length === 0) {
+        console.log(`[${brandKey}] hybrid produced 0 rows (existing found nothing to classify)`)
+      }
     }
   }
 
   const summary = buildSummary(options, rows, stats, runDir)
   await writeArtifacts(runDir, rows, summary)
+  await fs.writeFile(path.join(runDir, "eval-set.json"), JSON.stringify(evalSets, null, 2) + "\n")
   console.log(`\nArtifacts written:`)
   console.log(`  ${path.join(runDir, "products.jsonl")}`)
   console.log(`  ${path.join(runDir, "summary.json")}`)
   console.log(`  ${path.join(runDir, "diff.csv")}`)
+  console.log(`  ${path.join(runDir, "eval-set.json")}`)
 }
 
 main().catch((err: unknown) => {
