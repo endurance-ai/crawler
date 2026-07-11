@@ -278,7 +278,9 @@ function parseArgs(argv = process.argv.slice(2)): CliOptions {
     if (!isVariant(v)) throw new Error(`Unknown variant: ${v}`)
     return v
   })
-  const limit = Math.min(numberFlag(flags, "limit") ?? HARD_LIMITS.maxProductsPerBrand, HARD_LIMITS.maxProductsPerBrand)
+  const requestedLimit = numberFlag(flags, "limit") ?? HARD_LIMITS.maxProductsPerBrand
+  // Scale runs (POC_UNSAFE_SCALE) may exceed the per-brand sample cap for full-catalog crawls.
+  const limit = process.env.POC_UNSAFE_SCALE === "1" ? requestedLimit : Math.min(requestedLimit, HARD_LIMITS.maxProductsPerBrand)
   const strict = Boolean(flags["strict-firecrawl-urls"]) || Boolean(flags["no-existing-url-fallback"])
   const format = stringFlag(flags, "format") ?? DEFAULT_FORMAT
   if (!isScrapeFormat(format)) throw new Error(`Unknown format: ${format}`)
