@@ -50,7 +50,7 @@ const SIZE_SUFFIX_RE =
   /(?:[-_\s/]+(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|free|os|one\s*size|[0-9]{1,3}(?:\.[0-9])?))$/i
 
 const NON_COLOR_RE =
-  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|select|choose|option|\+|-?\s*(?:krw|usd|eur|gbp|jpy|cny)?\s*[0-9,]+\s*(?:won|원)?)/i
+  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|품절|select|choose|option|참조|참고|제품명|상세\s*페이지|이미지|본문|select\s*option|옵션\s*선택|\+|-?\s*(?:krw|usd|eur|gbp|jpy|cny)?\s*[0-9,]+\s*(?:won|원)?)/i
 
 const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: string[]}> = [
   {
@@ -338,7 +338,9 @@ function isNonColorToken(token: string): boolean {
   const t = normalizeForMatch(token)
   if (!t) return true
   if (SIZE_TOKEN_RE.test(t)) return true
-  if (NON_COLOR_RE.test(t)) return true
+  // Test the raw token too: normalizeForMatch runs NFKD which decomposes Hangul
+  // into jamo, so composed Korean noise patterns (제품명/참조/품절) only match raw.
+  if (NON_COLOR_RE.test(t) || NON_COLOR_RE.test(token)) return true
   if (/^\*+$/.test(t)) return true
   return false
 }

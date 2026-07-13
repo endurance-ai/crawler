@@ -59,6 +59,12 @@ test("QC keeps unknown real color names instead of over-normalizing", () => {
   assert.equal(result.product.color, "Beige")
 })
 
+test("QC holds Korean placeholder color for review (제품명 참조 not loaded)", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Bag", color: "제품명 참조"}))
+  assert.equal(result.action, "review")
+  assert.ok(result.reasons.includes("color_non_color_unresolved"))
+})
+
 test("QC canonicalizes gender aliases", () => {
   const result = normalizeProductTextFields(product({gender: ["male"]}))
   assert.equal(result.action, "auto_fix")
