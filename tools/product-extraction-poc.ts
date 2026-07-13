@@ -10,6 +10,8 @@ import {chromium, type Page} from "playwright"
 import {z} from "zod"
 import {getSiteConfig} from "../src/configs/platforms"
 import {crawlCafe24} from "../src/lib/cafe24-engine"
+import {crawlCafe24WithLightpanda} from "../src/lib/cafe24-lightpanda"
+import {parseCafe24EngineMode} from "../src/lib/cafe24-engine-selection"
 import {crawlShopify} from "../src/lib/shopify-engine"
 import {getDetailParser} from "../src/lib/parsers/detail"
 import type {CrawlResult, Product, SiteConfig} from "../src/lib/types"
@@ -403,18 +405,26 @@ async function runExistingVariant(config: SiteConfig, limit: number, stats: Runt
   if (config.type === "shopify") {
     result = await crawlShopify(clonePocConfig(config, limit))
   } else if (config.type === "cafe24") {
-    const browser = await chromium.launch({headless: true})
-    try {
-      const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
-      const page = await context.newPage()
-      page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
-      const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
-      result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
-        sampleLimit: limit,
-      })
-      await context.close().catch(() => {})
-    } finally {
-      await browser.close().catch(() => {})
+    const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
+    const engine = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
+    if (engine === "lightpanda" || engine === "auto") {
+      // Lightpanda manages its own browser process (built-in Chromium fallback).
+      // The lightpanda path does not honor sampleLimit — it crawls the full catalog,
+      // which is sliced to `limit` below. Fine for full-catalog onboarding.
+      result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {})
+    } else {
+      const browser = await chromium.launch({headless: true})
+      try {
+        const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
+        const page = await context.newPage()
+        page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
+        result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
+          sampleLimit: limit,
+        })
+        await context.close().catch(() => {})
+      } finally {
+        await browser.close().catch(() => {})
+      }
     }
   } else {
     throw new Error(`Existing POC only supports cafe24/shopify, got ${config.type}`)
