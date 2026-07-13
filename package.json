@@ -19,13 +19,18 @@
     "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
     "brand-crawl": "dotenv -e .env.local -- tsx src/brand-crawl.ts",
+    "poc:product-extraction": "dotenv -e .env -e .env.local -- tsx tools/product-extraction-poc.ts",
     "scaffold:platform": "tsx tools/scaffold-platform.ts",
     "spike:lightpanda": "dotenv -e .env -e .env.local -- tsx src/spikes/lightpanda-poc.ts",
     "test": "sh -c 'node --test --import tsx ./tests/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.96",
+    "@ai-sdk/openai": "^3.0.83",
     "@supabase/supabase-js": "^2.100.1",
+    "ai": "^6.0.222",
+    "llm-scraper": "^2.0.0",
     "openai": "^6.32.0",
     "playwright": "^1.58.2",
     "xlsx": "^0.18.5",

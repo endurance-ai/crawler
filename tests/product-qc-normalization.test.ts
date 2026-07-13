@@ -59,6 +59,12 @@ test("QC keeps unknown real color names instead of over-normalizing", () => {
   assert.equal(result.product.color, "Beige")
 })
 
+test("QC holds Korean placeholder color for review (제품명 참조 not loaded)", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Bag", color: "제품명 참조"}))
+  assert.equal(result.action, "review")
+  assert.ok(result.reasons.includes("color_non_color_unresolved"))
+})
+
 test("QC canonicalizes gender aliases", () => {
   const result = normalizeProductTextFields(product({gender: ["male"]}))
   assert.equal(result.action, "auto_fix")
@@ -75,5 +81,23 @@ test("QC reviews category conflicts instead of overwriting them", () => {
   const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "Accessories"}))
   assert.equal(result.action, "review")
   assert.ok(result.reasons.includes("category_text_conflict"))
+})
+
+test("QC folds non-canonical mappable category to canonical (knitwear -> Top)", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "knitwear"}))
+  assert.equal(result.product.category, "Top")
+  assert.ok(result.reasons.includes("category_canonicalized"))
+})
+
+test("QC holds non-canonical noise category for review (not loaded) when name gives no signal", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "~50%"}))
+  assert.equal(result.action, "review")
+  assert.ok(result.reasons.includes("category_noncanonical_dropped"))
+})
+
+test("QC recovers canonical from name when category is noise (모두 보기 -> Dress)", () => {
+  const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "모두 보기"}))
+  assert.equal(result.product.category, "Dress")
+  assert.ok(result.reasons.includes("category_noise_text_fallback"))
 })
 
