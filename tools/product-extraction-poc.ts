@@ -398,6 +398,26 @@ function clonePocConfig(config: SiteConfig, limit: number): SiteConfig {
   }
 }
 
+async function crawlCafe24Chromium(
+  config: SiteConfig,
+  limit: number,
+  detailParser: ReturnType<typeof getDetailParser> | undefined,
+): Promise<CrawlResult> {
+  const browser = await chromium.launch({headless: true})
+  try {
+    const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
+    const page = await context.newPage()
+    page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
+    const result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
+      sampleLimit: limit,
+    })
+    await context.close().catch(() => {})
+    return result
+  } finally {
+    await browser.close().catch(() => {})
+  }
+}
+
 async function runExistingVariant(config: SiteConfig, limit: number, stats: RuntimeStats): Promise<Product[]> {
   const started = Date.now()
   let result: CrawlResult
@@ -408,23 +428,19 @@ async function runExistingVariant(config: SiteConfig, limit: number, stats: Runt
     const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
     const engine = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
     if (engine === "lightpanda" || engine === "auto") {
-      // Lightpanda manages its own browser process (built-in Chromium fallback).
-      // The lightpanda path does not honor sampleLimit — it crawls the full catalog,
-      // which is sliced to `limit` below. Fine for full-catalog onboarding.
-      result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {})
-    } else {
-      const browser = await chromium.launch({headless: true})
+      // Lightpanda runs its own browser process. It does not honor sampleLimit —
+      // it crawls the full catalog, sliced to `limit` below (fine for onboarding).
+      // Per-brand Chromium fallback mirrors src/crawl.ts so a brand Lightpanda
+      // cannot render is not silently dropped.
       try {
-        const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
-        const page = await context.newPage()
-        page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
-        result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
-          sampleLimit: limit,
-        })
-        await context.close().catch(() => {})
-      } finally {
-        await browser.close().catch(() => {})
+        result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {})
+        if (result.stats.totalProducts === 0) throw new Error("Lightpanda returned 0 products")
+      } catch (err) {
+        console.warn(`⚠️ ${config.key} Lightpanda failed — Chromium fallback: ${(err as Error).message}`)
+        result = await crawlCafe24Chromium(config, limit, detailParser)
       }
+    } else {
+      result = await crawlCafe24Chromium(config, limit, detailParser)
     }
   } else {
     throw new Error(`Existing POC only supports cafe24/shopify, got ${config.type}`)
