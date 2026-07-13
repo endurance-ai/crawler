@@ -429,12 +429,20 @@ function normalizeCategoryField(product: ProductQcInput): {
     return {value: null, reason: "category_missing", confidence: 0, needsReview: true}
   }
 
+  // 방침 A 예외 (category canonical-strict): 출력은 canonical(CATEGORIES) 또는 null 만.
+  // 원본을 그대로 통과시키지 않는다 — 비-canonical(할인율·세일배너·내비라벨 등)이 새면
+  // 검색 필터가 오염되므로, 매핑되지 않는 값은 상품명 추론으로 대체하고 그마저 없으면
+  // null(NOT NULL 에 걸려 적재 제외)로 떨어뜨린다.
   const current = currentCategoryCompat(raw)
-  if (current && inferred && current !== inferred) {
-    return {value: raw, reason: "category_text_conflict", confidence: 0.35, needsReview: true}
+  if (current) {
+    if (inferred && current !== inferred) {
+      return {value: inferred, reason: "category_text_conflict", confidence: 0.5, needsReview: true}
+    }
+    return {value: current, reason: current === raw ? null : "category_canonicalized", confidence: 0.9, needsReview: false}
   }
 
-  return {value: raw, reason: null, confidence: 0.9, needsReview: false}
+  if (inferred) return {value: inferred, reason: "category_noise_text_fallback", confidence: 0.8, needsReview: false}
+  return {value: null, reason: "category_noncanonical_dropped", confidence: 0, needsReview: true}
 }
 
 function normalizeGenderToken(raw: string): "men" | "women" | "unisex" | null {

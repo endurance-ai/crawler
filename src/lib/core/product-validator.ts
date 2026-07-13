@@ -10,6 +10,12 @@
  * products 테이블에 NOT NULL 제약 적용(migration 091) 에 따라 두 필드는
  * 빈 문자열·null 모두 거부한다. 추출 불가 상품은 적재하지 않는다.
  *
+ * 방침 A 예외 (category canonical-strict): category 는 QC 정규화
+ * (product-qc/normalization.ts normalizeCategoryField)에서 CATEGORIES(enums)
+ * 의 canonical 값 또는 null 로만 산출된다. 비-canonical 원본(할인율·세일배너·
+ * 내비라벨 등)은 통과시키지 않고 상품명 추론으로 대체하거나 null(적재 제외)
+ * 처리한다. 검색 필터 신뢰성 확보를 위한 의도적 강화.
+ *
  * 스키마 결정 근거 (cross-check 소스):
  *  - `src/lib/types.ts` 의 `Product` 인터페이스 (현재 출력 형 계약).
  *  - `tests/fixtures/uniqlo-kr-parse.golden.json` (100개 실제 출력 product —

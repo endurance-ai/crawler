@@ -77,3 +77,21 @@ test("QC reviews category conflicts instead of overwriting them", () => {
   assert.ok(result.reasons.includes("category_text_conflict"))
 })
 
+test("QC folds non-canonical mappable category to canonical (knitwear -> Top)", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "knitwear"}))
+  assert.equal(result.product.category, "Top")
+  assert.ok(result.reasons.includes("category_canonicalized"))
+})
+
+test("QC holds non-canonical noise category for review (not loaded) when name gives no signal", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "~50%"}))
+  assert.equal(result.action, "review")
+  assert.ok(result.reasons.includes("category_noncanonical_dropped"))
+})
+
+test("QC recovers canonical from name when category is noise (모두 보기 -> Dress)", () => {
+  const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "모두 보기"}))
+  assert.equal(result.product.category, "Dress")
+  assert.ok(result.reasons.includes("category_noise_text_fallback"))
+})
+
