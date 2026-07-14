@@ -394,7 +394,7 @@ async function main() {
           version,
           model_id: getModelId(),
           prompt_hash: getPromptHash(),
-          category: "Accessories",
+          category: "other",
           error: output.error,
           raw_response: output.raw,
         })

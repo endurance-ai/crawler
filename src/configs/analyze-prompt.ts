@@ -27,7 +27,7 @@ ${buildNodeReference()}
 
 === OUTPUT FORMAT (JSON only, no markdown fences) ===
 {
-  "category": "Outer",
+  "category": "outerwear",
   "subcategory": "overcoat",
   "fit": "oversized",
   "fabric": "wool",
@@ -45,13 +45,13 @@ ${buildNodeReference()}
 - CRITICAL — PRODUCT IDENTIFICATION: You may receive product name, shop category, material, color, and description as hints.
   The image may show a model wearing the product. DO NOT analyze the model's full outfit.
   Use the product name and category hint to identify WHICH item in the image is the actual product.
-  Example: If the hint says the product is a "Leather Tote Bag" in category "Bag", analyze the BAG — not the model's jacket or pants.
+  Example: If the hint says the product is a "Leather Tote Bag" in category "bags", analyze the BAG — not the model's jacket or pants.
   If hints are not provided or conflict with the image, rely on the image.
 - MATERIAL/FABRIC HINTS: When material text is provided (e.g. "LAMB SKIN", "COTTON 100%", "POLYESTER/RAYON"), use it to select the correct fabric enum. This is more reliable than guessing from the image.
   "lamb skin", "sheep skin", "cow hide" → leather, "cotton 100%" → cotton, "polyester" → synthetic, "linen" → linen, "wool" → wool, "nylon" → nylon, "denim" → denim, "silk" → silk
 - COLOR HINTS: When color options are provided, use them to determine color_family more accurately than image alone.
 - DESCRIPTION HINTS: Product descriptions often contain style keywords (e.g. "오버사이즈", "크롭", "A라인"). Use these to infer fit, subcategory, and style_node.
-- category: MUST be one of the enum values (PascalCase)
+- category: MUST be one of the enum values (lowercase family name; use "other" for non-fashion)
 - subcategory: MUST be from the subcategory list for the chosen category (lowercase, hyphenated)
 - fit: MUST be one of the fit enum values (lowercase). Infer from visual cues. Default "regular" if unclear.
 - fabric: MUST be one of the fabric enum values (lowercase). Infer from texture/sheen. Use null only if truly indeterminate.

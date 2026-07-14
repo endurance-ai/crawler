@@ -12,7 +12,7 @@ function product(overrides: Partial<Product> = {}): Product {
   return {
     brand: "Brand",
     name: "Black Wide Pants",
-    category: "Bottom",
+    category: "bottoms",
     price: 1000,
     originalPrice: 1000,
     salePrice: null,
@@ -78,15 +78,21 @@ test("QC infers missing gender from text", () => {
 })
 
 test("QC reviews category conflicts instead of overwriting them", () => {
-  const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "Accessories"}))
+  const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "accessories"}))
   assert.equal(result.action, "review")
   assert.ok(result.reasons.includes("category_text_conflict"))
 })
 
-test("QC folds non-canonical mappable category to canonical (knitwear -> Top)", () => {
-  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "knitwear"}))
-  assert.equal(result.product.category, "Top")
+test("QC folds non-canonical mappable category to canonical family (sweater -> knitwear)", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "sweater"}))
+  assert.equal(result.product.category, "knitwear")
   assert.ok(result.reasons.includes("category_canonicalized"))
+})
+
+test("QC passes a canonical family through unchanged (knitwear stays knitwear)", () => {
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "knitwear"}))
+  assert.equal(result.product.category, "knitwear")
+  assert.ok(!result.reasons.includes("category_canonicalized"))
 })
 
 test("QC holds non-canonical noise category for review (not loaded) when name gives no signal", () => {
@@ -95,9 +101,9 @@ test("QC holds non-canonical noise category for review (not loaded) when name gi
   assert.ok(result.reasons.includes("category_noncanonical_dropped"))
 })
 
-test("QC recovers canonical from name when category is noise (모두 보기 -> Dress)", () => {
+test("QC recovers canonical from name when category is noise (모두 보기 -> dresses)", () => {
   const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "모두 보기"}))
-  assert.equal(result.product.category, "Dress")
+  assert.equal(result.product.category, "dresses")
   assert.ok(result.reasons.includes("category_noise_text_fallback"))
 })
 
