@@ -3,6 +3,8 @@
 > 대상: 새 브랜드를 추가하는 작업자.
 > 범위: 브랜드 선정 → 크롤 코드 작성(로컬 AI 활용) → 데이터 적재 → 임베딩까지 한 사이클.
 > 파서 아키텍처(셀렉터 레지스트리/전략) 상세는 [`add-platform.md`](./add-platform.md) 참조.
+> **수십~수백 개 브랜드를 한 번에** 재크롤/재분류하는 대량 온보딩은
+> [`bulk-onboarding.md`](./bulk-onboarding.md) 참조 (`tools/onboard-batch.sh`).
 
 ---
 

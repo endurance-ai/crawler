@@ -5,9 +5,15 @@
 // rewrites both fields to the frozen vocabulary shared with the search path.
 //
 // Usage:
-//   tsx tools/_reclassify-categories.ts --dry-run --limit 200   # sample, no writes
-//   tsx tools/_reclassify-categories.ts                          # full run, writes DB
-//   tsx tools/_reclassify-categories.ts --start-id <uuid>        # resume after id
+//   tsx tools/reclassify-categories.ts --dry-run --limit 200   # sample, no writes
+//   tsx tools/reclassify-categories.ts                          # full run, writes DB
+//   tsx tools/reclassify-categories.ts --start-id <id>          # resume after id
+//   tsx tools/reclassify-categories.ts --only-invalid           # guardrail: fix only
+//                                                                # rows whose category
+//                                                                # isn't a canonical
+//                                                                # family (cheap — safe
+//                                                                # to run after every
+//                                                                # onboarding import)
 //
 // Resumable: processes products ordered by id in pages; prints the last id per
 // page so a killed run can resume with --start-id.
@@ -20,6 +26,7 @@ import {classifyShopifyCategory} from "../src/lib/shopify-category-classifier"
 
 const args = process.argv.slice(2)
 const DRY = args.includes("--dry-run")
+const ONLY_INVALID = args.includes("--only-invalid")
 const LIMIT = Number((args.find((a) => a.startsWith("--limit=")) || "").split("=")[1] || (args.includes("--limit") ? args[args.indexOf("--limit") + 1] : "") || 0)
 const START_ID = (args.find((a) => a.startsWith("--start-id=")) || "").split("=")[1] || (args.includes("--start-id") ? args[args.indexOf("--start-id") + 1] : "")
 const PAGE = 1000
@@ -89,7 +96,9 @@ async function mapWithConcurrency<T>(tasks: (() => Promise<T>)[], n: number): Pr
 }
 
 async function main() {
-  console.log(`reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`)
+  console.log(
+    `reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · ${ONLY_INVALID ? "mode=only-invalid (guardrail)" : `limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`}`,
+  )
   let lastId = START_ID
   let processed = 0
   let changed = 0
@@ -97,8 +106,13 @@ async function main() {
   const samples: string[] = []
 
   for (;;) {
-    let q = db.from("products").select("id,name,category,subcategory,brand").order("id", {ascending: true}).limit(PAGE)
-    if (lastId) q = q.gt("id", lastId)
+    // --only-invalid: no id cursor — each fixed row leaves the invalid set, so
+    // re-querying the same filter naturally drains to empty. Safe to run after
+    // every onboarding import regardless of DB size (only touches broken rows).
+    let q = ONLY_INVALID
+      ? db.from("products").select("id,name,category,subcategory,brand").not("category", "in", `(${CATEGORIES.join(",")})`).limit(PAGE)
+      : db.from("products").select("id,name,category,subcategory,brand").order("id", {ascending: true}).limit(PAGE)
+    if (!ONLY_INVALID && lastId) q = q.gt("id", lastId)
     const {data, error} = await q
     if (error) {
       console.error("fetch error:", error.message)
@@ -174,6 +188,8 @@ async function main() {
 
     if (LIMIT && processed >= LIMIT) break
     if (data.length < PAGE) break
+    // ONLY_INVALID + DRY never shrinks the result set (no writes) — one pass is enough.
+    if (ONLY_INVALID && DRY) break
   }
 
   const cost = (usage.i / 1e6) * 0.1 + (usage.o / 1e6) * 0.4
