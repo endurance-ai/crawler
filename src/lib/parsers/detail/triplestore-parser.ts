@@ -1,4 +1,4 @@
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {DetailData, IDetailParser} from "./types"
 
 /**
@@ -12,7 +12,7 @@ import type {DetailData, IDetailParser} from "./types"
  *   리뷰 없음
  */
 export class TriplestoreDetailParser implements IDetailParser {
-  async parse(page: Page, productUrl: string): Promise<DetailData> {
+  async parse(page: Cafe24Page, productUrl: string): Promise<DetailData> {
     const result: DetailData = {
       description: null,
       color: null,

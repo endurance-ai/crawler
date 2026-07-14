@@ -20,6 +20,13 @@ import * as path from "path"
 import {createClient} from "@supabase/supabase-js"
 import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {crawlCafe24} from "./lib/cafe24-engine"
+import {crawlCafe24WithLightpanda} from "./lib/cafe24-lightpanda"
+import {
+  cafe24DetailConcurrency,
+  cafe24ParallelLimitFor,
+  parseCafe24EngineMode,
+  type Cafe24EngineMode,
+} from "./lib/cafe24-engine-selection"
 import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
@@ -43,11 +50,14 @@ import {
 import {checkRobots} from "./lib/robots-check"
 import {getDetailParser} from "./lib/parsers/detail"
 import {getReviewParser} from "./lib/parsers/review"
+import type {IDetailParser} from "./lib/parsers/detail"
+import type {IReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, Product, SiteConfig} from "./lib/types"
 import type {DetailData} from "./lib/parsers/detail/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
+import {cleanGenderScope, resolveProductGender} from "./lib/product-gender"
 
 // 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
 // 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
@@ -56,6 +66,8 @@ const queueDb =
   process.env.DB_URL && process.env.DB_TOKEN
     ? createClient(process.env.DB_URL, process.env.DB_TOKEN)
     : null
+
+const brandGenderScopeCache = new Map<string, Promise<string[]>>()
 
 // platform_key → brand_node_id. 기존 status 행의 platform_key 로 resolve, 없으면
 // SiteConfig.brand 로 brand_nodes 를 매칭해 폴백.
@@ -115,6 +127,31 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
       errors: result.errors,
     },
   })
+}
+
+async function loadBrandGenderScopeForPlatform(platform: string): Promise<string[]> {
+  if (!queueDb) return []
+  const brandNodeId = await resolveBrandNodeId(platform)
+  if (!brandNodeId) return []
+
+  const {data, error} = await queueDb
+    .from("brand_nodes")
+    .select("gender_scope")
+    .eq("id", brandNodeId)
+    .maybeSingle()
+  if (error) {
+    console.warn(`⚠️ brand_nodes.gender_scope 조회 실패 (${platform}): ${error.message}`)
+    return []
+  }
+  return cleanGenderScope((data as {gender_scope: unknown} | null)?.gender_scope)
+}
+
+function getBrandGenderScopeForPlatform(platform: string): Promise<string[]> {
+  const existing = brandGenderScopeCache.get(platform)
+  if (existing) return existing
+  const promise = loadBrandGenderScopeForPlatform(platform)
+  brandGenderScopeCache.set(platform, promise)
+  return promise
 }
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
@@ -514,8 +551,6 @@ async function probeSite(config: SiteConfig) {
 
 // ─── 크롤 실행 ────────────────────────────────────────
 
-const PARALLEL_LIMIT = 3 // 동시 브라우저 수
-
 // 사이트 전체 크롤 상한 — 한 사이트가 어딘가에서 멈춰도(무한 hang) 배치 전체가
 // 얼어붙지 않도록 강제 중단한다. crawlCafe24 내부에는 evaluate/detail 단위
 // timeout이 있지만, 사이트 단위 전체 안전망이 별도로 필요하다.
@@ -531,6 +566,77 @@ const withSiteTimeout = <T>(promise: Promise<T>, site: string): Promise<T> =>
       ),
     ),
   ])
+
+async function crawlCafe24WithChromium(
+  config: SiteConfig,
+  detailParser?: IDetailParser,
+  reviewParser?: IReviewParser,
+  detailConcurrency = 3,
+  onDetailProgress?: (products: Product[]) => Promise<void> | void,
+  existingDetails?: Map<string, DetailData>,
+): Promise<CrawlResult> {
+  const browser = await chromium.launch({headless: true})
+  try {
+    const context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      locale: "ko-KR",
+    })
+    const page = await context.newPage()
+    page.on("dialog", (d) => d.dismiss().catch(() => {}))
+    return await crawlCafe24(page, config, detailParser, reviewParser, {
+      detailConcurrency,
+      onDetailProgress,
+      existingDetails,
+    })
+  } finally {
+    await browser.close()
+  }
+}
+
+async function crawlCafe24WithSelectedEngine(
+  config: SiteConfig,
+  detailParser: IDetailParser | undefined,
+  reviewParser: IReviewParser | undefined,
+  mode: Cafe24EngineMode,
+  detailConcurrency: number,
+  onDetailProgress?: (products: Product[]) => Promise<void> | void,
+  existingDetails?: Map<string, DetailData>,
+): Promise<CrawlResult> {
+  if (mode === "chromium") {
+    return await crawlCafe24WithChromium(
+      config,
+      detailParser,
+      reviewParser,
+      detailConcurrency,
+      onDetailProgress,
+      existingDetails,
+    )
+  }
+
+  try {
+    const result = await crawlCafe24WithLightpanda(config, detailParser, reviewParser, {
+      detailConcurrency,
+      onDetailProgress,
+      existingDetails,
+    })
+    if (result.stats.totalProducts === 0) {
+      throw new Error("Lightpanda returned 0 products")
+    }
+    return result
+  } catch (err) {
+    console.warn(
+      `⚠️ ${config.name} Lightpanda 실패 — Chromium으로 폴백: ${(err as Error).message}`,
+    )
+    return await crawlCafe24WithChromium(
+      config,
+      detailParser,
+      reviewParser,
+      detailConcurrency,
+      onDetailProgress,
+      existingDetails,
+    )
+  }
+}
 
 async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   const results: CrawlResult[] = []
@@ -568,7 +674,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
             return null
           }
           const result = await crawlUniqlo(config)
-          return saveResultAndTrim(outDir, result)
+          return await saveResultAndTrim(outDir, result)
         } catch (err) {
           console.error(`❌ ${config.name} 크롤 실패:`, err)
           return null
@@ -599,7 +705,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlZara(config)
-        results.push(saveResultAndTrim(outDir, result))
+        results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -626,7 +732,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawl29cm(config)
-        results.push(saveResultAndTrim(outDir, result))
+        results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -653,7 +759,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlFarfetch(config)
-        results.push(saveResultAndTrim(outDir, result))
+        results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
@@ -680,34 +786,28 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           continue
         }
         const result = await crawlShopify(config)
-        results.push(saveResultAndTrim(outDir, result))
+        results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
     }
   }
 
-  // Cafe24 — 사이트별 병렬 (워커 풀: PARALLEL_LIMIT개 동시, 하나 끝나면 큐에서 바로 다음 투입)
+  // Cafe24 — 사이트별 병렬 (엔진별 워커 풀, 하나 끝나면 큐에서 바로 다음 투입)
   if (cafe24Sites.length > 0) {
-    console.log(`\n⚡ 병렬 크롤링: ${cafe24Sites.length}개 사이트, ${PARALLEL_LIMIT}개 동시 (큐 방식)\n`)
+    const cafe24EngineMode = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
+    const cafe24ParallelLimit = cafe24ParallelLimitFor(cafe24EngineMode)
+    const detailConcurrency = cafe24DetailConcurrency()
+    console.log(
+      `\n⚡ 병렬 크롤링: ${cafe24Sites.length}개 사이트, ${cafe24ParallelLimit}개 동시 ` +
+        `(engine=${cafe24EngineMode}, detail=${detailConcurrency}-way)\n`,
+    )
 
     let nextIndex = 0
     const worker = async () => {
       while (nextIndex < cafe24Sites.length) {
         const config = cafe24Sites[nextIndex++]!
         console.log(`\n🔄 시작 (${nextIndex}/${cafe24Sites.length}): ${config.name}`)
-
-        // 사이트마다 독립 브라우저
-        const browser = await chromium.launch({headless: true})
-        const context = await browser.newContext({
-          userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          locale: "ko-KR",
-        })
-        const page = await context.newPage()
-        // JS 팝업(alert/confirm 등)을 즉시 닫는다 — 안 닫고 두면 브라우저 종료 시
-        // Playwright 내부 dialog 핸들링이 uncaught rejection을 던져 전체 배치
-        // 프로세스가 죽는다 (2026-07-06, kupido-movingwear/hagamos 크롤 중 확인).
-        page.on("dialog", (d) => d.dismiss().catch(() => {}))
 
         try {
           if (dryRun) {
@@ -722,20 +822,26 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           }
           const onDetailProgress = (products: Product[]) => saveCheckpoint(outDir, config.key, products)
           const result = await withSiteTimeout(
-            crawlCafe24(page, config, dp, rp, onDetailProgress, existingDetails),
+            crawlCafe24WithSelectedEngine(
+              config,
+              dp,
+              rp,
+              cafe24EngineMode,
+              detailConcurrency,
+              onDetailProgress,
+              existingDetails,
+            ),
             config.key,
           )
-          results.push(saveResultAndTrim(outDir, result))
+          results.push(await saveResultAndTrim(outDir, result))
         } catch (err) {
           console.error(`❌ ${config.name} 크롤 실패:`, err)
-        } finally {
-          await browser.close()
         }
       }
     }
 
     await Promise.all(
-      Array.from({length: Math.min(PARALLEL_LIMIT, cafe24Sites.length)}, () => worker())
+      Array.from({length: Math.min(cafe24ParallelLimit, cafe24Sites.length)}, () => worker())
     )
   }
 
@@ -744,15 +850,21 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   }
 }
 
-function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
+async function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
   if (rawProducts.length === 0) return
+
+  const brandGenderScope = await getBrandGenderScopeForPlatform(platform)
+  const productsWithGenderFallback = rawProducts.map((product) => {
+    const gender = resolveProductGender(product.gender, brandGenderScope)
+    return gender.length > 0 ? {...product, gender} : product
+  })
 
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
   // product before it is written to JSON. Valid products pass through
   // byte-identical; invalid ones are excluded + a structured reject
   // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
   // exact legacy behavior (all products written, no gate).
-  const qcProducts = applyProductQcGate(rawProducts, platform)
+  const qcProducts = applyProductQcGate(productsWithGenderFallback, platform)
   const products = applyValidationGate(qcProducts, platform)
   if (products.length === 0) return
 
@@ -761,8 +873,8 @@ function writeProductsFile(outDir: string, platform: string, rawProducts: Produc
   console.log(`   💾 저장: ${outPath}`)
 }
 
-function saveResult(outDir: string, result: CrawlResult) {
-  writeProductsFile(outDir, result.platform, result.products)
+async function saveResult(outDir: string, result: CrawlResult) {
+  await writeProductsFile(outDir, result.platform, result.products)
 }
 
 // 상세크롤 도중 주기적으로 지금까지의 진행 상황을 디스크에 반영한다 — 대형
@@ -770,8 +882,8 @@ function saveResult(outDir: string, result: CrawlResult) {
 // 유실되지 않도록 함 (2026-07-06, hippiedippy 1511개 중 795개 완료 상태에서
 // 유실된 사고). crawlCafe24()가 아직 반환하기 전에 호출되므로 saveResultAndTrim
 // 의 "사이트 완료 시 products 비움" 불변식과는 무관 — 별개의 중간 저장일 뿐이다.
-function saveCheckpoint(outDir: string, platform: string, products: Product[]) {
-  writeProductsFile(outDir, platform, products)
+async function saveCheckpoint(outDir: string, platform: string, products: Product[]) {
+  await writeProductsFile(outDir, platform, products)
 }
 
 // 재시작 스킵: 이전 실행(체크포인트든 정상 완료든)의 결과 파일이 있으면
@@ -804,8 +916,8 @@ function loadExistingDetails(outDir: string, platform: string): Map<string, Deta
 // products 배열(description/images/reviews 포함)까지 전체 런 끝까지 들고
 // 있을 필요는 없다 — 31개 cafe24 사이트 detail 크롤 시 heap OOM 유발 확인
 // (2026-07-05). 디스크에 쓴 직후 products 를 비워서 GC가 회수하게 한다.
-function saveResultAndTrim(outDir: string, result: CrawlResult): CrawlResult {
-  saveResult(outDir, result)
+async function saveResultAndTrim(outDir: string, result: CrawlResult): Promise<CrawlResult> {
+  await saveResult(outDir, result)
   return {...result, products: []}
 }
 

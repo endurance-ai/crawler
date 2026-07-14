@@ -10,9 +10,15 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# lightpanda spike binary (downloaded via scripts/install-lightpanda.sh)
+/bin/lightpanda
+
 # crawler output
 output/
 *.log
+
+# product-extraction POC run artifacts
+poc-runs/
 
 # OS / editor
 .DS_Store

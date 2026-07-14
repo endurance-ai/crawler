@@ -1,4 +1,4 @@
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 
 export interface ReviewerBody {
   height: string | null
@@ -22,5 +22,5 @@ export interface ReviewData {
 }
 
 export interface IReviewParser {
-  parse(page: Page, maxReviews: number): Promise<ReviewData>
+  parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData>
 }

@@ -14,7 +14,7 @@
  * MODEL SIZE early cut, material-pollution) are reproduced exactly.
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {DetailData} from "../detail/types"
 import type {RegistryEntry, StrategyId} from "../detail/selector-registry"
 import {colorFromOptionList} from "./color"
@@ -29,7 +29,7 @@ function guardSectionInput(s: string): string {
   return s.length > MAX_SECTION_INPUT ? s.slice(0, MAX_SECTION_INPUT) : s
 }
 
-type Strategy = (page: Page, entry: RegistryEntry) => Promise<DetailData>
+type Strategy = (page: Cafe24Page, entry: RegistryEntry) => Promise<DetailData>
 
 const empty = (): DetailData => ({
   description: null,

@@ -17,7 +17,7 @@
  * extraction bodies live verbatim in ../field-extractors/strategies.ts.
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {DetailData, IDetailParser} from "./types"
 import {DETAIL_REGISTRY, type RegistryEntry} from "./selector-registry"
 import {STRATEGIES} from "../field-extractors/strategies"
@@ -28,7 +28,7 @@ import {STRATEGIES} from "../field-extractors/strategies"
 // golden 픽스처는 page.route로 즉시 응답하는 정적 HTML이라 재시도 경로 자체가
 // 트리거되지 않음 — 18-site 골든 마스터 byte-identical 보장에 영향 없음.
 async function gotoWithRetry(
-  page: Page,
+  page: Cafe24Page,
   url: string,
   waitUntil: "domcontentloaded" | "commit",
   timeout: number,
@@ -51,7 +51,7 @@ export class RegistryDetailParser implements IDetailParser {
     this.entry = entry
   }
 
-  async parse(page: Page, productUrl: string): Promise<DetailData> {
+  async parse(page: Cafe24Page, productUrl: string): Promise<DetailData> {
     const result: DetailData = {
       description: null,
       color: null,

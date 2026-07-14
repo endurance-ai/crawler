@@ -4,7 +4,7 @@
  * 플랫폼별 파서는 이 클래스를 상속하고 셀렉터를 오버라이드한다.
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {DetailData, IDetailParser} from "./types"
 
 export class BaseDetailParser implements IDetailParser {
@@ -44,7 +44,7 @@ export class BaseDetailParser implements IDetailParser {
 
   // ─── 메인 파서 ──────────────────────────────────────
 
-  async parse(page: Page, productUrl: string): Promise<DetailData> {
+  async parse(page: Cafe24Page, productUrl: string): Promise<DetailData> {
     const result: DetailData = {
       description: null,
       color: null,
@@ -93,10 +93,12 @@ export class BaseDetailParser implements IDetailParser {
               const t = (opt as HTMLElement).innerText?.trim() || ""
               if (
                 t &&
+                !/^empty$/i.test(t) &&
                 !t.includes("선택") &&
                 !t.includes("Select") &&
                 t !== "*" &&
                 !/^-{3,}$/.test(t) &&
+                !/^(?:color|colour|색상|컬러)\s*[-/:：]?\s*(?:size|사이즈)?$/i.test(t) &&
                 !/^\d+$/.test(t) &&
                 !/^\d+\s*(size|사이즈)$/i.test(t) &&
                 !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t) &&

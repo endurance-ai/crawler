@@ -3,6 +3,8 @@
 > 대상: 새 브랜드를 추가하는 작업자.
 > 범위: 브랜드 선정 → 크롤 코드 작성(로컬 AI 활용) → 데이터 적재 → 임베딩까지 한 사이클.
 > 파서 아키텍처(셀렉터 레지스트리/전략) 상세는 [`add-platform.md`](./add-platform.md) 참조.
+> **수십~수백 개 브랜드를 한 번에** 재크롤/재분류하는 대량 온보딩은
+> [`bulk-onboarding.md`](./bulk-onboarding.md) 참조 (`tools/onboard-batch.sh`).
 
 ---
 
@@ -71,10 +73,16 @@ npm test              # 기존 golden 깨지면 안 됨
 # (선택) 카테고리 탐색만 — 상품 안 긁음
 npm run crawl -- --dry-run --site=<key>
 
-# 실제 크롤
-npm run crawl -- --site=<key>
+# 온보딩 크롤 — 기본으로 --detail (상세 페이지) 사용.
+# color·description은 상세 페이지에만 있어 온보딩 때 확보한다
+# (리스트-only는 description 0% / color ~58%, 상세는 description 100% / color ~83%).
+npm run crawl -- --site=<key> --detail
 ```
 출력: `data/<key>-products.json`
+
+> **온보딩 = 상세, 갱신 = 리스트.** 가격/재고 주기 갱신은 `--detail` 없이 실행한다
+> (리스트 페이지에서 price·stock만, 상품당 상세 로드 없이 빠르게). color·description·image는
+> 거의 변하지 않으므로 온보딩 1회 상세크롤로 확정하고 갱신에서는 다시 긁지 않는다.
 
 ### 크롤 후 확인 사항
 - **category 채움률**: 출력 JSON에서 `category`가 비어있는 비율이 높으면 카테고리 매핑 점검.
@@ -159,7 +167,7 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
 ```
 브랜드 선정(+brand_nodes 등록)
   → 크롤 코드(config/셀렉터/색상맵) 작성 → npm run typecheck && npm test
-  → npm run crawl -- --site=<key>            (category/color/품절 확인)
+  → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/color/description/품절 확인)
   → import-products --no-new-brands --in-stock-only --site=<key>   (validation_reject/스키마 확인)
   → embed_batch_devapp.py --download-workers 8                     (재실행으로 커버리지 수렴)
 ```

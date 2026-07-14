@@ -1,0 +1,423 @@
+import type {Cafe24Page} from "./cafe24-page"
+import type {Product, SiteConfig} from "./types"
+import {extractColorFromText, normalizeCafe24DetailColorList} from "./parsers/field-extractors/color-normalizer"
+
+export interface Cafe24ChainStep<TContext, TValue> {
+  name: string
+  run: (context: TContext) => Promise<TValue[]> | TValue[]
+}
+
+export interface Cafe24ChainResult<TValue> {
+  value: TValue[]
+  strategy: string
+  attempted: Array<{name: string; count: number}>
+}
+
+export async function runFirstUsefulCafe24Step<TContext, TValue>(
+  context: TContext,
+  steps: Array<Cafe24ChainStep<TContext, TValue>>,
+  isUseful: (value: TValue[]) => boolean = (value) => value.length > 0,
+): Promise<Cafe24ChainResult<TValue>> {
+  const attempted: Array<{name: string; count: number}> = []
+  let fallback: Cafe24ChainResult<TValue> = {value: [], strategy: "none", attempted}
+
+  for (const step of steps) {
+    const value = await step.run(context)
+    attempted.push({name: step.name, count: value.length})
+    fallback = {value, strategy: step.name, attempted}
+    if (isUseful(value)) return fallback
+  }
+
+  return fallback
+}
+
+export interface Cafe24CategoryCandidate {
+  name: string
+  cateNo: number
+  gender: string[]
+  url: string
+}
+
+export function parseCafe24CategoryHref(
+  href: string,
+  baseUrl: string,
+  text = "",
+): Cafe24CategoryCandidate | null {
+  if (!href || /^javascript:/i.test(href) || href.startsWith("#")) return null
+
+  let url: URL
+  try {
+    url = new URL(href, baseUrl)
+  } catch {
+    return null
+  }
+
+  const pathname = url.pathname
+  const isProductDetail =
+    /\/product\//i.test(pathname) && !/\/product\/list\.html$/i.test(pathname)
+  if (isProductDetail) return null
+  if (/\/(?:board|member|order|myshop|article)\//i.test(pathname)) return null
+
+  const queryCateNo = url.searchParams.get("cate_no")
+  const prettyMatch = pathname.match(/\/category\/[^/]+\/(\d+)(?:\/|$)/i)
+  const cateNoRaw = queryCateNo ?? prettyMatch?.[1] ?? null
+  if (!cateNoRaw) return null
+
+  const cateNo = Number(cateNoRaw)
+  if (!Number.isInteger(cateNo) || cateNo <= 0) return null
+
+  const name = cleanCategoryName(text) || nameFromPrettyCategoryPath(pathname) || `cate_no=${cateNo}`
+  return {name, cateNo, gender: inferGender(name), url: url.href}
+}
+
+function cleanCategoryName(raw: string): string {
+  return raw
+    .replace(/\s+/g, " ")
+    .replace(/^\s*[-|/]+\s*/, "")
+    .replace(/\s*[-|/]+\s*$/, "")
+    .trim()
+    .slice(0, 80)
+}
+
+function nameFromPrettyCategoryPath(pathname: string): string {
+  const match = pathname.match(/\/category\/([^/]+)\/\d+(?:\/|$)/i)
+  if (!match) return ""
+  try {
+    return decodeURIComponent(match[1] ?? "")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  } catch {
+    return ""
+  }
+}
+
+function inferGender(text: string): string[] {
+  const hay = text.toLowerCase()
+  if (/unisex|유니섹스|공용|남녀/.test(hay)) return ["unisex"]
+
+  const gender: string[] = []
+  const isWomen = /women|woman|female|우먼|여성|여자/.test(hay)
+  const menHay = hay.replace(/wom[ae]n|우먼/g, " ")
+  const isMen = /\bmen\b|men'|man'|\bmale\b|맨즈|남성|남자/.test(menHay)
+  if (isWomen) gender.push("women")
+  if (isMen) gender.push("men")
+  return gender
+}
+
+export function isNoisyCafe24CategoryName(name: string, ignorePatterns: string[] = []): boolean {
+  const lower = cleanCategoryName(name).toLowerCase()
+  if (!lower) return true
+
+  const exact = new Set([
+    "home",
+    "shop home",
+    "login",
+    "member",
+    "cart",
+    "order",
+    "mypage",
+    "my page",
+    "cs",
+    "faq",
+    "q&a",
+    "notice",
+    "stockist",
+    "brand story",
+    "about",
+    "about us",
+    "journal",
+    "magazine",
+    "event",
+    "events",
+    "lookbook",
+    "look book",
+    "styling",
+    "campaign",
+    "view more",
+    "detail",
+    "all",
+    "전체",
+    "홈",
+    "로그인",
+    "장바구니",
+  ])
+  if (exact.has(lower)) return true
+
+  const contains = [
+    "brand story",
+    "stockist",
+    "lookbook",
+    "look book",
+    "editorial",
+    "journal",
+    "notice",
+    "faq",
+    "q&a",
+    "membership",
+    "view more",
+  ]
+  if (contains.some((needle) => lower.includes(needle))) return true
+
+  return ignorePatterns.some((pattern) => lower === pattern.toLowerCase())
+}
+
+export function dedupeAndFilterCafe24Categories(
+  categories: Cafe24CategoryCandidate[],
+  ignorePatterns: string[] = [],
+): Cafe24CategoryCandidate[] {
+  const seen = new Set<number>()
+  const out: Cafe24CategoryCandidate[] = []
+  for (const category of categories) {
+    if (seen.has(category.cateNo)) continue
+    seen.add(category.cateNo)
+    if (isNoisyCafe24CategoryName(category.name, ignorePatterns)) continue
+    out.push(category)
+  }
+  return out
+}
+
+export function cleanCafe24ProductName(raw: string | null | undefined): string {
+  let text = (typeof raw === "string" ? raw : "").replace(/\s+/g, " ").trim()
+  for (let i = 0; i < 3; i++) {
+    const next = text.replace(
+      /^(?:상품명|제품명|product\s*name|name|제조사|판매가|브랜드|소비자가|적립금)\s*[:：]\s*/i,
+      "",
+    ).trim()
+    if (next === text) break
+    text = next
+  }
+  return text
+}
+
+export function isGenericCafe24ProductName(name: string | null | undefined): boolean {
+  const cleaned = cleanCafe24ProductName(name)
+  const folded = cleaned.toLowerCase().replace(/[\s:：_-]+/g, "")
+  return folded === "" || folded === "상품명" || folded === "productname" || folded === "name"
+}
+
+export interface Cafe24DetailFallbacks {
+  name: string | null
+  price: number | null
+  priceFormatted: string | null
+  color: string | null
+  descriptionFirstLine: string | null
+}
+
+export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Cafe24DetailFallbacks> {
+  const raw = await page
+    .evaluate(() => {
+      /* eslint-disable no-var */
+      var nameParts: string[] = []
+      var nameSelectors = [
+        ".xans-product-detail .heading h2",
+        ".xans-product-detail .name",
+        ".infoArea h2",
+        ".prdName",
+        ".product-name",
+        "#titleArea h2",
+        "h1",
+        "meta[property='og:title']",
+      ]
+      for (var n = 0; n < nameSelectors.length; n++) {
+        var nameEls = document.querySelectorAll(nameSelectors[n])
+        for (var ni = 0; ni < nameEls.length; ni++) {
+          var nameEl = nameEls[ni]
+          var nameText = nameEl.tagName === "META"
+            ? (nameEl.getAttribute("content") || "")
+            : ((nameEl as HTMLElement).innerText || nameEl.textContent || "")
+          nameText = nameText.replace(/\s+/g, " ").trim()
+          if (nameText) nameParts.push(nameText)
+        }
+      }
+
+      var priceText = ""
+      var rowEls = document.querySelectorAll("tr, li, .xans-product-detaildesign, .infoArea, .price, [class*=price], [class*=Price]")
+      for (var r = 0; r < rowEls.length; r++) {
+        var rowText = (rowEls[r].textContent || "").replace(/\s+/g, " ").trim()
+        if (!rowText) continue
+        if (/할인판매가|판매가|price|KRW|₩|￦/i.test(rowText)) {
+          priceText += " " + rowText
+        }
+      }
+
+      var descFirstLine = ""
+      var descEls = document.querySelectorAll(".cont_detail, #prdDetail, .product-detail, .xans-product-detaildesign, .detail_cont, #productDetail")
+      for (var d = 0; d < descEls.length; d++) {
+        var desc = ((descEls[d] as HTMLElement).innerText || descEls[d].textContent || "").trim()
+        if (!desc) continue
+        var lines = desc.split(/\n+/)
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].replace(/\s+/g, " ").trim()
+          if (line.length >= 4 && !/^KRW\b|^₩|^\d[\d,]+/.test(line)) {
+            descFirstLine = line
+            break
+          }
+        }
+        if (descFirstLine) break
+      }
+
+      var colorText = ""
+      var rows = document.querySelectorAll("tr, li, .xans-product-detail li")
+      for (var cr = 0; cr < rows.length; cr++) {
+        var txt = (rows[cr].textContent || "").replace(/\s+/g, " ").trim()
+        var m = txt.match(/(?:색상|컬러|color)\s*[:：]?\s*([^\n]{1,80})/i)
+        if (m && m[1]) colorText += " " + m[1]
+      }
+
+      return {
+        names: nameParts.slice(0, 10),
+        priceText,
+        colorText,
+        descFirstLine,
+      }
+      /* eslint-enable no-var */
+    })
+    .catch(() => ({names: [] as string[], priceText: "", colorText: "", descFirstLine: ""}))
+
+  const name = firstUsefulName([...raw.names, raw.descFirstLine])
+  const price = parseCafe24Price(raw.priceText)
+  const color = extractColorFromText(raw.colorText) ?? extractColorFromText(raw.descFirstLine)
+  const formatted = price === null ? null : `₩${price.toLocaleString()}`
+
+  return {
+    name,
+    price,
+    priceFormatted: formatted,
+    color,
+    descriptionFirstLine: firstUsefulName([raw.descFirstLine]),
+  }
+}
+
+function firstUsefulName(candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const name = cleanCafe24ProductName(candidate)
+    if (name.length >= 3 && name.length <= 180 && !isGenericCafe24ProductName(name)) {
+      return name
+    }
+  }
+  return null
+}
+
+function parseCafe24Price(text: string): number | null {
+  if (!text) return null
+
+  const clean = text.replace(/,/g, "")
+  const preferred =
+    clean.match(/할인판매가\s*[:：]?\s*[₩￦]?\s*(\d{4,})/) ??
+    clean.match(/판매가\s*[:：]?\s*[₩￦]?\s*(\d{4,})/) ??
+    clean.match(/price\s*[:：]?\s*(?:KRW)?\s*[₩￦]?\s*(\d{4,})/i) ??
+    clean.match(/[₩￦]\s*(\d{4,})/) ??
+    clean.match(/KRW\s*(\d{4,})/i)
+
+  if (!preferred?.[1]) return null
+  const price = Number(preferred[1])
+  return Number.isFinite(price) && price >= 1000 ? price : null
+}
+
+export function applyCafe24DetailFallbacks(
+  product: Product,
+  detailFallbacks: Cafe24DetailFallbacks,
+): void {
+  if (isGenericCafe24ProductName(product.name) && detailFallbacks.name) {
+    product.name = detailFallbacks.name
+  }
+
+  if (product.price === null && detailFallbacks.price !== null) {
+    product.price = detailFallbacks.price
+    product.originalPrice = product.originalPrice ?? detailFallbacks.price
+    product.priceFormatted = detailFallbacks.priceFormatted ?? product.priceFormatted
+  }
+
+  if (!product.color) {
+    const color =
+      detailFallbacks.color ??
+      extractColorFromText(product.name) ??
+      extractColorFromText(detailFallbacks.descriptionFirstLine ?? "")
+    if (color) product.color = normalizeCafe24DetailColorList(color)
+  }
+}
+
+export interface Cafe24QualityAssessment {
+  passed: boolean
+  reasons: string[]
+  metrics: {
+    total: number
+    generic_name_count: number
+    generic_name_rate: number
+    price_missing_count: number
+    price_missing_rate: number
+    image_missing_count: number
+    image_missing_rate: number
+    brand_contamination_count: number
+    brand_contamination_rate: number
+  }
+}
+
+const KNOWN_EXTERNAL_BRAND_PREFIXES = [
+  "adidas",
+  "asics",
+  "birkenstock",
+  "keen",
+  "hoka",
+  "merrell",
+  "new balance",
+  "nike",
+  "norda",
+  "on",
+  "reebok",
+  "roa",
+  "salomon",
+  "teva",
+  "vans",
+]
+
+export function assessCafe24ProductQuality(
+  products: Product[],
+  config: Pick<SiteConfig, "brand" | "name" | "type">,
+): Cafe24QualityAssessment {
+  const total = products.length
+  const genericNameCount = products.filter((p) => isGenericCafe24ProductName(p.name)).length
+  const priceMissingCount = products.filter((p) => typeof p.price !== "number").length
+  const imageMissingCount = products.filter((p) => typeof p.imageUrl !== "string" || !p.imageUrl.trim()).length
+  const brandContaminationCount = products.filter((p) => looksLikeExternalBrandProduct(p, config)).length
+  const pct = (count: number) => (total === 0 ? 0 : Math.round((count / total) * 10000) / 100)
+
+  const metrics = {
+    total,
+    generic_name_count: genericNameCount,
+    generic_name_rate: pct(genericNameCount),
+    price_missing_count: priceMissingCount,
+    price_missing_rate: pct(priceMissingCount),
+    image_missing_count: imageMissingCount,
+    image_missing_rate: pct(imageMissingCount),
+    brand_contamination_count: brandContaminationCount,
+    brand_contamination_rate: pct(brandContaminationCount),
+  }
+
+  const reasons: string[] = []
+  if (total === 0) reasons.push("no_products")
+  if (metrics.generic_name_rate > 5) reasons.push(`generic_name_rate=${metrics.generic_name_rate}`)
+  if (metrics.price_missing_rate > 50) reasons.push(`price_missing_rate=${metrics.price_missing_rate}`)
+  if (metrics.image_missing_rate > 20) reasons.push(`image_missing_rate=${metrics.image_missing_rate}`)
+  if (metrics.brand_contamination_rate > 20) {
+    reasons.push(`brand_contamination_rate=${metrics.brand_contamination_rate}`)
+  }
+
+  return {passed: reasons.length === 0, reasons, metrics}
+}
+
+function looksLikeExternalBrandProduct(
+  product: Product,
+  config: Pick<SiteConfig, "brand" | "name" | "type">,
+): boolean {
+  if (!config.brand) return false
+  const brand = config.brand.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  const name = (typeof product.name === "string" ? product.name : "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+  if (!brand || !name) return false
+  if (name.startsWith(`${brand} `)) return false
+  return KNOWN_EXTERNAL_BRAND_PREFIXES.some((prefix) => name.startsWith(`${prefix} `))
+}
