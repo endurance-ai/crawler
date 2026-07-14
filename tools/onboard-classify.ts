@@ -33,8 +33,18 @@ async function main() {
     for (let i = 0; i < pass.length; i++) { const r = pass[i]; let c = has(r.color) ? (normalizeColorList(r.color) || null) : null; if (!c) { c = detColor(`${r.name} ${r.product_url} ${r.description || ""}`); if (c) det++ } if (!c) { c = await llmColor(page, r); if (c) { c = normalizeColorList(c) || c; llm++ } await page.goto("about:blank", {timeout: 5000}).catch(() => {}) } fc[i] = c }
     await ctx.close().catch(() => {}) } finally { await browser.close().catch(() => {}) }
   console.log(`color: det +${det} · llm +${llm}`)
+  // brand is a required non-nullable field downstream (product-validator.ts
+  // ProductSchema). cfg.brand is unset for multi-brand editorial shops (correct —
+  // they need per-product DOM brand extraction, not a single config value) and
+  // for house-brand malls not yet given a `brand:` field in platforms.ts. Either
+  // way, writing `undefined` here gets silently dropped by JSON.stringify and the
+  // validator rejects 100% of the brand's products with no obvious signal. Fall
+  // back to cfg.name (always set) and warn once per brand so the gap is visible.
+  const warnedNoBrand = new Set<string>()
   const perBrand: Record<string, any[]> = {}
-  pass.forEach((r, i) => { const cfg = cfgByKey[r.brand_key], p = preds[i] || {}, cur = r.currency || "KRW", price = typeof r.price === "number" ? r.price : null; (perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: cfg.type, gender: cfg.defaultGender ?? [], brand: cfg.brand, color: fc[i], description: r.description ?? null, crawledAt: new Date().toISOString()}) })
+  pass.forEach((r, i) => { const cfg = cfgByKey[r.brand_key], p = preds[i] || {}, cur = r.currency || "KRW", price = typeof r.price === "number" ? r.price : null
+    if (!cfg.brand && !warnedNoBrand.has(r.brand_key)) { warnedNoBrand.add(r.brand_key); console.warn(`⚠️  ${r.brand_key}: platforms.ts has no config.brand — falling back to name "${cfg.name}". If this is a single-house-brand shop, add the brand field (see docs/bulk-onboarding.md §4-1); if it's multi-brand, this fallback is wrong and needs per-product brand extraction instead.`) }
+    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: cfg.type, gender: cfg.defaultGender ?? [], brand: cfg.brand || cfg.name, color: fc[i], description: r.description ?? null, crawledAt: new Date().toISOString()}) })
   fs.mkdirSync("data", {recursive: true}); const written: string[] = []
   for (const [key, prods] of Object.entries(perBrand)) { fs.writeFileSync(path.join("data", `${key}-products.json`), JSON.stringify(prods, null, 2)); written.push(key) }
   fs.writeFileSync(PASSOUT, JSON.stringify(written))
