@@ -180,77 +180,161 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
   },
 ]
 
+// Name-text \u2192 family inference (fallback only). inferCategoryFromText returns a
+// family ONLY when exactly one entry matches; overlapping matches resolve to null
+// and defer to the raw/LLM category, so imperfect overlap here is safe.
 const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?: string[]}> = [
   {
-    category: "Outer",
-    patterns: [/\b(coat|jacket|blazer|parka|anorak|windbreaker|cardigan|vest|outerwear|fleece)\b/i],
-    contains: ["\uc544\uc6b0\ud130", "\ucf54\ud2b8", "\uc7ac\ud0b7", "\uc790\ucf13", "\ube14\ub808\uc774\uc800", "\ud30c\uce74", "\uac00\ub514\uac74"],
+    category: "outerwear",
+    patterns: [/\b(coat|jacket|blazer|parka|anorak|windbreaker|bomber|trench|overcoat|outerwear)\b/i],
+    contains: ["\uc544\uc6b0\ud130", "\ucf54\ud2b8", "\uc7ac\ud0b7", "\uc790\ucf13", "\ube14\ub808\uc774\uc800", "\ud30c\uce74", "\uc810\ud37c", "\uc57c\uc0c1"],
   },
   {
-    category: "Dress",
-    patterns: [/\b(dress|robe|vestido|abito|one[-\s]?piece)\b/i],
-    contains: ["\ub4dc\ub808\uc2a4", "\uc6d0\ud53c\uc2a4"],
+    category: "knitwear",
+    patterns: [/\b(knit|knitwear|sweater|cardigan|pullover|turtleneck)\b/i],
+    contains: ["\ub2c8\ud2b8", "\uc2a4\uc6e8\ud130", "\uac00\ub514\uac74", "\uce74\ub514\uac74", "\ud130\ud2c0\ub125", "\ub2c8\ud2b8\uc6e8\uc5b4"],
   },
   {
-    category: "Shoes",
-    patterns: [/\b(shoes?|sneakers?|boots?|loafers?|sandals?|mules?|heels?|flats?|slides?)\b/i],
-    contains: ["\uc2e0\ubc1c", "\uc2a4\ub2c8\ucee4\uc988", "\ubd80\uce20", "\ub85c\ud37c", "\uc0cc\ub4e4", "\uad6c\ub450"],
+    category: "tops",
+    patterns: [/\b(t[-\s]?shirt|tee|shirt|blouse|polo|hoodie|sweatshirt|tank[-\s]?top|crop[-\s]?top|henley|camisole)\b/i],
+    contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1"],
   },
   {
-    category: "Bag",
-    patterns: [/\b(bag|tote|backpack|crossbody|clutch|shoulder\s*bag|messenger|briefcase)\b/i],
-    contains: ["\uac00\ubc29", "\ud1a0\ud2b8", "\ubc31\ud329", "\ud074\ub7ec\uce58", "\uc204\ub354\ubc31"],
+    category: "bottoms",
+    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
+    contains: ["\ud558\uc758", "\ud32c\uce20", "\ubc14\uc9c0", "\ub370\ub2d8", "\uc9c4", "\uc1fc\uce20", "\uc2a4\ucee4\ud2b8", "\uce58\ub9c8", "\uc2ac\ub799\uc2a4", "\uc870\uac70"],
   },
   {
-    category: "Bottom",
-    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?|skirt|joggers?|leggings|culottes)\b/i],
-    contains: ["\ud558\uc758", "\ud32c\uce20", "\ubc14\uc9c0", "\ub370\ub2d8", "\uc9c4", "\uc1fc\uce20", "\uc2a4\ucee4\ud2b8"],
+    category: "dresses",
+    patterns: [/\b(dress|robe|vestido|abito|one[-\s]?piece|jumpsuit|romper)\b/i],
+    contains: ["\ub4dc\ub808\uc2a4", "\uc6d0\ud53c\uc2a4", "\uc810\ud504\uc218\ud2b8"],
   },
   {
-    category: "Accessories",
-    patterns: [/\b(hat|cap|scarf|belt|sunglasses|watch|necklace|bracelet|ring|earrings|tie|gloves|socks|wallet)\b/i],
-    contains: ["\uc561\uc138\uc11c\ub9ac", "\uc545\uc138\uc0ac\ub9ac", "\ubaa8\uc790", "\ucea1", "\uc2a4\uce74\ud504", "\ubca8\ud2b8", "\uc591\ub9d0", "\uc9c0\uac11"],
+    category: "shoes",
+    patterns: [/\b(shoes?|sneakers?|boots?|loafers?|sandals?|mules?|heels?|flats?|slides?|derby|oxford|footwear)\b/i],
+    contains: ["\uc2e0\ubc1c", "\uc2a4\ub2c8\ucee4\uc988", "\ubd80\uce20", "\ub85c\ud37c", "\uc0cc\ub4e4", "\uad6c\ub450", "\ud790", "\uc288\uc988"],
   },
   {
-    category: "Top",
-    patterns: [/\b(top|tee|t[-\s]?shirt|shirt|blouse|polo|sweater|knit|tank|camisole|sweatshirt|hoodie)\b/i],
-    contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ub2c8\ud2b8", "\uc2a4\uc6e8\ud130", "\ud6c4\ub4dc"],
+    category: "bags",
+    patterns: [/\b(bag|tote|backpack|crossbody|clutch|shoulder\s*bag|messenger|bucket\s*bag)\b/i],
+    contains: ["\uac00\ubc29", "\ud1a0\ud2b8", "\ubc31\ud329", "\ud074\ub7ec\uce58", "\uc204\ub354\ubc31", "\ud06c\ub85c\uc2a4\ubc31", "\uc5d0\ucf54\ubc31"],
+  },
+  {
+    category: "eyewear",
+    patterns: [/\b(sunglasses|glasses|eyewear|goggles)\b/i],
+    contains: ["\uc120\uae00\ub77c\uc2a4", "\uc548\uacbd", "\uc544\uc774\uc6e8\uc5b4", "\uace0\uae00"],
+  },
+  {
+    category: "jewelry",
+    patterns: [/\b(necklace|bracelet|ring|earrings?|jewelry|jewellery|pendant|anklet)\b/i],
+    contains: ["\ubaa9\uac78\uc774", "\ud314\ucc0c", "\ubc18\uc9c0", "\uadc0\uac78\uc774", "\uc8fc\uc5bc\ub9ac", "\uc96c\uc5bc\ub9ac", "\ud39c\ub358\ud2b8"],
+  },
+  {
+    category: "headwear",
+    patterns: [/\b(hat|cap|beanie|beret|bucket\s*hat)\b/i],
+    contains: ["\ubaa8\uc790", "\ube44\ub2c8", "\ubca0\ub808", "\ubc84\ud0b7\ud587"],
+  },
+  {
+    category: "accessories",
+    patterns: [/\b(scarf|belt|watch|tie|gloves|socks|wallet|muffler)\b/i],
+    contains: ["\uc2a4\uce74\ud504", "\ubca8\ud2b8", "\uc2dc\uacc4", "\ub125\ud0c0\uc774", "\uc7a5\uac11", "\uc591\ub9d0", "\uc9c0\uac11", "\uba38\ud50c\ub7ec"],
+  },
+  {
+    category: "underwear",
+    patterns: [/\b(underwear|briefs|boxers?|bra|lingerie|panties)\b/i],
+    contains: ["\uc18d\uc637", "\ube0c\ub77c", "\ud32c\ud2f0", "\uc5b8\ub354\uc6e8\uc5b4", "\ub780\uc81c\ub9ac"],
+  },
+  {
+    category: "swimwear",
+    patterns: [/\b(swimsuit|bikini|swimwear|trunks|rashguard)\b/i],
+    contains: ["\uc218\uc601\ubcf5", "\ube44\ud0a4\ub2c8", "\ub798\uc2dc\uac00\ub4dc", "\uc2a4\uc714"],
+  },
+  {
+    category: "activewear",
+    patterns: [/\b(activewear|tracksuit|sportswear|sports[-\s]?bra|athletic|yoga)\b/i],
+    contains: ["\ud2b8\ub808\uc774\ub2dd", "\uc6b4\ub3d9\ubcf5", "\uc694\uac00", "\uc561\ud2f0\ube0c\uc6e8\uc5b4", "\uc2a4\ud3ec\uce20"],
   },
 ]
 
+// Raw category string \u2192 family. Includes legacy capitalized DB values
+// (Outer/Top/\u2026 lowercased by normalizeForMatch) so values passing through QC are
+// canonicalized to the new taxonomy. Ambiguous legacy splits default to the most
+// common family (Top\u2192tops, Accessories\u2192accessories); name inference above and the
+// LLM re-classification pass resolve the finer split.
 const CATEGORY_COMPAT: Record<string, Category> = {
-  outer: "Outer",
-  outerwear: "Outer",
-  jacket: "Outer",
-  jackets: "Outer",
-  coat: "Outer",
-  coats: "Outer",
-  cardigan: "Outer",
-  top: "Top",
-  tops: "Top",
-  shirt: "Top",
-  shirts: "Top",
-  knit: "Top",
-  knitwear: "Top",
-  sweater: "Top",
-  sweatshirt: "Top",
-  bottom: "Bottom",
-  bottoms: "Bottom",
-  pants: "Bottom",
-  trousers: "Bottom",
-  jeans: "Bottom",
-  denim: "Bottom",
-  skirt: "Bottom",
-  shorts: "Bottom",
-  shoes: "Shoes",
-  shoe: "Shoes",
-  footwear: "Shoes",
-  bag: "Bag",
-  bags: "Bag",
-  dress: "Dress",
-  dresses: "Dress",
-  accessories: "Accessories",
-  accessory: "Accessories",
+  // legacy capitalized DB values
+  outer: "outerwear",
+  top: "tops",
+  bottom: "bottoms",
+  bag: "bags",
+  dress: "dresses",
+  // outerwear synonyms
+  outerwear: "outerwear",
+  jacket: "outerwear",
+  jackets: "outerwear",
+  coat: "outerwear",
+  coats: "outerwear",
+  blazer: "outerwear",
+  // knitwear synonyms
+  knit: "knitwear",
+  knits: "knitwear",
+  knitwear: "knitwear",
+  sweater: "knitwear",
+  cardigan: "knitwear",
+  pullover: "knitwear",
+  // tops synonyms
+  tops: "tops",
+  shirt: "tops",
+  shirts: "tops",
+  tee: "tops",
+  tshirt: "tops",
+  blouse: "tops",
+  hoodie: "tops",
+  sweatshirt: "tops",
+  // bottoms synonyms
+  bottoms: "bottoms",
+  pants: "bottoms",
+  trousers: "bottoms",
+  jeans: "bottoms",
+  denim: "bottoms",
+  skirt: "bottoms",
+  shorts: "bottoms",
+  leggings: "bottoms",
+  // dresses synonyms
+  dresses: "dresses",
+  onepiece: "dresses",
+  jumpsuit: "dresses",
+  // shoes synonyms
+  shoes: "shoes",
+  shoe: "shoes",
+  footwear: "shoes",
+  sneakers: "shoes",
+  boots: "shoes",
+  // bags synonyms
+  bags: "bags",
+  // accessories & split families
+  accessories: "accessories",
+  accessory: "accessories",
+  eyewear: "eyewear",
+  sunglasses: "eyewear",
+  glasses: "eyewear",
+  jewelry: "jewelry",
+  jewellery: "jewelry",
+  necklace: "jewelry",
+  headwear: "headwear",
+  hat: "headwear",
+  cap: "headwear",
+  beanie: "headwear",
+  // intimates & sport
+  underwear: "underwear",
+  lingerie: "underwear",
+  swimwear: "swimwear",
+  swimsuit: "swimwear",
+  bikini: "swimwear",
+  activewear: "activewear",
+  sportswear: "activewear",
+  // passthrough
+  other: "other",
 }
 
 const GENDER_RULES: Array<{gender: "men" | "women" | "unisex"; patterns: RegExp[]; contains?: string[]}> = [

@@ -1,48 +1,73 @@
 // Centralized product enum definitions — single source of truth
 // Used by: prompts (analyze, prompt-search), search engine, batch analyzer
 
-// ─── Categories ──────────────────────────────────────────
+// ─── Categories (families) ───────────────────────────────
+// Frozen vocabulary shared with the search path (Vision/RPC). The crawler emits
+// exactly these tokens so both halves meet on the same words. Fashion families
+// give precision at the subcategory level (e.g. sneakers vs boots live under
+// `shoes`), so the family count stays small. Non-fashion / unclassifiable → `other`.
 
 export const CATEGORIES = [
-  "Outer", "Top", "Bottom", "Shoes", "Bag", "Dress", "Accessories",
+  "tops", "knitwear", "bottoms", "dresses", "outerwear",
+  "underwear", "swimwear", "activewear",
+  "shoes", "bags", "accessories", "eyewear", "jewelry", "headwear",
+  "other",
 ] as const
 export type Category = (typeof CATEGORIES)[number]
 
 // ─── Subcategories ───────────────────────────────────────
+// One vocabulary per family. `other` carries no subcategory.
 
 export const SUBCATEGORIES = {
-  Outer: [
-    "overcoat", "trench-coat", "parka", "bomber", "blazer", "cardigan",
-    "vest", "anorak", "leather-jacket", "denim-jacket", "fleece",
-    "windbreaker", "cape", "poncho", "shearling", "down-jacket",
-    "field-jacket", "chore-jacket", "overshirt", "hoodie",
+  tops: [
+    "t-shirt", "shirt", "blouse", "polo", "hoodie", "sweatshirt",
+    "tank-top", "crop-top", "henley", "camisole",
   ],
-  Top: [
-    "t-shirt", "shirt", "blouse", "polo", "sweater", "knit-top",
-    "tank-top", "crop-top", "henley", "turtleneck", "sweatshirt",
-    "rugby-shirt", "camisole",
+  knitwear: [
+    "sweater", "cardigan", "pullover", "knit-top", "turtleneck",
   ],
-  Bottom: [
+  bottoms: [
     "jeans", "trousers", "chinos", "shorts", "skirt", "joggers",
-    "cargo-pants", "wide-pants", "leggings", "culottes", "sweatpants",
+    "cargo-pants", "wide-pants", "leggings", "sweatpants",
   ],
-  Shoes: [
-    "sneakers", "boots", "loafers", "derby", "oxford", "sandals",
-    "mules", "heels", "flats", "slides", "chelsea-boots", "combat-boots",
-    "running-shoes",
-  ],
-  Bag: [
-    "tote", "crossbody", "backpack", "clutch", "shoulder-bag",
-    "belt-bag", "messenger", "bucket-bag", "briefcase",
-  ],
-  Dress: [
+  dresses: [
     "mini-dress", "midi-dress", "maxi-dress", "shirt-dress",
-    "wrap-dress", "slip-dress", "knit-dress",
+    "wrap-dress", "slip-dress", "knit-dress", "jumpsuit",
   ],
-  Accessories: [
-    "hat", "cap", "scarf", "belt", "sunglasses", "watch", "necklace",
-    "bracelet", "ring", "earrings", "tie", "gloves", "socks",
+  outerwear: [
+    "overcoat", "trench-coat", "parka", "bomber", "blazer", "vest",
+    "leather-jacket", "denim-jacket", "down-jacket", "windbreaker", "fleece",
   ],
+  underwear: [
+    "briefs", "bra",
+  ],
+  swimwear: [
+    "swimsuit", "bikini", "trunks",
+  ],
+  activewear: [
+    "tracksuit", "sports-bra", "athletic-shorts",
+  ],
+  shoes: [
+    "sneakers", "boots", "loafers", "derby", "oxford", "sandals",
+    "mules", "heels", "flats", "slides", "running-shoes",
+  ],
+  bags: [
+    "tote", "crossbody", "backpack", "clutch", "shoulder-bag",
+    "belt-bag", "messenger", "bucket-bag",
+  ],
+  accessories: [
+    "scarf", "belt", "watch", "tie", "gloves", "socks",
+  ],
+  eyewear: [
+    "sunglasses", "glasses",
+  ],
+  jewelry: [
+    "necklace", "bracelet", "ring", "earrings",
+  ],
+  headwear: [
+    "hat", "cap", "beanie", "beret", "bucket-hat",
+  ],
+  other: [],
 } as const satisfies Record<Category, readonly string[]>
 
 export type Subcategory = (typeof SUBCATEGORIES)[Category][number]
@@ -105,13 +130,14 @@ export function isValidColorFamily(v: string): v is ColorFamily {
 /** AI 프롬프트에 주입할 enum 레퍼런스 텍스트 생성 */
 export function buildEnumReference(): string {
   const subcategoryLines = (Object.entries(SUBCATEGORIES) as [Category, readonly string[]][])
+    .filter(([, subs]) => subs.length > 0)
     .map(([cat, subs]) => `  ${cat}: ${subs.join(", ")}`)
     .join("\n")
 
-  return `category (pick one):
+  return `category (pick one; use "other" for non-fashion / unclassifiable items):
   ${CATEGORIES.join(", ")}
 
-subcategory by category:
+subcategory by category (null if none fits):
 ${subcategoryLines}
 
 fit (pick one):
