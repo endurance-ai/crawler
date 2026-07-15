@@ -1,0 +1,109 @@
+import {test} from "node:test"
+import * as assert from "node:assert/strict"
+
+import {
+  assessCafe24ProductQuality,
+  cleanCafe24ProductName,
+  isGenericCafe24ProductName,
+  parseCafe24CategoryHref,
+  runFirstUsefulCafe24Step,
+} from "../src/lib/cafe24-chain"
+import type {Product} from "../src/lib/types"
+
+test("Cafe24 category chain parses pretty category URLs and rejects product detail URLs", () => {
+  assert.deepEqual(
+    parseCafe24CategoryHref("/category/tops/24/", "https://example.com", "TOPS"),
+    {
+      name: "TOPS",
+      cateNo: 24,
+      gender: [],
+      url: "https://example.com/category/tops/24/",
+    },
+  )
+
+  assert.equal(
+    parseCafe24CategoryHref(
+      "/product/example-shirt/123/category/24/display/1/",
+      "https://example.com",
+      "Example Shirt",
+    ),
+    null,
+  )
+})
+
+test("runFirstUsefulCafe24Step falls through until a strategy is useful", async () => {
+  const result = await runFirstUsefulCafe24Step(
+    undefined,
+    [
+      {name: "too-small", run: () => [1]},
+      {name: "useful", run: () => [1, 2]},
+    ],
+    (value) => value.length >= 2,
+  )
+
+  assert.equal(result.strategy, "useful")
+  assert.deepEqual(result.value, [1, 2])
+  assert.deepEqual(result.attempted, [
+    {name: "too-small", count: 1},
+    {name: "useful", count: 2},
+  ])
+})
+
+test("Cafe24 product name cleaner removes labels and detects generic placeholders", () => {
+  assert.equal(cleanCafe24ProductName("Product Name : Marco Bag_Black"), "Marco Bag_Black")
+  assert.equal(cleanCafe24ProductName("상품명 : 오버사이즈 셔츠"), "오버사이즈 셔츠")
+  assert.equal(isGenericCafe24ProductName("상품명"), true)
+  assert.equal(isGenericCafe24ProductName("Product Name : "), true)
+  assert.equal(isGenericCafe24ProductName("Marco Bag_Black"), false)
+})
+
+test("Cafe24 quality gate rejects generic names, missing prices, and external brand contamination", () => {
+  const base = product({name: "CAYL Trail Cap Black", price: 68000, brand: "Cayl"})
+
+  const ok = assessCafe24ProductQuality([base], {type: "cafe24", name: "Cayl", brand: "Cayl"})
+  assert.equal(ok.passed, true)
+
+  const generic = assessCafe24ProductQuality(
+    [product({name: "상품명", price: 68000, brand: "NOTHINGEVERYTHING"})],
+    {type: "cafe24", name: "NOTHINGEVERYTHING", brand: "NOTHINGEVERYTHING"},
+  )
+  assert.equal(generic.passed, false)
+  assert.deepEqual(generic.reasons, ["generic_name_rate=100"])
+
+  const noPrice = assessCafe24ProductQuality(
+    [product({name: "MPa Jacket Black", price: null, brand: "PLASTICPRODUCT"})],
+    {type: "cafe24", name: "PLASTICPRODUCT", brand: "PLASTICPRODUCT"},
+  )
+  assert.equal(noPrice.passed, false)
+  assert.deepEqual(noPrice.reasons, ["price_missing_rate=100"])
+
+  const contaminated = assessCafe24ProductQuality(
+    [
+      product({name: "HOKA 여성 호파라 2 Black", price: 179000, brand: "Cayl"}),
+      product({name: "CAYL Trail Cap Black", price: 68000, brand: "Cayl"}),
+    ],
+    {type: "cafe24", name: "Cayl", brand: "Cayl"},
+  )
+  assert.equal(contaminated.passed, false)
+  assert.deepEqual(contaminated.reasons, ["brand_contamination_rate=50"])
+})
+
+function product(overrides: Partial<Product>): Product {
+  return {
+    brand: "Brand",
+    name: "Product Black",
+    category: "Top",
+    price: 10000,
+    originalPrice: 10000,
+    salePrice: null,
+    priceFormatted: "₩10,000",
+    imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://example.com/product/1",
+    inStock: true,
+    gender: ["unisex"],
+    platform: "test",
+    crawledAt: "2026-01-01T00:00:00.000Z",
+    color: "Black",
+    ...overrides,
+  }
+}

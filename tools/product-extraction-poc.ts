@@ -10,6 +10,8 @@ import {chromium, type Page} from "playwright"
 import {z} from "zod"
 import {getSiteConfig} from "../src/configs/platforms"
 import {crawlCafe24} from "../src/lib/cafe24-engine"
+import {crawlCafe24WithLightpanda} from "../src/lib/cafe24-lightpanda"
+import {parseCafe24EngineMode} from "../src/lib/cafe24-engine-selection"
 import {crawlShopify} from "../src/lib/shopify-engine"
 import {getDetailParser} from "../src/lib/parsers/detail"
 import type {CrawlResult, Product, SiteConfig} from "../src/lib/types"
@@ -396,6 +398,26 @@ function clonePocConfig(config: SiteConfig, limit: number): SiteConfig {
   }
 }
 
+async function crawlCafe24Chromium(
+  config: SiteConfig,
+  limit: number,
+  detailParser: ReturnType<typeof getDetailParser> | undefined,
+): Promise<CrawlResult> {
+  const browser = await chromium.launch({headless: true})
+  try {
+    const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
+    const page = await context.newPage()
+    page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
+    const result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
+      sampleLimit: limit,
+    })
+    await context.close().catch(() => {})
+    return result
+  } finally {
+    await browser.close().catch(() => {})
+  }
+}
+
 async function runExistingVariant(config: SiteConfig, limit: number, stats: RuntimeStats): Promise<Product[]> {
   const started = Date.now()
   let result: CrawlResult
@@ -403,18 +425,22 @@ async function runExistingVariant(config: SiteConfig, limit: number, stats: Runt
   if (config.type === "shopify") {
     result = await crawlShopify(clonePocConfig(config, limit))
   } else if (config.type === "cafe24") {
-    const browser = await chromium.launch({headless: true})
-    try {
-      const context = await browser.newContext({userAgent: USER_AGENT, locale: "ko-KR"})
-      const page = await context.newPage()
-      page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
-      const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
-      result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, undefined, undefined, {
-        sampleLimit: limit,
-      })
-      await context.close().catch(() => {})
-    } finally {
-      await browser.close().catch(() => {})
+    const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
+    const engine = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
+    if (engine === "lightpanda" || engine === "auto") {
+      // Lightpanda runs its own browser process. It does not honor sampleLimit —
+      // it crawls the full catalog, sliced to `limit` below (fine for onboarding).
+      // Per-brand Chromium fallback mirrors src/crawl.ts so a brand Lightpanda
+      // cannot render is not silently dropped.
+      try {
+        result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {})
+        if (result.stats.totalProducts === 0) throw new Error("Lightpanda returned 0 products")
+      } catch (err) {
+        console.warn(`⚠️ ${config.key} Lightpanda failed — Chromium fallback: ${(err as Error).message}`)
+        result = await crawlCafe24Chromium(config, limit, detailParser)
+      }
+    } else {
+      result = await crawlCafe24Chromium(config, limit, detailParser)
     }
   } else {
     throw new Error(`Existing POC only supports cafe24/shopify, got ${config.type}`)

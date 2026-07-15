@@ -14,14 +14,14 @@
  * 비색상 잡텍스트(사이즈·"선택" 등)는 CANONICAL 매칭에서 자연 탈락한다.
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import {extractColorFromText} from "./color-normalizer"
 
 /**
  * 상세 페이지에서 색상 후보 원문을 긁어 첫 canonical 색상 문자열을 반환.
  * 하나도 못 찾으면 null.
  */
-export async function genericCafe24Color(page: Page): Promise<string | null> {
+export async function genericCafe24Color(page: Cafe24Page): Promise<string | null> {
   const raw = await page
     .evaluate(() => {
       /* eslint-disable no-var */

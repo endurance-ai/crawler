@@ -23,6 +23,9 @@ import {
   type ProductCollectionClient,
   type ProductCrawlBrand,
 } from "./lib/product-collection"
+import {getSiteConfig} from "./configs/platforms"
+import {assessCafe24ProductQuality} from "./lib/cafe24-chain"
+import type {Product} from "./lib/types"
 
 type Flags = Record<string, string | boolean>
 
@@ -39,6 +42,8 @@ interface CrawledProduct {
   categories?: unknown
   color?: unknown
   colors?: unknown
+  gender?: unknown
+  gender_scope?: unknown
   price?: unknown
   source_price?: unknown
   imageUrl?: unknown
@@ -205,7 +210,7 @@ function hasValue(value: unknown): boolean {
   return value != null
 }
 
-function analyzeArtifact(filePath: string): {metrics: Record<string, unknown>; passed: boolean; sha256: string} {
+function analyzeArtifact(filePath: string, platformKey?: string): {metrics: Record<string, unknown>; passed: boolean; sha256: string} {
   const text = fs.readFileSync(filePath, "utf-8")
   const sha256 = crypto.createHash("sha256").update(text).digest("hex")
   const products = JSON.parse(text) as CrawledProduct[]
@@ -214,26 +219,39 @@ function analyzeArtifact(filePath: string): {metrics: Record<string, unknown>; p
   const total = products.length
   const categoryPresent = products.filter((p) => hasValue(p.category) || hasValue(p.categories)).length
   const colorPresent = products.filter((p) => hasValue(p.color) || hasValue(p.colors)).length
+  const genderPresent = products.filter((p) => hasValue(p.gender) || hasValue(p.gender_scope)).length
   const pricePresent = products.filter((p) => hasValue(p.price) || hasValue(p.source_price)).length
   const imagePresent = products.filter((p) => hasValue(p.imageUrl) || hasValue(p.image_url) || hasValue(p.images)).length
   const inStock = products.filter((p) => p.inStock !== false && p.in_stock !== false).length
 
   const pct = (count: number): number => (total === 0 ? 0 : Math.round((10000 * count) / total) / 100)
-  const metrics = {
+  const metrics: Record<string, unknown> = {
     total,
     category_present: categoryPresent,
     color_present: colorPresent,
+    gender_present: genderPresent,
     price_present: pricePresent,
     image_present: imagePresent,
     in_stock: inStock,
     category_fill_rate: pct(categoryPresent),
     color_fill_rate: pct(colorPresent),
+    gender_fill_rate: pct(genderPresent),
     price_fill_rate: pct(pricePresent),
     image_fill_rate: pct(imagePresent),
   }
+
+  let passed = total > 0 && categoryPresent === total && colorPresent === total && genderPresent === total
+  const config = platformKey ? getSiteConfig(platformKey) : undefined
+  if (config?.type === "cafe24") {
+    const quality = assessCafe24ProductQuality(products as Product[], config)
+    metrics.cafe24_quality = quality.metrics
+    metrics.cafe24_quality_reasons = quality.reasons
+    passed = passed && quality.passed
+  }
+
   return {
     metrics,
-    passed: total > 0 && categoryPresent === total && colorPresent === total,
+    passed,
     sha256,
   }
 }
@@ -361,7 +379,7 @@ async function qcBrand(flags: Flags): Promise<void> {
     platformKey,
   })
   try {
-    const {metrics, passed, sha256} = analyzeArtifact(artifactPath)
+    const {metrics, passed, sha256} = analyzeArtifact(artifactPath, platformKey)
     // Manual QC gate no longer promotes status — crawl.ts/import-products.ts auto-sync
     // (2026-07-06) already carries crawled -> imported. A pass just records the diagnostic;
     // a fail still downgrades to qc_failed.
@@ -371,13 +389,13 @@ async function qcBrand(flags: Flags): Promise<void> {
       qc_summary: {...metrics, passed},
       ...(passed
         ? {last_error: null}
-        : {status: "qc_failed", last_error: "QC failed: category/color fill must be 100%"}),
+        : {status: "qc_failed", last_error: "QC failed: category/color/gender fill must be 100%"}),
     })
     await finishProductRun(db, runId, {
       status: passed ? "success" : "failed",
       metrics: {...metrics, passed},
       artifactPath: artifactRelPath,
-      errorMessage: passed ? null : "category/color fill below threshold",
+      errorMessage: passed ? null : "category/color/gender fill below threshold",
       startedAt,
     })
     console.log(`#${brandNodeId} ${platformKey}: qc ${passed ? "passed" : "failed"} ${JSON.stringify(metrics)}`)

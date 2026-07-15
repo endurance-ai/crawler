@@ -9,13 +9,23 @@
  * 사이트마다 테마가 달라 셀렉터가 조금씩 다를 수 있음 → 폴백 셀렉터로 대응
  */
 
-import type {Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
+import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
 import type {DetailData} from "./parsers/detail/types"
 import type {IReviewParser} from "./parsers/review"
-import {extractColorFromText, isNonColorOptionText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
+import {extractColorFromText, isNonColorOptionText, normalizeCafe24DetailColorList, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
+import {
+  applyCafe24DetailFallbacks,
+  assessCafe24ProductQuality,
+  cleanCafe24ProductName,
+  dedupeAndFilterCafe24Categories,
+  extractCafe24DetailFallbacks,
+  parseCafe24CategoryHref,
+  runFirstUsefulCafe24Step,
+  type Cafe24CategoryCandidate,
+} from "./cafe24-chain"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
 // with this to prevent indefinite hangs when page JS is stuck or network stalls.
@@ -96,9 +106,45 @@ interface CrawlTiming {
   listWaitMs: number
 }
 
-export interface Cafe24CrawlOptions {
+export interface CrawlCafe24Options {
+  detailConcurrency?: number
+  createDetailPage?: () => Promise<Cafe24DetailPageLease>
+  onDetailProgress?: (products: Product[]) => Promise<void> | void
+  existingDetails?: Map<string, DetailData>
   /** POC-only cap for list/detail work; omitted in production crawl paths. */
   sampleLimit?: number
+}
+
+function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe24DetailPageLease> {
+  const browser = (
+    page as unknown as {
+      context?: () => {browser?: () => {
+        newContext: () => Promise<{
+          route: (pattern: string, handler: (route: {abort: () => unknown}) => unknown) => Promise<unknown>
+          newPage: () => Promise<Cafe24Page>
+          close: () => Promise<unknown>
+        }>
+      } | null}
+    }
+  ).context?.().browser?.()
+
+  if (!browser) {
+    throw new Error("Cafe24 detail crawl requires a detail page factory for this browser engine")
+  }
+
+  return async () => {
+    const ctx = await browser.newContext()
+    await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
+    const detailPage = await ctx.newPage()
+    ;(detailPage as unknown as {on?: (event: "dialog", handler: (dialog: {dismiss: () => Promise<void>}) => void) => void})
+      .on?.("dialog", (dialog) => {
+        dialog.dismiss().catch(() => {})
+      })
+    return {
+      page: detailPage,
+      close: async () => void (await ctx.close()),
+    }
+  }
 }
 
 function countUniqueInStockProducts(products: Product[]): number {
@@ -113,79 +159,62 @@ function countUniqueInStockProducts(products: Product[]): number {
 }
 
 async function discoverCategories(
-  page: Page,
+  page: Cafe24Page,
   config: SiteConfig
 ): Promise<DiscoveredCategory[]> {
   const discoveryUrl = config.category?.discoveryUrl || config.baseUrl
-  const selector = config.category?.discoverySelector || 'a[href*="cate_no="]'
   const ignorePatterns = config.category?.ignorePatterns || []
-
-  const defaultIgnore = [
-    "home", "new", "sale", "brands", "brand", "journal", "styling",
-    "about", "magazine", "lookbook", "event", "notice", "faq",
-    "login", "member", "cart", "order", "mypage", "cs",
-    "all", "전체", "홈", "로그인", "장바구니",
-  ]
 
   await page.goto(discoveryUrl, {waitUntil: "domcontentloaded", timeout: 60000})
   // Cafe24는 JS 렌더링이 필요한 경우가 많음
   await page.waitForTimeout(2000)
 
-  const categories = await withTimeout(
-    page.evaluate(({sel, baseUrl}: {sel: string; baseUrl: string}) => {
-      const links = document.querySelectorAll(sel)
-      const catMap = new Map<number, {name: string; cateNo: number; gender: string[]; url: string}>()
+  const selectors = [
+    config.category?.discoverySelector || 'a[href*="cate_no="]',
+    'a[href*="/category/"]',
+    'a[href*="/product/list.html"]',
+    'a[href*="cate_no="], a[href*="/category/"], a[href*="/product/list.html"]',
+  ]
 
-      links.forEach((a) => {
-        const href = a.getAttribute("href") || ""
-        const match = href.match(/cate_no=(\d+)/)
-        if (!match) return
+  const extractBySelector = async (selector: string): Promise<Cafe24CategoryCandidate[]> => {
+    const links = await withTimeout(
+      page.evaluate(({sel}: {sel: string}) => {
+        const anchors = document.querySelectorAll(sel)
+        return Array.from(anchors).slice(0, 500).map((a) => ({
+          text: a.textContent?.trim().replace(/\s+/g, " ") || "",
+          href: a.getAttribute("href") || "",
+        }))
+      }, {sel: selector}),
+      20_000,
+      `discoverCategories:${selector}`,
+    )
 
-        const cateNo = parseInt(match[1], 10)
-        const name = a.textContent?.trim().replace(/\s+/g, " ") || ""
-        const className = (a.className || "").toLowerCase()
-        const parentClass = (a.parentElement?.className || "").toLowerCase()
+    return dedupeAndFilterCafe24Categories(
+      links
+        .map((link) => parseCafe24CategoryHref(link.href, config.baseUrl, link.text))
+        .filter((category): category is Cafe24CategoryCandidate => category !== null),
+      ignorePatterns,
+    )
+  }
 
-        // gender 추론: CSS 클래스 + 카테고리 이름 텍스트(영/한 키워드) 병행.
-        // "women" 이 "men" 을 포함하므로, women 매칭 토큰을 먼저 제거한 뒤 men 을 본다.
-        // 한글 키워드는 \b(word boundary)가 안 먹으므로 단순 substring 매칭.
-        const hay = `${className} ${parentClass} ${name}`.toLowerCase()
-        const gender: string[] = []
-        if (/unisex|유니섹스|공용|남녀/.test(hay)) {
-          gender.push("unisex")
-        } else {
-          const isWomen = /women|woman|female|우먼|여성|여자/.test(hay)
-          const menHay = hay.replace(/wom[ae]n|우먼/g, " ")
-          const isMen = /\bmen\b|men'|man'|\bmale\b|맨즈|남성|남자/.test(menHay)
-          if (isWomen) gender.push("women")
-          if (isMen) gender.push("men")
-        }
+  const chain = selectors.map((selector, index) => ({
+    name: index === 0 ? "configured-cate-no" : `fallback-${index}`,
+    run: () => extractBySelector(selector),
+  }))
 
-        const fullUrl = href.startsWith("http") ? href : `${baseUrl}${href.startsWith("/") ? "" : "/"}${href}`
+  const result = await runFirstUsefulCafe24Step(undefined, chain, (value) => value.length >= 2)
+  if (result.attempted.length > 1) {
+    const attempted = result.attempted.map((s) => `${s.name}:${s.count}`).join(", ")
+    console.log(`[${config.name}]    category-chain ${result.strategy} (${attempted})`)
+  }
 
-        if (name.length >= 1 && !catMap.has(cateNo)) {
-          catMap.set(cateNo, {name, cateNo, gender, url: fullUrl})
-        }
-      })
-
-      return Array.from(catMap.values())
-    }, {sel: selector, baseUrl: config.baseUrl}),
-    20_000,
-    "discoverCategories"
-  )
-
-  // 필터링: 무시 패턴 + 기본 무시 목록
-  const allIgnore = [...defaultIgnore, ...ignorePatterns]
-  return categories.filter((c) => {
-    const lower = c.name.toLowerCase()
-    return !allIgnore.some((p) => lower === p.toLowerCase())
-  })
+  return result.value
 }
 
 // ─── 상품 수집 (단일 페이지) ──────────────────────────
 
 async function collectProductsFromPage(
-  page: Page,
+  page: Cafe24Page,
   config: SiteConfig,
   categoryName: string,
   categoryGender: string[],
@@ -267,7 +296,7 @@ async function collectProductsFromPage(
               ? (ne.getAttribute("alt") || "").trim()
               : (ne.textContent || "").trim().replace(/\s+/g, " ")
             // Cafe24 숨은 spec 블록 라벨이 앞에 붙는 사이트 대응: "상품명 : X" → "X"
-            txt = txt.replace(/^(상품명|제조사|판매가|브랜드|소비자가|적립금)\s*:\s*/, "")
+            txt = txt.replace(/^(상품명|제품명|Product\s*Name|Name|제조사|판매가|브랜드|소비자가|적립금)\s*[:：]\s*/i, "")
             // ":" 또는 1~2글자 쓰레기값 건너뛰기
             if (txt.length > 2 && txt !== ":") { name = txt; break }
           }
@@ -454,6 +483,7 @@ async function collectProductsFromPage(
   // swatchText 는 전송용 임시 필드 → Product 로 넘기기 전 제거한다.
   const products = (evalResult.products || []) as Array<Record<string, unknown>>
   for (const p of products) {
+    if (typeof p.name === "string") p.name = cleanCafe24ProductName(p.name)
     const swatch = typeof p.swatchText === "string" ? p.swatchText : ""
     const nm = typeof p.name === "string" ? p.name : ""
     const color = extractColorFromText(swatch) ?? extractColorFromText(nm)
@@ -467,7 +497,7 @@ async function collectProductsFromPage(
 // ─── 카테고리 크롤 (페이지네이션 포함) ────────────────
 
 async function crawlCategory(
-  page: Page,
+  page: Cafe24Page,
   config: SiteConfig,
   category: DiscoveredCategory,
   timing?: CrawlTiming
@@ -525,13 +555,11 @@ async function crawlCategory(
 // ─── 메인 크롤 함수 ──────────────────────────────────
 
 export async function crawlCafe24(
-  page: Page,
+  page: Cafe24Page,
   config: SiteConfig,
   detailParser?: IDetailParser,
   reviewParser?: IReviewParser,
-  onDetailProgress?: (products: Product[]) => void,
-  existingDetails?: Map<string, DetailData>,
-  options: Cafe24CrawlOptions = {},
+  options: CrawlCafe24Options = {},
 ): Promise<CrawlResult> {
   const startTime = Date.now()
   const errors: string[] = []
@@ -637,30 +665,24 @@ export async function crawlCafe24(
     const detailStart = Date.now()
     detailNavCount = uniqueProducts.length
     let detailSuccess = 0
-    const DETAIL_CONCURRENCY = 3
-    const browser = page.context().browser()!
+    const DETAIL_CONCURRENCY = options.detailConcurrency ?? 3
     // 체크포인트: 대형 카탈로그(1000+ 상품) 상세크롤 도중 프로세스가 죽어도
     // 이미 끝낸 작업이 통째로 유실되지 않도록 30개 상품마다 디스크에 반영한다
     // (2026-07-06, hippiedippy 1511개 중 795개 완료 상태에서 유실된 사고).
     const CHECKPOINT_EVERY = 30
     let sinceCheckpoint = 0
+    const externalDetailFactory = options.createDetailPage
 
     // 상품마다 browser.newContext()를 새로 만들고 닫는 대신, DETAIL_CONCURRENCY개의
     // 컨텍스트/페이지를 한 번만 만들어 사이트 전체 상세크롤 동안 재사용한다.
     // 대형 카탈로그(bergwerk 1344개 등)에서 상품당 컨텍스트 생성/종료를 반복하니
     // OS 프로세스가 점진적으로 쌓여(체크: 79개 chrome/node) 크롤이 극도로 느려지고
     // 결국 리소스 고갈로 프로세스가 죽는 사고가 있었다 (2026-07-06).
-    const workerPages: Page[] = []
-    for (let w = 0; w < DETAIL_CONCURRENCY; w++) {
-      const ctx = await browser.newContext()
-      await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
-      const pg = await ctx.newPage()
-      // JS 팝업을 즉시 닫는다 — 안 닫으면 context 종료 시 Playwright의 dialog
-      // 핸들링이 uncaught rejection을 던져 프로세스 전체가 죽을 수 있다
-      // (2026-07-06, kupido-movingwear/hagamos 상세크롤 중 확인).
-      pg.on("dialog", (d) => d.dismiss().catch(() => {}))
-      workerPages.push(pg)
-    }
+    const workerLeases: Cafe24DetailPageLease[] = externalDetailFactory
+      ? []
+      : await Promise.all(
+          Array.from({length: DETAIL_CONCURRENCY}, () => createPlaywrightDetailPageFactory(page)()),
+        )
 
     try {
       for (let i = 0; i < uniqueProducts.length; i += DETAIL_CONCURRENCY) {
@@ -670,11 +692,12 @@ export async function crawlCafe24(
             // 재시작 스킵: 이전 체크포인트/결과 파일에 이미 색상까지 확보된 상품이면
             // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
             // 상세크롤을 반복하지 않기 위함).
-            const known = existingDetails?.get(product.productUrl)
+            const known = options.existingDetails?.get(product.productUrl)
             if (known && known.color) {
-              return {product, detail: known}
+              return {product, detail: known, detailFallbacks: null}
             }
-            const pg = workerPages[slot]!
+            const lease = externalDetailFactory ? await externalDetailFactory() : workerLeases[slot]!
+            const pg = lease.page
             try {
               const detail = await withTimeout(
                 detailParser.parse(pg, product.productUrl),
@@ -685,26 +708,35 @@ export async function crawlCafe24(
               if (!detail.color) {
                 detail.color = await genericCafe24Color(pg).catch(() => null)
               }
-              return {product, detail}
+              const detailFallbacks = await extractCafe24DetailFallbacks(pg)
+              return {product, detail, detailFallbacks}
             } catch {
               // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서
               // 계속 진행 중일 수 있다 — 페이지를 재사용하므로, 다음 배치가 같은
               // 슬롯에서 새 URL로 goto할 때 "interrupted by another navigation"
               // 에러가 나는 걸 막기 위해 about:blank로 강제 리셋해 정리한다
               // (2026-07-06, 페이지 재사용 도입 후 A.R.U 등에서 확인된 회귀).
+              const detailFallbacks = await extractCafe24DetailFallbacks(pg).catch(() => null)
               await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
-              return {product, detail: null}
+              return {product, detail: null, detailFallbacks}
+            } finally {
+              if (externalDetailFactory) await lease.close()
             }
           })
         )
 
-        for (const {product, detail} of results) {
-          if (!detail) continue
-          if (detail.description) product.description = detail.description
+        for (const {product, detail, detailFallbacks} of results) {
+          if (!detail && !detailFallbacks) continue
+          if (detail?.description) product.description = detail.description
           // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명 → "_COLOR"/"[COLOR]" 패턴.
-          if (detail.color) {
-            product.color = detail.color
-          } else if (!product.color && product.name) {
+          const detailColor = detail?.color ? normalizeCafe24DetailColorList(detail.color) : ""
+          if (detailColor) {
+            product.color = detailColor
+          }
+          if (detailFallbacks) {
+            applyCafe24DetailFallbacks(product, detailFallbacks)
+          }
+          if (!product.color && product.name) {
             const nameColor = extractColorFromText(product.name)
             if (nameColor) {
               product.color = nameColor
@@ -718,24 +750,33 @@ export async function crawlCafe24(
               if (m && !isNonColorOptionText(m[1].trim())) product.color = normalizeColor(m[1].trim())
             }
           }
-          if (detail.material) product.material = detail.material
-          if (detail.productCode) product.productCode = detail.productCode
-          if (detail.description || detail.color || detail.material) detailSuccess++
+          if (detail?.material) product.material = detail.material
+          if (detail?.productCode) product.productCode = detail.productCode
+          if (
+            detail?.description ||
+            detailColor ||
+            detail?.material ||
+            detail?.productCode ||
+            detailFallbacks?.name ||
+            detailFallbacks?.price != null ||
+            detailFallbacks?.color ||
+            detailFallbacks?.descriptionFirstLine
+          ) {
+            detailSuccess++
+          }
         }
 
         const done = Math.min(i + DETAIL_CONCURRENCY, uniqueProducts.length)
         process.stdout.write(`\r${tag}    📖 ${done}/${uniqueProducts.length} (성공: ${detailSuccess})`)
 
         sinceCheckpoint += batch.length
-        if (onDetailProgress && sinceCheckpoint >= CHECKPOINT_EVERY) {
+        if (options.onDetailProgress && sinceCheckpoint >= CHECKPOINT_EVERY) {
           sinceCheckpoint = 0
-          onDetailProgress(uniqueProducts)
+          await options.onDetailProgress(uniqueProducts)
         }
       }
     } finally {
-      for (const pg of workerPages) {
-        await pg.context().close().catch(() => {})
-      }
+      await Promise.all(workerLeases.map((lease) => lease.close().catch(() => {})))
     }
 
     detailMs = Date.now() - detailStart
@@ -774,6 +815,13 @@ export async function crawlCafe24(
     }
 
     console.log(`${tag} ✅ 리뷰 크롤링 완료 — ${withReviews}/${uniqueProducts.length}개 상품에 리뷰`)
+  }
+
+  const quality = assessCafe24ProductQuality(uniqueProducts, config)
+  if (!quality.passed) {
+    const msg = `Cafe24 quality failed: ${quality.reasons.join(", ")}`
+    errors.push(msg)
+    console.log(`${tag} ⚠️ ${msg} ${JSON.stringify(quality.metrics)}`)
   }
 
   // 통계

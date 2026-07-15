@@ -5,12 +5,12 @@
  * text, author, date, photos, body info를 추출한다.
  */
 
-import type {Page} from "playwright"
+import type {Cafe24Page} from "../../cafe24-page"
 import type {IReviewParser, Review, ReviewData, ReviewerBody} from "./types"
 import {BODY_INFO_PATTERNS} from "../../body-info-extractor"
 
 export class InlineReviewParser implements IReviewParser {
-  async parse(page: Page, maxReviews: number): Promise<ReviewData> {
+  async parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData> {
     const result: ReviewData = { reviewCount: 0, reviews: [] }
 
     try {
@@ -42,7 +42,7 @@ export class InlineReviewParser implements IReviewParser {
   }
 
   /** 인라인 리뷰 링크를 직접 방문하여 리뷰 데이터 추출 */
-  private async parseInlineReviewDetails(page: Page, baseUrl: string, urls: string[]): Promise<Review[]> {
+  private async parseInlineReviewDetails(page: Cafe24Page, baseUrl: string, urls: string[]): Promise<Review[]> {
     const reviews: Review[] = []
     const patterns = BODY_INFO_PATTERNS
 
