@@ -264,6 +264,7 @@ export const PLATFORMS: SiteConfig[] = [
     name: "이스트로그",
     type: "cafe24",
     baseUrl: "https://eastlogue.com",
+    brand: "EASTLOGUE", // 단일브랜드 자사몰 — DOM 브랜드 추출이 한글명("이스트로그")을 반환해 brand_nodes와 불일치했음
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
