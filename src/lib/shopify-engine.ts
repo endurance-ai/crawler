@@ -147,8 +147,14 @@ export function parseShopifyProducts(
 
   // options.name에서 색상/사이즈 포지션 식별 (Shopify는 옵션명이 store마다 다름)
   // 1차: 옵션명 기반 (빠름, 확실할 때)
-  const COLOR_NAMES = ["color", "colour", "colorway", "shade", "colore", "couleur", "farbe", "color option"]
-  const SIZE_NAMES = ["size", "length", "shoe size", "us size", "eu size", "uk size", "taille", "größe", "taglia", "talla"]
+  const COLOR_NAMES = [
+    "color", "colour", "colorway", "shade", "colore", "couleur", "farbe", "color option",
+    "색상", "컬러", "칼라", "색깔",
+  ]
+  const SIZE_NAMES = [
+    "size", "length", "shoe size", "us size", "eu size", "uk size", "taille", "größe", "taglia", "talla",
+    "사이즈", "치수",
+  ]
 
   const data: ShopifyResponse = productsJson
 
