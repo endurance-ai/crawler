@@ -6,6 +6,7 @@
  */
 
 import type {SiteConfig} from "../lib/types"
+import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const PLATFORMS: SiteConfig[] = [
   // ─── Manual 설정 완료 (카테고리 구조 깔끔) ─────────
@@ -2406,6 +2407,7 @@ export const PLATFORMS: SiteConfig[] = [
     disabled: true,
     notes: "BLOCKED — brand_node id=5734. detect=custom. cafe24/shopify 시그니처 없음 — 커스텀 테마 전용 엔진 필요. 베트남몰(VND) 통화 이슈도 확인 필요.",
   },
+  ...GENERATED_PLATFORMS,
 ]
 
 /** key로 사이트 설정 조회 */
