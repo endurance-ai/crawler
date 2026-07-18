@@ -12,6 +12,11 @@ PNPM="corepack pnpm"
 
 batch_prep() {
   echo "── [prep 1/3] git pull"
+  # codegen 산출물(platforms.generated.ts)은 매 런마다 재생성되므로 체크아웃이
+  # 항상 dirty 해진다 — 그대로 두면 --ff-only 가 막혀 서버가 코드 갱신을 영영
+  # 못 받는다 (실측 2026-07-19: 첫 런 이후 pull 이 조용히 실패하고 있었다).
+  # 어차피 prep 3/3 에서 다시 만드므로 버리고 당긴다.
+  git checkout -- src/configs/platforms.generated.ts 2>/dev/null || true
   git pull --ff-only || echo "⚠️ git pull 실패 — 기존 체크아웃으로 진행"
 
   echo "── [prep 2/3] pnpm install"
