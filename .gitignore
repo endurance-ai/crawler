@@ -34,3 +34,7 @@ poc-runs/
 .moai/cache/
 .app-database
 .app-src
+
+# local-only artifacts
+/bin/lightpanda
+package-lock.json

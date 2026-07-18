@@ -1,0 +1,28 @@
+# 재수집 배치 (큐 기반) — dev-app EC2 (t4g.medium, 4GB) 에서 Postgres 와 동거하므로
+# 리소스 캡 필수: 크롤러가 폭주해도 DB/PostgREST 는 살아야 한다.
+# 선행 조건: swap 4GB (deploy/README.md §1) — 물리 4GB 에서 db 캡(3G)과 공존하기 위한 안전판.
+# 설치: sudo cp deploy/systemd/kiko-recrawl.* /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now kiko-recrawl.timer
+# 수동 1회 실행: sudo systemctl start kiko-recrawl.service
+[Unit]
+Description=kiko.ai recrawl batch (queue-based stock/price refresh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ec2-user
+WorkingDirectory=/opt/kiko-crawler
+ExecStart=/opt/kiko-crawler/scripts/run-recrawl.sh --budget-minutes=240
+# ARM chromium + node 가 DB 를 밀어내지 못하게 상한 (물리 4GB 중 1.5G / vCPU 2 중 1.5)
+# 초과분은 swap 으로 밀려나며, 그래도 넘으면 크롤러만 OOM-kill 된다 (DB 보호가 우선).
+MemoryMax=1500M
+CPUQuota=150%
+Nice=15
+# 예산 240분 + wrapper 오버헤드 여유
+TimeoutStartSec=18000
+# corepack/node 는 nvm 이 아니라 시스템 설치 기준 (deploy/README.md 참조)
+Environment=HOME=/home/ec2-user
+
+[Install]
+WantedBy=multi-user.target
