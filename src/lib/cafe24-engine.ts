@@ -263,6 +263,7 @@ async function collectProductsFromPage(
     baseUrl: config.baseUrl,
     platformKey: config.key,
     pricePatternStr: config.pricePattern?.source || null,
+    sourceCurrency: config.sourceCurrency || "KRW",
   }
 
   // NOTE: page.evaluate 블록 안에서는 var 사용 — tsx의 __name 변환이 let/const 선언을 브라우저에서 ReferenceError로 유발
@@ -284,7 +285,9 @@ async function collectProductsFromPage(
       // fallback 경로) 상품명 안의 콤마(예: "DRESS, WHITE")를 실제 가격보다 먼저
       // "가격"으로 잘못 캡처한다 → parseInt(",")=NaN → 가격 null (실측: areyou,
       // 381개 중 379개가 이 사고로 전부 null 처리됨).
-      const priceRegex = args.pricePatternStr ? new RegExp(args.pricePatternStr) : /\d[\d,]*/
+      const priceRegex = args.pricePatternStr
+        ? new RegExp(args.pricePatternStr)
+        : (args.sourceCurrency === "KRW" ? /\d[\d,]*/ : /\d+(?:\.\d+)?/)
       const products: Array<Record<string, unknown>> = []
 
       for (let j = 0; j < items.length; j++) {
@@ -338,7 +341,12 @@ async function collectProductsFromPage(
           const spans = el.querySelectorAll("span, p, div")
           for (let k = 0; k < spans.length; k++) {
             const t = (spans[k].textContent || "").trim()
-            if (t.match(/[₩\uFFE6][\d,]+/) || t.match(/KRW\s*[\d,]+/) || t.match(/^\d{1,3}(,\d{3})+원?$/)) {
+            if (
+              t.match(/[₩\uFFE6][\d,]+/) ||
+              t.match(/KRW\s*[\d,]+/) ||
+              t.match(/^\d{1,3}(,\d{3})+원?$/) ||
+              (args.sourceCurrency !== "KRW" && t.match(/(?:USD|\$|EUR|€|GBP|£)\s*\d+(?:\.\d+)?/i))
+            ) {
               priceText = t
               break
             }
@@ -348,9 +356,12 @@ async function collectProductsFromPage(
         const priceMatch = priceText.match(priceRegex)
         // 캡처 그룹이 있으면 [1], 없으면 [0]
         const priceStr = priceMatch ? (priceMatch[1] || priceMatch[0]) : null
-        const rawPrice = priceStr ? parseInt(priceStr.replace(/,/g, ""), 10) : null
-        // ₩1,000 미만은 비정상 (상품명의 숫자가 파싱된 경우 — e.g. "26SS" → 26)
-        let price = rawPrice !== null && rawPrice >= 1000 ? rawPrice : null
+        const rawPrice = priceStr ? Number(priceStr.replace(/,/g, "")) : null
+        // KRW ₩1,000 미만은 비정상 (상품명의 숫자가 파싱된 경우 — e.g. "26SS" → 26).
+        // 해외 멀티샵 Cafe24는 $9.12 같은 소수 가격이 정상이라 0 초과만 검사한다.
+        let price = rawPrice !== null && (
+          args.sourceCurrency === "KRW" ? rawPrice >= 1000 : rawPrice > 0
+        ) ? rawPrice : null
 
         // Cafe24 표준 spec 블록(.xans-product-listitem) 폴백.
         // 일부 테마는 가격을 .price 가 아닌 "판매가 : ₩X" 라벨 텍스트로만 노출 (beslow 등).
@@ -359,10 +370,17 @@ async function collectProductsFromPage(
         for (var sx = 0; sx < specEls.length; sx++) specText += " " + (specEls[sx].textContent || "")
         if (price === null && specText) {
           var specClean = specText.replace(/,/g, "")
-          var saleM = specClean.match(/할인판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
-          var listM = specClean.match(/판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
-          var specPrice = saleM ? parseInt(saleM[1], 10) : (listM ? parseInt(listM[1], 10) : null)
-          if (specPrice !== null && specPrice >= 1000) price = specPrice
+          if (args.sourceCurrency === "KRW") {
+            var saleM = specClean.match(/할인판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
+            var listM = specClean.match(/판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
+            var specPrice = saleM ? Number(saleM[1]) : (listM ? Number(listM[1]) : null)
+            if (specPrice !== null && specPrice >= 1000) price = specPrice
+          } else {
+            var saleUsdM = specClean.match(/(?:discounted\s*price|sale\s*price|할인판매가)\s*:?\s*(?:USD|\$|EUR|€|GBP|£)?\s*(\d+(?:\.\d+)?)/i)
+            var listUsdM = specClean.match(/(?:price|판매가)\s*:?\s*(?:USD|\$|EUR|€|GBP|£)?\s*(\d+(?:\.\d+)?)/i)
+            var specCurrencyPrice = saleUsdM ? Number(saleUsdM[1]) : (listUsdM ? Number(listUsdM[1]) : null)
+            if (specCurrencyPrice !== null && specCurrencyPrice > 0) price = specCurrencyPrice
+          }
         }
 
         // 이미지: 아이콘/로고가 아닌 실제 상품 이미지 찾기
@@ -473,7 +491,7 @@ async function collectProductsFromPage(
           const price2Text = (price2El.textContent || "").trim()
           const price2Match = price2Text.match(priceRegex)
           if (price2Match) {
-            const p2 = parseInt(price2Match[0].replace(/,/g, ""), 10)
+            const p2 = Number((price2Match[1] || price2Match[0]).replace(/,/g, ""))
             if (p2 > 0 && p2 < (price || Infinity)) {
               // price2가 더 싸면: price=원가, price2=세일가
               originalPrice = price
@@ -482,13 +500,28 @@ async function collectProductsFromPage(
           }
         }
 
+        var priceFormatted = ""
+        if (price) {
+          if (args.sourceCurrency === "USD") {
+            priceFormatted = "$" + price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
+          } else if (args.sourceCurrency === "EUR") {
+            priceFormatted = "€" + price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
+          } else if (args.sourceCurrency === "GBP") {
+            priceFormatted = "£" + price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
+          } else {
+            priceFormatted = "₩" + price.toLocaleString()
+          }
+        }
+
         products.push({
           brand, name, category: args.categoryName,
           price: salePrice || price,
           originalPrice, salePrice,
-          priceFormatted: price ? "₩" + price.toLocaleString() : "",
+          priceFormatted,
           imageUrl, productUrl, inStock,
           gender: args.gender, platform: args.platformKey,
+          sourceCurrency: args.sourceCurrency,
+          sourcePrice: salePrice || price || undefined,
           swatchText,
           crawledAt: new Date().toISOString(),
         })
