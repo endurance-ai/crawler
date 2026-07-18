@@ -43,7 +43,7 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
 | `kiko-devapp-mem-high` | `mem_used_percent > 85` (5분 2회) | Postgres 보호 — 크롤러 폭주 조기 감지 |
 | `kiko-devapp-disk-high` | `disk used_percent > 80` (/) | data/*.json 누적 + WAL |
 
-알람 액션은 기존 알림 채널(SNS→Discord/이메일)로 연결.
+알람 액션은 SNS 토픽 `kiko-devapp-alerts` 로 연결 (계정에 기존 알림 채널이 없어 신규 생성).
 
 ## 2. 크롤러 설치
 
@@ -57,7 +57,12 @@ sudo git clone <crawler-repo> /opt/kiko-crawler
 sudo chown -R ec2-user:ec2-user /opt/kiko-crawler
 cd /opt/kiko-crawler
 corepack pnpm install --frozen-lockfile
-corepack pnpm exec playwright install chromium --with-deps   # ARM chromium
+
+# ARM chromium — playwright 의 --with-deps 는 apt 전용이라 AL2023 에서 실패한다.
+# 시스템 라이브러리는 dnf 로 직접 깔고, 브라우저만 playwright 로 받는다.
+sudo dnf install -y alsa-lib atk at-spi2-atk at-spi2-core cups-libs libdrm \
+  libXcomposite libXdamage libXfixes libXrandr libxkbcommon mesa-libgbm nss pango
+corepack pnpm exec playwright install chromium
 
 # env — DB 는 같은 호스트이므로 localhost
 cat > .env.local <<'EOF'
@@ -79,25 +84,55 @@ corepack pnpm recrawl -- --dry-run           # 워크리스트 확인 (크롤 �
 
 ## 3. systemd 배치
 
-```bash
-sudo cp /opt/kiko-crawler/deploy/systemd/kiko-recrawl.* /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now kiko-recrawl.timer
+일상 배치는 **갱신(kiko-refresh)** 이다 — 리스트만 훑어 재고/가격만 고친다.
 
-# 수동 1회 (파일럿):
-sudo systemctl start kiko-recrawl.service
-journalctl -u kiko-recrawl -f
+```bash
+sudo cp /opt/kiko-crawler/deploy/systemd/kiko-refresh.* /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kiko-refresh.timer
+
+# 수동 1회:
+sudo systemctl start kiko-refresh.service
+journalctl -u kiko-refresh -f
 ```
 
-파일럿 기간에는 service 의 `ExecStart` 를 `--budget-minutes=240 --limit=200` 으로
-제한해 수일 관측 후(브랜드당 p50/p95, 메모리 피크) limit 을 해제한다.
+`kiko-recrawl.*` 는 온보딩급 재수집(상세 크롤 + LLM 재분류) 이라 **타이머로 돌리지
+않는다** — 카테고리/색상을 다시 만들어야 할 때만 수동 실행한다. 두 경로의 차이는
+`src/refresh-listing.ts` 헤더 참조.
 
 ## 4. 운영 규칙
 
 - **리소스 캡**: `MemoryMax=1500M CPUQuota=150% Nice=15` — 4GB 에서 DB 동거의 전제 조건.
   완화는 CloudWatch 실측 근거로만 (t4g.large 리사이즈 시 3G 로 상향 가능).
-- **재수집은 게이트 ON**: 러너는 기존 crawl/import 경로를 그대로 쓴다.
-  `CRAWLER_VALIDATION_ENABLED=false` 류 게이트 OFF 는 온보딩 크롤 전용 — 서버 env 에 넣지 말 것.
+- **갱신은 컬럼을 가려서 쓴다**: `refresh-listing` 은 `price/original_price/sale_price/
+  in_stock` 만 UPDATE 한다. `import-products` 의 upsert 는 행 전체를 덮어쓰므로 갱신에
+  쓰면 category/color/gender 가 날아간다 — 갱신 경로에서 import 를 호출하지 말 것.
+- **리스트에 없는 상품**: 완전성 가드(`--min-coverage`, 기본 0.7) 를 통과한 런에서만
+  품절 처리한다. 부분 실패한 크롤이 멀쩡한 상품을 대량으로 숨기는 사고를 막는 장치라
+  임계값을 낮출 때는 근거가 필요하다.
+- **신규 상품은 적재하지 않는다**: 갱신은 카테고리/성별을 만들지 않으므로(DB CHECK 필수)
+  리스트에만 있는 신규 URL 은 카운트만 하고 넘긴다 — 온보딩 경로로 편입시켜야 한다.
 - **신규 브랜드 편입**: 로컬 온보딩 → DB 등록 + config 커밋 → wrapper 의 git pull + codegen 이
   다음 런에 자동 반영. config 미등록 브랜드는 러너가 스킵하고 Discord 요약에 집계한다.
 - **디스크**: `data/*.json` 은 런마다 갱신 누적 — disk 알람 발화 시 오래된 파일 정리.
+
+## 5. 배포 기록 (2026-07-18)
+
+위 절차대로 dev-app 에 설치 완료. 현재 상태와 식별자:
+
+| 항목 | 값 |
+|---|---|
+| 호스트 | `ec2-user@15.165.107.28` (i-01956ed16d12ee792, t4g.medium) |
+| 체크아웃 | `/opt/kiko-crawler` (dev 브랜치, deploy key `dev-app EC2 (recrawl batch, read-only)`) |
+| 타이머 | `kiko-recrawl.timer` **enabled** — 매일 04:00 KST |
+| 파일럿 제한 | `/etc/systemd/system/kiko-recrawl.service.d/pilot-limit.conf` (`--limit=200`) — 관측 후 이 파일 삭제로 해제 |
+| 알림 | SNS `kiko-devapp-alerts` → 이메일 |
+| 검증 | DB OK · cafe24(rense)/imweb(heretic) probe 통과 · `recrawl --dry-run` 워크리스트 86브랜드 |
+
+설치 중 절차서와 어긋났던 지점 (재설치 시 주의):
+
+1. **인스턴스 스펙**: 설계는 t4g.large(8GB) 전제였으나 실제는 **t4g.medium(4GB)** — 2026-05-26 마이그레이션 때 다운스케일됨. `MemoryMax` 를 3G→1500M 로 낮추고 swap 4GB 를 추가했다.
+2. **IAM**: `dev-app-ec2-role` 에 `CloudWatchAgentServerPolicy` 가 없어 `PutMetricData` 가 403 이었다. 주의할 점은 **agent 기동 직후 로그에는 오류가 없다** — 첫 flush(1분 후)에야 `E! AccessDenied` 가 찍히므로, 기동 확인만으로 성공 판정하면 안 되고 `list-metrics` 로 실제 도착을 봐야 한다.
+3. **playwright**: `--with-deps` 는 apt 전용이라 AL2023 에서 실패 (§2 참조).
+4. **deploy key**: org 정책에서 deploy key 가 비활성이라 등록이 거부됐다. 조직 설정에서 허용으로 바꾼 뒤 등록.
+5. **disk 알람 디멘전**: `disk_used_percent` 는 `InstanceId` 만으로는 매칭되지 않는다 — `path=/`, `device=nvme0n1p1`, `fstype=xfs` 를 모두 지정해야 한다 (mem 은 `InstanceId` 만으로 충분).

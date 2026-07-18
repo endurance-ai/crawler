@@ -1,0 +1,29 @@
+# 리스트-only 재고/가격 갱신 (일상 배치) — dev-app EC2 (t4g.medium, 4GB) 에서
+# Postgres 와 동거하므로 리소스 캡 필수.
+#
+# 상세 크롤/LLM 을 돌지 않으므로 kiko-recrawl 대비 훨씬 가볍다. 온보딩급 재수집은
+# kiko-recrawl.service (수동 실행 전용).
+#
+# 설치: sudo cp deploy/systemd/kiko-refresh.* /etc/systemd/system/
+#       sudo systemctl daemon-reload && sudo systemctl enable --now kiko-refresh.timer
+# 수동 1회: sudo systemctl start kiko-refresh.service
+[Unit]
+Description=kiko.ai listing refresh (stock/price only, no detail crawl, no LLM)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ec2-user
+WorkingDirectory=/opt/kiko-crawler
+ExecStart=/opt/kiko-crawler/scripts/run-refresh.sh --budget-minutes=240
+# 상세 크롤이 없어 브라우저 상주 부담이 작지만, DB 동거 전제는 동일하게 유지한다.
+MemoryMax=1500M
+CPUQuota=150%
+Nice=15
+# 예산 240분 + wrapper 오버헤드 여유
+TimeoutStartSec=18000
+Environment=HOME=/home/ec2-user
+
+[Install]
+WantedBy=multi-user.target

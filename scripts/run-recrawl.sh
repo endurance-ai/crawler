@@ -1,30 +1,19 @@
 #!/usr/bin/env bash
-# 재수집 배치 wrapper — systemd(kiko-recrawl.service)가 호출한다.
+# 온보딩급 재수집 wrapper — 상세 크롤 + LLM 재분류를 포함한다 (recrawl-batch.ts).
 #
-#   1. git pull        — 로컬 온보딩으로 커밋된 신규 config/엔진 코드 반영 (best-effort)
-#   2. pnpm install    — lockfile 변경 시 의존성 동기화 (no-op 이면 수 초)
-#   3. config codegen  — DB 의 tech_detected 브랜드를 platforms.generated.ts 로 반영 (best-effort)
-#   4. recrawl runner  — 큐 기반 재수집 (src/recrawl-batch.ts). 인자는 그대로 전달.
-#
-# 1~3 은 실패해도 러너를 막지 않는다 — 어제 코드/설정으로라도 재수집이 도는 것이
-# 하루를 건너뛰는 것보다 낫다. 실패는 로그로 남는다.
+# ⚠️ 일상적인 재고/가격 갱신에는 쓰지 않는다 — 그 용도는 run-refresh.sh 다.
+# 이 경로는 카테고리/색상을 다시 만들어야 할 때(온보딩, 재분류)만 쓴다.
+# 2026-07-19 실측: 10개 브랜드 청크에 82분, 청크당 LLM $0.014.
 #
 # Usage: scripts/run-recrawl.sh [--budget-minutes=240 ...]
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-PNPM="corepack pnpm"
+# shellcheck source=scripts/lib-batch-prep.sh
+. "$(dirname "$0")/lib-batch-prep.sh"
 
-echo "── [1/4] git pull"
-git pull --ff-only || echo "⚠️ git pull 실패 — 기존 체크아웃으로 진행"
+batch_prep
 
-echo "── [2/4] pnpm install"
-$PNPM install --frozen-lockfile || echo "⚠️ pnpm install 실패 — 기존 node_modules 로 진행"
-
-echo "── [3/4] platform config codegen"
-$PNPM exec dotenv -e .env.local -- tsx tools/generate-platform-configs.ts \
-  || echo "⚠️ config codegen 실패 — 기존 platforms.generated.ts 로 진행"
-
-echo "── [4/4] recrawl runner"
+echo "── 재수집 러너"
 $PNPM recrawl -- "$@"
 exit $?

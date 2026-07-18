@@ -1318,6 +1318,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     name: "BALANSA",
     type: "cafe24",
     baseUrl: "https://en.balansa.co.kr",
+    sourceCurrency: "USD",
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -1346,7 +1347,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat199", cateNo: 199, gender: ["unisex"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=3887, KR origin, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=3887, KR origin, auto-generated — sourceCurrency=USD verified from rendered Cafe24 list price",
   },
   {
     key: "bittercells",

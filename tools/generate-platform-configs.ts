@@ -46,6 +46,14 @@ const DISABLED_KEYS = new Set<string>([
   "en-2368", // BASTONG — 502개 크롤됐지만 QC(color_missing)에 전량 드롭, detail 셀렉터 튜닝 필요
 ])
 
+const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCurrency"]>> = {
+  // BALANSA English Cafe24 storefront exposes list prices as USD decimals
+  // (for example: "Price : $79.00"). Without this, the KRW parser drops prices.
+  "en-3887": "USD",
+  // Sienne English Cafe24 storefront declares SHOP_CURRENCY_INFO currency_code=USD.
+  "en-4821": "USD",
+}
+
 interface CandidateRow {
   brand_node_id: number
   brand_name: string
@@ -130,6 +138,9 @@ function buildEntrySource(
   const baseUrl = `https://${host}`
   const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
   const disabled = DISABLED_KEYS.has(row.platform_key) || currencyUndetected
+  const cafe24SourceCurrency = row.platform_type === "cafe24"
+    ? CAFE24_SOURCE_CURRENCY_BY_KEY[row.platform_key]
+    : undefined
   const lines: string[] = []
   lines.push("  {")
   lines.push(`    key: ${JSON.stringify(row.platform_key)},`)
@@ -137,6 +148,7 @@ function buildEntrySource(
   lines.push(`    type: ${JSON.stringify(row.platform_type)},`)
   lines.push(`    baseUrl: ${JSON.stringify(baseUrl)},`)
   if (row.platform_type === "cafe24") {
+    if (cafe24SourceCurrency) lines.push(`    sourceCurrency: ${JSON.stringify(cafe24SourceCurrency)},`)
     lines.push("    paginate: true,")
     lines.push("    maxPages: 300,")
     lines.push("    crawlDetails: true,")
@@ -164,8 +176,11 @@ function buildEntrySource(
   const noteSuffix = currencyUndetected
     ? ` — currency undetected via /cart.js${shopifyCurrencyResult?.raw ? ` (raw="${shopifyCurrencyResult.raw}", unsupported by FX table)` : ""}, disabled to avoid mispricing`
     : ""
+  const cafe24CurrencyNote = cafe24SourceCurrency
+    ? ` — sourceCurrency=${cafe24SourceCurrency} verified from rendered Cafe24 list price`
+    : ""
   lines.push(
-    `    notes: ${JSON.stringify(`generate-platform-configs.ts — brand_node_id=${row.brand_node_id}, KR origin, auto-generated${noteSuffix}`)},`,
+    `    notes: ${JSON.stringify(`generate-platform-configs.ts — brand_node_id=${row.brand_node_id}, KR origin, auto-generated${noteSuffix}${cafe24CurrencyNote}`)},`,
   )
   lines.push("  },")
   return lines.join("\n")

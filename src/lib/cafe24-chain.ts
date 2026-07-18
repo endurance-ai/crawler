@@ -246,6 +246,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       }
 
       var descFirstLine = ""
+      var detailPriceText = ""
       var descEls = document.querySelectorAll(".cont_detail, #prdDetail, .product-detail, .xans-product-detaildesign, .detail_cont, #productDetail")
       for (var d = 0; d < descEls.length; d++) {
         var desc = ((descEls[d] as HTMLElement).innerText || descEls[d].textContent || "").trim()
@@ -253,6 +254,9 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         var lines = desc.split(/\n+/)
         for (var li = 0; li < lines.length; li++) {
           var line = lines[li].replace(/\s+/g, " ").trim()
+          if (/할인판매가|판매가|price|KRW|₩|￦/i.test(line)) {
+            detailPriceText += " " + line
+          }
           if (line.length >= 4 && !/^KRW\b|^₩|^\d[\d,]+/.test(line)) {
             descFirstLine = line
             break
@@ -325,6 +329,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         jsonLdCurrency,
         scriptProductPrice,
         scriptSalePrice,
+        detailPriceText,
         colorText,
         descFirstLine,
       }
@@ -340,6 +345,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       jsonLdCurrency: "",
       scriptProductPrice: "",
       scriptSalePrice: "",
+      detailPriceText: "",
       colorText: "",
       descFirstLine: "",
     }))
@@ -353,10 +359,14 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency) ??
     parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency) ??
     parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.priceText, sourceCurrency)
+    parseCafe24PriceCandidate(raw.priceText, sourceCurrency) ??
+    parseCafe24PriceCandidate(raw.detailPriceText, sourceCurrency)
+  const detailPriceValues = parseCafe24PriceCandidates(raw.detailPriceText, sourceCurrency)
+  const detailSaleCandidate = detailPriceValues.length >= 2 ? Math.min(...detailPriceValues) : null
   const saleCandidate =
     parseCafe24PriceCandidate(raw.metaSalePrice, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency)
+    parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency) ??
+    detailSaleCandidate
   const salePrice = saleCandidate !== null && basePrice !== null && saleCandidate > 0 && saleCandidate < basePrice
     ? saleCandidate
     : null
@@ -441,6 +451,34 @@ export function parseCafe24PriceCandidate(
   if (!preferred?.[1]) return null
   const price = Number(preferred[1])
   return Number.isFinite(price) && price >= 1000 ? price : null
+}
+
+export function parseCafe24PriceCandidates(
+  text: string | number | null | undefined,
+  currencyHint: Product["sourceCurrency"] | null = "KRW",
+): number[] {
+  if (!text) return []
+
+  const clean = String(text)
+    .replace(/,/g, "")
+    .replace(/&#36;/gi, "$")
+    .replace(/&pound;/gi, "£")
+    .replace(/&euro;/gi, "€")
+  const currency = currencyHint ?? inferCafe24Currency(clean) ?? "KRW"
+  const pattern = currency === "USD" ? /(?:USD|\$)\s*(\d+(?:\.\d+)?)/gi
+    : currency === "EUR" ? /(?:EUR|€)\s*(\d+(?:\.\d+)?)/gi
+      : currency === "GBP" ? /(?:GBP|£)\s*(\d+(?:\.\d+)?)/gi
+        : /(?:할인판매가|판매가|price)?\s*[:：]?\s*(?:KRW)?\s*[₩￦]\s*(\d{4,})|(?:할인판매가|판매가|price)\s*[:：]?\s*(?:KRW)?\s*(\d{4,})/gi
+  const values: number[] = []
+  for (const match of clean.matchAll(pattern)) {
+    const raw = match[1] ?? match[2]
+    if (!raw) continue
+    const price = Number(raw)
+    if (Number.isFinite(price) && (currency === "KRW" ? price >= 1000 : price > 0)) {
+      values.push(price)
+    }
+  }
+  return values
 }
 
 function formatCafe24Price(price: number, currency: Product["sourceCurrency"]): string {
