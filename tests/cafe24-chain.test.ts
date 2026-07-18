@@ -7,6 +7,7 @@ import {
   inferCafe24Currency,
   isGenericCafe24ProductName,
   parseCafe24PriceCandidate,
+  parseCafe24PriceCandidates,
   parseCafe24CategoryHref,
   runFirstUsefulCafe24Step,
 } from "../src/lib/cafe24-chain"
@@ -65,6 +66,7 @@ test("Cafe24 price parser handles KRW integers and foreign decimal prices", () =
   assert.equal(parseCafe24PriceCandidate("sale price: KRW 418,500 ( KRW 46,500 할인)", "KRW"), 418500)
   assert.equal(parseCafe24PriceCandidate("$9.12", "USD"), 9.12)
   assert.equal(inferCafe24Currency("Price $9.12"), "USD")
+  assert.deepEqual(parseCafe24PriceCandidates("₩98,000 ₩88,200", "KRW"), [98000, 88200])
 })
 
 test("Cafe24 quality gate rejects generic names, missing prices, and external brand contamination", () => {

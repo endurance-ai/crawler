@@ -460,7 +460,10 @@ async function collectProductsFromPage(
         // 일부 사이트는 상품명 전체 텍스트 첫 줄이 브랜드
         if (!brand) {
           const firstText = el.querySelector(".description, .spec, .summary")
-          brand = firstText ? (firstText.textContent || "").trim().split("\n")[0].trim() : ""
+          var firstBrandLine = firstText ? (firstText.textContent || "").trim().split("\n")[0].trim() : ""
+          if (!/^(상품명|제품명|product\s*name|name|제조사|판매가|price|소비자가|적립금)\s*[:：]?/i.test(firstBrandLine)) {
+            brand = firstBrandLine
+          }
         }
 
         // 색상 후보 원문: 목록 카드의 옵션/스와치 이미지 alt·title + 색상 칩 링크 title.
