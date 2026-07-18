@@ -800,7 +800,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
         // 루프로 8.7시간을 소모하며 뒤 사이트 전체를 지연시켰다. cafe24와 동일한
         // withSiteTimeout으로 강제 중단한다.
         const result = await withSiteTimeout(crawlImweb(config), config.key)
-        results.push(saveResultAndTrim(outDir, result))
+        results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }
