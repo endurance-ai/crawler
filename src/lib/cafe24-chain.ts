@@ -199,7 +199,11 @@ export function isGenericCafe24ProductName(name: string | null | undefined): boo
 export interface Cafe24DetailFallbacks {
   name: string | null
   price: number | null
+  originalPrice: number | null
+  salePrice: number | null
   priceFormatted: string | null
+  sourceCurrency: Product["sourceCurrency"] | null
+  sourcePrice: number | null
   color: string | null
   descriptionFirstLine: string | null
 }
@@ -265,25 +269,110 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         if (m && m[1]) colorText += " " + m[1]
       }
 
+      var metaPrice = ""
+      var metaSalePrice = ""
+      var metaCurrency = ""
+      var priceMetaEl = document.querySelector("meta[property='product:price:amount'], meta[property='og:price:amount']")
+      if (priceMetaEl) metaPrice = priceMetaEl.getAttribute("content") || ""
+      var saleMetaEl = document.querySelector("meta[property='product:sale_price:amount'], meta[property='og:sale_price:amount']")
+      if (saleMetaEl) metaSalePrice = saleMetaEl.getAttribute("content") || ""
+      var currencyMetaEl = document.querySelector("meta[property='product:price:currency'], meta[property='og:price:currency']")
+      if (currencyMetaEl) metaCurrency = currencyMetaEl.getAttribute("content") || ""
+
+      var jsonLdPrice = ""
+      var jsonLdCurrency = ""
+      var jsonLdEls = document.querySelectorAll("script[type='application/ld+json']")
+      for (var js = 0; js < jsonLdEls.length; js++) {
+        try {
+          var payload = JSON.parse(jsonLdEls[js].textContent || "null")
+          var records = Array.isArray(payload) ? payload : [payload]
+          for (var pr = 0; pr < records.length; pr++) {
+            var record = records[pr]
+            if (!record || typeof record !== "object") continue
+            var offers = record.offers
+            if (!offers) continue
+            var offerList = Array.isArray(offers) ? offers : [offers]
+            for (var ofi = 0; ofi < offerList.length; ofi++) {
+              var offer = offerList[ofi]
+              if (!offer || typeof offer !== "object") continue
+              if (!jsonLdPrice && offer.price != null) jsonLdPrice = String(offer.price)
+              if (!jsonLdCurrency && offer.priceCurrency != null) jsonLdCurrency = String(offer.priceCurrency)
+              if (jsonLdPrice && jsonLdCurrency) break
+            }
+            if (jsonLdPrice && jsonLdCurrency) break
+          }
+          if (jsonLdPrice && jsonLdCurrency) break
+        } catch {
+          // ignore malformed JSON-LD blocks
+        }
+      }
+
+      var html = document.documentElement.innerHTML
+      var scriptProductPrice = ""
+      var scriptSalePrice = ""
+      var productPriceMatch = html.match(/var\s+product_price\s*=\s*['"]([^'"]+)['"]/)
+      if (productPriceMatch && productPriceMatch[1]) scriptProductPrice = productPriceMatch[1]
+      var salePriceMatch = html.match(/var\s+product_sale_price\s*=\s*['"]?(\d+(?:\.\d+)?)['"]?/)
+      if (salePriceMatch && salePriceMatch[1]) scriptSalePrice = salePriceMatch[1]
+
       return {
         names: nameParts.slice(0, 10),
         priceText,
+        metaPrice,
+        metaSalePrice,
+        metaCurrency,
+        jsonLdPrice,
+        jsonLdCurrency,
+        scriptProductPrice,
+        scriptSalePrice,
         colorText,
         descFirstLine,
       }
       /* eslint-enable no-var */
     })
-    .catch(() => ({names: [] as string[], priceText: "", colorText: "", descFirstLine: ""}))
+    .catch(() => ({
+      names: [] as string[],
+      priceText: "",
+      metaPrice: "",
+      metaSalePrice: "",
+      metaCurrency: "",
+      jsonLdPrice: "",
+      jsonLdCurrency: "",
+      scriptProductPrice: "",
+      scriptSalePrice: "",
+      colorText: "",
+      descFirstLine: "",
+    }))
 
   const name = firstUsefulName([...raw.names, raw.descFirstLine])
-  const price = parseCafe24Price(raw.priceText)
+  const sourceCurrency =
+    normalizeCafe24Currency(raw.metaCurrency) ??
+    normalizeCafe24Currency(raw.jsonLdCurrency) ??
+    inferCafe24Currency(raw.priceText)
+  const basePrice =
+    parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency) ??
+    parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency) ??
+    parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency) ??
+    parseCafe24PriceCandidate(raw.priceText, sourceCurrency)
+  const saleCandidate =
+    parseCafe24PriceCandidate(raw.metaSalePrice, sourceCurrency) ??
+    parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency)
+  const salePrice = saleCandidate !== null && basePrice !== null && saleCandidate > 0 && saleCandidate < basePrice
+    ? saleCandidate
+    : null
+  const price = salePrice ?? basePrice
+  const originalPrice = basePrice
   const color = extractColorFromText(raw.colorText) ?? extractColorFromText(raw.descFirstLine)
-  const formatted = price === null ? null : `₩${price.toLocaleString()}`
+  const formatted = price === null ? null : formatCafe24Price(price, sourceCurrency ?? "KRW")
 
   return {
     name,
     price,
+    originalPrice,
+    salePrice,
     priceFormatted: formatted,
+    sourceCurrency,
+    sourcePrice: price,
     color,
     descriptionFirstLine: firstUsefulName([raw.descFirstLine]),
   }
@@ -299,20 +388,66 @@ function firstUsefulName(candidates: string[]): string | null {
   return null
 }
 
-function parseCafe24Price(text: string): number | null {
+export function normalizeCafe24Currency(value: string | null | undefined): Product["sourceCurrency"] | null {
+  const raw = (value ?? "").trim().toUpperCase()
+  if (raw === "USD" || raw === "$" || raw === "&#36;") return "USD"
+  if (raw === "EUR" || raw === "€" || raw === "&EURO;") return "EUR"
+  if (raw === "GBP" || raw === "£" || raw === "&POUND;") return "GBP"
+  if (raw === "KRW" || raw === "₩" || raw === "￦" || raw === "&#8361;" || raw === "\\UFFE6") return "KRW"
+  return null
+}
+
+export function inferCafe24Currency(text: string): Product["sourceCurrency"] | null {
+  const raw = text.replace(/&(?:#36|dollar);/gi, "$")
+  if (/\bUSD\b|\$/i.test(raw)) return "USD"
+  if (/\bEUR\b|€/i.test(raw)) return "EUR"
+  if (/\bGBP\b|£/i.test(raw)) return "GBP"
+  if (/\bKRW\b|₩|￦|\uFFE6/i.test(raw)) return "KRW"
+  return null
+}
+
+export function parseCafe24PriceCandidate(
+  text: string | number | null | undefined,
+  currencyHint: Product["sourceCurrency"] | null = "KRW",
+): number | null {
   if (!text) return null
 
-  const clean = text.replace(/,/g, "")
+  const clean = String(text)
+    .replace(/,/g, "")
+    .replace(/&#36;/gi, "$")
+    .replace(/&pound;/gi, "£")
+    .replace(/&euro;/gi, "€")
+  const currency = currencyHint ?? inferCafe24Currency(clean) ?? "KRW"
+  if (currency !== "KRW") {
+    const codePattern = currency === "USD" ? /(?:USD|\$)\s*(\d+(?:\.\d+)?)/i
+      : currency === "EUR" ? /(?:EUR|€)\s*(\d+(?:\.\d+)?)/i
+        : /(?:GBP|£)\s*(\d+(?:\.\d+)?)/i
+    const preferred =
+      clean.match(codePattern) ??
+      (currencyHint ? clean.match(/(\d+(?:\.\d+)?)/) : null)
+    if (!preferred?.[1]) return null
+    const price = Number(preferred[1])
+    return Number.isFinite(price) && price > 0 ? price : null
+  }
+
   const preferred =
     clean.match(/할인판매가\s*[:：]?\s*[₩￦]?\s*(\d{4,})/) ??
     clean.match(/판매가\s*[:：]?\s*[₩￦]?\s*(\d{4,})/) ??
     clean.match(/price\s*[:：]?\s*(?:KRW)?\s*[₩￦]?\s*(\d{4,})/i) ??
     clean.match(/[₩￦]\s*(\d{4,})/) ??
-    clean.match(/KRW\s*(\d{4,})/i)
+    clean.match(/KRW\s*(\d{4,})/i) ??
+    (currencyHint ? clean.match(/^(\d{4,})(?:\.00)?$/) : null)
 
   if (!preferred?.[1]) return null
   const price = Number(preferred[1])
   return Number.isFinite(price) && price >= 1000 ? price : null
+}
+
+function formatCafe24Price(price: number, currency: Product["sourceCurrency"]): string {
+  if (currency === "USD") return `$${price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+  if (currency === "EUR") return `€${price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+  if (currency === "GBP") return `£${price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+  return `₩${price.toLocaleString("ko-KR")}`
 }
 
 export function applyCafe24DetailFallbacks(
@@ -325,8 +460,13 @@ export function applyCafe24DetailFallbacks(
 
   if (product.price === null && detailFallbacks.price !== null) {
     product.price = detailFallbacks.price
-    product.originalPrice = product.originalPrice ?? detailFallbacks.price
+    product.originalPrice = product.originalPrice ?? detailFallbacks.originalPrice ?? detailFallbacks.price
+    product.salePrice = detailFallbacks.salePrice
     product.priceFormatted = detailFallbacks.priceFormatted ?? product.priceFormatted
+  }
+  if (detailFallbacks.sourceCurrency) {
+    product.sourceCurrency = detailFallbacks.sourceCurrency
+    product.sourcePrice = detailFallbacks.sourcePrice ?? detailFallbacks.price ?? undefined
   }
 
   if (!product.color) {

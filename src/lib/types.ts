@@ -119,7 +119,7 @@ export interface SiteConfig {
   paginate?: boolean
   /** 최대 페이지 수 (기본: 10) */
   maxPages?: number
-  /** Shopify 전용: 원본 통화. 미지정 시 KRW로 간주 (해외 사이트 POC용) */
+  /** 원본 통화. 미지정 시 KRW로 간주 (Shopify/해외 멀티샵 Cafe24 등) */
   sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
   /** 요청 간 딜레이 ms (기본: 2000) */
   crawlDelay?: number
