@@ -27,6 +27,7 @@ import {
   parseCafe24EngineMode,
   type Cafe24EngineMode,
 } from "./lib/cafe24-engine-selection"
+import {crawlImweb} from "./lib/imweb-engine"
 import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
@@ -100,18 +101,23 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
   const success = result.errors.length === 0 && result.stats.totalProducts > 0
   const status = success ? "crawled" : "qc_failed"
 
-  await queueDb.from("product_crawl_status").upsert(
+  // product_crawl_status 에는 crawled_at 컬럼이 없다(크롤 시각은 product_crawl_runs 가
+  // 담당). 과거에 crawled_at 을 넣어 upsert 전체가 400 으로 조용히 실패했었다 — 여기
+  // 필드를 추가할 때는 실제 테이블 컬럼 존재를 먼저 확인할 것.
+  const {error: statusError} = await queueDb.from("product_crawl_status").upsert(
     {
       brand_node_id: brandNodeId,
       status,
       platform_key: result.platform,
-      crawled_at: success ? new Date().toISOString() : null,
       last_error: result.errors[0] ?? null,
     },
     {onConflict: "brand_node_id"},
   )
+  if (statusError) {
+    console.warn(`⚠️ product_crawl_status sync failed (${result.platform}): ${statusError.message}`)
+  }
 
-  await queueDb.from("product_crawl_runs").insert({
+  const {error: runError} = await queueDb.from("product_crawl_runs").insert({
     brand_node_id: brandNodeId,
     stage: "crawl",
     status: success ? "success" : "failed",
@@ -127,6 +133,9 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
       errors: result.errors,
     },
   })
+  if (runError) {
+    console.warn(`⚠️ product_crawl_runs insert failed (${result.platform}): ${runError.message}`)
+  }
 }
 
 async function loadBrandGenderScopeForPlatform(platform: string): Promise<string[]> {
@@ -649,6 +658,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
   const zaraSites = configs.filter((c) => c.type === "zara")
   const twentyninecmSites = configs.filter((c) => c.type === "29cm")
   const farfetchSites = configs.filter((c) => c.type === "farfetch")
+  const imwebSites = configs.filter((c) => c.type === "imweb")
 
   // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
   if (uniqloSites.length > 0) {
@@ -760,6 +770,37 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
         }
         const result = await crawlFarfetch(config)
         results.push(await saveResultAndTrim(outDir, result))
+      } catch (err) {
+        console.error(`❌ ${config.name} 크롤 실패:`, err)
+      }
+    }
+  }
+
+  // imweb — sequential (each crawl launches its own Chromium internally;
+  // mirrors ZARA's per-engine browser-launch pattern). Custom-brand pilot
+  // 2026-07: 리스트는 data-product-properties JSON, 상세는 JSON-LD 기반.
+  if (imwebSites.length > 0) {
+    for (const config of imwebSites) {
+      const robots = await checkRobots(config.baseUrl)
+      if (!robots.allowed) {
+        console.error(
+          `❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
+            `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
+        )
+        process.exit(1)
+      }
+    }
+    for (const config of imwebSites) {
+      try {
+        if (dryRun) {
+          await probeSite(config)
+          continue
+        }
+        // 사이트 단위 안전망 — 파일럿 실측: 604service가 리다이렉트/타임아웃
+        // 루프로 8.7시간을 소모하며 뒤 사이트 전체를 지연시켰다. cafe24와 동일한
+        // withSiteTimeout으로 강제 중단한다.
+        const result = await withSiteTimeout(crawlImweb(config), config.key)
+        results.push(saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
       }

@@ -50,7 +50,7 @@ export interface Product {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch" | "imweb"
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
@@ -148,6 +148,11 @@ export interface SiteConfig {
    * and parses the embedded product JSON. Only consumed when
    * `type === "zara"`.
    * SPEC: SPEC-PLATFORM-EXPANSION-003 REQ-001
+   *
+   * Also consumed when `type === "imweb"` (custom-brand pilot, 2026-07):
+   * full category page URLs to crawl. When absent the imweb engine
+   * auto-discovers categories by visiting nav links and keeping pages
+   * that render `.shop-item` widgets.
    */
   categoryUrls?: string[]
   /**
