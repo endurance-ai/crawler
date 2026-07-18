@@ -21,11 +21,20 @@ import {fileURLToPath} from "node:url"
 
 import {createProductCollectionClient} from "../src/lib/product-collection"
 import {PLATFORMS} from "../src/configs/platforms"
+import type {SiteConfig} from "../src/lib/types"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /** Keys to force-disable regardless of DB state (curated after validation crawls). */
-const DISABLED_KEYS = new Set<string>([])
+const DISABLED_KEYS = new Set<string>([
+  // batch 1 (2026-07-17): 검증 크롤에서 0개 상품 — cateNo가 detect 시점 이후 바뀐 것으로 추정, 재탐지 필요
+  "en-208", // lesugiatelier
+  "le17septembre",
+  "lvir",
+  "wesken-509",
+  "yujiofficial",
+  "en-1190", // MMIC
+])
 
 interface CandidateRow {
   brand_node_id: number
@@ -43,6 +52,38 @@ function normalizeHost(url: string): string {
     return h.startsWith("www.") ? h.slice(4) : h
   } catch {
     return ""
+  }
+}
+
+const SUPPORTED_CURRENCIES = new Set(["USD", "EUR", "GBP", "KRW"])
+
+/**
+ * Detect a Shopify store's actual presentment currency via `/cart.js`'s
+ * `currency` field — Shopify's own authoritative signal for what currency
+ * a fresh session's prices (and by extension /products.json) are
+ * denominated in. Far more reliable than assuming "KR brand ⇒ KRW store":
+ * many KR-origin brands price internationally in USD/EUR/GBP (2026-07-17
+ * incident: adsb/nokwol/halfboy were hardcoded KRW, causing ~1000x-too-low
+ * prices to import into production — see PR description).
+ *
+ * `ok: false` (undetected, network error, or a currency outside the FX
+ * table in src/lib/fx.ts) means the caller MUST NOT guess — the site is
+ * marked `disabled` instead of silently defaulting to a currency that could
+ * be wrong.
+ */
+async function detectShopifyCurrency(
+  baseUrl: string,
+): Promise<{currency: SiteConfig["sourceCurrency"]; ok: boolean; raw?: string}> {
+  try {
+    const res = await fetch(`${baseUrl}/cart.js`, {signal: AbortSignal.timeout(10000)})
+    if (!res.ok) return {currency: "KRW", ok: false}
+    const json = (await res.json()) as {currency?: string}
+    const currency = json.currency
+    if (!currency) return {currency: "KRW", ok: false}
+    if (!SUPPORTED_CURRENCIES.has(currency)) return {currency: "KRW", ok: false, raw: currency}
+    return {currency: currency as SiteConfig["sourceCurrency"], ok: true}
+  } catch {
+    return {currency: "KRW", ok: false}
   }
 }
 
@@ -71,10 +112,14 @@ async function fetchCandidates(): Promise<CandidateRow[]> {
   return (data ?? []) as CandidateRow[]
 }
 
-function buildEntrySource(row: CandidateRow): string {
+function buildEntrySource(
+  row: CandidateRow,
+  shopifyCurrencyResult?: {currency: SiteConfig["sourceCurrency"]; ok: boolean; raw?: string},
+): string {
   const host = normalizeHost(row.homepage_url)
   const baseUrl = `https://${host}`
-  const disabled = DISABLED_KEYS.has(row.platform_key)
+  const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
+  const disabled = DISABLED_KEYS.has(row.platform_key) || currencyUndetected
   const lines: string[] = []
   lines.push("  {")
   lines.push(`    key: ${JSON.stringify(row.platform_key)},`)
@@ -101,13 +146,16 @@ function buildEntrySource(row: CandidateRow): string {
       lines.push('    category: {discovery: "auto"},')
     }
   } else {
-    lines.push('    sourceCurrency: "KRW",')
+    lines.push(`    sourceCurrency: ${JSON.stringify(shopifyCurrencyResult?.currency ?? "KRW")},`)
     lines.push("    maxPages: 300,")
     lines.push("    crawlDelay: 1500,")
   }
   if (disabled) lines.push("    disabled: true,")
+  const noteSuffix = currencyUndetected
+    ? ` — currency undetected via /cart.js${shopifyCurrencyResult?.raw ? ` (raw="${shopifyCurrencyResult.raw}", unsupported by FX table)` : ""}, disabled to avoid mispricing`
+    : ""
   lines.push(
-    `    notes: ${JSON.stringify(`generate-platform-configs.ts — brand_node_id=${row.brand_node_id}, KR origin, auto-generated`)},`,
+    `    notes: ${JSON.stringify(`generate-platform-configs.ts — brand_node_id=${row.brand_node_id}, KR origin, auto-generated${noteSuffix}`)},`,
   )
   lines.push("  },")
   return lines.join("\n")
@@ -151,7 +199,33 @@ async function main() {
     kept.push(row)
   }
 
-  const activeCount = kept.filter((r) => !DISABLED_KEYS.has(r.platform_key)).length
+  // Shopify: probe each store's actual presentment currency (see
+  // detectShopifyCurrency doc comment) instead of assuming KRW — KR-origin
+  // brands frequently sell internationally in USD/EUR/GBP, and mislabeling
+  // caused a real production data bug (2026-07-17: adsb/nokwol/halfboy
+  // prices imported ~1000x too low). Sites where currency can't be safely
+  // determined are disabled rather than guessed.
+  const shopifyCurrencyByKey = new Map<string, {currency: SiteConfig["sourceCurrency"]; ok: boolean; raw?: string}>()
+  const shopifyRows = kept.filter((r) => r.platform_type === "shopify")
+  const CONCURRENCY = 8
+  let cursor = 0
+  let currencyDetectedCount = 0
+  async function currencyWorker() {
+    while (cursor < shopifyRows.length) {
+      const row = shopifyRows[cursor++]!
+      const result = await detectShopifyCurrency(`https://${normalizeHost(row.homepage_url)}`)
+      shopifyCurrencyByKey.set(row.platform_key, result)
+      if (result.ok) currencyDetectedCount++
+      else console.warn(`   ⚠️  currency undetected for ${row.platform_key} — disabling (raw="${result.raw ?? "n/a"}")`)
+    }
+  }
+  await Promise.all(Array.from({length: CONCURRENCY}, () => currencyWorker()))
+
+  const activeCount = kept.filter((r) => {
+    if (DISABLED_KEYS.has(r.platform_key)) return false
+    if (r.platform_type === "shopify" && !shopifyCurrencyByKey.get(r.platform_key)?.ok) return false
+    return true
+  }).length
   const disabledCount = kept.length - activeCount
 
   const header = `/**
@@ -168,7 +242,7 @@ import type {SiteConfig} from "../lib/types"
 export const GENERATED_PLATFORMS: SiteConfig[] = [
 `
 
-  const body = kept.map(buildEntrySource).join("\n")
+  const body = kept.map((row) => buildEntrySource(row, shopifyCurrencyByKey.get(row.platform_key))).join("\n")
   const footer = "\n]\n"
   const outPath = path.join(__dirname, "../src/configs/platforms.generated.ts")
   fs.writeFileSync(outPath, header + body + footer)
@@ -179,6 +253,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
   console.log(`skip (manual host match): ${skipManualHost}`)
   console.log(`skip (duplicate host among candidates): ${skipDupHost}`)
   console.log(`generated: ${kept.length} (active ${activeCount} / disabled ${disabledCount})`)
+  console.log(`shopify currency detected: ${currencyDetectedCount}/${shopifyRows.length}`)
   console.log(`written: ${outPath}`)
 }
 
