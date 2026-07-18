@@ -3,23 +3,13 @@
  * Regenerate: npx dotenv -e .env.local -- tsx tools/generate-platform-configs.ts
  *
  * KR-origin shopify/cafe24 brands (status=tech_detected) without a manual
- * config in platforms.ts. Generated 2026-07-18T04:07:47.391Z.
- * Total: 214 (active 206 / disabled 8)
+ * config in platforms.ts. Generated 2026-07-18T06:43:04.885Z.
+ * Total: 212 (active 195 / disabled 17)
  */
 
 import type {SiteConfig} from "../lib/types"
 
 export const GENERATED_PLATFORMS: SiteConfig[] = [
-  {
-    key: "halfboy",
-    name: "HALFBOY",
-    type: "shopify",
-    baseUrl: "https://halfboy.com",
-    sourceCurrency: "EUR",
-    maxPages: 300,
-    crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=119, KR origin, auto-generated",
-  },
   {
     key: "en-208",
     name: "lesugiatelier",
@@ -212,16 +202,6 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     notes: "generate-platform-configs.ts — brand_node_id=579, KR origin, auto-generated",
   },
   {
-    key: "adsb",
-    name: "ANDERSSON BELL",
-    type: "shopify",
-    baseUrl: "https://adsb.co.kr",
-    sourceCurrency: "USD",
-    maxPages: 300,
-    crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=585, KR origin, auto-generated",
-  },
-  {
     key: "yujiofficial",
     name: "Yuji",
     type: "cafe24",
@@ -324,16 +304,6 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     notes: "generate-platform-configs.ts — brand_node_id=1242, KR origin, auto-generated",
   },
   {
-    key: "nokwol",
-    name: "Nokwol",
-    type: "shopify",
-    baseUrl: "https://nokwol.com",
-    sourceCurrency: "GBP",
-    maxPages: 300,
-    crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1389, KR origin, auto-generated",
-  },
-  {
     key: "kusikohc",
     name: "KUSIKOHC",
     type: "shopify",
@@ -367,6 +337,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat49", cateNo: 49, gender: ["women"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=1643, KR origin, auto-generated",
   },
   {
@@ -530,6 +501,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat75", cateNo: 75, gender: ["women"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=1789, KR origin, auto-generated",
   },
   {
@@ -548,6 +520,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat45", cateNo: 45, gender: ["unisex"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2111, KR origin, auto-generated",
   },
   {
@@ -596,6 +569,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2120, KR origin, auto-generated",
   },
   {
@@ -626,6 +600,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat1", cateNo: 1, gender: ["unisex"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2122, KR origin, auto-generated",
   },
   {
@@ -813,6 +788,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat13", cateNo: 13, gender: ["women"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2154, KR origin, auto-generated",
   },
   {
@@ -849,6 +825,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat24", cateNo: 24, gender: ["unisex"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2206, KR origin, auto-generated",
   },
   {
@@ -867,6 +844,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat47", cateNo: 47, gender: ["women"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2226, KR origin, auto-generated",
   },
   {
@@ -888,6 +866,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat70", cateNo: 70, gender: ["men"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=2368, KR origin, auto-generated",
   },
   {
@@ -5156,5 +5135,16 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5749, KR origin, auto-generated",
+  },
+  {
+    key: "amunofficial",
+    name: "AMUN",
+    type: "cafe24",
+    baseUrl: "https://amunofficial.kr",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {discovery: "auto"},
+    notes: "generate-platform-configs.ts — brand_node_id=5763, KR origin, auto-generated",
   },
 ]

@@ -34,6 +34,16 @@ const DISABLED_KEYS = new Set<string>([
   "wesken-509",
   "yujiofficial",
   "en-1190", // MMIC
+  // batch 2 (2026-07-18): 검증 크롤에서 0개 상품 — cateNo 재탐지 필요
+  "sansangear",
+  "asif-calie",
+  "margesherwood-1789",
+  "thevinylhouse",
+  "moif",
+  "colocynth",
+  "safarispot",
+  "les-official",
+  "en-2368", // BASTONG — 502개 크롤됐지만 QC(color_missing)에 전량 드롭, detail 셀렉터 튜닝 필요
 ])
 
 interface CandidateRow {
