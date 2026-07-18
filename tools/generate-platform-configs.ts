@@ -50,6 +50,8 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
   // BALANSA English Cafe24 storefront exposes list prices as USD decimals
   // (for example: "Price : $79.00"). Without this, the KRW parser drops prices.
   "en-3887": "USD",
+  // Sienne English Cafe24 storefront declares SHOP_CURRENCY_INFO currency_code=USD.
+  "en-4821": "USD",
 }
 
 interface CandidateRow {

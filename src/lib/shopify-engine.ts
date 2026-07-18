@@ -118,6 +118,12 @@ export interface ShopifyParseOptions {
   defaultGender?: string[]
   /** Brand used when `product.vendor` is empty (preserves original `sp.vendor || config.name`). */
   brandFallback?: string
+  /**
+   * 품절 상품을 결과에 남긴다 (갱신 전용). 기본 false — 일반 크롤 출력은 종전과
+   * 바이트 동일하다(골든 마스터 불변식). 갱신 경로만 true 로 켜서 "재고→품절"
+   * 전이를 관측한다.
+   */
+  keepOutOfStock?: boolean
 }
 
 /**
@@ -213,7 +219,7 @@ export function parseShopifyProducts(
     const firstVariant = sp.variants[0]
     const srcPrice = firstVariant ? parseFloat(firstVariant.price) : null
     const inStock = sp.variants.some((v) => v.available)
-    if (!inStock) continue  // 품절 상품 제외
+    if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
 
     // gender 추론 (태그에서)
     const gender: string[] = [...(options.defaultGender || [])]
@@ -281,7 +287,7 @@ export function parseShopifyProducts(
           ? `${symbol}${srcPrice.toLocaleString("ko-KR")}`
           : `${symbol}${srcPrice.toFixed(2)}`)
       : ""
-    if (!inStock) continue  // 품절 상품 제외
+    if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
 
     allProducts.push({
       brand: sp.vendor || options.brandFallback || "",
@@ -310,7 +316,15 @@ export function parseShopifyProducts(
   return allProducts
 }
 
-export async function crawlShopify(config: SiteConfig): Promise<CrawlResult> {
+export interface CrawlShopifyOptions {
+  /** 갱신 전용 — 품절 상품도 결과에 남긴다 (parseShopifyProducts.keepOutOfStock). */
+  listingOnly?: boolean
+}
+
+export async function crawlShopify(
+  config: SiteConfig,
+  options: CrawlShopifyOptions = {},
+): Promise<CrawlResult> {
   const startTime = Date.now()
   const errors: string[] = []
   const allProducts: Product[] = []
@@ -371,6 +385,7 @@ export async function crawlShopify(config: SiteConfig): Promise<CrawlResult> {
           sourceCurrency: currency,
           defaultGender: config.defaultGender,
           brandFallback: config.name,
+          keepOutOfStock: options.listingOnly,
         }),
       )
 

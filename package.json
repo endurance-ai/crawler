@@ -20,6 +20,7 @@
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
     "brand-crawl": "dotenv -e .env.local -- tsx src/brand-crawl.ts",
     "recrawl": "dotenv -e .env -e .env.local -- tsx src/recrawl-batch.ts",
+    "refresh": "dotenv -e .env -e .env.local -- tsx src/refresh-listing.ts",
     "poc:product-extraction": "dotenv -e .env -e .env.local -- tsx tools/product-extraction-poc.ts",
     "scaffold:platform": "tsx tools/scaffold-platform.ts",
     "spike:lightpanda": "dotenv -e .env -e .env.local -- tsx src/spikes/lightpanda-poc.ts",

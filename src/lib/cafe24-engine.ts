@@ -115,6 +115,14 @@ export interface CrawlCafe24Options {
   existingDetails?: Map<string, DetailData>
   /** POC-only cap for list/detail work; omitted in production crawl paths. */
   sampleLimit?: number
+  /**
+   * 갱신 전용 모드 — 상세 크롤을 건너뛰고 품절 상품도 결과에 남긴다.
+   *
+   * 일반 크롤은 품절을 여기서 걸러내지만(적재 대상이 아니므로), 갱신은 "재고
+   * 있었는데 지금 품절"을 DB 에 반영해야 하므로 걸러내면 안 된다 — 사라진
+   * 상품과 품절 상품이 구분되지 않으면 완전성 가드가 오판한다.
+   */
+  listingOnly?: boolean
 }
 
 function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe24DetailPageLease> {
@@ -713,19 +721,20 @@ export async function crawlCafe24(
     await new Promise((r) => setTimeout(r, delay))
   }
 
-  // 중복 제거 + 품절 제외 (productUrl 기준)
+  // 중복 제거 + 품절 제외 (productUrl 기준). listingOnly(갱신)에서는 품절도 남긴다.
   const seen = new Set<string>()
-  const dedupedProducts = allProducts.filter((p) => {
+  const dedupedAll = allProducts.filter((p) => {
     if (!p.productUrl || seen.has(p.productUrl)) return false
     seen.add(p.productUrl)
     return true
-  }).filter((p) => p.inStock)
+  })
+  const dedupedProducts = options.listingOnly ? dedupedAll : dedupedAll.filter((p) => p.inStock)
   const uniqueProducts = options.sampleLimit
     ? dedupedProducts.slice(0, options.sampleLimit)
     : dedupedProducts
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
-  if (config.crawlDetails && detailParser) {
+  if (config.crawlDetails && detailParser && !options.listingOnly) {
     console.log(`\n${tag} 🔍 상세 크롤링 시작 — ${uniqueProducts.length}개 상품`)
     const detailStart = Date.now()
     detailNavCount = uniqueProducts.length
