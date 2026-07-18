@@ -62,6 +62,7 @@ const DEFAULT_SELECTORS = {
     ".nm a",
     ".nm",
     ".prd-name",
+    ".prdt-name",         // cafe24 "PC 2.0" 모던 스킨 패턴 (dadadaseoul 등)
     ".product-name",
     ".tit",
     "strong.title a",
@@ -70,6 +71,7 @@ const DEFAULT_SELECTORS = {
   productPrice: [
     ".price .sale_price",
     ".price",
+    ".prdt-price",         // cafe24 "PC 2.0" 모던 스킨 패턴 (productName과 동일 계열)
     ".prd-price",
     ".product-price",
     ".sell-price",
@@ -277,7 +279,12 @@ async function collectProductsFromPage(
       }
       if (!items) return {ok: false as const, error: "no items"}
 
-      const priceRegex = args.pricePatternStr ? new RegExp(args.pricePatternStr) : /[\d,]+/
+      // 기본 패턴은 반드시 숫자로 시작해야 한다 — 콤마만 있어도 매치되는 /[\d,]+/는
+      // 가격 후보 텍스트가 상품명을 포함한 큰 블록일 때(예: 여러 span/div를 훑는
+      // fallback 경로) 상품명 안의 콤마(예: "DRESS, WHITE")를 실제 가격보다 먼저
+      // "가격"으로 잘못 캡처한다 → parseInt(",")=NaN → 가격 null (실측: areyou,
+      // 381개 중 379개가 이 사고로 전부 null 처리됨).
+      const priceRegex = args.pricePatternStr ? new RegExp(args.pricePatternStr) : /\d[\d,]*/
       const products: Array<Record<string, unknown>> = []
 
       for (let j = 0; j < items.length; j++) {
@@ -295,6 +302,10 @@ async function collectProductsFromPage(
             var txt = ne.tagName === "IMG"
               ? (ne.getAttribute("alt") || "").trim()
               : (ne.textContent || "").trim().replace(/\s+/g, " ")
+            // 값 없이 라벨 단어만 있는 접근성 텍스트는 통째로 건너뛴다(예: "상품명"
+            // 단독 — 콜론이 없어 아래 stripping 정규식에 안 걸리고 length>2를 통과해
+            // name이 "상품명" 자체로 오염되는 사고 실측: 2026-07-18 fragola).
+            if (/^(상품명|제조사|판매가|브랜드|소비자가|적립금)\s*:?\s*$/.test(txt)) continue
             // Cafe24 숨은 spec 블록 라벨이 앞에 붙는 사이트 대응: "상품명 : X" → "X"
             txt = txt.replace(/^(상품명|제품명|Product\s*Name|Name|제조사|판매가|브랜드|소비자가|적립금)\s*[:：]\s*/i, "")
             // ":" 또는 1~2글자 쓰레기값 건너뛰기
@@ -309,7 +320,18 @@ async function collectProductsFromPage(
           priceEl = el.querySelector(args.priceSelectors[k])
           if (priceEl) break
         }
-        let priceText = priceEl ? (priceEl.textContent || "").trim() : ""
+        // .textContent는 displaynone 자손의 텍스트도 그대로 포함한다. 일부 테마는
+        // 할인 전/후 가격을 나란히 숨겨두는데(예: <p class="displaynone"><s>0원</s></p>
+        // 146,000원<p class="displaynone">...</p>), 이 경우 "0원"이 앞줄에 와서 첫
+        // 숫자 매치가 0이 되어 가격이 통째로 null 처리된다(실측: roseanne). priceEl을
+        // 복제해 displaynone 자손을 제거한 뒤 텍스트를 읽어 실제 노출 가격만 남긴다.
+        let priceText = ""
+        if (priceEl) {
+          var priceClone = priceEl.cloneNode(true) as Element
+          var hiddenInClone = priceClone.querySelectorAll(".displaynone")
+          for (var hi = 0; hi < hiddenInClone.length; hi++) hiddenInClone[hi].remove()
+          priceText = (priceClone.textContent || "").trim()
+        }
 
         // 셀렉터 실패 시: 아이템 내 모든 span/p에서 가격 패턴 (₩/KRW + 숫자) 탐색
         if (!priceText) {
@@ -379,18 +401,25 @@ async function collectProductsFromPage(
           // 방법 2: CSS computed display: none (슬로우스테디클럽 등)
           var hasDisplayNoneClass = soldoutEl.classList.contains("displaynone")
           var isHiddenByCSS = window.getComputedStyle(soldoutEl).display === "none"
-          inStock = hasDisplayNoneClass || isHiddenByCSS
+          // 방법 3: 빈 placeholder 컨테이너 (kyod 등) — 일부 테마는 `.sold` 같은
+          // 컨테이너를 모든 상품에 항상 렌더링해두고, 실제 품절일 때만 텍스트/이미지를
+          // 채워 넣는다. displaynone도 아니고 CSS로도 안 숨겨진 "빈" 컨테이너는
+          // 품절 신호가 아니라 항상 존재하는 뼈대일 뿐이다(재고 있어도 매칭되어
+          // 전 상품이 품절 오판되는 사고 실측: kyod).
+          var hasNoContent = soldoutEl.children.length === 0 && (soldoutEl.textContent || "").trim() === ""
+          inStock = hasDisplayNoneClass || isHiddenByCSS || hasNoContent
         } else {
-          // 숨겨진 요소 제외하고 보이는 텍스트만 검사
-          var stockText = ""
-          var stockEls = el.querySelectorAll("span, div, p")
-          for (var si = 0; si < stockEls.length; si++) {
-            var se = stockEls[si]
-            if (se.classList.contains("displaynone")) continue
-            if (window.getComputedStyle(se).display === "none") continue
-            stockText += " " + (se.textContent || "")
-          }
-          stockText = stockText.toLowerCase()
+          // 컨테이너 단위(span/div/p)로 순회하며 "그 요소 자신"의 visibility만
+          // 검사하면, displaynone이 안 걸린 부모 컨테이너(예: <div class="promotion">)의
+          // textContent를 읽을 때 그 안의 숨김 자손 배지(각각 displaynone인
+          // "Sold Out"/"Best"/"New"/"In Stock" span들)까지 통째로 섞여 들어온다
+          // (실측: smoothmood — 모든 상품이 "Sold Out" 배지 텍스트 오염으로 재고
+          // 0 판정). el 전체를 복제해 displaynone 자손을 먼저 제거한 뒤 남은
+          // 텍스트만 검사해야 부모-자손 visibility 불일치를 피한다.
+          var elClone = el.cloneNode(true) as Element
+          var hiddenInEl = elClone.querySelectorAll(".displaynone")
+          for (var hi2 = 0; hi2 < hiddenInEl.length; hi2++) hiddenInEl[hi2].remove()
+          var stockText = (elClone.textContent || "").toLowerCase()
           inStock = !stockText.includes("out of stock") && !stockText.includes("품절") && !stockText.includes("sold out")
         }
 

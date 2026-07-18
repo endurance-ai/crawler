@@ -142,14 +142,86 @@ async function probeShopifyProductsJson(baseUrl: string): Promise<boolean> {
   }
 }
 
+/**
+ * Minor-platform fingerprints checked against static homepage HTML.
+ * platform_type stays within the DB CHECK values ('cafe24'|'shopify'|'custom');
+ * the fine-grained family only lives in detection.platform_family so no
+ * migration is needed. Order matters: specific platforms before the generic
+ * "nextjs-headless" marker.
+ */
+const FAMILY_FINGERPRINTS: Array<{family: string; pattern: RegExp}> = [
+  {family: "imweb", pattern: /imweb\.me|cdn\.imweb/i},
+  {family: "sixshop", pattern: /sixshop/i},
+  {family: "godomall", pattern: /godo\.co\.kr|godomall|nhn-commerce/i},
+  {family: "makeshop", pattern: /makeshop/i},
+  {family: "shopby", pattern: /shop-?by\.co\.kr|e-ncp\.com/i},
+  {family: "woocommerce", pattern: /woocommerce/i},
+  {family: "wix", pattern: /wixstatic\.com|wix\.com\/website/i},
+  {family: "squarespace", pattern: /squarespace/i},
+  {family: "demandware", pattern: /demandware|salesforce.*commerce/i},
+  {family: "magento", pattern: /magento/i},
+  {family: "nextjs-headless", pattern: /__NEXT_DATA__|\/_next\/static\//},
+]
+
+const BOT_CHALLENGE_PATTERN = /cf-chl|just a moment|challenge-platform|_incapsula_|akamai.*bot|px-captcha/i
+
+async function probeWooStoreApi(baseUrl: string): Promise<boolean> {
+  try {
+    const url = new URL("/wp-json/wc/store/v1/products?per_page=1", baseUrl)
+    const res = await fetch(url, {
+      headers: {"User-Agent": "Mozilla/5.0 kiko.ai brand-node product crawl detector", Accept: "application/json"},
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return false
+    const json = (await res.json()) as unknown
+    return Array.isArray(json)
+  } catch {
+    return false
+  }
+}
+
+async function probeSitemap(baseUrl: string): Promise<boolean> {
+  try {
+    const {status, text} = await fetchText(new URL("/sitemap.xml", baseUrl).toString())
+    return status >= 200 && status < 300 && (text.includes("<urlset") || text.includes("<sitemapindex"))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * @MX:ANCHOR: [AUTO] Pure cate_no extraction seam (fan_in=1 caller today, but
+ * kept pure + exported because two silent-corruption incidents already hit
+ * this exact logic — see inline reasoning below). Extracts ONLY genuine
+ * cafe24 product-category cate_no values from raw homepage HTML.
+ * @MX:REASON: A naive `cate_no=(\d+)` scan matches cafe24 board-widget links
+ * that reuse the same query param (dadadaseoul: board cate_no 9/13 replaced
+ * the real 42/43/45.. categories, crawl 0). A naive `/category/slug/(\d+)/`
+ * scan matches CDN upload paths (kyod/roseanne/wknd-project: editor image
+ * paths like `/web/upload/category/editor/2025/12/07/hash.jpg` were read as
+ * cate_no 2025). Both patterns below are anchored to a real `href="..."`
+ * value spanning the whole match, and the pretty-URL form requires exactly
+ * two path segments after `/category/` with no room for extra segments.
+ */
+export function extractCafe24CateNos(html: string): number[] {
+  const cateNos = [
+    ...[...html.matchAll(/\/product\/list\.html\?[^"'\s]*\bcate_no=(\d+)/g)].map((m) => Number(m[1])),
+    ...[...html.matchAll(/href="(?:https?:\/\/[^"'/]+)?\/category\/[a-zA-Z0-9\-_%]+\/(\d+)\/?"/g)].map((m) =>
+      Number(m[1]),
+    ),
+  ].filter((n) => Number.isInteger(n))
+  return [...new Set(cateNos)].slice(0, 80)
+}
+
 async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
   const rawHomepage = homepageUrl(brand)
   if (!rawHomepage) throw new Error("brand_nodes.wiki.homepage_url is required before product crawling")
 
   const homepage = normalizeHomepageUrl(rawHomepage)
-  const [htmlResult, shopifyJsonOk] = await Promise.all([
+  const [htmlResult, shopifyJsonOk, sitemapOk] = await Promise.all([
     fetchText(homepage),
     probeShopifyProductsJson(homepage),
+    probeSitemap(homepage),
   ])
   const html = htmlResult.text
   const lower = html.toLowerCase()
@@ -170,10 +242,16 @@ async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
   if (cafe24Signals.some(Boolean)) platformType = "cafe24"
   else if (shopifySignals.some(Boolean)) platformType = "shopify"
 
-  const cateNos = [...html.matchAll(/cate_no=(\d+)/g)]
-    .map((m) => Number(m[1]))
-    .filter((n) => Number.isInteger(n))
-  const uniqueCateNos = [...new Set(cateNos)].slice(0, 80)
+  const botProtected =
+    htmlResult.status === 403 || htmlResult.status === 503 || BOT_CHALLENGE_PATTERN.test(html)
+  let platformFamily: string | null = platformType !== "custom" ? platformType : null
+  if (!platformFamily && !botProtected) {
+    platformFamily = FAMILY_FINGERPRINTS.find(({pattern}) => pattern.test(html))?.family ?? null
+  }
+  const wooStoreApiOk = platformFamily === "woocommerce" ? await probeWooStoreApi(homepage) : false
+  const jsonldProduct = /"@type"\s*:\s*"?Product"?/.test(html)
+
+  const uniqueCateNos = extractCafe24CateNos(html)
   const categories = uniqueCateNos.map((cateNo) => ({
     cateNo,
     gender: brand.gender_scope && brand.gender_scope.length > 0 ? brand.gender_scope : undefined,
@@ -193,10 +271,16 @@ async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
       homepage_status: htmlResult.status,
       final_url: htmlResult.finalUrl,
       html_bytes: html.length,
+      platform_family: platformFamily,
+      bot_protected: botProtected,
+      needs_browser: botProtected,
+      jsonld_product: jsonldProduct,
+      sitemap: sitemapOk,
       signals: {
         cafe24: cafe24Signals,
         shopify: shopifySignals,
         shopify_products_json: shopifyJsonOk,
+        woo_store_api: wooStoreApiOk,
       },
       cate_no_count: uniqueCateNos.length,
     },
@@ -308,53 +392,69 @@ async function listBrands(flags: Flags): Promise<void> {
   console.log(`total=${brands.length}`)
 }
 
+async function detectOneBrand(db: ProductCollectionClient, brand: ProductCrawlBrand): Promise<void> {
+  const startedAt = Date.now()
+  const runId = await startProductRun(db, {
+    brandNodeId: brand.brand_node_id,
+    stage: "detect",
+    platformKey: brand.platform_key,
+  })
+  try {
+    const result = await detectBrand(brand)
+    await upsertProductCrawlStatus(db, brand.brand_node_id, {
+      platform_key: result.platform_key,
+      platform_type: result.platform_type,
+      category_discovery: result.category_discovery,
+      categories: result.categories,
+      detection: result.detection,
+      status: "tech_detected",
+      config_status: "needed",
+      detected_at: new Date().toISOString(),
+      last_error: null,
+      blocked_reason: null,
+    })
+    await finishProductRun(db, runId, {
+      status: "success",
+      metrics: {
+        platform_type: result.platform_type,
+        platform_key: result.platform_key,
+        platform_family: result.detection.platform_family ?? null,
+        bot_protected: result.detection.bot_protected ?? false,
+        category_discovery: result.category_discovery,
+        cate_no_count: result.categories.length,
+      },
+      startedAt,
+    })
+    const family = result.detection.platform_family
+    const familyNote = family && family !== result.platform_type ? ` family=${family}` : ""
+    console.log(
+      `#${brand.brand_node_id} ${brand.brand_name}: ${result.platform_type}${familyNote} (${result.platform_key})`,
+    )
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await upsertProductCrawlStatus(db, brand.brand_node_id, {
+      status: "blocked",
+      config_status: "blocked",
+      last_error: message,
+      blocked_reason: message,
+    })
+    await finishProductRun(db, runId, {status: "failed", errorMessage: message, startedAt})
+    console.error(`#${brand.brand_node_id} ${brand.brand_name}: ${message}`)
+  }
+}
+
 async function detectBrands(flags: Flags): Promise<void> {
   const db = createProductCollectionClient()
   const brands = await selectBrands(db, flags)
-  for (const brand of brands) {
-    const startedAt = Date.now()
-    const runId = await startProductRun(db, {
-      brandNodeId: brand.brand_node_id,
-      stage: "detect",
-      platformKey: brand.platform_key,
-    })
-    try {
-      const result = await detectBrand(brand)
-      await upsertProductCrawlStatus(db, brand.brand_node_id, {
-        platform_key: result.platform_key,
-        platform_type: result.platform_type,
-        category_discovery: result.category_discovery,
-        categories: result.categories,
-        detection: result.detection,
-        status: "tech_detected",
-        config_status: "needed",
-        detected_at: new Date().toISOString(),
-        last_error: null,
-        blocked_reason: null,
-      })
-      await finishProductRun(db, runId, {
-        status: "success",
-        metrics: {
-          platform_type: result.platform_type,
-          platform_key: result.platform_key,
-          category_discovery: result.category_discovery,
-          cate_no_count: result.categories.length,
-        },
-        startedAt,
-      })
-      console.log(`#${brand.brand_node_id} ${brand.brand_name}: ${result.platform_type} (${result.platform_key})`)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      await upsertProductCrawlStatus(db, brand.brand_node_id, {
-        status: "blocked",
-        config_status: "blocked",
-        last_error: message,
-        blocked_reason: message,
-      })
-      await finishProductRun(db, runId, {status: "failed", errorMessage: message, startedAt})
-      console.error(`#${brand.brand_node_id} ${brand.brand_name}: ${message}`)
+  const concurrency = Math.min(numberFlag(flags, "concurrency") ?? 1, 12)
+  let cursor = 0
+  const workers = Array.from({length: Math.max(1, concurrency)}, async () => {
+    while (cursor < brands.length) {
+      const brand = brands[cursor++]
+      await detectOneBrand(db, brand)
     }
-  }
+  })
+  await Promise.all(workers)
 }
 
 async function qcBrand(flags: Flags): Promise<void> {
