@@ -1556,6 +1556,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     name: "Sienne",
     type: "cafe24",
     baseUrl: "https://en.sienneboutique.com",
+    sourceCurrency: "USD",
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -1578,7 +1579,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat118", cateNo: 118, gender: ["women"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=4821, KR origin, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=4821, KR origin, auto-generated — sourceCurrency=USD verified from rendered Cafe24 SHOP_CURRENCY_INFO",
   },
   {
     key: "oldequalnew",
