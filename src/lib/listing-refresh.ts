@@ -47,6 +47,33 @@ export interface RefreshDiff {
 
 const MAX_PRICE = 100_000_000 // 1억원 — import-products 와 동일 기준
 
+/**
+ * URL 이 달라져도 같은 상품임을 알아보는 보조 키.
+ *
+ * imweb 은 카테고리 경로가 URL 에 박히는데(`/66/?idx=402`), 카테고리 자동탐색이
+ * 런마다 다른 경로를 고를 수 있다 — 실측 2026-07-19 differentis: DB `/66/?idx=402`
+ * vs 재크롤 `/wwwdifferentiskr/?idx=402` 로 14개 전부 매칭 실패(coverage 0%).
+ * 상품 정체성은 경로가 아니라 `idx`(imweb) / `product_no`(cafe24) 다.
+ *
+ * 정확 URL 매칭이 실패했을 때만 폴백으로 쓴다 — 오매칭을 막기 위해 호스트까지 포함한다.
+ */
+export function productIdentityKey(url: string): string | null {
+  let host: string
+  let query: URLSearchParams
+  try {
+    const parsed = new URL(url)
+    host = parsed.host
+    query = parsed.searchParams
+  } catch {
+    return null
+  }
+  const idx = query.get("idx")
+  if (idx) return `${host}#idx=${idx}`
+  const productNo = query.get("product_no")
+  if (productNo) return `${host}#product_no=${productNo}`
+  return null
+}
+
 function sanitizePrice(v: unknown): number | null {
   const n = typeof v === "number" ? v : null
   return n !== null && n > 0 && n <= MAX_PRICE ? n : null
@@ -94,7 +121,14 @@ export function diffListing(args: {
   markMissingOutOfStock: boolean
 }): RefreshDiff {
   const byUrl = new Map<string, RefreshableRow>()
-  for (const row of args.existing) byUrl.set(row.product_url, row)
+  // 같은 키에 여러 행이 걸리면(경로만 다른 중복 적재) 폴백 매칭이 어느 쪽을 고를지
+  // 모호해지므로 아예 후보에서 뺀다 — 잘못된 행을 갱신하느니 건너뛰는 편이 낫다.
+  const byIdentity = new Map<string, RefreshableRow | null>()
+  for (const row of args.existing) {
+    byUrl.set(row.product_url, row)
+    const key = productIdentityKey(row.product_url)
+    if (key) byIdentity.set(key, byIdentity.has(key) ? null : row)
+  }
 
   const seen = new Set<string>()
   const updates: RefreshUpdate[] = []
@@ -105,7 +139,16 @@ export function diffListing(args: {
     if (!url || seen.has(url)) continue
     seen.add(url)
 
-    const row = byUrl.get(url)
+    let row = byUrl.get(url)
+    if (!row) {
+      // URL 이 안 맞아도 상품 식별자가 같으면 같은 상품이다 (imweb 카테고리 경로 변동).
+      const key = productIdentityKey(url)
+      const candidate = key ? byIdentity.get(key) : undefined
+      if (candidate) {
+        row = candidate
+        seen.add(row.product_url) // 사라진 것으로 오인되지 않도록 원본 URL 도 본 것으로 표시
+      }
+    }
     if (!row) {
       unknownUrls.push(url)
       continue
@@ -134,7 +177,9 @@ export function diffListing(args: {
     }
 
     if (reasons.length > 0 || patch.price !== undefined) {
-      updates.push({productUrl: url, patch, reasons})
+      // UPDATE 는 product_url 로 행을 찾으므로 크롤 URL 이 아니라 DB 에 저장된 URL 을 쓴다
+      // (폴백 매칭에서는 둘이 다르다).
+      updates.push({productUrl: row.product_url, patch, reasons})
     }
   }
 
