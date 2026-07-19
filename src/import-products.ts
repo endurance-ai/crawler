@@ -483,8 +483,6 @@ async function main() {
     }
 
     let fxSkipped = 0
-    let priceSkipped = 0
-    const priceSkipSamples: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
@@ -554,20 +552,11 @@ async function main() {
       const sourcePriceRaw = typeof p.sourcePrice === "number"
         ? p.sourcePrice
         : (typeof p.price === "number" ? p.price : null)
-      const price = sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw)
-      if (price === null) {
-        priceSkipped += 1
-        if (priceSkipSamples.length < 3) {
-          priceSkipSamples.push((p.name as string) || productUrl || "(unnamed)")
-        }
-        return null
-      }
-
       return {
         brand,
         name: p.name as string,
         category: p.category as string,
-        price,
+        price: sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw),
         original_price: sanitizePrice(originalRaw) ?? sanitizePrice(priceRaw),
         sale_price: sanitizePrice(saleRaw),
         source_currency: sourceCurrency,
@@ -598,11 +587,6 @@ async function main() {
     }).filter((r): r is NonNullable<typeof r> => r !== null)
     if (fxSkipped > 0) {
       console.log(`   ⚠️  ${fxSkipped} product(s) skipped due to unknown source currency`)
-    }
-    if (priceSkipped > 0) {
-      console.log(
-        `   ⚠️  ${priceSkipped} product(s) skipped due to missing/invalid price: ${priceSkipSamples.join(", ")}`,
-      )
     }
 
     // Dedup by product_url — Postgres rejects ON CONFLICT batches that
