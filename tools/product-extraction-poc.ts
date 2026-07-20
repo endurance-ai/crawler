@@ -11,7 +11,7 @@ import {z} from "zod"
 import {getSiteConfig} from "../src/configs/platforms"
 import {crawlCafe24} from "../src/lib/cafe24-engine"
 import {crawlCafe24WithLightpanda} from "../src/lib/cafe24-lightpanda"
-import {parseCafe24EngineMode} from "../src/lib/cafe24-engine-selection"
+import {cafe24DetailConcurrency, parseCafe24EngineMode} from "../src/lib/cafe24-engine-selection"
 import {crawlShopify} from "../src/lib/shopify-engine"
 import {getDetailParser} from "../src/lib/parsers/detail"
 import type {CrawlResult, Product, SiteConfig} from "../src/lib/types"
@@ -433,7 +433,13 @@ async function runExistingVariant(config: SiteConfig, limit: number, stats: Runt
       // Per-brand Chromium fallback mirrors src/crawl.ts so a brand Lightpanda
       // cannot render is not silently dropped.
       try {
-        result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {})
+        // Detail fetch is the wall-clock bottleneck on large catalogs, so honor
+        // CRAWLER_CAFE24_DETAIL_CONCURRENCY here the same way src/crawl.ts does.
+        // Without this the pool silently stayed at the default 3 even when the
+        // env var was set (2026-07-20 bulk onboarding).
+        result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {
+          detailConcurrency: cafe24DetailConcurrency(),
+        })
         if (result.stats.totalProducts === 0) throw new Error("Lightpanda returned 0 products")
       } catch (err) {
         console.warn(`⚠️ ${config.key} Lightpanda failed — Chromium fallback: ${(err as Error).message}`)
