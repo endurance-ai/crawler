@@ -532,6 +532,11 @@ export interface Cafe24QualityAssessment {
   }
 }
 
+export interface Cafe24UsablePriceFilter {
+  products: Product[]
+  dropped: Product[]
+}
+
 const KNOWN_EXTERNAL_BRAND_PREFIXES = [
   "adidas",
   "asics",
@@ -583,6 +588,21 @@ export function assessCafe24ProductQuality(
   }
 
   return {passed: reasons.length === 0, reasons, metrics}
+}
+
+export function filterCafe24ProductsWithUsablePrice(products: Product[]): Cafe24UsablePriceFilter {
+  const kept: Product[] = []
+  const dropped: Product[] = []
+
+  for (const product of products) {
+    if (typeof product.price === "number" && Number.isFinite(product.price) && product.price > 0) {
+      kept.push(product)
+    } else {
+      dropped.push(product)
+    }
+  }
+
+  return {products: kept, dropped}
 }
 
 function looksLikeExternalBrandProduct(

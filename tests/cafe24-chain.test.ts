@@ -4,6 +4,7 @@ import * as assert from "node:assert/strict"
 import {
   assessCafe24ProductQuality,
   cleanCafe24ProductName,
+  filterCafe24ProductsWithUsablePrice,
   inferCafe24Currency,
   isGenericCafe24ProductName,
   parseCafe24PriceCandidate,
@@ -98,6 +99,20 @@ test("Cafe24 quality gate rejects generic names, missing prices, and external br
   )
   assert.equal(contaminated.passed, false)
   assert.deepEqual(contaminated.reasons, ["brand_contamination_rate=50"])
+})
+
+test("Cafe24 usable price filter drops zero-price editorial records before save", () => {
+  const valid = product({name: "Padded Bag Black", price: 98, priceFormatted: "$98.00"})
+  const zeroPrice = product({
+    name: "One Year of the Padding Bag",
+    price: null,
+    priceFormatted: "",
+    productUrl: "https://en.sienneboutique.com/product/detail.html?product_no=2059",
+  })
+
+  const result = filterCafe24ProductsWithUsablePrice([valid, zeroPrice])
+  assert.deepEqual(result.products, [valid])
+  assert.deepEqual(result.dropped, [zeroPrice])
 })
 
 function product(overrides: Partial<Product>): Product {

@@ -22,6 +22,7 @@ import {
   cleanCafe24ProductName,
   dedupeAndFilterCafe24Categories,
   extractCafe24DetailFallbacks,
+  filterCafe24ProductsWithUsablePrice,
   parseCafe24CategoryHref,
   runFirstUsefulCafe24Step,
   type Cafe24CategoryCandidate,
@@ -729,7 +730,7 @@ export async function crawlCafe24(
     return true
   })
   const dedupedProducts = options.listingOnly ? dedupedAll : dedupedAll.filter((p) => p.inStock)
-  const uniqueProducts = options.sampleLimit
+  let uniqueProducts = options.sampleLimit
     ? dedupedProducts.slice(0, options.sampleLimit)
     : dedupedProducts
 
@@ -855,6 +856,19 @@ export async function crawlCafe24(
 
     detailMs = Date.now() - detailStart
     console.log(`\n${tag} ✅ 상세 크롤링 완료 — ${detailSuccess}/${uniqueProducts.length}개 데이터 수집`)
+  }
+
+  if (!options.listingOnly) {
+    const priceFiltered = filterCafe24ProductsWithUsablePrice(uniqueProducts)
+    if (priceFiltered.dropped.length > 0) {
+      const samples = priceFiltered.dropped
+        .slice(0, 3)
+        .map((p) => `${p.name || "(unnamed)"} (${p.priceFormatted || p.productUrl})`)
+        .join(", ")
+      console.log(`${tag} 🧹 가격 0/누락 상품 제외: ${priceFiltered.dropped.length}개 — ${samples}`)
+      uniqueProducts = priceFiltered.products
+      if (options.onDetailProgress) await options.onDetailProgress(uniqueProducts)
+    }
   }
 
   // ── Step 4: 리뷰 크롤링 (파서 주입) ──
