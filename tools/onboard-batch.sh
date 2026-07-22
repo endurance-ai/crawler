@@ -13,11 +13,18 @@
 #   --start <n>           first chunk index to run (default 0)
 #   --end <n>             last chunk index to run, inclusive (default = last chunk)
 #   --out-root <dir>      crawl output root (default poc-runs; gitignored)
+#   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
+#                          variant to crawl AND the one onboard-classify.ts reads
+#                          back out of products.jsonl (kept in lockstep — see
+#                          ONBOARD_VARIANT below). hybrid = llm-scraper re-visits
+#                          each detail page a second time for category/subcategory/
+#                          color/description/gender; existing = deterministic only.
 #
-# Each chunk: crawl (existing-variant, detail) -> onboard-classify.ts (QC + LLM
-# category/subcategory classify + color recovery) -> import-products.ts (upsert)
-# -> reclassify-categories.ts --only-invalid (guardrail: fixes any row that still
-# has a non-canonical category, regardless of cause — cheap, always safe to run).
+# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (QC + LLM
+# category/subcategory classify + color recovery, reading the same variant back
+# via ONBOARD_VARIANT) -> import-products.ts (upsert) -> reclassify-categories.ts
+# --only-invalid (guardrail: fixes any row that still has a non-canonical
+# category, regardless of cause — cheap, always safe to run).
 #
 # Resumable: if out-root/chunk-N/products.jsonl already exists, crawl is skipped
 # for that chunk (so a killed run can restart with the same --start).
@@ -29,6 +36,7 @@ START=0
 END=""
 OUT_ROOT="poc-runs"
 CONFIGS=""
+VARIANTS="existing"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -38,9 +46,15 @@ while [ $# -gt 0 ]; do
     --start) START="$2"; shift 2 ;;
     --end) END="$2"; shift 2 ;;
     --out-root) OUT_ROOT="$2"; shift 2 ;;
+    --variants) VARIANTS="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
+
+if [ "$VARIANTS" != "existing" ] && [ "$VARIANTS" != "hybrid" ]; then
+  echo "error: --variants must be existing or hybrid (got: $VARIANTS)" >&2
+  exit 1
+fi
 
 if [ -z "$CONFIGS" ]; then
   echo "error: --configs <path.json> is required" >&2
@@ -91,18 +105,27 @@ for c in $(seq "$START" "$END"); do
   ' "$CONFIGS" "$CHUNK_SIZE" "$c" "$CHUNK_JSON"
   KEYS=$(node -e 'console.log(require(require("path").resolve(process.argv[1])).map(x => x.key).join(","))' "$CHUNK_JSON")
 
+  # hybrid always crawls existing+hybrid together — hybrid is built ON TOP of the
+  # existing pool (see runHybridVariant), not a standalone replacement for it.
+  CRAWL_VARIANTS="existing"
+  if [ "$VARIANTS" = "hybrid" ]; then CRAWL_VARIANTS="existing,hybrid"; fi
+
   if [ -s "$OUT_ROOT/chunk-$c/products.jsonl" ]; then
     echo "chunk $c crawl SKIPPED (existing $(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl") rows)"
   else
     CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
       $PNPM tsx tools/product-extraction-poc.ts \
-      --brands="$KEYS" --variants=existing --limit=2000 --pool-limit=2000 \
+      --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit=2000 --pool-limit=2000 \
       --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)
   echo "chunk $c crawl done: $ROWS rows"
 
-  $PNPM tsx tools/onboard-classify.ts "$OUT_ROOT/chunk-$c" "$CHUNK_JSON" "$PASSKEYS_JSON" > "$OUT_ROOT/chunk-$c-finalize.log" 2>&1
+  # ONBOARD_VARIANT tells onboard-classify.ts which variant's rows to read back
+  # out of products.jsonl — kept in lockstep with $VARIANTS (not $CRAWL_VARIANTS,
+  # which always includes "existing" as the hybrid base and would otherwise win
+  # a naive first-match).
+  ONBOARD_VARIANT="$VARIANTS" $PNPM tsx tools/onboard-classify.ts "$OUT_ROOT/chunk-$c" "$CHUNK_JSON" "$PASSKEYS_JSON" > "$OUT_ROOT/chunk-$c-finalize.log" 2>&1
   PASS=$(node -e 'try{console.log(require(require("path").resolve(process.argv[1])).length)}catch(e){console.log(0)}' "$PASSKEYS_JSON")
 
   BEFORE=$(DB_COUNT)

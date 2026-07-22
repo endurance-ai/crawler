@@ -22,6 +22,7 @@ type ScrapeFormat = "markdown" | "html" | "raw_html"
 const DEFAULT_BRANDS = ["shopamomento", "pottery", "hamsaseyo", "rollingstudios", "becay"]
 const DEFAULT_VARIANTS: Variant[] = ["existing", "llm-scraper"]
 const DEFAULT_FORMAT: ScrapeFormat = "markdown"
+const DEFAULT_LLM_SCRAPER_MODEL = "gpt-5.4-nano"
 const CRAWLER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const REQUIRED_FIELDS = ["product_key", "name", "price", "currency", "image_url", "product_url", "in_stock"] as const
 // Graded separately: `existing` fills every REQUIRED_FIELD on 4/5 brands, so the
@@ -239,8 +240,10 @@ Options:
 
 Required env for full default run:
   FIRECRAWL_API_KEY
-  LLM_SCRAPER_MODEL
   OPENAI_API_KEY or ANTHROPIC_API_KEY
+
+Optional model env:
+  LLM_SCRAPER_MODEL            Default: ${DEFAULT_LLM_SCRAPER_MODEL}
 
 Optional cost env:
   FIRECRAWL_USD_PER_CREDIT
@@ -402,6 +405,7 @@ async function crawlCafe24Chromium(
   config: SiteConfig,
   limit: number,
   detailParser: ReturnType<typeof getDetailParser> | undefined,
+  enrichDetailPage?: (page: Page, product: Product) => Promise<void>,
 ): Promise<CrawlResult> {
   const browser = await chromium.launch({headless: true})
   try {
@@ -410,6 +414,12 @@ async function crawlCafe24Chromium(
     page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
     const result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
       sampleLimit: limit,
+      // Chromium detail-crawl pages are real Playwright Pages under the hood
+      // (createPlaywrightDetailPageFactory) even though crawlCafe24's own
+      // Cafe24Page type is narrower — safe to cast only on this branch.
+      enrichDetailPage: enrichDetailPage
+        ? (pg, product) => enrichDetailPage(pg as unknown as Page, product)
+        : undefined,
     })
     await context.close().catch(() => {})
     return result
@@ -418,7 +428,12 @@ async function crawlCafe24Chromium(
   }
 }
 
-async function runExistingVariant(config: SiteConfig, limit: number, stats: RuntimeStats): Promise<Product[]> {
+async function runExistingVariant(
+  config: SiteConfig,
+  limit: number,
+  stats: RuntimeStats,
+  enrichDetailPage?: (page: Page, product: Product) => Promise<void>,
+): Promise<Product[]> {
   const started = Date.now()
   let result: CrawlResult
 
@@ -428,6 +443,16 @@ async function runExistingVariant(config: SiteConfig, limit: number, stats: Runt
     const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
     const engine = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
     if (engine === "lightpanda" || engine === "auto") {
+      // llm-scraper (LLMScraper.run) requires a real playwright.Page; Lightpanda's
+      // Cafe24Page is backed by puppeteer-core, and Playwright cannot drive
+      // Lightpanda at all -- page.goto/page.evaluate hang even on example.com
+      // (.moai/plans/lightpanda-spike-report.md, 2026-07-07 spike). Fail loudly
+      // instead of silently falling back to a broken enrichment pass.
+      if (enrichDetailPage) {
+        throw new Error(
+          "hybrid variant is not supported on the Lightpanda engine — see .moai/plans/lightpanda-spike-report.md",
+        )
+      }
       // Lightpanda runs its own browser process. It does not honor sampleLimit —
       // it crawls the full catalog, sliced to `limit` below (fine for onboarding).
       // Per-brand Chromium fallback mirrors src/crawl.ts so a brand Lightpanda
@@ -440,7 +465,7 @@ async function runExistingVariant(config: SiteConfig, limit: number, stats: Runt
         result = await crawlCafe24Chromium(config, limit, detailParser)
       }
     } else {
-      result = await crawlCafe24Chromium(config, limit, detailParser)
+      result = await crawlCafe24Chromium(config, limit, detailParser, enrichDetailPage)
     }
   } else {
     throw new Error(`Existing POC only supports cafe24/shopify, got ${config.type}`)
@@ -708,11 +733,7 @@ async function runLlmScraperVariant(
   options: CliOptions,
   stats: RuntimeStats,
 ): Promise<PocProduct[]> {
-  const model = process.env.LLM_SCRAPER_MODEL
-  if (!model) {
-    stats.errors.push("LLM_SCRAPER_MODEL is not set")
-    return []
-  }
+  const model = process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL
   if (!process.env.OPENAI_API_KEY) {
     stats.errors.push("OPENAI_API_KEY is required")
     return []
@@ -844,11 +865,72 @@ async function readCompactContext(page: Page): Promise<string> {
   return JSON.stringify(compact)
 }
 
+interface InlineEnrichResult {
+  usage: TokenUsage
+  error: string | null
+}
+
 /**
- * Hybrid: existing crawler provides name/price/currency/image/in_stock/color; the LLM,
- * fed only the compact context, fills the fields existing is weak at (category,
- * subcategory, description, gender). Inherits existing's discovery -- so pottery,
- * where existing finds nothing, produces no hybrid rows either.
+ * Cafe24 + Chromium hybrid path: same LLM classification as runHybridVariant
+ * below, but invoked as crawlCafe24's enrichDetailPage hook -- reusing the
+ * detail page crawlCafe24 already has open instead of a second page.goto().
+ * Mutates `product` in place (category/subcategory/gender: LLM wins when
+ * present; color/description: existing wins, LLM only fills gaps -- same
+ * priority as runHybridVariant) and records per-product usage/error in
+ * `results` for the caller to build hybrid PocProduct rows from afterward.
+ * SPEC: .moai/plans/velvet-toasting-star.md.
+ */
+function createInlineClassifier(
+  model: string,
+  stats: RuntimeStats,
+): {enrich: (page: Page, product: Product) => Promise<void>; results: Map<string, InlineEnrichResult>} {
+  const results = new Map<string, InlineEnrichResult>()
+  const enrich = async (page: Page, product: Product): Promise<void> => {
+    const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
+    const scraper = new LLMScraper(usageCapturingModel(model, usage))
+    try {
+      const existingName = product.name ?? ""
+      const result = await scraper.run(page, Output.object({schema: ClassificationSchema}), {
+        format: "custom",
+        formatFunction: async (p: Page) => JSON.stringify({name: existingName, page: JSON.parse(await readCompactContext(p))}),
+        system: CLASSIFY_SYSTEM,
+        temperature: 0,
+      })
+      stats.requests += 1
+      addTokenUsage(stats.tokenUsage, usage)
+      const cls = ClassificationSchema.partial().safeParse(result.data)
+      const c = cls.success ? cls.data : {}
+      product.category = cleanString(c.category) ?? product.category
+      product.subcategory = cleanString(c.subcategory) ?? product.subcategory ?? undefined
+      if (!product.color) product.color = cleanString(c.color) ?? product.color
+      if (!product.description) product.description = cleanString(c.description) ?? product.description
+      if (!product.gender || product.gender.length === 0) {
+        product.gender = normalizeGender(c.gender) ?? product.gender
+      }
+      results.set(product.productUrl, {
+        usage,
+        error: cls.success ? null : `schema_validation_failed: ${cls.error.message}`,
+      })
+    } catch (err) {
+      stats.requests += 1
+      addTokenUsage(stats.tokenUsage, usage)
+      results.set(product.productUrl, {usage, error: messageOf(err)})
+    }
+  }
+  return {enrich, results}
+}
+
+/**
+ * Shopify hybrid path (and Lightpanda-engine cafe24 fallback -- but Lightpanda
+ * + hybrid is rejected upstream in runExistingVariant, so this only runs for
+ * shopify in practice): existing crawler never opens a detail page for
+ * shopify (pure /products.json fetch, see src/lib/shopify-engine.ts), so this
+ * IS the only browser visit -- unlike cafe24, there is no second navigation to
+ * eliminate here. Existing crawler provides name/price/currency/image/
+ * in_stock/color; the LLM, fed only the compact context, fills the fields
+ * existing is weak at (category, subcategory, description, gender). Inherits
+ * existing's discovery -- so pottery, where existing finds nothing, produces
+ * no hybrid rows either.
  */
 async function runHybridVariant(
   config: SiteConfig,
@@ -856,11 +938,7 @@ async function runHybridVariant(
   options: CliOptions,
   stats: RuntimeStats,
 ): Promise<PocProduct[]> {
-  const model = process.env.LLM_SCRAPER_MODEL
-  if (!model) {
-    stats.errors.push("LLM_SCRAPER_MODEL is not set")
-    return []
-  }
+  const model = process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL
   if (!process.env.OPENAI_API_KEY) {
     stats.errors.push("OPENAI_API_KEY is required")
     return []
@@ -1599,7 +1677,7 @@ async function main(): Promise<void> {
   console.log(`POC run: ${options.runId}`)
   console.log(`Brands: ${options.brands.join(", ")}`)
   console.log(`Variants: ${options.variants.join(", ")}`)
-  console.log(`Format: ${options.format} | model: ${process.env.LLM_SCRAPER_MODEL ?? "(unset)"}`)
+  console.log(`Format: ${options.format} | model: ${process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL}`)
   console.log(`Output: ${runDir}`)
 
   for (const brandKey of options.brands) {
@@ -1609,10 +1687,43 @@ async function main(): Promise<void> {
     console.log(`\n[${brandKey}] starting`)
     const existingRuntime = getRuntime(stats, brandKey, "existing")
 
+    // Cafe24 + Chromium + hybrid requested: enrich inline during the existing
+    // detail-crawl visit instead of a second page.goto() per product (SPEC:
+    // .moai/plans/velvet-toasting-star.md). Lightpanda can't host llm-scraper
+    // at all (lightpanda-spike-report.md) -- runExistingVariant throws below
+    // if hybrid is requested on that engine, rather than silently degrading.
+    const hybridRequested = options.variants.includes("hybrid")
+    const cafe24Engine = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
+    if (hybridRequested && config.type === "cafe24" && cafe24Engine !== "chromium") {
+      existingRuntime.errors.push(
+        `hybrid variant is not supported on the Lightpanda engine (CRAWLER_CAFE24_ENGINE=${cafe24Engine}) — see .moai/plans/lightpanda-spike-report.md`,
+      )
+      console.error(`[${brandKey}] ❌ hybrid + Lightpanda engine is unsupported — skipping brand`)
+      continue
+    }
+    const useInlineHybrid = hybridRequested && config.type === "cafe24" && cafe24Engine === "chromium"
+    let inlineHybrid: {model: string; results: Map<string, InlineEnrichResult>} | undefined
+    let enrichDetailPageFn: ((page: Page, product: Product) => Promise<void>) | undefined
+    if (useInlineHybrid) {
+      const model = process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL
+      if (!process.env.OPENAI_API_KEY) {
+        existingRuntime.errors.push("OPENAI_API_KEY is required for hybrid")
+      } else {
+        const hybridRuntime = getRuntime(stats, brandKey, "hybrid")
+        hybridRuntime.llmAdapter = `hybrid/${model}/compact-inline`
+        const classifier = createInlineClassifier(model, hybridRuntime)
+        enrichDetailPageFn = classifier.enrich
+        inlineHybrid = {model, results: classifier.results}
+      }
+    }
+
     // 1. Wide pool from the existing crawler (its own list-page discovery).
+    //    When useInlineHybrid, pool's products are already LLM-enriched in
+    //    place by the time this returns (crawlCafe24 called enrichDetailPageFn
+    //    per product during its own detail-crawl loop).
     let pool: Product[] = []
     try {
-      pool = await runExistingVariant(config, options.poolLimit, existingRuntime)
+      pool = await runExistingVariant(config, options.poolLimit, existingRuntime, enrichDetailPageFn)
     } catch (err) {
       existingRuntime.errors.push(messageOf(err))
     }
@@ -1663,12 +1774,40 @@ async function main(): Promise<void> {
       rows.push(...(await runLlmScraperVariant(config, evalSet, options, runtime)))
     }
 
-    if (options.variants.includes("hybrid")) {
-      const runtime = getRuntime(stats, brandKey, "hybrid")
-      rows.push(...(await runHybridVariant(config, matched, options, runtime)))
-      if (matched.length === 0) {
-        console.log(`[${brandKey}] hybrid produced 0 rows (existing found nothing to classify)`)
+    if (hybridRequested) {
+      if (inlineHybrid) {
+        // Cafe24 + Chromium: pool is already LLM-enriched in place (no second
+        // visit) -- just re-stamp the matched subset as hybrid rows.
+        const hybridRuntime = getRuntime(stats, brandKey, "hybrid")
+        hybridRuntime.selectedProductUrls = matched.length
+        hybridRuntime.discoveredProductUrls = matched.length
+        const hybridRows: PocProduct[] = matched.map((product) => {
+          const enrichResult = inlineHybrid!.results.get(product.productUrl)
+          const base = existingProductToPoc(product, config, 0)
+          return {
+            ...base,
+            variant: "hybrid",
+            confidence: null,
+            estimated_cost: enrichResult ? estimateLlmCost(enrichResult.usage) : null,
+            error: enrichResult?.error ?? null,
+            audit: {source: "hybrid_inline", model: inlineHybrid!.model, format: "compact", usage: enrichResult?.usage ?? null},
+          }
+        })
+        hybridRuntime.estimatedCost = sumNullable(hybridRows.map((r) => r.estimated_cost))
+        rows.push(...hybridRows)
+        if (matched.length === 0) {
+          console.log(`[${brandKey}] hybrid produced 0 rows (existing found nothing to classify)`)
+        }
+      } else if (config.type !== "cafe24") {
+        // Shopify (and any future non-cafe24 type): unchanged separate-visit path.
+        const runtime = getRuntime(stats, brandKey, "hybrid")
+        rows.push(...(await runHybridVariant(config, matched, options, runtime)))
+        if (matched.length === 0) {
+          console.log(`[${brandKey}] hybrid produced 0 rows (existing found nothing to classify)`)
+        }
       }
+      // else: cafe24 on a non-Chromium engine (Lightpanda/auto) -- runExistingVariant
+      // already threw/recorded an explicit error above; no hybrid rows to add.
     }
   }
 

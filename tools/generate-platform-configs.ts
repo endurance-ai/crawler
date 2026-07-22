@@ -147,6 +147,13 @@ function buildEntrySource(
   lines.push(`    name: ${JSON.stringify(row.brand_name)},`)
   lines.push(`    type: ${JSON.stringify(row.platform_type)},`)
   lines.push(`    baseUrl: ${JSON.stringify(baseUrl)},`)
+  // product_crawl_brands는 brand_nodes(브랜드-노드 매핑, 1행=1브랜드) 기반이라
+  // 이 generator가 만드는 항목은 전부 단일 하우스 브랜드몰이다. brand를
+  // 채우지 않으면 cafe24/shopify 엔진이 DOM에서 브랜드를 추측하게 되는데,
+  // 이는 멀티브랜드 편집샵 전용 폴백이라 단일브랜드몰에서는 spec 라벨
+  // 텍스트("판매가 : X, 상품명 : Y")를 브랜드로 잘못 주워오는 사고로 이어진다
+  // (실측: etce 1,604건 — brand 필드 미설정 상태로 생성된 게 원인).
+  lines.push(`    brand: ${JSON.stringify(row.brand_name)},`)
   if (row.platform_type === "cafe24") {
     if (cafe24SourceCurrency) lines.push(`    sourceCurrency: ${JSON.stringify(cafe24SourceCurrency)},`)
     lines.push("    paginate: true,")

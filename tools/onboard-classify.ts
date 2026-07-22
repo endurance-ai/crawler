@@ -5,6 +5,11 @@ import * as fs from "fs"; import * as path from "path"
 import {openai} from "@ai-sdk/openai"; import {generateText, Output, wrapLanguageModel} from "ai"; import {chromium, type Page} from "playwright"; import {z} from "zod"
 import {normalizeColorList} from "../src/lib/parsers/field-extractors/color-normalizer"
 const RUN = process.argv[2], CONFIGS = process.argv[3], PASSOUT = process.argv[4]
+// Which product-extraction-poc.ts variant to consume from products.jsonl.
+// Default "existing" preserves current behavior; "hybrid" picks up the
+// llm-scraper-enhanced rows (category/subcategory/color/description/gender
+// already LLM-filled during crawl — see runHybridVariant in product-extraction-poc.ts).
+const VARIANT = process.env.ONBOARD_VARIANT || "existing"
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 const CANON = ["tops", "knitwear", "bottoms", "dresses", "outerwear", "underwear", "swimwear", "activewear", "shoes", "bags", "accessories", "eyewear", "jewelry", "headwear", "other"], SYM: Record<string, string> = {KRW: "₩", USD: "$", EUR: "€", GBP: "£"}
 const configs: any[] = JSON.parse(fs.readFileSync(CONFIGS, "utf8")); const cfgByKey: Record<string, any> = {}; for (const c of configs) cfgByKey[c.key] = c
@@ -20,14 +25,17 @@ const detColor = (t: string) => { for (const r of t.split(/[\s,_/|.\-()]+/)) { c
 async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}], temperature: 0}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
 async function llmColor(page: Page, pr: any) { try { await page.goto(pr.product_url, {waitUntil: "domcontentloaded", timeout: 40000}).catch(() => {}); await page.waitForTimeout(300); const c = await page.evaluate(() => ({handle: location.pathname, options: Array.from(document.querySelectorAll("select option")).map((o) => (o.textContent || "").trim()).filter(Boolean).slice(0, 12), detail: (document.querySelector('#prdDetail, .xans-product-detail, .cont, [class*="detail" i]') as HTMLElement | null)?.innerText?.replace(/\s+/g, " ").slice(0, 800) || ""})).catch(() => ({handle: "", options: [] as string[], detail: ""})); const res = await generateText({model: colModel, output: Output.object({schema: ColSchema}), system: "Extract THIS product's primary color from name/handle/options/description. One color word. null ONLY if none.", messages: [{role: "user", content: JSON.stringify({name: pr.name, ...c})}], temperature: 0}); const col = (res.output as any)?.color; return col && String(col).trim() ? String(col).trim() : null } catch { return null } }
 async function main() {
-  const rows = fs.readFileSync(`${RUN}/products.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r: any) => r.variant === "existing")
+  const rows = fs.readFileSync(`${RUN}/products.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r: any) => r.variant === VARIANT)
   const seen = new Set<string>(); const uniq = rows.filter((r: any) => { const k = `${r.brand_key}|${r.product_url || r.name}`; if (seen.has(k)) return false; seen.add(k); return true })
   const byBrand: Record<string, any[]> = {}; for (const r of uniq) (byBrand[r.brand_key] ||= []).push(r)
   let fail = 0, anom = 0; const passBrands: string[] = []
   for (const c of configs) { const rs = byBrand[c.key] || []; if (rs.length === 0 || rs.filter((r) => !has(r.price)).length / rs.length >= 0.99) { fail++; continue } if (isAnomaly(rs)) { anom++; continue } passBrands.push(c.key) }
   const pass = uniq.filter((r) => passBrands.includes(r.brand_key) && has(r.name))
   console.log(`crawled ${Object.keys(byBrand).length}/${configs.length} · FAIL ${fail} · anomaly ${anom} · PASS ${passBrands.length} · SKU ${pass.length}`)
-  const preds = await classify(pass.map((r) => ({name: r.name, hint: r.raw_category ?? null})))
+  // hybrid rows already carry an LLM-derived `category` (from runHybridVariant) —
+  // feed it as the hint so this pass mostly just normalizes it into the canonical
+  // taxonomy instead of re-classifying blind from name alone.
+  const preds = await classify(pass.map((r) => ({name: r.name, hint: r.raw_category ?? r.category ?? null})))
   const browser = await chromium.launch({headless: true}); const fc: Record<number, string | null> = {}; let det = 0, llm = 0
   try { const ctx = await browser.newContext({userAgent: UA, locale: "ko-KR"}); await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2}", (r) => r.abort()); const page = await ctx.newPage(); page.on("dialog", (d) => d.dismiss().catch(() => {}))
     for (let i = 0; i < pass.length; i++) { const r = pass[i]; let c = has(r.color) ? (normalizeColorList(r.color) || null) : null; if (!c) { c = detColor(`${r.name} ${r.product_url} ${r.description || ""}`); if (c) det++ } if (!c) { c = await llmColor(page, r); if (c) { c = normalizeColorList(c) || c; llm++ } await page.goto("about:blank", {timeout: 5000}).catch(() => {}) } fc[i] = c }
