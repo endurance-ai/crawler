@@ -817,6 +817,12 @@ export async function crawlCafe24(
               const detailFallbacks = await extractCafe24DetailFallbacks(pg)
               if (options.enrichDetailPage) {
                 await options.enrichDetailPage(pg, product).catch(() => {})
+                // The outer loop below unconditionally does `if (detail?.description)
+                // product.description = detail.description` -- without this sync that
+                // would immediately clobber whatever enrichDetailPage just set back to
+                // the raw (possibly junk) deterministic value (2026-07-22 regression
+                // found via live smoke test: LLM-written description never survived).
+                detail.description = product.description ?? null
               }
               return {product, detail, detailFallbacks}
             } catch {

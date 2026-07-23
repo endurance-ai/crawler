@@ -208,7 +208,9 @@ const ClassificationSchema = z.object({
   category: z.string().nullable().describe("Canonical category, one of: Outer, Top, Knitwear, Shirts, Bottom, Dress, Shoes, Bag, Accessories"),
   subcategory: z.string().nullable().describe("Specific product type, e.g. hoodie, chino, blazer, ringer tee"),
   color: z.string().nullable().describe("Normalized primary color name, e.g. Black, Navy, Olive. Null if not shown."),
-  description: z.string().nullable().describe("Concise product description. Return null if the context shows none; never invent one."),
+  description: z.string().nullable().describe(
+    "A genuine product description capturing style/mood/use-case (e.g. a breezy resort/vacation piece, streetwear edge, minimalist office wear) so it supports natural-language style search later. If the raw page context already contains real descriptive prose (not a spec table, size chart, price/name repeated, or nav/label noise), lightly clean it up and return it. Otherwise write one yourself (1-2 concise sentences) grounded ONLY in the name/category/color/brand given -- do not invent factual claims (material, origin, fit details) that aren't evidenced by the context. Null only if there isn't enough context to say anything meaningful.",
+  ),
   gender: z.array(z.string()).nullable().describe("Audience labels: men, women, unisex"),
 })
 
@@ -216,7 +218,13 @@ const CLASSIFY_SYSTEM = [
   "You classify one fashion product from the compact context provided (name, breadcrumb, metadata, description).",
   "Return only JSON matching the schema.",
   "category MUST be one of the canonical names.",
-  "Do not invent a description: if the context contains none, return null.",
+  "For description: the raw context text is DISQUALIFIED (treat as if missing) when it is any of:",
+  "(a) mostly numbers/prices/currency symbols,",
+  "(b) the product name repeated verbatim or with only a price/season tag appended,",
+  "(c) a spec table, size chart, or SKU/option list,",
+  "(d) nav/breadcrumb/label noise unrelated to the product itself.",
+  "If disqualified or missing, ignore it and write a short evocative description yourself from name/category/color/brand -- convey style and mood for style-based search (e.g. 'a breezy piece for a resort getaway'), but never invent factual claims (material, origin, fit) the context doesn't support.",
+  "Only return the raw text as-is (lightly cleaned) when it is genuine descriptive prose about the product's look, feel, or styling.",
 ].join(" ")
 
 function usage(): string {
@@ -903,7 +911,22 @@ function createInlineClassifier(
       product.category = cleanString(c.category) ?? product.category
       product.subcategory = cleanString(c.subcategory) ?? product.subcategory ?? undefined
       if (!product.color) product.color = cleanString(c.color) ?? product.color
-      if (!product.description) product.description = cleanString(c.description) ?? product.description
+      // LLM already judged whether the raw page description is genuine and
+      // either returned it (cleaned up) or wrote a new one -- its output
+      // wins outright rather than only filling a gap (2026-07-22: description
+      // is meant to support style/vibe search, e.g. "resort vacation outfit",
+      // not just pass through raw spec-sheet text). looksLikeJunkDescription
+      // guards against the model ignoring that instruction and echoing back
+      // price/name noise anyway (observed on gpt-5.4-nano).
+      const llmDescription = cleanString(c.description)
+      if (llmDescription && !looksLikeJunkDescription(llmDescription, product.name)) {
+        product.description = llmDescription
+      } else if (product.description && looksLikeJunkDescription(product.description, product.name)) {
+        // Both the LLM's answer and the raw scraped text are junk -- null is
+        // a cleaner signal downstream than storing price/name noise as if it
+        // were a real description.
+        product.description = undefined
+      }
       if (!product.gender || product.gender.length === 0) {
         product.gender = normalizeGender(c.gender) ?? product.gender
       }
@@ -972,15 +995,28 @@ async function runHybridVariant(
         addTokenUsage(stats.tokenUsage, usage)
         const cls = ClassificationSchema.partial().safeParse(result.data)
         const c = cls.success ? cls.data : {}
+        // Existing reads color from option <select>s reliably; let the LLM fill only
+        // the gaps. Description is different: the LLM already judged whether the raw
+        // page text is a genuine description and either returned it (cleaned up) or
+        // wrote a new one, so its output wins outright (2026-07-22 -- description is
+        // meant to support style/vibe search, not just pass through raw spec text).
+        // looksLikeJunkDescription guards against the model ignoring that instruction
+        // and echoing back price/name noise anyway (observed on gpt-5.4-nano) -- if
+        // both the LLM's answer and the raw text are junk, null beats storing noise.
+        const llmDescription = cleanString(c.description)
+        const description =
+          llmDescription && !looksLikeJunkDescription(llmDescription, base.name)
+            ? llmDescription
+            : base.description && !looksLikeJunkDescription(base.description, base.name)
+              ? base.description
+              : null
         rows.push({
           ...base,
           variant: "hybrid",
           category: cleanString(c.category) ?? base.category,
           subcategory: cleanString(c.subcategory) ?? base.subcategory,
-          // Existing reads color from option <select>s reliably; let the LLM fill only
-          // the gaps. Same for description: keep real page copy, LLM covers when absent.
           color: base.color ?? cleanString(c.color),
-          description: base.description ?? cleanString(c.description),
+          description,
           gender: normalizeGender(c.gender) ?? base.gender,
           confidence: null,
           elapsed_ms: Date.now() - started,
@@ -1256,6 +1292,21 @@ function cleanString(value: unknown): string | null {
   if (typeof value !== "string") return null
   const cleaned = value.replace(/\s+/g, " ").trim()
   return cleaned.length > 0 ? cleaned : null
+}
+
+// Defense-in-depth against the LLM not following the "disqualify price/name
+// noise" instruction (observed on gpt-5.4-nano, 2026-07-22: it returned the
+// raw "<name> <season> ₩X ₩Y" text verbatim on every product in a 35-item
+// live test despite an explicit prompt rule against it). Rather than trust
+// the model's judgment blindly, reject descriptions that are obviously just
+// price/name text so callers fall back to null instead of storing noise.
+function looksLikeJunkDescription(description: string, name: string | null): boolean {
+  if (/[₩$€£]\s*[\d,]+/.test(description)) return true
+  const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "")
+  if (name && normalize(description).startsWith(normalize(name).slice(0, Math.max(8, normalize(name).length - 4)))) {
+    return true
+  }
+  return false
 }
 
 function coercePrice(value: unknown): number | null {
