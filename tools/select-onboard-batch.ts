@@ -7,9 +7,13 @@
  * import-products.ts의 MIN_QC_PASS_RATE 다운그레이드 참조)인 브랜드를 status_updated_at
  * 최신순으로 limit개 뽑아 onboard-batch.sh --configs 에 넣을 SiteConfig[] JSON을 만든다.
  *
- * qc_failed 재시도는 product_crawl_runs(stage='import')에서 이미 몇 번 시도했는지 세어
- * MAX_IMPORT_RETRIES 이상이면 건너뛴다 — 영구히 깨진 사이트(셀렉터가 안 맞는 등)에
- * LLM 비용/시간을 무한정 태우지 않기 위함.
+ * qc_failed 재시도는 product_crawl_runs(stage='import')에서 "가장 최근 success 이후
+ * 연속 실패 횟수"를 세어 MAX_IMPORT_RETRIES 이상이면 건너뛴다 — 영구히 깨진
+ * 사이트(셀렉터가 안 맞는 등)에 LLM 비용/시간을 무한정 태우지 않기 위함.
+ * 전체 기간 누적으로 세면 안 된다: 7월 초부터 여러 번 성공했던 브랜드가 최근
+ * 딱 한 번 실패했을 뿐인데 과거 성공 이력까지 합산돼 즉시 "소진"으로 잘못
+ * 판정되는 사고가 있었다 (2026-07-23 실측 — waineke/saengin/yahnsisi/lossyrow/
+ * demoshop 전부 7월 초 성공 이력이 있는데 7/19 실패 1건만으로 재시도가 막힘).
  *
  * 각 후보는 반드시 platforms.ts/platforms.generated.ts 에 이미 등록돼 있어야 한다
  * (tools/generate-platform-configs.ts 를 먼저 돌려서 최신 상태로 만들어둘 것) —
@@ -64,13 +68,23 @@ async function main() {
     if (!key) continue
 
     if (status === "qc_failed") {
-      const {count, error: runsError} = await db
+      // 최근 실행부터 역순으로 훑어 "가장 최근 success 직후부터의 연속 실패"만
+      // 센다 — status가 success인 행을 만나면 그 이전 실패는 이번 슬럼프와
+      // 무관하므로 카운트를 멈춘다.
+      const {data: runs, error: runsError} = await db
         .from("product_crawl_runs")
-        .select("id", {count: "exact", head: true})
+        .select("status")
         .eq("brand_node_id", brandNodeId)
         .eq("stage", "import")
+        .order("started_at", {ascending: false})
+        .limit(MAX_IMPORT_RETRIES + 1)
       if (runsError) throw new Error(`retry count check failed for ${key}: ${runsError.message}`)
-      if ((count ?? 0) >= MAX_IMPORT_RETRIES) {
+      let consecutiveFailures = 0
+      for (const run of runs ?? []) {
+        if ((run as {status: string}).status === "success") break
+        consecutiveFailures++
+      }
+      if (consecutiveFailures >= MAX_IMPORT_RETRIES) {
         retriesExhausted.push(key)
         continue
       }
