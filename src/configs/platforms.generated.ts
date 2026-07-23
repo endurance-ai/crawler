@@ -3,8 +3,8 @@
  * Regenerate: npx dotenv -e .env.local -- tsx tools/generate-platform-configs.ts
  *
  * KR-origin shopify/cafe24 brands (status=tech_detected) without a manual
- * config in platforms.ts. Generated 2026-07-23T01:02:40.638Z.
- * Total: 83 (active 66 / disabled 17)
+ * config in platforms.ts. Generated 2026-07-23T02:15:01.461Z.
+ * Total: 82 (active 64 / disabled 18)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -1681,6 +1681,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat13", cateNo: 13, gender: ["women"]},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=5433, KR origin, auto-generated",
   },
   {
@@ -1900,29 +1901,6 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5496, KR origin, auto-generated",
-  },
-  {
-    key: "dadakarada",
-    name: "dadakarada (다다카라다)",
-    type: "cafe24",
-    baseUrl: "https://dadakarada.com",
-    brand: "dadakarada (다다카라다)",
-    paginate: true,
-    maxPages: 300,
-    crawlDetails: true,
-    category: {
-      discovery: "manual",
-      categories: [
-        {name: "Cat9", cateNo: 9, gender: ["unisex"]},
-        {name: "Cat13", cateNo: 13, gender: ["unisex"]},
-        {name: "Cat24", cateNo: 24, gender: ["unisex"]},
-        {name: "Cat29", cateNo: 29, gender: ["unisex"]},
-        {name: "Cat75", cateNo: 75, gender: ["unisex"]},
-        {name: "Cat51", cateNo: 51, gender: ["unisex"]},
-        {name: "Cat43", cateNo: 43, gender: ["unisex"]},
-      ],
-    },
-    notes: "generate-platform-configs.ts — brand_node_id=5501, KR origin, auto-generated",
   },
   {
     key: "en-5510",

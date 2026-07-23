@@ -44,6 +44,11 @@ const DISABLED_KEYS = new Set<string>([
   "safarispot",
   "les-official",
   "en-2368", // BASTONG — 502개 크롤됐지만 QC(color_missing)에 전량 드롭, detail 셀렉터 튜닝 필요
+  // batch 3 (2026-07-23): daily-onboard 2회 연속 실측 — cateNo 9/13 둘 다 0개.
+  // 실제 사이트(noscouleurs.com) 네비게이션 확인 결과 진짜 카테고리는
+  // 24(outer)/25(tops)/27(bottoms)/28(acc)/42(all)/47(remix)/59(best) — detect
+  // 시점 이후 카테고리 번호가 바뀐 것으로 추정. cateNo 재탐지 필요.
+  "noscouleurs",
 ])
 
 const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCurrency"]>> = {
