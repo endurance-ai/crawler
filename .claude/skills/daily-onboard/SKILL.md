@@ -115,3 +115,11 @@ metadata:
   없이 import하므로 신규 브랜드가 `brand_nodes`/`products`에 자동 등록된다. 실행
   결과는 `<out-root>/onboard-tally.csv`와 `<out-root>/chunk-0-finalize.log`에서
   확인한다.
+- **`--out-root`를 직접 지정할 땐 실행마다 고유하게**: 기본값은 이제
+  `poc-runs/daily-<날짜>-<시분초>`라 같은 날 여러 번 돌려도 안전하지만, `--out-root`를
+  손으로 고정해서 넘기면 두 번째 실행이 첫 번째 실행의 `products.jsonl`을 재사용하는
+  `onboard-batch.sh`의 "중단 후 재개" 로직에 걸려 이번에 새로 선정된 브랜드가 실제로는
+  크롤되지 않고 0건으로 끝날 수 있다 (2026-07-23 실측: 같은 날짜 out-root를 재사용해서
+  `en-5267`/`dadakarada`/`temporahaus`/`noscouleurs` 전부 크롤 스킵, 우연히 겹친
+  브랜드 하나만 옛 데이터로 재적재됨). 정말 "같은 실행을 중단 후 재개"하려는 경우에만
+  동일한 `--out-root`를 재사용할 것.

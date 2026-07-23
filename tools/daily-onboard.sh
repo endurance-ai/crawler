@@ -47,7 +47,14 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$DETECT_LIMIT" ]; then DETECT_LIMIT="$LIMIT"; fi
-if [ -z "$OUT_ROOT" ]; then OUT_ROOT="poc-runs/daily-$(date +%Y-%m-%d)"; fi
+# 날짜만 쓰면 같은 날 두 번째 실행이 --out-root를 재사용해서, onboard-batch.sh의
+# "products.jsonl 있으면 크롤 스킵" 재개 로직이 오작동한다 — 직전 실행이 고른
+# (다른) 브랜드의 크롤 결과를 그대로 재사용해버려서, 이번에 새로 선정된 브랜드는
+# 실제로 크롤된 적 없이 0건으로 끝난다 (2026-07-23 실측: en-5267/dadakarada/
+# temporahaus/noscouleurs가 이 버그로 전부 0건, 겹쳤던 deeperthanblue만 재적재됨).
+# 초 단위까지 넣어 실행마다 고유 경로를 쓴다 — 같은 실행이 중간에 죽었다가 같은
+# --out-root로 재시작되는 정상적인 재개 케이스는 여전히 지원된다.
+if [ -z "$OUT_ROOT" ]; then OUT_ROOT="poc-runs/daily-$(date +%Y-%m-%d-%H%M%S)"; fi
 
 PNPM="corepack pnpm@10.33.2 exec dotenv -e .env.local --"
 mkdir -p "$OUT_ROOT"
