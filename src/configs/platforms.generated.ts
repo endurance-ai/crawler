@@ -3,7 +3,7 @@
  * Regenerate: npx dotenv -e .env.local -- tsx tools/generate-platform-configs.ts
  *
  * KR-origin shopify/cafe24 brands (status=tech_detected) without a manual
- * config in platforms.ts. Generated 2026-07-23T00:24:21.524Z.
+ * config in platforms.ts. Generated 2026-07-23T01:02:40.638Z.
  * Total: 83 (active 66 / disabled 17)
  */
 
