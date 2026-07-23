@@ -124,7 +124,13 @@ async function fetchCandidates(): Promise<CandidateRow[]> {
     .not("homepage_url", "is", null)
     .eq("wiki->>origin_country", "KR")
     .in("platform_type", ["shopify", "cafe24"])
-    .eq("status", "tech_detected")
+    // 'qc_failed'도 포함: select-onboard-batch.ts는 tech_detected뿐 아니라
+    // qc_failed(재시도 대상, MAX_IMPORT_RETRIES 캡 안)도 선정 후보로 삼는다.
+    // status='tech_detected'만 조회하면, 이미 한 번 시도돼서 qc_failed로 넘어간
+    // 브랜드의 config가 재생성할 때마다 이 파일에서 통째로 빠져버려서 — 선정은
+    // 되는데 config가 없어 매번 "missing" 스킵으로 재발하는 버그가 있었다
+    // (2026-07-23 실측: dadakarada/noscouleurs/temporahaus).
+    .in("status", ["tech_detected", "qc_failed"])
     .order("brand_node_id")
   if (error) throw new Error(`candidate query failed: ${error.message}`)
   return (data ?? []) as CandidateRow[]
