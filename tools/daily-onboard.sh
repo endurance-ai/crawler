@@ -52,8 +52,11 @@ if [ -z "$OUT_ROOT" ]; then OUT_ROOT="poc-runs/daily-$(date +%Y-%m-%d)"; fi
 PNPM="corepack pnpm@10.33.2 exec dotenv -e .env.local --"
 mkdir -p "$OUT_ROOT"
 
-echo "===== 1/5 detect: 미탐지 브랜드(homepage_url 있음) 최대 ${DETECT_LIMIT}개 ====="
-$PNPM tsx src/brand-crawl.ts detect --status=not_started --url=present --limit="$DETECT_LIMIT" \
+echo "===== 1/5 detect: 미탐지 KR 브랜드(homepage_url 있음) 최대 ${DETECT_LIMIT}개 ====="
+# --country=KR: generate-platform-configs.ts가 origin_country='KR'만 config로
+# 만들 수 있으므로, 애초에 KR 아닌 브랜드는 detect도 안 한다 — detect 낭비 방지 +
+# "config 없음"으로 매번 스킵 리포트에 잡히는 노이즈 방지 (2026-07-23).
+$PNPM tsx src/brand-crawl.ts detect --status=not_started --url=present --country=KR --limit="$DETECT_LIMIT" \
   || echo "  (detect 단계 실패/0건 — 계속 진행)"
 
 echo "===== 2/5 generate-platform-configs: tech_detected 후보를 platforms.generated.ts에 반영 ====="

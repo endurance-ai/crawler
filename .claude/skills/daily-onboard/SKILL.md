@@ -41,19 +41,29 @@ metadata:
 
 ## 파이프라인 단계
 
-1. **detect** (`src/brand-crawl.ts detect --status=not_started --url=present`) —
+1. **detect** (`src/brand-crawl.ts detect --status=not_started --url=present --country=KR`) —
    `status`가 없거나(`product_crawl_brands` 뷰에서 NULL은 `not_started`로 COALESCE됨)
-   `not_started`인, `homepage_url`이 있는 브랜드를 대상으로 cafe24/shopify 여부를
-   감지해 `tech_detected`(또는 실패 시 `blocked`)로 승격. 이 단계를 건너뛰면 신규
-   브랜드가 절대 후보 풀에 들어오지 않고 같은 브랜드만 계속 재시도하게 된다.
-2. **generate-platform-configs** (`tools/generate-platform-configs.ts`) — `tech_detected`
-   후보를 `platforms.generated.ts`에 반영. cafe24 brand 필드 자동 채움, shopify
-   `/cart.js` 기반 통화 실측 등 2026-07-21에 검증된 안전장치 포함.
+   `not_started`이고, `homepage_url`이 있고, `wiki.origin_country='KR'`인 브랜드를
+   대상으로 cafe24/shopify 여부를 감지해 `tech_detected`(또는 실패 시 `blocked`)로
+   승격. `--country=KR`은 2026-07-23 추가 — generate-platform-configs.ts가 애초에
+   KR만 config로 만들 수 있으므로, 해외 브랜드까지 detect해서 tech_detected로
+   승격시켜봤자 다음 단계에서 영구히 스킵될 뿐이라 detect 낭비 + "config 없음"
+   스킵 노이즈만 쌓였다 (실측: `status_updated_at` 최신순 50건 중 48건이 해외).
+   이 단계를 건너뛰면 신규 브랜드가 절대 후보 풀에 들어오지 않고 같은 브랜드만
+   계속 재시도하게 된다.
+2. **generate-platform-configs** (`tools/generate-platform-configs.ts`) —
+   `tech_detected` **및 `qc_failed`**(재시도 대상) 후보를 `platforms.generated.ts`에
+   반영. cafe24 brand 필드 자동 채움, shopify `/cart.js` 기반 통화 실측 등
+   2026-07-21에 검증된 안전장치 포함. `qc_failed`도 포함해야 하는 이유
+   (2026-07-23 실측 버그): `tech_detected`만 조회하면 이미 한 번 시도돼
+   `qc_failed`로 넘어간 브랜드의 config가 재생성 때마다 파일에서 빠져서, select
+   단계가 재시도 대상으로 정확히 골라도 config가 없어 매번 "missing"으로 재발함
+   (`dadakarada`/`noscouleurs`/`temporahaus`에서 확인).
    **범위 제약: `wiki->>origin_country = 'KR'`인 브랜드만 처리한다**
-   (`tools/generate-platform-configs.ts:125`). 해외(non-KR) 브랜드는 `tech_detected`
-   상태여도 이 단계에서 config가 안 만들어져 이후 select 단계에서 계속 스킵된다
-   (2026-07-22 실측 — `status_updated_at` 최신순 50건 중 48건이 해외 브랜드라 config
-   누락으로 스킵됨). KR 후보가 소진되면(`select-onboard-batch.ts`가 "선정 브랜드
+   (`tools/generate-platform-configs.ts:125`). detect 단계가 이제 `--country=KR`로
+   선필터링하므로 이 갭은 대부분 안 생기지만, origin_country가 나중에 바뀌거나
+   detect를 필터 없이 수동 실행한 경우를 대비해 이 단계도 여전히 KR만 통과시킨다.
+   KR 후보가 소진되면(`select-onboard-batch.ts`가 "선정 브랜드
    없음" 경고) 이 스코프를 넓힐지 사용자에게 확인할 것 — 자동으로 넓히지 않는다.
 3. **select** (`tools/select-onboard-batch.ts`) — `status`가 `tech_detected`(신규) 또는
    `qc_failed`(재시도 대상)인 브랜드를 `status_updated_at` 내림차순으로 `--limit`개
