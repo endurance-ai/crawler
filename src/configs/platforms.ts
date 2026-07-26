@@ -8,7 +8,7 @@
 import type {SiteConfig} from "../lib/types"
 import {GENERATED_PLATFORMS} from "./platforms.generated"
 
-export const PLATFORMS: SiteConfig[] = [
+export const MANUAL_PLATFORMS: SiteConfig[] = [
   // ─── Manual 설정 완료 (카테고리 구조 깔끔) ─────────
 
   {
@@ -2660,8 +2660,9 @@ export const PLATFORMS: SiteConfig[] = [
     brand: "HAUSOU",
     notes: "imweb 파일럿 — brand_node_id=5484, detect platform_family=imweb",
   },
-  ...GENERATED_PLATFORMS,
 ]
+
+export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]
 
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {

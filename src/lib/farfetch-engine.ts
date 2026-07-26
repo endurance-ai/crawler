@@ -556,14 +556,22 @@ export async function crawlFarfetch(config: SiteConfig): Promise<CrawlResult> {
 
   let browser: Browser | null = null
   try {
-    browser = await chromium.launch({headless: true, channel: "chrome"})
+    browser = await chromium.launch(
+      process.env.CRAWLER_BROWSER_CHANNEL === "chromium"
+        ? {headless: true}
+        : {headless: true, channel: "chrome"},
+    )
   } catch (err) {
+    const runtime =
+      process.env.CRAWLER_BROWSER_CHANNEL === "chromium"
+        ? "Playwright bundled Chromium"
+        : "system Chrome"
     errors.push(
       JSON.stringify({
         type: "browser-launch-failed",
         detail:
-          `${String(err).slice(0, 200)}. Farfetch engine requires a real Chrome ` +
-          `binary on the host system; install Chrome OR run \`npx playwright install chrome\`.`,
+          `${String(err).slice(0, 200)}. Farfetch engine tried ${runtime}; ` +
+          `install the selected browser runtime or change CRAWLER_BROWSER_CHANNEL.`,
         timestamp: new Date().toISOString(),
       }),
     )
