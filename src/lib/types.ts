@@ -13,6 +13,8 @@ export interface Product {
   salePrice: number | null
   priceFormatted: string
   imageUrl: string
+  /** Crawler-provided primary URL before representative-image selection. */
+  sourceImageUrl?: string
   productUrl: string
   inStock: boolean
   gender: string[]
@@ -24,6 +26,14 @@ export interface Product {
   material?: string
   subcategory?: string
   images?: string[]
+  /** Local Apple Vision representative-image selection metadata. */
+  imageSelection?: {
+    kind: "model" | "product" | "fallback"
+    score: number
+    version: string
+    candidateCount: number
+    selectedAt: string
+  }
   sizeInfo?: string
   tags?: string[]
   productCode?: string

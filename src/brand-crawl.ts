@@ -203,6 +203,23 @@ async function probeSitemap(baseUrl: string): Promise<boolean> {
  * value spanning the whole match, and the pretty-URL form requires exactly
  * two path segments after `/category/` with no room for extra segments.
  */
+/**
+ * product_crawl_status.platform_key UNIQUE 충돌 여부 판정.
+ * PostgREST 는 유니크 위반을 인덱스명이 담긴 에러 메시지로 돌려준다.
+ */
+export function isPlatformKeyConflict(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.includes("idx_product_crawl_status_platform_key")
+}
+
+/**
+ * 충돌한 platform_key 를 brand_node_id 접미사로 고유화한다.
+ * brand_node_id 는 PK 라 전역 유일하므로 재충돌하지 않는다.
+ */
+export function uniquePlatformKey(platformKey: string, brandNodeId: number): string {
+  return `${platformKey}-${brandNodeId}`
+}
+
 export function extractCafe24CateNos(html: string): number[] {
   const cateNos = [
     ...[...html.matchAll(/\/product\/list\.html\?[^"'\s]*\bcate_no=(\d+)/g)].map((m) => Number(m[1])),
@@ -410,18 +427,31 @@ async function detectOneBrand(db: ProductCollectionClient, brand: ProductCrawlBr
   })
   try {
     const result = await detectBrand(brand)
-    await upsertProductCrawlStatus(db, brand.brand_node_id, {
-      platform_key: result.platform_key,
+    // platform_key 는 호스트 첫 라벨(keyFromUrl)에서 파생되므로, 무관한 다른
+    // brand_node 가 같은 라벨을 이미 선점했으면 UNIQUE 충돌이 난다
+    // (예: 수동 config 의 "goyowear" vs intl.goyowear.kr).
+    // 폴백이 없으면 upsert 가 throw 되고 바깥 catch 가 정상 감지된 브랜드를
+    // "blocked" 로 잘못 마킹해 이후 크롤 배치에서 조용히 누락된다.
+    const detectedAt = new Date().toISOString()
+    const statusFor = (platformKey: string) => ({
+      platform_key: platformKey,
       platform_type: result.platform_type,
       category_discovery: result.category_discovery,
       categories: result.categories,
       detection: result.detection,
-      status: "tech_detected",
-      config_status: "needed",
-      detected_at: new Date().toISOString(),
+      status: "tech_detected" as const,
+      config_status: "needed" as const,
+      detected_at: detectedAt,
       last_error: null,
       blocked_reason: null,
     })
+    try {
+      await upsertProductCrawlStatus(db, brand.brand_node_id, statusFor(result.platform_key))
+    } catch (keyErr) {
+      if (!isPlatformKeyConflict(keyErr)) throw keyErr
+      result.platform_key = uniquePlatformKey(result.platform_key, brand.brand_node_id)
+      await upsertProductCrawlStatus(db, brand.brand_node_id, statusFor(result.platform_key))
+    }
     await finishProductRun(db, runId, {
       status: "success",
       metrics: {

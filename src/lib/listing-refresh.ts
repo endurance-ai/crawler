@@ -50,19 +50,29 @@ const MAX_PRICE = 100_000_000 // 1억원 — import-products 와 동일 기준
 /**
  * URL 이 달라져도 같은 상품임을 알아보는 보조 키.
  *
- * imweb 은 카테고리 경로가 URL 에 박히는데(`/66/?idx=402`), 카테고리 자동탐색이
- * 런마다 다른 경로를 고를 수 있다 — 실측 2026-07-19 differentis: DB `/66/?idx=402`
- * vs 재크롤 `/wwwdifferentiskr/?idx=402` 로 14개 전부 매칭 실패(coverage 0%).
- * 상품 정체성은 경로가 아니라 `idx`(imweb) / `product_no`(cafe24) 다.
+ * 카테고리 번호가 URL 에 박히는 플랫폼이 많은데, 카테고리 자동탐색이 런마다 다른
+ * 경로를 고를 수 있어 같은 상품이 다른 URL 로 나온다. 상품 정체성은 경로가 아니라
+ * `idx`(imweb) / `product_no`(cafe24) 다.
+ *
+ * 실측 2026-07-19 (첫 운영 갱신 런):
+ *   imweb   differentis: DB `/66/?idx=402` vs 재크롤 `/wwwdifferentiskr/?idx=402`
+ *   cafe24  themysterioushotel: 같은 상품이 `/category/50/` 과 다른 카테고리로 갈림
+ *
+ * cafe24 는 두 형식을 쓴다 — 쿼리형(`detail.html?product_no=63781&cate_no=218`) 과
+ * rewrite 형(`/product/{슬러그}/{product_no}/category/{cate_no}/display/1/`). 후자를
+ * 놓치면 대형 카탈로그가 통째로 미매칭돼 멀쩡한 상품이 품절 처리된다 (실측:
+ * themysterioushotel 101건 오탐). 슬러그는 상품명이라 바뀔 수 있으므로 숫자 ID 만 쓴다.
  *
  * 정확 URL 매칭이 실패했을 때만 폴백으로 쓴다 — 오매칭을 막기 위해 호스트까지 포함한다.
  */
 export function productIdentityKey(url: string): string | null {
   let host: string
+  let pathname: string
   let query: URLSearchParams
   try {
     const parsed = new URL(url)
     host = parsed.host
+    pathname = parsed.pathname
     query = parsed.searchParams
   } catch {
     return null
@@ -71,6 +81,10 @@ export function productIdentityKey(url: string): string | null {
   if (idx) return `${host}#idx=${idx}`
   const productNo = query.get("product_no")
   if (productNo) return `${host}#product_no=${productNo}`
+  // cafe24 rewrite: /product/{슬러그}/{product_no}/... — 쿼리형과 같은 네임스페이스에
+  // 넣어 한 사이트가 두 형식을 섞어 써도 통합된다.
+  const rewritten = pathname.match(/^\/product\/[^/]+\/(\d+)(?:\/|$)/)
+  if (rewritten) return `${host}#product_no=${rewritten[1]}`
   return null
 }
 
@@ -121,13 +135,18 @@ export function diffListing(args: {
   markMissingOutOfStock: boolean
 }): RefreshDiff {
   const byUrl = new Map<string, RefreshableRow>()
-  // 같은 키에 여러 행이 걸리면(경로만 다른 중복 적재) 폴백 매칭이 어느 쪽을 고를지
-  // 모호해지므로 아예 후보에서 뺀다 — 잘못된 행을 갱신하느니 건너뛰는 편이 낫다.
-  const byIdentity = new Map<string, RefreshableRow | null>()
+  // 같은 상품이 카테고리별 URL 로 여러 행 적재돼 있는 경우가 흔하다 (실측
+  // themysterioushotel: 409행 = 상품 103개, 평균 4배). 이들은 같은 상품이므로
+  // 하나가 리스트에서 확인되면 전부 함께 갱신해야 한다 — 한 행만 고치면 나머지가
+  // "사라진 상품" 으로 보여 품절 처리된다 (실측 오탐 101건).
+  const byIdentity = new Map<string, RefreshableRow[]>()
   for (const row of args.existing) {
     byUrl.set(row.product_url, row)
     const key = productIdentityKey(row.product_url)
-    if (key) byIdentity.set(key, byIdentity.has(key) ? null : row)
+    if (!key) continue
+    const bucket = byIdentity.get(key)
+    if (bucket) bucket.push(row)
+    else byIdentity.set(key, [row])
   }
 
   const seen = new Set<string>()
@@ -139,47 +158,46 @@ export function diffListing(args: {
     if (!url || seen.has(url)) continue
     seen.add(url)
 
-    let row = byUrl.get(url)
-    if (!row) {
-      // URL 이 안 맞아도 상품 식별자가 같으면 같은 상품이다 (imweb 카테고리 경로 변동).
-      const key = productIdentityKey(url)
-      const candidate = key ? byIdentity.get(key) : undefined
-      if (candidate) {
-        row = candidate
-        seen.add(row.product_url) // 사라진 것으로 오인되지 않도록 원본 URL 도 본 것으로 표시
-      }
-    }
-    if (!row) {
+    // 상품 식별자가 같은 DB 행 전부가 대상이다 (같은 상품의 카테고리별 중복 적재).
+    // 식별자를 못 뽑는 URL 은 정확 매칭만 시도한다.
+    const key = productIdentityKey(url)
+    const targets = (key && byIdentity.get(key)) || (byUrl.has(url) ? [byUrl.get(url)!] : [])
+    if (targets.length === 0) {
       unknownUrls.push(url)
       continue
     }
 
-    const reasons: string[] = []
-    const patch: RefreshPatch = {in_stock: product.inStock}
-    if (row.in_stock !== product.inStock) {
-      reasons.push(product.inStock ? "재입고" : "품절")
-    }
-
     const prices = toPriceFields(product, args.sourceCurrency)
-    if (prices) {
-      if (row.price !== prices.price) {
-        reasons.push(`가격 ${row.price ?? "-"}→${prices.price}`)
-      }
-      if (
-        row.price !== prices.price ||
-        row.original_price !== prices.original_price ||
-        row.sale_price !== prices.sale_price
-      ) {
-        patch.price = prices.price
-        patch.original_price = prices.original_price
-        patch.sale_price = prices.sale_price
-      }
-    }
 
-    if (reasons.length > 0 || patch.price !== undefined) {
-      // UPDATE 는 product_url 로 행을 찾으므로 크롤 URL 이 아니라 DB 에 저장된 URL 을 쓴다
-      // (폴백 매칭에서는 둘이 다르다).
-      updates.push({productUrl: row.product_url, patch, reasons})
+    for (const row of targets) {
+      // 사라진 것으로 오인되지 않도록 대상 행의 URL 을 전부 본 것으로 표시한다.
+      seen.add(row.product_url)
+
+      const reasons: string[] = []
+      const patch: RefreshPatch = {in_stock: product.inStock}
+      if (row.in_stock !== product.inStock) {
+        reasons.push(product.inStock ? "재입고" : "품절")
+      }
+
+      if (prices) {
+        if (row.price !== prices.price) {
+          reasons.push(`가격 ${row.price ?? "-"}→${prices.price}`)
+        }
+        if (
+          row.price !== prices.price ||
+          row.original_price !== prices.original_price ||
+          row.sale_price !== prices.sale_price
+        ) {
+          patch.price = prices.price
+          patch.original_price = prices.original_price
+          patch.sale_price = prices.sale_price
+        }
+      }
+
+      if (reasons.length > 0 || patch.price !== undefined) {
+        // UPDATE 는 product_url 로 행을 찾으므로 크롤 URL 이 아니라 DB 에 저장된 URL 을 쓴다.
+        updates.push({productUrl: row.product_url, patch, reasons})
+      }
     }
   }
 
