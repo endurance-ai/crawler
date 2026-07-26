@@ -1,11 +1,12 @@
-# 매일 KST 04:00 (= UTC 19:00, 전날) — 트래픽 낮은 새벽. Persistent=true 로
-# EC2 재부팅 등으로 놓친 발화를 다음 부팅 시 보충한다.
+# 한 런이 끝난 뒤 15분 쉬고 다음 런을 시작한다. 동일 service는 중복 실행되지
+# 않으므로 새벽에만 몰지 않고 낮에도 source queue를 계속 순환한다.
 [Unit]
-Description=Daily kiko.ai listing refresh (stock/price)
+Description=Continuous kiko.ai listing refresh (stock/price)
 
 [Timer]
-OnCalendar=*-*-* 19:00:00 UTC
-Persistent=true
+OnBootSec=10min
+OnUnitInactiveSec=15min
+AccuracySec=1min
 Unit=kiko-refresh.service
 
 [Install]

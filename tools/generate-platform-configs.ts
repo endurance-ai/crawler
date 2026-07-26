@@ -2,9 +2,10 @@
 /**
  * DB → SiteConfig codegen (read-only, never writes to DB).
  *
- * Targets KR-origin brands whose product-collection detect step already
- * identified them as shopify/cafe24 and that don't have a manual config yet
- * in src/configs/platforms.ts. Writes src/configs/platforms.generated.ts.
+ * Adds new KR-origin storefronts after detection and retains every generated
+ * storefront that has already collected data. This keeps refresh inventory
+ * independent from later brand onboarding status transitions. Supported
+ * generated engines are Shopify, Cafe24, and Imweb.
  *
  * Idempotent self-reference guard: when computing "already configured"
  * hosts/keys, entries produced by a *previous* run of this generator are
@@ -20,8 +21,14 @@ import * as path from "node:path"
 import {fileURLToPath} from "node:url"
 
 import {createProductCollectionClient} from "../src/lib/product-collection"
-import {PLATFORMS} from "../src/configs/platforms"
-import type {SiteConfig} from "../src/lib/types"
+import {MANUAL_PLATFORMS} from "../src/configs/platforms"
+import {
+  generatedPlatformType,
+  shouldDisableGeneratedConfig,
+  shouldGeneratePlatformConfig,
+  type PlatformConfigLifecycleRow,
+} from "../src/lib/platform-config-lifecycle"
+import type {PlatformType, SiteConfig} from "../src/lib/types"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -58,13 +65,22 @@ interface CandidateRow {
   brand_node_id: number
   brand_name: string
   homepage_url: string
-  platform_key: string
-  platform_type: "shopify" | "cafe24"
+  platform_key: string | null
+  platform_type: string
   category_discovery: "manual" | "auto"
   categories: Array<{cateNo: number; gender?: string[]}>
+  status: string
+  config_status: string
+  detection: Record<string, unknown>
+  wiki: Record<string, unknown> | null
 }
 
-function normalizeHost(url: string): string {
+interface GeneratedCandidate extends Omit<CandidateRow, "platform_key" | "platform_type"> {
+  platform_key: string
+  platform_type: Extract<PlatformType, "shopify" | "cafe24" | "imweb">
+}
+
+export function normalizeHost(url: string): string {
   try {
     const h = new URL(url).hostname.toLowerCase()
     return h.startsWith("www.") ? h.slice(4) : h
@@ -105,39 +121,77 @@ async function detectShopifyCurrency(
   }
 }
 
-async function loadPreviousGeneratedKeys(): Promise<Set<string>> {
+async function loadPreviousGenerated(): Promise<SiteConfig[]> {
   const outPath = path.join(__dirname, "../src/configs/platforms.generated.ts")
-  if (!fs.existsSync(outPath)) return new Set()
+  if (!fs.existsSync(outPath)) return []
   try {
     const mod = await import("../src/configs/platforms.generated")
-    return new Set((mod.GENERATED_PLATFORMS as Array<{key: string}>).map((p) => p.key))
+    return mod.GENERATED_PLATFORMS as SiteConfig[]
   } catch {
-    return new Set()
+    return []
   }
 }
 
-async function fetchCandidates(): Promise<CandidateRow[]> {
+async function fetchCandidates(): Promise<GeneratedCandidate[]> {
   const db = createProductCollectionClient()
   const {data, error} = await db
     .from("product_crawl_brands")
-    .select("brand_node_id,brand_name,homepage_url,platform_key,platform_type,category_discovery,categories")
+    .select(
+      "brand_node_id,brand_name,homepage_url,platform_key,platform_type,category_discovery,categories,status,config_status,detection,wiki",
+    )
     .not("homepage_url", "is", null)
-    .eq("wiki->>origin_country", "KR")
-    .in("platform_type", ["shopify", "cafe24"])
-    .eq("status", "tech_detected")
+    .not("platform_key", "is", null)
+    .in("status", [
+      "tech_detected",
+      "qc_failed",
+      "crawled",
+      "imported",
+      "embedded",
+      "active",
+      "blocked",
+    ])
     .order("brand_node_id")
   if (error) throw new Error(`candidate query failed: ${error.message}`)
-  return (data ?? []) as CandidateRow[]
+  const candidates: GeneratedCandidate[] = []
+  for (const raw of (data ?? []) as CandidateRow[]) {
+    const lifecycle: PlatformConfigLifecycleRow = {
+      status: raw.status,
+      config_status: raw.config_status,
+      origin_country:
+        typeof raw.wiki?.origin_country === "string" ? raw.wiki.origin_country : null,
+      platform_type: raw.platform_type,
+      detection: raw.detection,
+    }
+    const type = generatedPlatformType(lifecycle)
+    if (
+      !raw.platform_key ||
+      !shouldGeneratePlatformConfig(lifecycle) ||
+      (type !== "cafe24" && type !== "shopify" && type !== "imweb")
+    ) {
+      continue
+    }
+    candidates.push({...raw, platform_key: raw.platform_key, platform_type: type})
+  }
+  return candidates
 }
 
 function buildEntrySource(
-  row: CandidateRow,
+  row: GeneratedCandidate,
   shopifyCurrencyResult?: {currency: SiteConfig["sourceCurrency"]; ok: boolean; raw?: string},
 ): string {
   const host = normalizeHost(row.homepage_url)
   const baseUrl = `https://${host}`
   const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
-  const disabled = DISABLED_KEYS.has(row.platform_key) || currencyUndetected
+  const disabled =
+    DISABLED_KEYS.has(row.platform_key) ||
+    currencyUndetected ||
+    shouldDisableGeneratedConfig({
+      status: row.status,
+      config_status: row.config_status,
+      origin_country: typeof row.wiki?.origin_country === "string" ? row.wiki.origin_country : null,
+      platform_type: row.platform_type,
+      detection: row.detection,
+    })
   const cafe24SourceCurrency = row.platform_type === "cafe24"
     ? CAFE24_SOURCE_CURRENCY_BY_KEY[row.platform_key]
     : undefined
@@ -167,10 +221,16 @@ function buildEntrySource(
     } else {
       lines.push('    category: {discovery: "auto"},')
     }
-  } else {
+  } else if (row.platform_type === "shopify") {
     lines.push(`    sourceCurrency: ${JSON.stringify(shopifyCurrencyResult?.currency ?? "KRW")},`)
     lines.push("    maxPages: 300,")
     lines.push("    crawlDelay: 1500,")
+  } else {
+    const genders = row.categories.flatMap((category) => category.gender ?? [])
+    const defaultGender = [...new Set(genders)]
+    if (defaultGender.length > 0) {
+      lines.push(`    defaultGender: ${JSON.stringify(defaultGender)},`)
+    }
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected
@@ -180,22 +240,22 @@ function buildEntrySource(
     ? ` — sourceCurrency=${cafe24SourceCurrency} verified from rendered Cafe24 list price`
     : ""
   lines.push(
-    `    notes: ${JSON.stringify(`generate-platform-configs.ts — brand_node_id=${row.brand_node_id}, KR origin, auto-generated${noteSuffix}${cafe24CurrencyNote}`)},`,
+    `    notes: ${JSON.stringify(`generate-platform-configs.ts — brand_node_id=${row.brand_node_id}, status=${row.status}, auto-generated${noteSuffix}${cafe24CurrencyNote}`)},`,
   )
   lines.push("  },")
   return lines.join("\n")
 }
 
 async function main() {
-  const previousGeneratedKeys = await loadPreviousGeneratedKeys()
-  const manualPlatforms = PLATFORMS.filter((p) => !previousGeneratedKeys.has(p.key))
-  const existingHosts = new Set(manualPlatforms.map((p) => normalizeHost(p.baseUrl)))
-  const existingKeys = new Set(manualPlatforms.map((p) => p.key))
+  const previousGenerated = await loadPreviousGenerated()
+  const previousByKey = new Map(previousGenerated.map((config) => [config.key, config]))
+  const existingHosts = new Set(MANUAL_PLATFORMS.map((p) => normalizeHost(p.baseUrl)))
+  const existingKeys = new Set(MANUAL_PLATFORMS.map((p) => p.key))
 
   const candidates = await fetchCandidates()
 
   const seenHosts = new Set<string>()
-  const kept: CandidateRow[] = []
+  const kept: GeneratedCandidate[] = []
   let skipManualHost = 0
   let skipManualKey = 0
   let skipDupHost = 0
@@ -238,7 +298,11 @@ async function main() {
   async function currencyWorker() {
     while (cursor < shopifyRows.length) {
       const row = shopifyRows[cursor++]!
-      const result = await detectShopifyCurrency(`https://${normalizeHost(row.homepage_url)}`)
+      let result = await detectShopifyCurrency(`https://${normalizeHost(row.homepage_url)}`)
+      const previousCurrency = previousByKey.get(row.platform_key)?.sourceCurrency
+      if (!result.ok && previousCurrency) {
+        result = {currency: previousCurrency, ok: true}
+      }
       shopifyCurrencyByKey.set(row.platform_key, result)
       if (result.ok) currencyDetectedCount++
       else console.warn(`   ⚠️  currency undetected for ${row.platform_key} — disabling (raw="${result.raw ?? "n/a"}")`)
@@ -248,6 +312,7 @@ async function main() {
 
   const activeCount = kept.filter((r) => {
     if (DISABLED_KEYS.has(r.platform_key)) return false
+    if (r.status === "blocked" || r.config_status === "blocked") return false
     if (r.platform_type === "shopify" && !shopifyCurrencyByKey.get(r.platform_key)?.ok) return false
     return true
   }).length
@@ -257,8 +322,9 @@ async function main() {
  * AUTO-GENERATED by tools/generate-platform-configs.ts — DO NOT EDIT BY HAND.
  * Regenerate: npx dotenv -e .env.local -- tsx tools/generate-platform-configs.ts
  *
- * KR-origin shopify/cafe24 brands (status=tech_detected) without a manual
- * config in platforms.ts. Generated ${new Date().toISOString()}.
+ * Auto-generated shopify/cafe24/imweb sources without a manual config.
+ * New onboarding remains KR-scoped; collected sources survive workflow status
+ * transitions. Generated ${new Date().toISOString()}.
  * Total: ${kept.length} (active ${activeCount} / disabled ${disabledCount})
  */
 

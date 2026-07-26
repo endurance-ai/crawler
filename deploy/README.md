@@ -3,8 +3,8 @@
 > 대상: dev-app EC2 (t4g.medium 4GB, ARM, Postgres + PostgREST shim 동거 호스트).
 > 주의: 2026-05-26 마이그레이션 때 t4g.large→medium 다운스케일됨 — 리소스 캡과 swap 은 4GB 전제.
 > 배경/설계: [`../docs/operations.md`](../docs/operations.md) §13 (큐 모델).
-> 재수집 대상 엔진(cafe24/imweb=번들 chromium, shopify=fetch)은 ARM 에서 동작한다.
-> `channel:'chrome'`(x86 필수)인 zara/farfetch/29cm 은 이 배치 대상이 아니다 (기존 로컬 플로우 유지).
+> 갱신 워크리스트는 브랜드가 아니라 `platform_key` 단위이며 등록된 모든 엔진을
+> dispatch한다. 엔진별 브라우저 런타임 요구사항은 배포 전 probe로 확인한다.
 
 ## 0. 순서 요약
 
@@ -84,7 +84,9 @@ corepack pnpm recrawl -- --dry-run           # 워크리스트 확인 (크롤 �
 
 ## 3. systemd 배치
 
-일상 배치는 **갱신(kiko-refresh)** 이다 — 리스트만 훑어 재고/가격만 고친다.
+일상 배치는 **갱신(kiko-refresh)** 이다. 한 런이 끝난 뒤 15분 후 다시 시작해
+새벽에만 몰지 않고 source queue를 계속 순환한다. 리스트에서 기존 상품의
+재고/가격만 직접 고치고, 신규 URL은 별도 LLM 후보 큐로 보낸다.
 
 ```bash
 sudo cp /opt/kiko-crawler/deploy/systemd/kiko-refresh.* /etc/systemd/system/
@@ -94,6 +96,7 @@ sudo systemctl enable --now kiko-refresh.timer
 # 수동 1회:
 sudo systemctl start kiko-refresh.service
 journalctl -u kiko-refresh -f
+journalctl -u kiko-refresh-candidates -f
 ```
 
 `kiko-recrawl.*` 는 온보딩급 재수집(상세 크롤 + LLM 재분류) 이라 **타이머로 돌리지
@@ -104,16 +107,22 @@ journalctl -u kiko-refresh -f
 
 - **리소스 캡**: `MemoryMax=1500M CPUQuota=150% Nice=15` — 4GB 에서 DB 동거의 전제 조건.
   완화는 CloudWatch 실측 근거로만 (t4g.large 리사이즈 시 3G 로 상향 가능).
+- **갱신 병렬도**: `refresh-listing` 기본값은 서로 다른 브랜드 2개 동시 실행이다.
+  Cafe24 목록은 상품 DOM이 준비되는 즉시 진행하고(고정 3초 sleep 없음), 빈/AJAX
+  목록만 최대 3초 기다린다. `--concurrency` 상향은 배치 중 메모리 실측 후에만 한다.
 - **갱신은 컬럼을 가려서 쓴다**: `refresh-listing` 은 `price/original_price/sale_price/
   in_stock` 만 UPDATE 한다. `import-products` 의 upsert 는 행 전체를 덮어쓰므로 갱신에
   쓰면 category/color/gender 가 날아간다 — 갱신 경로에서 import 를 호출하지 말 것.
 - **리스트에 없는 상품**: 완전성 가드(`--min-coverage`, 기본 0.7) 를 통과한 런에서만
   품절 처리한다. 부분 실패한 크롤이 멀쩡한 상품을 대량으로 숨기는 사고를 막는 장치라
   임계값을 낮출 때는 근거가 필요하다.
-- **신규 상품은 적재하지 않는다**: 갱신은 카테고리/성별을 만들지 않으므로(DB CHECK 필수)
-  리스트에만 있는 신규 URL 은 카운트만 하고 넘긴다 — 온보딩 경로로 편입시켜야 한다.
-- **신규 브랜드 편입**: 로컬 온보딩 → DB 등록 + config 커밋 → wrapper 의 git pull + codegen 이
-  다음 런에 자동 반영. config 미등록 브랜드는 러너가 스킵하고 Discord 요약에 집계한다.
+- **신규 상품은 LLM worker만 적재한다**: 리스트에만 있는 URL은
+  `product_refresh_candidates`로 보내고, 기존 `brand_nodes`와 정확히 하나로
+  매칭된 후보만 상세 추출 → LLM → QC/validation을 거쳐 적재한다.
+- **신규 브랜드는 절대 만들지 않는다**: 브랜드가 없거나 중복 매칭되는 후보는
+  `brand_unmatched`에 남는다. refresh와 후보 worker 어느 쪽도 `brand_nodes`를 INSERT하지 않는다.
+- **신규 source도 자동 편입하지 않는다**: 갱신 대상은 코드에 이미 등록된 config 중
+  DB에 기존 상품이 있는 `platform_key`뿐이다. 신규 브랜드/source 온보딩은 기존 수동 절차를 따른다.
 - **디스크**: `data/*.json` 은 런마다 갱신 누적 — disk 알람 발화 시 오래된 파일 정리.
 
 ## 5. 배포 기록 (2026-07-18)
