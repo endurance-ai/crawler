@@ -20,6 +20,7 @@ import {chromium, type Browser, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {extractStructuredProduct} from "./parsers/structured-data"
 import {extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
+import {CURRENCY_SYMBOL} from "./fx"
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -81,7 +82,7 @@ function toNumber(value: number | string | undefined): number | null {
  */
 export function parseImwebListItem(
   item: ImwebListItem,
-  config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender">,
+  config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender" | "sourceCurrency">,
   category: string,
 ): Product | null {
   const props = item.properties
@@ -98,6 +99,14 @@ export function parseImwebListItem(
   // 상품명 뒤 "/ color" 패턴이 흔함 (예: "JACKET / light beige") → 색상 추출
   const colorFromName = extractColorFromText(name)
 
+  // imweb 위젯 JSON의 price/original_price는 항상 스토어 원본 통화값이다.
+  // 이전에는 sourceCurrency를 전혀 판정하지 않고 KRW로 단정해 저장했는데,
+  // 604service(config.sourceCurrency="USD")처럼 원화가 아닌 스토어에서
+  // $145 같은 값이 그대로 145원으로 적재되는 사고가 있었다(실측: id 605827).
+  // cafe24/shopify 엔진과 동일하게 원본 통화값 그대로 저장하고, KRW 환산은
+  // import-products.ts의 기존 sourceCurrency 분기(convertToKrw)에 위임한다.
+  const sourceCurrency = config.sourceCurrency || "KRW"
+
   return {
     brand: config.brand || config.name,
     name,
@@ -105,7 +114,9 @@ export function parseImwebListItem(
     price,
     originalPrice: originalPrice ?? price,
     salePrice: onSale ? price : null,
-    priceFormatted: `₩${price.toLocaleString("ko-KR")}`,
+    priceFormatted: sourceCurrency === "KRW"
+      ? `₩${price.toLocaleString("ko-KR")}`
+      : `${CURRENCY_SYMBOL[sourceCurrency] ?? sourceCurrency}${price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
     imageUrl,
     productUrl: item.link,
     inStock: !item.soldOutBadge,
@@ -115,6 +126,8 @@ export function parseImwebListItem(
     color: colorFromName ?? undefined,
     images: imageUrl ? [imageUrl] : undefined,
     productCode: typeof props.code === "string" ? props.code : undefined,
+    sourceCurrency,
+    sourcePrice: price,
   }
 }
 

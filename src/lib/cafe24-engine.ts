@@ -124,6 +124,17 @@ export interface CrawlCafe24Options {
    * 상품과 품절 상품이 구분되지 않으면 완전성 가드가 오판한다.
    */
   listingOnly?: boolean
+  /**
+   * Chromium 전용: deterministic 상세 파싱 직후, 페이지가 리셋/재사용되기 전에
+   * 그 살아있는 상세 페이지와 함께 호출된다. product-extraction-poc.ts의 hybrid
+   * variant가 두 번째 네비게이션 없이 LLM 보강(category/subcategory/color/
+   * description/gender)을 돌릴 수 있게 해준다 (SPEC: .moai/plans/velvet-toasting-star.md).
+   * Lightpanda 엔진에는 절대 넘기면 안 된다 — 그쪽 Cafe24Page는 진짜 Playwright
+   * Page가 아니라서 llm-scraper(LLMScraper.run)가 요구하는 타입이 아니고, 실측상
+   * Playwright의 page.goto/page.evaluate 자체가 Lightpanda와 근본적으로 안 맞아
+   * 타임아웃난다 (.moai/plans/lightpanda-spike-report.md).
+   */
+  enrichDetailPage?: (page: Cafe24Page, product: Product) => Promise<void>
 }
 
 function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe24DetailPageLease> {
@@ -475,6 +486,21 @@ async function collectProductsFromPage(
           }
         }
 
+        // 스펙 라벨 누출 가드: 위 두 DOM 폴백(461/471줄)은 매칭된 요소의
+        // textContent를 그대로 쓰거나 "첫 줄"만 잘라내는데, 일부 테마는 spec
+        // 블록의 여러 라벨(판매가/상품명/제조사 등)을 <br>·인접 span으로 렌더링해
+        // 실제 줄바꿈 문자 없이 한 덩어리로 이어붙는다 — 이 경우 "첫 줄" 추출이
+        // 라벨 여러 개를 통째로 brand에 담아버린다(실측: brand="판매가 : 125,000,
+        // 상품명 : ..." 1,604건). 라벨:콜론 패턴이 하나라도 섞여 있거나, brand가
+        // 상품명 그대로 복제된 경우(=DOM에서 상품명을 브랜드로 오인)는 폐기한다.
+        // config.brand로 고정된 자사몰(brandNameOverride)에는 이 폴백 자체가
+        // 적용되지 않으므로 가드 대상에서 제외.
+        if (brand && !args.brandNameOverride) {
+          var leaksSpecLabel = /(?:판매가|상품명|제조사|소비자가|적립금|브랜드|원산지|모델명|재질)\s*[:：]/.test(brand)
+          var duplicatesName = brand.trim().toLowerCase() === name.trim().toLowerCase()
+          if (leaksSpecLabel || duplicatesName || brand.length > 40) brand = ""
+        }
+
         // 색상 후보 원문: 목록 카드의 옵션/스와치 이미지 alt·title + 색상 칩 링크 title.
         // Node 측에서 extractColorFromText 로 정규화한다(브라우저 컨텍스트에서는 import 불가).
         var swatchParts: string[] = []
@@ -504,7 +530,12 @@ async function collectProductsFromPage(
           const price2Match = price2Text.match(priceRegex)
           if (price2Match) {
             const p2 = Number((price2Match[1] || price2Match[0]).replace(/,/g, ""))
-            if (p2 > 0 && p2 < (price || Infinity)) {
+            // 메인 가격(371~373줄)과 동일한 KRW 1000원 하한을 여기도 적용한다.
+            // 이 하한이 없으면 할인율 배지("10%")나 적립금 텍스트의 작은 숫자가
+            // price2 셀렉터에 걸려 세일가로 잘못 캡처된다 (실측: etce 1239건,
+            // lossyrow 698건이 이 경로로 1~1000원대 가격이 저장됨).
+            const p2Valid = args.sourceCurrency === "KRW" ? p2 >= 1000 : p2 > 0
+            if (p2Valid && p2 < (price || Infinity)) {
               // price2가 더 싸면: price=원가, price2=세일가
               originalPrice = price
               salePrice = p2
@@ -784,6 +815,15 @@ export async function crawlCafe24(
                 detail.color = await genericCafe24Color(pg).catch(() => null)
               }
               const detailFallbacks = await extractCafe24DetailFallbacks(pg)
+              if (options.enrichDetailPage) {
+                await options.enrichDetailPage(pg, product).catch(() => {})
+                // The outer loop below unconditionally does `if (detail?.description)
+                // product.description = detail.description` -- without this sync that
+                // would immediately clobber whatever enrichDetailPage just set back to
+                // the raw (possibly junk) deterministic value (2026-07-22 regression
+                // found via live smoke test: LLM-written description never survived).
+                detail.description = product.description ?? null
+              }
               return {product, detail, detailFallbacks}
             } catch {
               // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서

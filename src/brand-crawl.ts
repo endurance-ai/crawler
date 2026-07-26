@@ -373,9 +373,18 @@ async function selectBrands(db: ProductCollectionClient, flags: Flags): Promise<
   const status = stringFlag(flags, "status") ?? stringFlag(flags, "tech-status")
   const platformType = stringFlag(flags, "platform-type")
   const urlFilter = stringFlag(flags, "url")
+  // wiki.origin_country is populated independently of detection (brand-wiki
+  // enrichment runs before tech-detect), so it's safe to pre-filter here --
+  // avoids detect wasting a network probe on brands generate-platform-configs.ts
+  // can never turn into a config anyway (it's hard-scoped to KR-origin;
+  // non-KR brands just accumulate as permanently-unusable tech_detected rows
+  // and show up as confusing "missing config" noise in daily-onboard runs,
+  // 2026-07-23 observed).
+  const country = stringFlag(flags, "country")
   const q = cleanSearch(stringFlag(flags, "q") ?? "")
   if (status) query = query.eq("status", status)
   if (platformType) query = query.eq("platform_type", platformType)
+  if (country) query = query.eq("wiki->>origin_country", country.toUpperCase())
   if (urlFilter === "missing") query = query.is("homepage_url", null)
   else if (urlFilter === "present") query = query.not("homepage_url", "is", null)
   if (q) {

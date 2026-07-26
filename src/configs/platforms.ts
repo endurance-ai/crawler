@@ -2478,7 +2478,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "http://604service-en.com",
     defaultGender: ["unisex"],
     brand: "604service",
-    notes: "imweb 파일럿 — brand_node_id=823, detect platform_family=imweb",
+    sourceCurrency: "USD",
+    notes: "imweb 파일럿 — brand_node_id=823, detect platform_family=imweb. 2026-07-21: 사이트 실측 currency=USD 확인 (기존엔 미설정으로 KRW 오판정 → id 605827 등 가격 오적재, crawler SPEC 수정과 함께 반영).",
   },
   {
     key: "youche-pa",

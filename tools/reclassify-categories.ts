@@ -14,6 +14,10 @@
 //                                                                # family (cheap — safe
 //                                                                # to run after every
 //                                                                # onboarding import)
+//   tsx tools/reclassify-categories.ts --only-invalid --platform=etce,oheshio
+//                                                                # scope to specific
+//                                                                # platform key(s),
+//                                                                # comma-separated
 //
 // Resumable: processes products ordered by id in pages; prints the last id per
 // page so a killed run can resume with --start-id.
@@ -29,6 +33,7 @@ const DRY = args.includes("--dry-run")
 const ONLY_INVALID = args.includes("--only-invalid")
 const LIMIT = Number((args.find((a) => a.startsWith("--limit=")) || "").split("=")[1] || (args.includes("--limit") ? args[args.indexOf("--limit") + 1] : "") || 0)
 const START_ID = (args.find((a) => a.startsWith("--start-id=")) || "").split("=")[1] || (args.includes("--start-id") ? args[args.indexOf("--start-id") + 1] : "")
+const PLATFORM_FILTER = (args.find((a) => a.startsWith("--platform=")) || "").split("=")[1]?.split(",").filter(Boolean) || null
 const PAGE = 1000
 const BATCH = 25
 const CONCURRENCY = 8
@@ -97,7 +102,8 @@ async function mapWithConcurrency<T>(tasks: (() => Promise<T>)[], n: number): Pr
 
 async function main() {
   console.log(
-    `reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · ${ONLY_INVALID ? "mode=only-invalid (guardrail)" : `limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`}`,
+    `reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · ${ONLY_INVALID ? "mode=only-invalid (guardrail)" : `limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`}` +
+      (PLATFORM_FILTER ? ` · platform=${PLATFORM_FILTER.join(",")}` : ""),
   )
   let lastId = START_ID
   let processed = 0
@@ -113,6 +119,7 @@ async function main() {
       ? db.from("products").select("id,name,category,subcategory,brand").not("category", "in", `(${CATEGORIES.join(",")})`).limit(PAGE)
       : db.from("products").select("id,name,category,subcategory,brand").order("id", {ascending: true}).limit(PAGE)
     if (!ONLY_INVALID && lastId) q = q.gt("id", lastId)
+    if (PLATFORM_FILTER) q = q.in("platform", PLATFORM_FILTER)
     const {data, error} = await q
     if (error) {
       console.error("fetch error:", error.message)

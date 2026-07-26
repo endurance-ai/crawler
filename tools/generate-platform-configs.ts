@@ -51,6 +51,11 @@ const DISABLED_KEYS = new Set<string>([
   "safarispot",
   "les-official",
   "en-2368", // BASTONG — 502개 크롤됐지만 QC(color_missing)에 전량 드롭, detail 셀렉터 튜닝 필요
+  // batch 3 (2026-07-23): daily-onboard 2회 연속 실측 — cateNo 9/13 둘 다 0개.
+  // 실제 사이트(noscouleurs.com) 네비게이션 확인 결과 진짜 카테고리는
+  // 24(outer)/25(tops)/27(bottoms)/28(acc)/42(all)/47(remix)/59(best) — detect
+  // 시점 이후 카테고리 번호가 바뀐 것으로 추정. cateNo 재탐지 필요.
+  "noscouleurs",
 ])
 
 const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCurrency"]>> = {
@@ -141,6 +146,13 @@ async function fetchCandidates(): Promise<GeneratedCandidate[]> {
     )
     .not("homepage_url", "is", null)
     .not("platform_key", "is", null)
+    // qc_failed 포함: select-onboard-batch.ts는 tech_detected뿐 아니라
+    // qc_failed(재시도 대상, MAX_IMPORT_RETRIES 캡 안)도 선정 후보로 삼는다.
+    // tech_detected/qc_failed는 shouldGeneratePlatformConfig()에서 KR-origin으로
+    // 스코프되고, crawled~active/blocked는 recrawl-by-source(#47) 인벤토리
+    // 유지를 위해 포함된다. status를 좁히면 qc_failed 브랜드의 config가
+    // 재생성마다 빠져 "missing" 스킵으로 재발하던 버그가 되살아난다
+    // (2026-07-23 실측: dadakarada/noscouleurs/temporahaus).
     .in("status", [
       "tech_detected",
       "qc_failed",
@@ -201,6 +213,13 @@ function buildEntrySource(
   lines.push(`    name: ${JSON.stringify(row.brand_name)},`)
   lines.push(`    type: ${JSON.stringify(row.platform_type)},`)
   lines.push(`    baseUrl: ${JSON.stringify(baseUrl)},`)
+  // product_crawl_brands는 brand_nodes(브랜드-노드 매핑, 1행=1브랜드) 기반이라
+  // 이 generator가 만드는 항목은 전부 단일 하우스 브랜드몰이다. brand를
+  // 채우지 않으면 cafe24/shopify 엔진이 DOM에서 브랜드를 추측하게 되는데,
+  // 이는 멀티브랜드 편집샵 전용 폴백이라 단일브랜드몰에서는 spec 라벨
+  // 텍스트("판매가 : X, 상품명 : Y")를 브랜드로 잘못 주워오는 사고로 이어진다
+  // (실측: etce 1,604건 — brand 필드 미설정 상태로 생성된 게 원인).
+  lines.push(`    brand: ${JSON.stringify(row.brand_name)},`)
   if (row.platform_type === "cafe24") {
     if (cafe24SourceCurrency) lines.push(`    sourceCurrency: ${JSON.stringify(cafe24SourceCurrency)},`)
     lines.push("    paginate: true,")

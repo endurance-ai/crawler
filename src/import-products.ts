@@ -135,16 +135,30 @@ async function resolveBrandNodeId(platform: string, brandName: string | null): P
 // import 성공/실패를 product_crawl_status(090, brand_node_id 기준)에 자동 반영한다.
 // 배포 admin 페이지가 읽는 product_crawl_brands 뷰의 소스가 이 테이블이다.
 // brand_node_id 해석 실패 시 no-op(신규 브랜드는 brand_nodes 등록 후 반영됨).
+// 최소 QC 통과율 — 이 밑으로 떨어지면 "inserted>0"이라도 imported로 확정하지
+// 않는다. import-products.ts의 QC 게이트(applyProductQcGate/applyValidationGate)가
+// 크롤 원본 상품 대다수를 review/reject로 걸러내는 경우(실측: en-5267 1,886건 중
+// 1건만 통과) 예전에는 그래도 status='imported'로 찍혀서 daily-onboard 스킬의
+// status='tech_detected' 선정 쿼리에 영구히 안 걸리는 문제가 있었다 (2026-07-22).
+const MIN_QC_PASS_RATE = 0.5
+
 async function syncProductCrawlStatus(
   platform: string,
   brandName: string | null,
-  result: {inserted: number; errors: number; total: number},
+  result: {inserted: number; errors: number; total: number; qcPassRate: number},
 ): Promise<void> {
   const brandNodeId = await resolveBrandNodeId(platform, brandName)
   if (!brandNodeId) return
 
-  const success = result.errors === 0 && result.inserted > 0
+  const inserted = result.errors === 0 && result.inserted > 0
+  const lowYield = result.qcPassRate < MIN_QC_PASS_RATE
+  const success = inserted && !lowYield
   const status = success ? "imported" : "qc_failed"
+  if (inserted && lowYield) {
+    console.warn(
+      `   ⚠️  ${platform}: QC 통과율 ${(result.qcPassRate * 100).toFixed(1)}% (<${MIN_QC_PASS_RATE * 100}%) — imported 대신 qc_failed로 기록, 재시도 대상에 남김`,
+    )
+  }
 
   await db.from("product_crawl_status").upsert(
     {
@@ -152,7 +166,13 @@ async function syncProductCrawlStatus(
       status,
       platform_key: platform,
       imported_at: success ? new Date().toISOString() : null,
-      qc_summary: {rows_total: result.total, rows_upserted: result.inserted, errors: result.errors},
+      qc_summary: {
+        rows_total: result.total,
+        rows_upserted: result.inserted,
+        errors: result.errors,
+        qc_pass_rate: Math.round(result.qcPassRate * 1000) / 1000,
+      },
+      last_error: inserted && lowYield ? `low QC pass rate: ${(result.qcPassRate * 100).toFixed(1)}%` : null,
     },
     {onConflict: "brand_node_id"},
   )
@@ -495,8 +515,13 @@ async function main() {
         brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
       )
 
+      // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
+      // 누출 가드(cafe24-engine.ts)가 오염된 값을 걸러내고 brand=""로 넘기는
+      // 경우 color와 동일하게 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
+      // 잘못 적재되는 것보다 재크롤 때까지 보류하는 편이 안전하다.
+      if (!brand) return null
       // --no-new-brands: 미등록 brand 상품 적재 제외
-      if (noNewBrands && brand && brandNodeId === null) return null
+      if (noNewBrands && brandNodeId === null) return null
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
       // color NOT NULL — color 없는 상품은 스킵
@@ -679,7 +704,8 @@ async function main() {
       (rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand as string | undefined) ??
       SELF_BRANDED[platform] ??
       null
-    await syncProductCrawlStatus(platform, dominantBrand, {inserted, errors, total: deduped.length})
+    const qcPassRate = rawAll.length > 0 ? raw.length / rawAll.length : 1
+    await syncProductCrawlStatus(platform, dominantBrand, {inserted, errors, total: deduped.length, qcPassRate})
     totalInserted += inserted
     totalErrors += errors
 
