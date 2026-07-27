@@ -306,13 +306,26 @@ async function applyPlan(planPath: string): Promise<void> {
   }
   const brandScopes = await loadBrandScopes(db)
 
-  // 계획 생성 이후 분류기나 brand_nodes 가 바뀌었을 수 있다. 계획에 담긴 행을
-  // 현재 DB 상태로 다시 읽어 재판정하고, 판정이 달라졌으면 중단한다.
-  const targetIds = plan.decisions.filter((d) => d.after !== null).map((d) => d.id)
   const platformFilter = flag("platform")
   const brandFilter = flag("brand-node") !== null ? Number(flag("brand-node")) : null
+  const applied = loadProgress(absolute)
+  if (applied.size > 0) console.log(`   ⏩ 이전 실행에서 ${applied.size}행 적용됨 — 건너뜀`)
 
-  console.log(`🔁 계획 재검증: ${targetIds.length}행`)
+  // 계획 생성 이후 분류기나 brand_nodes 가 바뀌었을 수 있다. 계획에 담긴 행을
+  // 현재 DB 상태로 다시 읽어 재판정하고, 판정이 달라졌으면 중단한다.
+  //
+  // 재검증 대상은 **이번 호출 범위**(--platform/--brand-node 필터 + 아직 미적용)
+  // 로 한정한다 — 계획 전체를 검증하면, 앞선 --platform 호출로 이미 적용된 행이
+  // (더 이상 값이 안 바뀌므로 "drift"로 잡혀) 전혀 무관한 이후 --platform 호출까지
+  // 막아버린다.
+  const targetIds = plan.decisions
+    .filter((d) => d.after !== null)
+    .filter((d) => !applied.has(d.id))
+    .filter((d) => !platformFilter || d.platform === platformFilter)
+    .filter((d) => brandFilter === null || d.brand_node_id === brandFilter)
+    .map((d) => d.id)
+
+  console.log(`🔁 계획 재검증: ${targetIds.length}행${platformFilter ? ` (platform=${platformFilter})` : ""}`)
   const expected = new Map(plan.decisions.map((d) => [d.id, JSON.stringify(d.after)]))
   const rowsById = new Map<number, ProductGenderRow>()
   for (let i = 0; i < targetIds.length; i += PAGE_SIZE) {
@@ -342,9 +355,6 @@ async function applyPlan(planPath: string): Promise<void> {
   }
   console.log("   ✅ drift 없음")
 
-  const applied = loadProgress(absolute)
-  if (applied.size > 0) console.log(`   ⏩ 이전 실행에서 ${applied.size}행 적용됨 — 건너뜀`)
-
   const stampUnverified = has("stamp-unverified")
   const sleepMs = flag("sleep-ms") !== null ? Number(flag("sleep-ms")) : 0
 
@@ -355,7 +365,12 @@ async function applyPlan(planPath: string): Promise<void> {
     if (platformFilter && d.platform !== platformFilter) continue
     if (brandFilter !== null && d.brand_node_id !== brandFilter) continue
     const writesGender = d.after !== null
-    if (!writesGender && !(stampUnverified && d.gender_source === "unverified_legacy")) continue
+    // after===null 인 결정은 gender 를 바꾸지 않고 gender_source 만 쓴다.
+    // "unchanged"(진짜 unisex — 값은 같지만 gender_source 는 repair_text 등으로
+    // 확정됨) 와 "kids"/"unverified"(gender_source="unverified_legacy") 를
+    // 모두 포함한다 — 전자만 걸러내면 "확인된 unisex" 269건이 --stamp-unverified
+    // 를 켜도 영원히 stamp 되지 않는다.
+    if (!writesGender && !stampUnverified) continue
     const key = `${JSON.stringify(d.after)}\u0000${d.gender_source}`
     const list = groups.get(key) ?? []
     list.push(d)
@@ -390,32 +405,41 @@ async function applyPlan(planPath: string): Promise<void> {
   }
   console.log(`\n✅ applied=${updated} stale_or_already_changed=${stale} plan=${absolute}`)
 
-  await recordRuns(db, plan, updated, stale)
+  // 이번 호출에서 실제로 쓴 행만 감사 기록 대상이다. plan.decisions 전체를 쓰면
+  // --platform/--brand-node/--limit 로 걸러진 이번 실행과 무관한 브랜드까지
+  // product_crawl_runs 에 잡음으로 기록된다.
+  const touched = [...groups.values()].flat()
+  await recordRuns(db, touched, plan.scope, updated, stale)
 }
 
 /**
- * 감사 추적: 영향받은 brand_node 별로 product_crawl_runs 에 기록한다
- * (CLAUDE.md §18 패턴). product_crawl_status.status 는 건드리지 않는다 —
- * 크롤 상태 전이가 아니고, 092 가 status CHECK 를 8개 값으로 제한한다.
+ * 감사 추적: 이번 apply 호출에서 실제로 쓴 행의 brand_node 별로
+ * product_crawl_runs 에 기록한다 (CLAUDE.md §18 패턴).
+ * product_crawl_status.status 는 건드리지 않는다 — 크롤 상태 전이가 아니고,
+ * 092 가 status CHECK 를 8개 값으로 제한한다.
  */
 async function recordRuns(
   db: ProductCollectionClient,
-  plan: RepairPlanFile,
+  touched: GenderRepairDecision[],
+  scope: string,
   updated: number,
   stale: number,
 ): Promise<void> {
   const byBrand = new Map<number, number>()
-  for (const d of plan.decisions) {
-    if (d.after === null || d.brand_node_id === null) continue
+  for (const d of touched) {
+    if (d.brand_node_id === null) continue
     byBrand.set(d.brand_node_id, (byBrand.get(d.brand_node_id) ?? 0) + 1)
   }
   if (byBrand.size === 0) return
+
+  const bucketCounts: Record<string, number> = {}
+  for (const d of touched) bucketCounts[d.bucket] = (bucketCounts[d.bucket] ?? 0) + 1
 
   const rows = [...byBrand.entries()].map(([brand_node_id, n]) => ({
     brand_node_id,
     stage: "manual",
     status: "success",
-    metrics: {actor: "repair-product-gender", scope: plan.scope, rows: n, updated, stale, by_bucket: plan.by_bucket},
+    metrics: {actor: "repair-product-gender", scope, rows: n, updated, stale, by_bucket: bucketCounts},
     created_at: new Date().toISOString(),
   }))
   for (let i = 0; i < rows.length; i += WRITE_BATCH) {
