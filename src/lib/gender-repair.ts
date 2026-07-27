@@ -103,7 +103,10 @@ function sameGender(a: string[], b: string[]): boolean {
 function evidenceOf(row: ProductGenderRow, source: GenderSource | null): string {
   if (source === "url" || source === "repair_url") return row.product_url
   if (source === "brand_scope" || source === "repair_brand_scope") return `brand_scope(${row.brand ?? "?"})`
-  return [row.name, row.category, row.subcategory].filter(Boolean).join(" | ").slice(0, 160)
+  // tags 도 inferGenderFromText 의 입력이므로 감사 시 실제 판정 근거가 name/
+  // category/subcategory 에 없어 보이는 혼란(예: "mens" 태그만 있는 상품)을
+  // 막기 위해 표시한다.
+  return [row.name, row.category, row.subcategory, row.tags?.join(",")].filter(Boolean).join(" | ").slice(0, 160)
 }
 
 /**
