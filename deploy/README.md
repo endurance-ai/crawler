@@ -1,5 +1,10 @@
 # dev-app EC2 재수집 배치 셋업 (Phase 0 + Phase 1)
 
+> **이관 예정:** 크롤 배치를 AWS 동거 호스트에서 연구실 서버로 옮기는 최신 계획과
+> 실행 순서는 [`../.moai/plans/batch-server-migration-alert-signals-plan.md`](../.moai/plans/batch-server-migration-alert-signals-plan.md),
+> [`../docs/batch-server-migration-runbook.md`](../docs/batch-server-migration-runbook.md)를 따른다.
+> 본 문서의 AWS 절차는 현재 운영 상태와 롤백 기준을 확인하기 위해 보존한다.
+>
 > 대상: dev-app EC2 (t4g.medium 4GB, ARM, Postgres + PostgREST shim 동거 호스트).
 > 주의: 2026-05-26 마이그레이션 때 t4g.large→medium 다운스케일됨 — 리소스 캡과 swap 은 4GB 전제.
 > 배경/설계: [`../docs/operations.md`](../docs/operations.md) §13 (큐 모델).
