@@ -155,10 +155,22 @@ test("product with unsupported gender value is rejected", () => {
   if (!r.ok) assert.equal(r.failedField, "gender.0")
 })
 
-test("resolveProductGender prefers product value and falls back to brand gender_scope", () => {
+test("resolveProductGender falls back to brand gender_scope only when it is a single gender", () => {
+  // 상품 값이 항상 우선.
   assert.deepEqual(resolveProductGender(["women"], ["men"]), ["women"])
+
+  // 단일 성별 스코프 = "이 브랜드는 남성복만 판다" → 개별 상품에 유효한 추론.
+  assert.deepEqual(resolveProductGender([], ["men"]), ["men"])
+  assert.deepEqual(resolveProductGender([], ["women"]), ["women"])
   assert.deepEqual(resolveProductGender([], ["men", "men", "unknown"]), ["men"])
-  assert.deepEqual(resolveProductGender(undefined, ["unisex"]), ["unisex"])
+
+  // 모호한 스코프는 개별 상품에 대해 아무것도 말해주지 않는다 → 미확인.
+  // unisex 상품은 검색 RPC 에서 남녀 양쪽에 노출되므로, "모름"을 unisex 로
+  // 폴백하면 여성 상품이 남성 결과로 샌다.
+  assert.deepEqual(resolveProductGender(undefined, ["unisex"]), [])
+  assert.deepEqual(resolveProductGender([], ["men", "women"]), [])
+  assert.deepEqual(resolveProductGender([], ["men", "women", "unisex"]), [])
+
   assert.deepEqual(resolveProductGender([], []), [])
   assert.deepEqual(cleanGenderScope(["Women", "MEN", "kids", "women"]), ["women", "men"])
 })

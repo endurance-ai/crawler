@@ -2,6 +2,8 @@
  * 크롤러 공통 타입
  */
 
+import type {GenderSource} from "./product-gender"
+
 // ─── 상품 ─────────────────────────────────────────────
 
 export interface Product {
@@ -18,6 +20,12 @@ export interface Product {
   productUrl: string
   inStock: boolean
   gender: string[]
+  /**
+   * `gender` 의 출처 (products.gender_source 로 적재). "모름"이 unisex 로
+   * 세탁되는 것을 사후에도 감사할 수 있게 하는 필드 — resolveProductGenderWithSource
+   * 가 채운다.
+   */
+  genderSource?: GenderSource
   platform: string
   crawledAt: string
   // ── 상세 페이지 데이터 (Phase 2) ──
