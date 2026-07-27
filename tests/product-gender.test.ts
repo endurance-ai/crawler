@@ -82,6 +82,49 @@ test("엔진 값이 이미 있으면 재호출해도 source 는 engine 으로 �
   assert.deepEqual(second, {gender: ["women"], source: "engine"})
 })
 
+// ─── config_default (사이트 전역 defaultGender) ──────────────────────────
+//
+// 카테고리가 교차하는 사이트(yearsago: 여성 라인 상품이 "상의"에도 함께 걸린다)
+// 에서 전역 기본값이 카테고리 유래 값과 동순위이면 dedup merge 가 union 을 만들어
+// ['men','women'] → 남녀 양쪽 노출이 된다. 반드시 상품 단위 근거보다 아래여야 한다.
+
+test("config_default 는 상품 단위 근거(카테고리/URL/텍스트)보다 아래다", () => {
+  // 카테고리 유래 값은 그대로 engine
+  assert.deepEqual(resolveProductGenderWithSource(["women"], [], {name: "Coat"}, "engine"), {
+    gender: ["women"],
+    source: "engine",
+  })
+
+  // 전역 기본값이 men 이어도 카테고리/텍스트가 women 이면 women 이 이긴다
+  assert.deepEqual(
+    resolveProductGenderWithSource(["men"], [], {name: "Years Ago Women Wool Coat"}, "config_default"),
+    {gender: ["women"], source: "text"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource(["men"], [], {name: "Coat", productUrl: "https://x.com/women/1"}, "config_default"),
+    {gender: ["women"], source: "url"},
+  )
+})
+
+test("config_default 는 상품 단위 근거가 없을 때만 쓰이고, 브랜드 스코프보다는 위다", () => {
+  assert.deepEqual(resolveProductGenderWithSource(["men"], [], {name: "Vintage Blank T"}, "config_default"), {
+    gender: ["men"],
+    source: "config_default",
+  })
+  // 브랜드 스코프가 women 이어도 사이트 기본값이 이긴다 (사이트가 더 구체적)
+  assert.deepEqual(resolveProductGenderWithSource(["men"], ["women"], {name: "Tee"}, "config_default"), {
+    gender: ["men"],
+    source: "config_default",
+  })
+})
+
+test("config_default 라도 kids 는 성인 성별을 받지 않는다", () => {
+  assert.deepEqual(resolveProductGenderWithSource(["men"], [], {name: "KIDS 아동 티셔츠"}, "config_default"), {
+    gender: [],
+    source: null,
+  })
+})
+
 // ─── 한글 + \b 함정 ──────────────────────────────────────────────────────
 //
 // \b 는 한글에 적용되지 않으므로 한글 대안은 반드시 \b() 그룹 밖에 있어야 한다.

@@ -121,6 +121,8 @@ export function parseImwebListItem(
     productUrl: item.link,
     inStock: !item.soldOutBadge,
     gender: [...(config.defaultGender ?? [])],
+    // imweb 은 카테고리 성별 신호가 없어 항상 사이트 전역 기본값이다.
+    genderSource: "config_default" as const,
     platform: config.key,
     crawledAt: new Date().toISOString(),
     color: colorFromName ?? undefined,

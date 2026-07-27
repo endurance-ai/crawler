@@ -280,6 +280,9 @@ async function collectProductsFromPage(
     categoryName,
     brandNameOverride: brandOverride || "",
     gender: categoryGender.length > 0 ? categoryGender : (config.defaultGender || []),
+    // 카테고리 유래(상품 단위 근거)와 사이트 전역 기본값을 구분한다 — 후자는
+    // 카테고리가 교차하는 사이트에서 URL/텍스트 추론보다 낮은 순위로 쓰인다.
+    genderSource: categoryGender.length > 0 ? "engine" : "config_default",
     baseUrl: config.baseUrl,
     platformKey: config.key,
     pricePatternStr: config.pricePattern?.source || null,
@@ -562,7 +565,7 @@ async function collectProductsFromPage(
           originalPrice, salePrice,
           priceFormatted,
           imageUrl, productUrl, inStock,
-          gender: args.gender, platform: args.platformKey,
+          gender: args.gender, genderSource: args.genderSource, platform: args.platformKey,
           sourceCurrency: args.sourceCurrency,
           sourcePrice: salePrice || price || undefined,
           swatchText,

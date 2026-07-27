@@ -911,7 +911,7 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
       tags: product.tags,
       productUrl: product.productUrl,
       useDescription: true,
-    })
+    }, product.genderSource ?? "engine")
     genderSourceCounts[resolved.source ?? "unknown"] = (genderSourceCounts[resolved.source ?? "unknown"] ?? 0) + 1
     if (resolved.conflict) {
       emit({

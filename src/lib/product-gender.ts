@@ -32,6 +32,7 @@ export const GENDER_SOURCE_VALUES = [
   "engine",
   "url",
   "text",
+  "config_default",
   "brand_scope",
   // 093 이전 행 / 교정 스크립트
   "legacy_backfill",
@@ -175,21 +176,32 @@ function evidenceText(evidence: GenderEvidence): string {
 /**
  * 상품 성별 결의. 우선순위:
  *
- *   1. 엔진이 뽑은 상품 성별
+ *   1. 엔진이 뽑은 상품 성별 (카테고리 유래 등 상품 단위 근거)
  *   2. kids 가드 (성인 토큰 없이 아동 신호만 있으면 미확인)
  *   3. URL 경로
  *   4. 상품명/카테고리/태그 텍스트
  *   5. 3·4 가 서로 다르면 미확인 (추측하지 않음)
- *   6. 브랜드 gender_scope — 단, 단일 성별일 때만
- *   7. 미확인
+ *   6. 사이트 전역 defaultGender (productGenderSource === "config_default")
+ *   7. 브랜드 gender_scope — 단, 단일 성별일 때만
+ *   8. 미확인
  */
 export function resolveProductGenderWithSource(
   productGender: unknown,
   brandGenderScope: unknown,
   evidence: GenderEvidence = {},
+  productGenderSource: GenderSource = "engine",
 ): GenderResolution {
   const fromProduct = cleanGenderScope(productGender)
-  if (fromProduct.length > 0) return {gender: fromProduct, source: "engine"}
+
+  // 사이트 전역 defaultGender 는 상품 단위 근거가 아니라 설정상의 기본값이다.
+  // 카테고리가 교차하는 사이트(예: yearsago — 여성 라인 상품이 "상의"에도 함께
+  // 걸린다)에서는 같은 상품의 다른 행이 카테고리 유래 성별을 들고 오므로,
+  // 전역 기본값은 URL/텍스트 추론보다 **아래**에서만 쓰여야 한다. 그러지 않으면
+  // dedup merge 에서 동순위 충돌이 나 ['men','women'] union 이 만들어진다.
+  const isConfigDefault = productGenderSource === "config_default"
+  if (fromProduct.length > 0 && !isConfigDefault) {
+    return {gender: fromProduct, source: productGenderSource}
+  }
 
   const text = evidenceText(evidence)
   const url = typeof evidence.productUrl === "string" ? evidence.productUrl : ""
@@ -206,6 +218,9 @@ export function resolveProductGenderWithSource(
   }
   if (fromUrl !== null) return {gender: [fromUrl], source: "url"}
   if (fromText !== null) return {gender: [fromText], source: "text"}
+
+  // 상품 단위 근거가 없을 때만 사이트 전역 기본값을 쓴다.
+  if (fromProduct.length > 0 && isConfigDefault) return {gender: fromProduct, source: "config_default"}
 
   const scope = cleanGenderScope(brandGenderScope)
   if (isSingleGenderScope(scope)) return {gender: scope, source: "brand_scope"}

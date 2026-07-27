@@ -16,7 +16,7 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGenderWithSource} from "./lib/product-gender"
+import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
 import {emit} from "./lib/core/observability"
 
 const dbUrl = process.env.DB_URL
@@ -514,6 +514,7 @@ async function main() {
           productUrl: p.productUrl,
           useDescription: true,
         },
+        (p.genderSource as GenderSource | undefined) ?? "engine",
       )
       if (resolved.conflict) {
         emit({
@@ -735,7 +736,18 @@ async function main() {
     // 노출된다 — 브랜드 폴백과 똑같은 세탁이다. 대신 출처 신뢰도가 높은 쪽을
     // 채택하고, 동순위인데 값이 다르면 판정 불가로 보고 기존 union 동작을
     // 유지하면서 이벤트로 남긴다.
-    const GENDER_SOURCE_RANK: Record<string, number> = {engine: 4, url: 3, text: 2, brand_scope: 1}
+    // resolveProductGenderWithSource 의 우선순위와 같은 순서. config_default 가
+    // url/text 아래인 것이 핵심 — 카테고리가 교차하는 사이트(yearsago 등)에서
+    // 여성 라인 상품은 "상의" 행에서 사이트 기본값(men)을, "Years Ago Women"
+    // 행에서 카테고리 유래 women 을 받는다. 동순위였다면 union 이 되어
+    // ['men','women'] 로 남녀 양쪽에 노출된다.
+    const GENDER_SOURCE_RANK: Record<string, number> = {
+      engine: 5,
+      url: 4,
+      text: 3,
+      config_default: 2,
+      brand_scope: 1,
+    }
     type Row = (typeof rows)[number]
     const merge = (a: Row, b: Row): Row => {
       const pickRicher = <K extends keyof Row>(key: K): Row[K] => {

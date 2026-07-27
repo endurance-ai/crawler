@@ -33,7 +33,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS gender_source text;
 ALTER TABLE products DROP CONSTRAINT IF EXISTS products_gender_source_chk;
 ALTER TABLE products ADD CONSTRAINT products_gender_source_chk
   CHECK (gender_source IS NULL OR gender_source IN (
-    'engine', 'url', 'text', 'brand_scope',
+    'engine', 'url', 'text', 'config_default', 'brand_scope',
     'legacy_backfill', 'repair_url', 'repair_text', 'repair_brand_scope',
     'unverified_legacy'
   )) NOT VALID;
