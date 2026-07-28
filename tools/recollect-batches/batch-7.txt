@@ -1,0 +1,4 @@
+# 배치 7 (13,865개) — mohawk-general 은 7,848행 중 6,522행(83%)이 품절.
+# 멀티브랜드 편집샵이라 신규 brand_nodes INSERT 수를 함께 볼 것.
+kith
+mohawk-general

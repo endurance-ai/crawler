@@ -49,6 +49,18 @@ export interface Product {
   sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
   /** 원본 통화 기준 가격 (환산 전) */
   sourcePrice?: number
+  // ── LLM 보강 provenance (src/enrich-products-file.ts) ──
+  /**
+   * enrichProductWithLlm 이 이 상품을 보강한 시각 (ISO-8601).
+   *
+   * 재개 마커를 겸한다 — 보강 스크립트는 이 값이 있는 항목을 건너뛰므로,
+   * 수천 건짜리 보강이 중간에 죽어도 처음부터 다시 돌지 않는다. DB 적재
+   * payload(import-products.ts)는 컬럼을 명시적으로 나열하므로 이 필드는
+   * JSON 에만 남고 products 테이블로는 가지 않는다.
+   */
+  llmEnrichedAt?: string
+  /** 보강에 사용된 모델 (배치 간 결과를 비교할 때 필요). */
+  llmModel?: string
   // ── 리뷰 데이터 (Phase 3) ──
   reviewCount?: number
   reviews?: Array<{

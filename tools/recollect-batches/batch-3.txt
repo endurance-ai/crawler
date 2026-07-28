@@ -1,0 +1,6 @@
+# 배치 3 (3,381개) — uniqlo 최초 노출.
+# uniqlo 는 SPA 라 파일럿에서 렌더 타이밍을 확인한 뒤 필요하면
+#   --enrich-args "--wait-ms=3000" 을 붙인다.
+union-la
+uniqlo-kr
+uniqlo-us

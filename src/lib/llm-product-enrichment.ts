@@ -142,10 +142,27 @@ async function compactContext(page: Page): Promise<Record<string, unknown>> {
   }))
 }
 
+export interface EnrichOptions {
+  /**
+   * 페이지 로드 후 컨텍스트를 읽기까지의 대기 (기본 800ms). zara/uniqlo 처럼
+   * 클라이언트 렌더가 늦은 SPA 는 800ms 시점에 jsonLd/breadcrumb 가 아직
+   * 비어 있을 수 있어 상향이 필요하다.
+   */
+  waitMs?: number
+  /**
+   * false 면 page.goto 를 생략하고 호출자가 준비해 둔 페이지를 그대로 읽는다.
+   * 상세 페이지 대량 방문이 봇 차단을 부르는 사이트에서, 크롤 레코드만으로
+   * 만든 최소 문서를 대신 넣어 돌리기 위한 탈출구
+   * (src/enrich-products-file.ts --no-visit-page).
+   */
+  navigate?: boolean
+}
+
 export async function enrichProductWithLlm(
   page: Page,
   product: Product,
   config: SiteConfig,
+  options: EnrichOptions = {},
 ): Promise<LlmProductEnrichment> {
   if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is required")
   assertSameSource(product.productUrl, config)
@@ -166,8 +183,10 @@ export async function enrichProductWithLlm(
     },
   })
 
-  await page.goto(product.productUrl, {waitUntil: "domcontentloaded", timeout: 60_000})
-  await page.waitForTimeout(800)
+  if (options.navigate !== false) {
+    await page.goto(product.productUrl, {waitUntil: "domcontentloaded", timeout: 60_000})
+  }
+  await page.waitForTimeout(options.waitMs ?? 800)
   const context = await compactContext(page)
   const scraper = new LLMScraper(wrapped)
   // Reasoning models (gpt-5.x, o1/o3, ...) reject the `temperature` sampling

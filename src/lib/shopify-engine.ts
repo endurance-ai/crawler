@@ -327,6 +327,17 @@ export function parseShopifyProducts(
 export interface CrawlShopifyOptions {
   /** 갱신 전용 — 품절 상품도 결과에 남긴다 (parseShopifyProducts.keepOutOfStock). */
   listingOnly?: boolean
+  /**
+   * 재수집 전용 — 품절 상품도 결과에 남긴다. `listingOnly` 와 결과는 같지만
+   * 의도가 다르다: `listingOnly` 는 "가격/재고만 갱신" 모드라 cafe24 쪽에서는
+   * 상세 크롤 자체를 끄는 스위치로도 쓰인다. 재수집은 상세까지 다 받아야 하므로
+   * 별도 플래그가 필요하다 (src/crawl.ts --include-out-of-stock).
+   *
+   * 왜 필요한가: 품절 상품은 import 플래그가 아니라 이 크롤 레이어에서 버려진다.
+   * 2026-06 코호트 재수집 시점 실측으로 대상 60,634행 중 14,971행(24.7%)이
+   * 품절이었고, 이걸 남기지 않으면 그 행들은 옛 추출 로직 산물을 영구히 유지한다.
+   */
+  includeOutOfStock?: boolean
 }
 
 export async function crawlShopify(
@@ -393,7 +404,7 @@ export async function crawlShopify(
           sourceCurrency: currency,
           defaultGender: config.defaultGender,
           brandFallback: config.name,
-          keepOutOfStock: options.listingOnly,
+          keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )
 

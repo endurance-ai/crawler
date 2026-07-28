@@ -1,0 +1,6 @@
+# 배치 0 — 파일럿 (281개). end-to-end 검증용.
+# shopify + cafe24 를 모두 커버하고 전부 단일 브랜드라 브랜드 추출 변수를 배제한다.
+cpfm
+matteveil
+032c
+blankroom
