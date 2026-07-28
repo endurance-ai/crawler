@@ -77,6 +77,21 @@ function parseFlags(): Flags {
   return flags
 }
 
+/**
+ * 배포 호스트에서만 제외할 source key 목록. 특정 호스트의 네트워크에서만
+ * 닿지 않는 판매처를 config 수정 없이 건너뛰기 위한 것이다. config 를 고치면
+ * batch_prep 의 `git pull --ff-only` 와 충돌하므로 env 로 받는다.
+ */
+function parseExcluded(): Set<string> {
+  const raw = process.env.REFRESH_EXCLUDE ?? ""
+  return new Set(
+    raw
+      .split(",")
+      .map((key) => key.trim())
+      .filter(Boolean),
+  )
+}
+
 async function fetchWorklist(
   db: ProductCollectionClient,
   types: string[],
@@ -90,6 +105,7 @@ async function fetchWorklist(
     sourceStates,
     productCounts,
     types: new Set(types),
+    excluded: parseExcluded(),
   })
 }
 
