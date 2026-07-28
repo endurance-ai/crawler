@@ -46,8 +46,21 @@ export interface ProductQcStats {
 
 const qcReport = new Map<string, ProductQcStats>()
 
+// 2026-07-28 additions (recollect campaign color-quality review, real DB
+// samples): spelled-out sizes ("Small, Medium, Large" — only s/m/l
+// abbreviations were covered before), a dotted "O.s" variant of "os", bare
+// "one" (previously only the two-word "one size" matched), bare "fr"/"n"
+// (single/double-letter size-scale noise with no accompanying digits, so the
+// existing "us\s*N"/"eu\s*N" patterns don't catch them), "sm"/"ml"/"md"/"lg"
+// (merged size abbreviations — "Md, Lg" was showing up as a raw color
+// value), bare "ss" (a spring/summer season-collection code, not a color —
+// "Ss" was showing up the same way), and Roman numeral size tiers I–X —
+// Korean sites commonly use 사이즈 Ⅰ/Ⅱ/Ⅲ instead of S/M/L.
+// normalizeForMatch()'s NFKD pass already decomposes the Unicode Roman
+// numeral glyphs (Ⅰ, Ⅱ, …) to plain "i"/"ii"/… before this regex ever runs,
+// so no separate Unicode range check is needed here.
 const SIZE_TOKEN_RE =
-  /^(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size|size|[0-9]{1,3}(?:\.[0-9])?|us\s*[0-9.]+|eu\s*[0-9.]+)$/i
+  /^(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free(?:\s*size)?|o\.?s\.?|one(?:\s*size)?|size|small|medium|large|extra\s*small|extra\s*large|sm|ml|md|lg|ss|fr|n|i{1,3}|iv|vi{0,3}|ix|x|[0-9]{1,3}(?:\.[0-9])?|us\s*[0-9.]+|eu\s*[0-9.]+)$/i
 
 const SIZE_SUFFIX_RE =
   /(?:[-_\s/]+(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|free|os|one\s*size|[0-9]{1,3}(?:\.[0-9])?))$/i
@@ -70,19 +83,47 @@ const SIZE_SUFFIX_RE =
 // names — colorCandidates' SIZE_SUFFIX_RE-stripping then duplicated the
 // "사이즈 M L Empty M" variants into a mangled multi-value string instead of
 // dropping them, since neither half was ever recognized as noise).
+// 2026-07-28 additions: "Null" (a stringified-null placeholder, unrelated to
+// any real color), "sale"/"restock" (inventory/discount-tier option labels,
+// not colors — some Cafe24 sites bundle them into the same option list as
+// color/size), "notice" (a disclaimer-sentence lead-in, same shape as the
+// "Sale, ..." case below), 교환/환불 ("exchange"/"refund") — some sites use an
+// entire disclaimer sentence ("세일 상품은 교환, 환불이 어렵습니다"/"Notice, 액세
+// 서리 상품 특성상 교환 환불이 불가능합니다") as an option value for discounted or
+// non-returnable variants, landing in the color field whole — and 동의
+// ("agree/consent"), a checkbox-label leak ("동의합니다" — "I agree").
 const NON_COLOR_RE =
-  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|품절|select|choose|option|참조|참고|제품명|상세\s*페이지|이미지|본문|select\s*option|옵션\s*선택|사이즈|quantity|empty|\+|(?<![A-Za-z])-\s*[0-9,]+\s*(?:won|원)?|(?:krw|usd|eur|gbp|jpy|cny)\s*[0-9,]+|[0-9,]+\s*(?:won|원))/i
+  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|품절|select|choose|option|참조|참고|제품명|상세\s*페이지|이미지|본문|select\s*option|옵션\s*선택|사이즈|quantity|empty|null|sale|restock|notice|교환|환불|동의|\+|(?<![A-Za-z])-\s*[0-9,]+\s*(?:won|원)?|(?:krw|usd|eur|gbp|jpy|cny)\s*[0-9,]+|[0-9,]+\s*(?:won|원))/i
 
 export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: string[]}> = [
   {
     canonical: "Black",
-    patterns: [/\b(black|noir|noire|negro|negra|nero|nera|schwarz|preto|preta)\b/i],
+    // "blackout" added 2026-07-28 \u2014 streetwear colorway naming convention
+    // ("Triple Black"/"Blackout") that's functionally just "solid black",
+    // not a distinct shade, so merged as a synonym rather than split out
+    // (unlike Onyx/Crow below, which \u2014 same reasoning as Jade/Emerald under
+    // Green \u2014 are kept as their own canonicals per the detailed-granularity
+    // direction, since they at least name a specific black-adjacent finish).
+    patterns: [/\b(black|noir|noire|negro|negra|nero|nera|schwarz|preto|preta|blackout|blk)\b/i],
     contains: ["\uac80\uc815", "\uac80\uc740\uc0c9", "\ube14\ub799"],
   },
   {
     canonical: "White",
     patterns: [/\b(white|blanc|blanche|blanco|blanca|bianco|bianca|weiss|wei\u00df|branco|branca)\b/i],
     contains: ["\ud654\uc774\ud2b8", "\ud558\uc591", "\ud558\uc580\uc0c9", "\ubc31\uc0c9"],
+  },
+  {
+    canonical: "Onyx",
+    patterns: [/\bonyx\b/i],
+  },
+  {
+    canonical: "Crow",
+    patterns: [/\bcrow\b/i],
+    contains: ["\ud06c\ub85c\uc6b0"],
+  },
+  {
+    canonical: "Ink",
+    patterns: [/\bink\b/i],
   },
   {
     canonical: "Ivory",
@@ -95,9 +136,45 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
     contains: ["\ud06c\ub9bc"],
   },
   {
+    canonical: "Vanilla",
+    patterns: [/\bvanilla\b/i],
+  },
+  {
+    canonical: "Pearl",
+    patterns: [/\bpearl\b/i],
+  },
+  {
     canonical: "Grey",
     patterns: [/\b(gr[ae]y|gris|grau|grigio|cinza|ash|slate)\b/i],
     contains: ["\uadf8\ub808\uc774", "\ud68c\uc0c9", "\uc7bf\ube5b"],
+  },
+  {
+    canonical: "Chalk",
+    patterns: [/\bchalk\b/i],
+  },
+  {
+    canonical: "Cement",
+    patterns: [/\bcement\b/i],
+  },
+  {
+    canonical: "Mist",
+    patterns: [/\bmist\b/i],
+  },
+  {
+    canonical: "Fog",
+    patterns: [/\bfog\b/i],
+  },
+  {
+    canonical: "Ice",
+    patterns: [/\bice\b/i],
+  },
+  {
+    canonical: "Heather Grey",
+    patterns: [/\bheather\s*gr[ae]y\b/i],
+  },
+  {
+    canonical: "Steel",
+    patterns: [/\bsteel\b/i],
   },
   {
     canonical: "Charcoal",
@@ -111,18 +188,73 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
   },
   {
     canonical: "Indigo",
-    patterns: [/\bindigo\b/i],
+    patterns: [/\b(indigo|idg)\b/i],
     contains: ["\uc778\ub514\uace0"],
+  },
+  // 2026-07-28: Cobalt/Sky Blue/Light Blue were previously folded into the
+  // generic Blue rule below (see the old pattern's "sky\s*blue|cobalt|
+  // royal\s*blue" alternatives). Split out as their own canonicals, mirroring
+  // color-normalizer.ts's parser-layer CANONICAL list, which already treated
+  // these as distinct \u2014 the two lists had drifted apart, and this realigns
+  // them. Placed before the generic Blue rule per the file's "more specific
+  // before broader" ordering discipline.
+  {
+    canonical: "Cobalt",
+    patterns: [/\b(cobalt|royal\s*blue)\b/i],
+  },
+  // Bare "sky"/"light" are deliberately NOT accepted as standalone triggers \u2014
+  // canonicalColorFromText() is also used as a name/description text-fallback
+  // when the color field itself is empty, and bare "sky" collides with
+  // marketing phrases like "Sky High Heels" that say nothing about the
+  // item's actual color. Requiring the word "blue" alongside keeps the match
+  // essentially collision-free while still catching real "Sky Blue"/
+  // "Light Blue" color values.
+  {
+    canonical: "Sky Blue",
+    patterns: [/\b(sky\s*blue|skyblue)\b/i],
+    contains: ["\ud558\ub298\uc0c9"],
+  },
+  {
+    canonical: "Light Blue",
+    patterns: [/\b(light\s*blue|lightblue|powder\s*blue|baby\s*blue)\b/i],
+  },
+  {
+    canonical: "Dark Blue",
+    patterns: [/\b(dark\s*blue|darkblue)\b/i],
   },
   {
     canonical: "Blue",
-    patterns: [/\b(blue|bleu|azul|blu|blau|sky\s*blue|cobalt|royal\s*blue)\b/i],
-    contains: ["\ube14\ub8e8", "\ud30c\ub791", "\ud30c\ub780\uc0c9", "\ud558\ub298\uc0c9", "\uc18c\ub77c"],
+    patterns: [/\b(blue|bleu|azul|blu|blau)\b/i],
+    contains: ["\ube14\ub8e8", "\ud30c\ub791", "\ud30c\ub780\uc0c9", "\uc18c\ub77c"],
+  },
+  {
+    canonical: "Teal",
+    patterns: [/\b(teal|turquoise|aqua)\b/i],
+  },
+  {
+    canonical: "Mint",
+    patterns: [/\bmint\b/i],
+    contains: ["\ubbfc\ud2b8"],
   },
   {
     canonical: "Beige",
     patterns: [/\b(beige|taupe|greige)\b/i],
     contains: ["\ubca0\uc774\uc9c0"],
+  },
+  // Ivory/Cream-adjacent off-whites. Kept distinct rather than merged into
+  // Ivory (detailed granularity is the point of this pass) but ordered so a
+  // more specific hue word elsewhere in the same text still wins first.
+  {
+    canonical: "Natural",
+    patterns: [/\bnatural\b/i],
+  },
+  {
+    canonical: "Bone",
+    patterns: [/\bbone\b/i],
+  },
+  {
+    canonical: "Coconut Milk",
+    patterns: [/\bcoconut\s*milk\b/i],
   },
   {
     canonical: "Sand",
@@ -130,9 +262,21 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
     contains: ["\uc0cc\ub4dc"],
   },
   {
+    canonical: "Dune",
+    patterns: [/\bdune\b/i],
+  },
+  {
+    canonical: "Mushroom",
+    patterns: [/\bmushroom\b/i],
+  },
+  {
     canonical: "Camel",
     patterns: [/\b(camel)\b/i],
     contains: ["\uce74\uba5c"],
+  },
+  {
+    canonical: "Caramel",
+    patterns: [/\bcaramel\b/i],
   },
   {
     canonical: "Tan",
@@ -145,14 +289,47 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
     contains: ["\uce74\ud0a4"],
   },
   {
+    canonical: "Mink",
+    patterns: [/\bmink\b/i],
+  },
+  {
     canonical: "Brown",
     patterns: [/\b(brown|marron|marr\u00f3n|brun|brune|braun|chocolate|espresso)\b/i],
-    contains: ["\ube0c\ub77c\uc6b4", "\uac08\uc0c9", "\ucd08\ucf5c\ub9bf"],
+    contains: ["\ube0c\ub77c\uc6b4", "\uac08\uc0c9", "\ucd08\ucf5c\ub9bf", "\ucd08\ucf5c\ub81b"],
+  },
+  {
+    canonical: "Mocha",
+    patterns: [/\bmocha\b/i],
+  },
+  {
+    canonical: "Chestnut",
+    patterns: [/\bchestnut\b/i],
+  },
+  {
+    canonical: "Cognac",
+    patterns: [/\bcognac\b/i],
+  },
+  {
+    canonical: "Tobacco",
+    patterns: [/\btobacco\b/i],
+  },
+  {
+    canonical: "Mud",
+    patterns: [/\bmud\b/i],
+    contains: ["\uba38\ub4dc"],
   },
   {
     canonical: "Burgundy",
     patterns: [/\b(burgundy|wine|maroon|bordeaux|bordo|crimson|scarlet)\b/i],
     contains: ["\ubc84\uac74\ub514", "\uc640\uc778", "\uc790\uc8fc"],
+  },
+  {
+    canonical: "Ruby",
+    patterns: [/\bruby\b/i],
+  },
+  {
+    canonical: "Brick",
+    patterns: [/\bbrick\b/i],
   },
   {
     canonical: "Red",
@@ -165,13 +342,61 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
     contains: ["\ud551\ud06c", "\ubd84\ud64d"],
   },
   {
+    canonical: "Coral",
+    patterns: [/\b(coral)\b/i],
+    contains: ["\ucf54\ub784"],
+  },
+  {
+    canonical: "Peach",
+    patterns: [/\bpeach\b/i],
+  },
+  {
+    canonical: "Salmon",
+    patterns: [/\bsalmon\b/i],
+  },
+  {
     canonical: "Purple",
     patterns: [/\b(purple|violet|lavender|lilac|morado|pourpre|viola)\b/i],
     contains: ["\ud37c\ud50c", "\ubcf4\ub77c", "\ub77c\ubca4\ub354"],
   },
   {
+    canonical: "Plum",
+    patterns: [/\bplum\b/i],
+  },
+  {
+    canonical: "Mauve",
+    patterns: [/\bmauve\b/i],
+  },
+  {
+    canonical: "Blueberry",
+    patterns: [/\bblueberry\b/i],
+  },
+  // "forest"/"hunter"/"military" used to fold straight into the generic
+  // Green rule below; split out (same rationale as Cobalt above) and
+  // realigned with color-normalizer.ts, which already made this split.
+  {
+    canonical: "Forest Green",
+    patterns: [/\b(forest|hunter|military)\s*green\b/i],
+  },
+  {
+    canonical: "Pine",
+    patterns: [/\bpine\b/i],
+  },
+  {
+    canonical: "Moss",
+    patterns: [/\bmoss\b/i],
+  },
+  {
+    canonical: "Emerald",
+    patterns: [/\bemerald\b/i],
+  },
+  {
+    canonical: "Jade",
+    patterns: [/\bjade\b/i],
+  },
+  {
     canonical: "Green",
-    patterns: [/\b(green|vert|verde|grun|gr\u00fcn|sage|forest|hunter)\b/i],
+    patterns: [/\b(green|vert|verde|grun|gr\u00fcn|sage)\b/i],
     contains: ["\uadf8\ub9b0", "\ub179\uc0c9", "\ucd08\ub85d"],
   },
   {
@@ -180,9 +405,46 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
     contains: ["\uc62c\ub9ac\ube0c"],
   },
   {
+    canonical: "Pistachio",
+    patterns: [/\bpistachio\b/i],
+  },
+  {
+    canonical: "Lime",
+    patterns: [/\blime\b/i],
+  },
+  // Grey-adjacent texture/finish name. Ordered after Grey (earlier in this
+  // array) so "Grey Melange" still resolves to the more useful "Grey" \u2014
+  // this rule only fires for bare "Melange" with no other hue word present,
+  // which is how it actually shows up as a raw color value in practice.
+  {
+    canonical: "Melange",
+    patterns: [/\bmelange\b/i],
+    contains: ["\uba5c\ub780\uc9c0"],
+  },
+  {
+    canonical: "Graphite",
+    patterns: [/\bgraphite\b/i],
+  },
+  {
+    canonical: "Mustard",
+    patterns: [/\bmustard\b/i],
+  },
+  {
+    canonical: "Butter",
+    patterns: [/\bbutter\b/i],
+  },
+  {
+    canonical: "Lemon",
+    patterns: [/\blemon\b/i],
+  },
+  {
     canonical: "Yellow",
     patterns: [/\b(yellow|jaune|amarillo|amarilla|giallo|gelb)\b/i],
     contains: ["\uc610\ub85c", "\ub178\ub791", "\ub178\ub780\uc0c9", "\ud669\uc0c9"],
+  },
+  {
+    canonical: "Rust",
+    patterns: [/\b(rust|terracotta|burnt\s*orange)\b/i],
   },
   {
     canonical: "Orange",
@@ -200,9 +462,39 @@ export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains
     contains: ["\uace8\ub4dc", "\uae08\uc0c9"],
   },
   {
+    canonical: "Brass",
+    patterns: [/\bbrass\b/i],
+  },
+  {
+    canonical: "Bronze",
+    patterns: [/\bbronze\b/i],
+  },
+  {
     canonical: "Multi",
-    patterns: [/\b(multi(?:color|colour|colore)?|multicolor|multicolour|assorted)\b/i],
+    // "multicolored"/"multicoloured" (spelled-out -ed suffix) added
+    // 2026-07-28 \u2014 the original alternation required the match to end
+    // exactly on "color"/"colour"/"colore", so \b right after it failed on
+    // any -ed suffix ("multicolored" has more word characters after
+    // position 10). Purely additive; every previously-matched form still
+    // matches unchanged.
+    patterns: [
+      /\b(multi(?:color|colour|colore)?|multicolor|multicolour|multicolored|multicoloured|assorted)\b/i,
+    ],
     contains: ["\uba40\ud2f0", "\ub2e4\uc0c9"],
+  },
+  // Print/material names that function as de-facto color values in retail
+  // listings \u2014 a shopper filtering by "camo" or "leopard" expects that to
+  // work the same way a hue filter does. Unlike "Denim" (a fabric name
+  // spanning many actual colors, deliberately NOT added here \u2014 too risky as
+  // a text-fallback trigger), these directly describe the visible
+  // appearance, so the false-positive rate via name-text fallback is low.
+  {
+    canonical: "Camo",
+    patterns: [/\b(camo|camouflage)\b/i],
+  },
+  {
+    canonical: "Leopard",
+    patterns: [/\bleopard\b/i],
   },
 ]
 
