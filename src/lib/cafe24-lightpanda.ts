@@ -19,6 +19,7 @@ export interface LightpandaCafe24Options {
   detailConcurrency?: number
   onDetailProgress?: CrawlCafe24Options["onDetailProgress"]
   existingDetails?: CrawlCafe24Options["existingDetails"]
+  includeOutOfStock?: CrawlCafe24Options["includeOutOfStock"]
 }
 
 interface LightpandaPageLease extends Cafe24DetailPageLease {
@@ -152,6 +153,7 @@ export async function crawlCafe24WithLightpanda(
       detailConcurrency,
       onDetailProgress: options.onDetailProgress,
       existingDetails: options.existingDetails,
+      includeOutOfStock: options.includeOutOfStock,
       createDetailPage: detailPool
         ? async () => {
             const lease = await detailPool.acquire()

@@ -125,6 +125,18 @@ export interface CrawlCafe24Options {
    */
   listingOnly?: boolean
   /**
+   * 재수집 전용 — 품절 상품을 결과에 남기되 상세 크롤은 그대로 수행한다.
+   * `listingOnly` 를 재사용할 수 없는 이유: 그 플래그는 아래 상세 크롤 블록의
+   * 게이트(`!options.listingOnly`)도 겸하고 있어서, 켜면 description/color 추출이
+   * 통째로 죽는다. 재수집은 품절 상품까지 상세를 다 받아야 한다.
+   *
+   * 왜 필요한가: 품절 상품은 import 플래그가 아니라 이 크롤 레이어에서 버려진다
+   * (2026-06 코호트 실측 — 대상 60,634행 중 14,971행 24.7%가 품절이었고,
+   * mohawk-general/bodega 는 각각 83%였다). 남기지 않으면 그 행들은 옛 추출 로직
+   * 산물을 영구히 유지한다. src/crawl.ts 의 --include-out-of-stock 로 켠다.
+   */
+  includeOutOfStock?: boolean
+  /**
    * Chromium 전용: deterministic 상세 파싱 직후, 페이지가 리셋/재사용되기 전에
    * 그 살아있는 상세 페이지와 함께 호출된다. product-extraction-poc.ts의 hybrid
    * variant가 두 번째 네비게이션 없이 LLM 보강(category/subcategory/color/
@@ -135,6 +147,20 @@ export interface CrawlCafe24Options {
    * 타임아웃난다 (.moai/plans/lightpanda-spike-report.md).
    */
   enrichDetailPage?: (page: Cafe24Page, product: Product) => Promise<void>
+}
+
+/**
+ * 품절 상품을 결과에 남길지 결정한다.
+ *
+ * 두 플래그가 같은 결과를 내지만 의미가 다르다는 점이 요지다. `listingOnly` 는
+ * 상세 크롤 자체를 끄는 갱신 모드 스위치를 겸하므로(아래 Step 3 게이트),
+ * 재수집처럼 "품절도 상세까지 다 받아야" 하는 경우에 재사용하면 description/
+ * color 추출이 통째로 죽는다. 그래서 `includeOutOfStock` 이 따로 있다.
+ */
+export function shouldKeepOutOfStock(
+  options: Pick<CrawlCafe24Options, "listingOnly" | "includeOutOfStock">,
+): boolean {
+  return Boolean(options.listingOnly || options.includeOutOfStock)
 }
 
 function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe24DetailPageLease> {
@@ -756,14 +782,17 @@ export async function crawlCafe24(
     await new Promise((r) => setTimeout(r, delay))
   }
 
-  // 중복 제거 + 품절 제외 (productUrl 기준). listingOnly(갱신)에서는 품절도 남긴다.
+  // 중복 제거 + 품절 제외 (productUrl 기준). listingOnly(갱신)와
+  // includeOutOfStock(재수집)에서는 품절도 남긴다.
   const seen = new Set<string>()
   const dedupedAll = allProducts.filter((p) => {
     if (!p.productUrl || seen.has(p.productUrl)) return false
     seen.add(p.productUrl)
     return true
   })
-  const dedupedProducts = options.listingOnly ? dedupedAll : dedupedAll.filter((p) => p.inStock)
+  const dedupedProducts = shouldKeepOutOfStock(options)
+    ? dedupedAll
+    : dedupedAll.filter((p) => p.inStock)
   let uniqueProducts = options.sampleLimit
     ? dedupedProducts.slice(0, options.sampleLimit)
     : dedupedProducts

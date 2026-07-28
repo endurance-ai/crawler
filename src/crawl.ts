@@ -583,6 +583,7 @@ async function crawlCafe24WithChromium(
   detailConcurrency = 3,
   onDetailProgress?: (products: Product[]) => Promise<void> | void,
   existingDetails?: Map<string, DetailData>,
+  includeOutOfStock?: boolean,
 ): Promise<CrawlResult> {
   const browser = await chromium.launch({headless: true})
   try {
@@ -596,6 +597,7 @@ async function crawlCafe24WithChromium(
       detailConcurrency,
       onDetailProgress,
       existingDetails,
+      includeOutOfStock,
     })
   } finally {
     await browser.close()
@@ -610,6 +612,7 @@ async function crawlCafe24WithSelectedEngine(
   detailConcurrency: number,
   onDetailProgress?: (products: Product[]) => Promise<void> | void,
   existingDetails?: Map<string, DetailData>,
+  includeOutOfStock?: boolean,
 ): Promise<CrawlResult> {
   if (mode === "chromium") {
     return await crawlCafe24WithChromium(
@@ -619,6 +622,7 @@ async function crawlCafe24WithSelectedEngine(
       detailConcurrency,
       onDetailProgress,
       existingDetails,
+      includeOutOfStock,
     )
   }
 
@@ -627,6 +631,7 @@ async function crawlCafe24WithSelectedEngine(
       detailConcurrency,
       onDetailProgress,
       existingDetails,
+      includeOutOfStock,
     })
     if (result.stats.totalProducts === 0) {
       throw new Error("Lightpanda returned 0 products")
@@ -643,11 +648,12 @@ async function crawlCafe24WithSelectedEngine(
       detailConcurrency,
       onDetailProgress,
       existingDetails,
+      includeOutOfStock,
     )
   }
 }
 
-async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
+async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStock = false) {
   const results: CrawlResult[] = []
   const outDir = path.join(process.cwd(), "data")
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, {recursive: true})
@@ -826,7 +832,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
           await probeSite(config)
           continue
         }
-        const result = await crawlShopify(config)
+        const result = await crawlShopify(config, {includeOutOfStock})
         results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
@@ -871,6 +877,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
               detailConcurrency,
               onDetailProgress,
               existingDetails,
+              includeOutOfStock,
             ),
             config.key,
           )
@@ -1132,6 +1139,10 @@ async function main() {
   const flags = parseArgs()
   const detailFlag = !!flags.detail
   const reviewFlag = !!flags.reviews
+  // 품절 상품은 평소 shopify/cafe24 엔진에서 걸러진다. 재수집(옛 추출 로직으로
+  // 만들어진 행을 현재 로직으로 갈아엎는 작업)에서는 품절 행도 갱신 대상이므로
+  // 남겨야 한다 — 안 그러면 그 행들만 옛 데이터로 영구히 남는다.
+  const includeOutOfStock = !!flags["include-out-of-stock"]
 
   // REQ-007: --rate=N parser. Validate at parse time BEFORE any fetch.
   // Rejects N>5, N<=0, non-integer N (e.g. 2.5, "abc").
@@ -1245,6 +1256,8 @@ async function main() {
   --dry-run               카테고리 탐색만 (상품 안 긁음)
   --detail      상세 페이지 크롤링 (description, color, material 수집)
   --reviews     리뷰 크롤링 (--detail 없이도 가능, 리뷰 보드 페이지 기반)
+  --include-out-of-stock  품절 상품도 수집 (재수집 전용 — shopify/cafe24 엔진의
+                          기본 품절 필터를 끈다. zara/uniqlo 는 원래 품절도 남긴다)
 `)
     return
   }
@@ -1279,7 +1292,11 @@ async function main() {
   console.log(`\n🚀 크롤링 시작: ${targets.map((t) => t.name).join(", ")}`)
   if (dryRun) console.log("   (dry-run 모드 — 카테고리 탐색만)")
 
-  await runCrawl(targets, dryRun)
+  if (includeOutOfStock) {
+    console.log("📦 품절 상품 포함 (재수집 모드)")
+  }
+
+  await runCrawl(targets, dryRun, includeOutOfStock)
 }
 
 /**
