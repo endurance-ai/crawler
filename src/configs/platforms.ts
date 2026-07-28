@@ -779,6 +779,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
+    // 2026-07-28 재수집 파일럿에서 발견: 상품 9개 전부 성별 신호가 없어
+    // gender_missing 으로 QC 게이트에 전량 걸려 writeProductsFile 이 파일을
+    // 아예 안 썼다 (크롤 "0개"로 보였던 원인). 스트리트웨어 브랜드로 사이트에
+    // 남녀 구분이 없어 unisex 로 명시.
+    defaultGender: ["unisex"],
   },
   {
     key: "drakes",

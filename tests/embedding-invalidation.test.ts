@@ -74,6 +74,22 @@ test("normalizeImageUrl: 캐시버스터와 리사이즈 접미사를 같은 이
 
   assert.equal(normalizeImageUrl(null), null)
   assert.equal(normalizeImageUrl("   "), null)
+})
+
+test("normalizeImageUrl: 각도별 파일명(_top/_back/_front/_side)도 같은 이미지로 본다", () => {
+  // 2026-07-28 파일럿 032c 실측: "32_00245-2_top.jpg" vs "32_00245-2.jpg" 가
+  // 변경 비율 20% 경보를 넘겨 임베딩 무효화가 자동 보류됐다.
+  assert.equal(
+    normalizeImageUrl("https://cdn.shopify.com/s/files/1/1018/1547/files/32_00245-2_top.jpg"),
+    normalizeImageUrl("https://cdn.shopify.com/s/files/1/1018/1547/files/32_00245-2.jpg"),
+  )
+  for (const angle of ["bottom", "back", "front", "side", "detail", "alt", "flat"]) {
+    assert.equal(
+      normalizeImageUrl(`https://cdn.shopify.com/s/files/1/shirt_${angle}.jpg`),
+      normalizeImageUrl("https://cdn.shopify.com/s/files/1/shirt.jpg"),
+      `_${angle} 접미사도 동일 상품 사진으로 취급해야 한다`,
+    )
+  }
   assert.equal(normalizeImageUrl("not a url"), "not a url", "파싱 실패는 원문 유지 — 같은 값끼리는 같다고 판정된다")
 })
 

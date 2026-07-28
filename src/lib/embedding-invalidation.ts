@@ -46,10 +46,14 @@ export function normalizeImageUrl(raw: string | null): string | null {
   try {
     const url = new URL(trimmed)
     const host = url.hostname.toLowerCase().replace(/^www\./, "")
-    const pathname = url.pathname.replace(
-      /_(\d+x\d*|x\d+)(?=\.[a-z0-9]+$)/i,
-      "",
-    )
+    const pathname = url.pathname
+      .replace(/_(\d+x\d*|x\d+)(?=\.[a-z0-9]+$)/i, "")
+      // 2026-07-28 파일럿 032c 실측: 같은 상품의 각도별 파일명
+      // ("32_00245-2_top.jpg" vs "32_00245-2.jpg")이 변경 비율 20% 경보를
+      // 넘겨 임베딩 무효화가 자동 보류됐다. embed_products.py 는 어차피
+      // images[0] 하나만 쓰므로, 어느 각도 파일이 오든 "그 상품 사진"이라는
+      // 사실은 같다 — 사이즈 접미사와 같은 취급.
+      .replace(/_(top|bottom|back|front|side|detail|alt|flat)(?=\.[a-z0-9]+$)/i, "")
     return `${host}${pathname}`
   } catch {
     return trimmed
