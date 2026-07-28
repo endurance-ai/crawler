@@ -50,7 +50,35 @@ export interface ProductQcReviewEvent {
   changes: unknown[]
 }
 
-export type CrawlerEvent = ValidationSuccessEvent | ValidationRejectEvent | ProductQcReviewEvent
+/**
+ * URL 경로 신호와 상품 텍스트 신호가 서로 다른 성별을 가리킨 경우.
+ *
+ * 이때 크롤러는 둘 중 하나를 고르지 않고 성별 미확인으로 떨어뜨린다(= 적재 제외).
+ * 이 이벤트가 특정 사이트에서 몰려 나오면 그 사이트의 카테고리 매핑이나
+ * platforms.ts gender 설정이 틀렸다는 신호다.
+ */
+export interface GenderSourceConflictEvent {
+  kind: "gender_source_conflict"
+  site: string
+  sku: string
+  urlGender: string
+  textGender: string
+}
+
+/** 중복 product_url 병합 시 서로 다른 성별이 같은 우선순위로 충돌한 경우. */
+export interface GenderMergeConflictEvent {
+  kind: "gender_merge_conflict"
+  site: string
+  sku: string
+  genders: string[]
+}
+
+export type CrawlerEvent =
+  | ValidationSuccessEvent
+  | ValidationRejectEvent
+  | ProductQcReviewEvent
+  | GenderSourceConflictEvent
+  | GenderMergeConflictEvent
 
 // ─── 사이트별 reject 집계 (요약 리포트용) ─────────────────────────────
 // emit() 를 통과하는 모든 validation_reject 를 site → 실패필드 별로 누적한다.

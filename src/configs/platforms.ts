@@ -1775,7 +1775,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     brand: "Years Ago",
     paginate: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    // 메인 라인이 남성복이고 여성은 "Years Ago Women"/"우먼즈 캡슐 컬렉션" 으로
+    // 붙은 별도 라인이다 (사이트에 MEN 카테고리 자체가 없다). 카테고리가 교차
+    // 구조라 여성 라인 상품은 "상의"/"아우터" 에도 함께 걸리는데, 카테고리 유래
+    // gender(engine)가 이 전역 기본값(config_default)보다 상위라 dedup merge 에서
+    // women 이 이긴다 — 확인: tests/product-gender.test.ts 의 config_default 케이스.
+    defaultGender: ["men"],
+    notes: "3차 배치 draft — dry-run 필요. defaultGender=men (여성 라인은 카테고리로 분리됨)",
   },
   {
     key: "ceyesseoul",

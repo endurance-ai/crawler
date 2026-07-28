@@ -23,6 +23,7 @@
     "refresh": "dotenv -e .env -e .env.local -- tsx src/refresh-listing.ts",
     "refresh:candidates": "dotenv -e .env -e .env.local -- tsx src/refresh-candidates.ts",
     "repair:product-platforms": "dotenv -e .env -e .env.local -- tsx tools/repair-product-platforms.ts",
+    "repair:product-gender": "dotenv -e .env -e .env.local -- tsx src/repair-product-gender.ts",
     "poc:product-extraction": "dotenv -e .env -e .env.local -- tsx tools/product-extraction-poc.ts",
     "scaffold:platform": "tsx tools/scaffold-platform.ts",
     "spike:lightpanda": "dotenv -e .env -e .env.local -- tsx src/spikes/lightpanda-poc.ts",

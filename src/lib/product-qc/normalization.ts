@@ -1,5 +1,7 @@
 import {CATEGORIES, type Category} from "../enums/product-enums"
 import {emit} from "../core/observability"
+import {inferGenderFromText, normalizeGenderToken} from "../product-gender"
+import {matchesAny, normalizeForMatch} from "../text-match"
 
 export type ProductQcAction = "keep" | "auto_fix" | "review" | "reject"
 
@@ -337,38 +339,16 @@ const CATEGORY_COMPAT: Record<string, Category> = {
   other: "other",
 }
 
-const GENDER_RULES: Array<{gender: "men" | "women" | "unisex"; patterns: RegExp[]; contains?: string[]}> = [
-  {
-    gender: "men",
-    patterns: [/\b(men|mens|men's|man|male|hombre|homme|uomo|herren)\b/i],
-    contains: ["\ub0a8\uc131", "\ub0a8\uc790", "\ub0a8\uc790\uc6a9", "\uba58\uc988"],
-  },
-  {
-    gender: "women",
-    patterns: [/\b(women|womens|women's|woman|female|mujer|femme|donna|damen|ladies)\b/i],
-    contains: ["\uc5ec\uc131", "\uc5ec\uc790", "\uc5ec\uc790\uc6a9", "\uc6b0\uba3c", "\ub808\uc774\ub514\uc2a4"],
-  },
-  {
-    gender: "unisex",
-    patterns: [/\b(unisex|genderless|gender[-\s]?free)\b/i],
-    contains: ["\ub0a8\ub140\uacf5\uc6a9", "\uacf5\uc6a9", "\uc720\ub2c8\uc139\uc2a4"],
-  },
-]
+// GENDER_RULES / normalizeGenderToken / inferGenderFromText \ub294 ../product-gender
+// \ub85c \uc774\uad00\ub410\ub2e4 (\uaddc\uce59 \uc790\uccb4\ub294 \ub3d9\uc77c) \u2014 write-path(crawl.ts, import-products.ts)\uac00
+// \ube0c\ub79c\ub4dc gender_scope \ud3f4\ubc31\ubcf4\ub2e4 **\uba3c\uc800** \uac19\uc740 \uaddc\uce59\uc73c\ub85c \ucd94\ub860\ud574\uc57c \ud558\uace0, \uad50\uc815
+// \uc2a4\ud06c\ub9bd\ud2b8(lib/gender-repair.ts)\ub3c4 \uac19\uc740 \uaddc\uce59\uc744 \uc7ac\uc0ac\uc6a9\ud574\uc57c \ud558\uae30 \ub54c\ubb38\uc774\ub2e4.
+// \uc774 \ud30c\uc77c\uc758 gender \uc815\uaddc\ud654\ub294 \uadf8 \ub4a4\uc5d0 \ub3c4\ub294 backstop \uc73c\ub85c \ub0a8\ub294\ub2e4.
 
 function isQcEnabled(): boolean {
   const v = process.env.CRAWLER_QC_NORMALIZATION_ENABLED
   if (v === undefined || v === "") return true
   return v.toLowerCase() !== "false"
-}
-
-function normalizeForMatch(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase()
 }
 
 function titleCase(value: string): string {
@@ -402,12 +382,6 @@ function record(site: string, result: ProductQcResult): void {
     const sku = skuOf(result.product)
     if (bucket.length < 3 && sku) bucket.push(sku)
   }
-}
-
-function matchesAny(text: string, patterns: RegExp[], contains?: string[]): boolean {
-  const stripped = normalizeForMatch(text)
-  if (patterns.some((re) => re.test(text) || re.test(stripped))) return true
-  return (contains ?? []).some((needle) => text.includes(needle))
 }
 
 function canonicalColorFromText(text: string): string | null {
@@ -529,20 +503,6 @@ function normalizeCategoryField(product: ProductQcInput): {
 
   if (inferred) return {value: inferred, reason: "category_noise_text_fallback", confidence: 0.8, needsReview: false}
   return {value: null, reason: "category_noncanonical_dropped", confidence: 0, needsReview: true}
-}
-
-function normalizeGenderToken(raw: string): "men" | "women" | "unisex" | null {
-  for (const rule of GENDER_RULES) {
-    if (matchesAny(raw, rule.patterns, rule.contains)) return rule.gender
-  }
-  return null
-}
-
-function inferGenderFromText(text: string): "men" | "women" | "unisex" | null {
-  const matches = GENDER_RULES.filter((rule) => matchesAny(text, rule.patterns, rule.contains)).map((rule) => rule.gender)
-  const unique = [...new Set(matches)]
-  if (unique.includes("unisex")) return "unisex"
-  return unique.length === 1 ? unique[0] : null
 }
 
 function normalizeGenderField(product: ProductQcInput): {

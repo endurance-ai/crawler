@@ -30,7 +30,7 @@
 
 import {z} from "zod"
 import type {Product} from "../types.js"
-import {PRODUCT_GENDER_VALUES} from "../product-gender.js"
+import {GENDER_SOURCE_VALUES, PRODUCT_GENDER_VALUES} from "../product-gender.js"
 
 // @MX:ANCHOR: [AUTO] validateProduct() is the crawler write-boundary contract —
 //   every product crossing into JSON output or DB upsert passes through here.
@@ -67,6 +67,9 @@ export const ProductSchema = z
     productUrl: z.string(),
     inStock: z.boolean(),
     gender: z.array(z.enum(PRODUCT_GENDER_VALUES)).min(1),
+    // gender 의 출처. 이 필드를 쓰지 않는 기존 파서/golden 픽스처가 있으므로
+    // optional — 값이 있다면 알려진 provenance 여야 한다.
+    genderSource: z.enum(GENDER_SOURCE_VALUES).optional(),
     platform: z.string(),
     crawledAt: z.string(),
     // ── 상세 페이지 데이터 (선택) ──

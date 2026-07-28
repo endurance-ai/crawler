@@ -230,6 +230,14 @@ export function parseShopifyProducts(
     if (tagsLower.some((t) => t.includes("men") || t.includes("male"))) {
       if (!gender.includes("men")) gender.push("men")
     }
+    // NOTE: cafe24/imweb 과 달리 여기서는 genderSource 를 stamp 하지 않는다.
+    // parseShopifyProducts 의 출력은 SPEC-ARCH-CRAWLER-001 골든 마스터로 고정돼
+    // 있고(tests/shopify-parse.characterization.test.ts — "do NOT regenerate"),
+    // 필드를 추가하면 그 게이트가 깨진다. shopify 는 /products.json 에서 상품당
+    // 1행만 나와 카테고리 교차 노출이 없으므로 config_default 를 구분해야 하는
+    // dedup merge union 문제도 발생하지 않는다. 대신 defaultGender 만으로 성별이
+    // 정해진 shopify 상품은 engine 으로 기록돼 실제보다 신뢰도가 높게 표시된다 —
+    // 이를 고치려면 골든 갱신을 팀 리뷰로 처리해야 한다.
 
     // description — HTML 태그 제거 + 잔여 "<" 인코딩 (downstream XSS 방지)
     const bodyHtml = sp.body_html || ""

@@ -56,9 +56,9 @@ import type {IReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, Product, SiteConfig} from "./lib/types"
 import type {DetailData} from "./lib/parsers/detail/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
-import {getValidationReport} from "./lib/core/observability"
+import {emit, getValidationReport} from "./lib/core/observability"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGender} from "./lib/product-gender"
+import {cleanGenderScope, resolveProductGenderWithSource} from "./lib/product-gender"
 
 // 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
 // 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
@@ -894,10 +894,37 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean) {
 async function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
   if (rawProducts.length === 0) return
 
+  // brand_nodes.gender_scope 는 **플랫폼** 단위로 조회된다 — 멀티브랜드 편집샵
+  // (29cm/farfetch/zara)에서는 그 브랜드가 상품의 브랜드가 아니므로 폴백 근거가
+  // 되지 못한다. 단일브랜드 자사몰(config.brand 설정됨)에서만 유효하고, 나머지는
+  // 상품별 brand_node_id 를 아는 import-products.ts 단계에 위임한다.
   const brandGenderScope = await getBrandGenderScopeForPlatform(platform)
+  const scopeForFallback = getSiteConfig(platform)?.brand ? brandGenderScope : []
+
+  const genderSourceCounts: Record<string, number> = {}
   const productsWithGenderFallback = rawProducts.map((product) => {
-    const gender = resolveProductGender(product.gender, brandGenderScope)
-    return gender.length > 0 ? {...product, gender} : product
+    const resolved = resolveProductGenderWithSource(product.gender, scopeForFallback, {
+      name: product.name,
+      category: product.category,
+      subcategory: product.subcategory,
+      description: product.description,
+      tags: product.tags,
+      productUrl: product.productUrl,
+      useDescription: true,
+    }, product.genderSource ?? "engine")
+    genderSourceCounts[resolved.source ?? "unknown"] = (genderSourceCounts[resolved.source ?? "unknown"] ?? 0) + 1
+    if (resolved.conflict) {
+      emit({
+        kind: "gender_source_conflict",
+        site: platform,
+        sku: product.productUrl,
+        urlGender: resolved.conflict.url,
+        textGender: resolved.conflict.text,
+      })
+    }
+    return resolved.gender.length > 0
+      ? {...product, gender: resolved.gender, genderSource: resolved.source ?? undefined}
+      : product
   })
 
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
@@ -911,7 +938,12 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
 
   const outPath = path.join(outDir, `${platform}-products.json`)
   fs.writeFileSync(outPath, JSON.stringify(products, null, 2), "utf-8")
+  const genderSourceSummary = Object.entries(genderSourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([source, n]) => `${source}=${n}`)
+    .join(" ")
   console.log(`   💾 저장: ${outPath}`)
+  console.log(`   🚻 gender 출처: ${genderSourceSummary}`)
 }
 
 async function saveResult(outDir: string, result: CrawlResult) {
