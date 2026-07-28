@@ -37,10 +37,24 @@ test("size/stock noise with a clear color in the name falls back to text", () =>
   assert.equal(d.after, "Black")
 })
 
-test("a real but non-canonical color name gets recased, not dropped", () => {
+test("mustard is now a recognized canonical color (2026-07-28 color-vocab sync)", () => {
+  // Was "recased, not dropped" before the fix — this is the exact bug the
+  // sync closed: COLOR_RULES here didn't recognize "mustard" even though
+  // color-normalizer.ts (the parser-layer vocabulary) already did, so it
+  // fell through to the title-case passthrough instead of canonicalizing.
   const d = classifyColorRepair(row({color: "mustard"}))
-  assert.equal(d.bucket, "recased")
+  assert.equal(d.bucket, "canonicalized")
   assert.equal(d.after, "Mustard")
+})
+
+test("a real but still-unrecognized color name gets recased, not dropped", () => {
+  // "Denim" is deliberately NOT in COLOR_RULES — it's a fabric name spanning
+  // many actual colors, too risky as a name-text-fallback trigger (see the
+  // comment above the Camo/Leopard entries in normalization.ts). Kept as a
+  // live example of the "recased" bucket now that mustard graduated out of it.
+  const d = classifyColorRepair(row({color: "denim"}))
+  assert.equal(d.bucket, "recased")
+  assert.equal(d.after, "Denim")
 })
 
 test("unresolvable noise with no color signal anywhere is kept, never nulled", () => {

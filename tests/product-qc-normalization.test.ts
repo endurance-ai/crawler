@@ -210,3 +210,71 @@ test("QC resolves subcategory against the canonicalized category, not the raw al
   assert.equal(result.product.subcategory, "turtleneck")
 })
 
+// ── 2026-07-28 color-vocab sync ──────────────────────────────────────────
+// COLOR_RULES went from 26 to 81 canonical names after a real-DB review
+// found browns (the largest single cohort) at 99.9% non-canonical color —
+// almost entirely real color words (Teal, Mint, Coral, ...) that simply
+// weren't recognized, not garbage. These tests lock in a representative
+// sample rather than every added name.
+
+test("QC canonicalizes a color word added in the 2026-07-28 sync", () => {
+  const result = normalizeProductTextFields(product({color: "teal"}))
+  assert.equal(result.product.color, "Teal")
+  assert.ok(result.reasons.includes("color_canonicalized"))
+})
+
+test("QC canonicalizes the spelled-out -ed form of multicolor", () => {
+  // The original pattern required the match to end exactly on "color"/
+  // "colour"/"colore" — \b right after it failed on any -ed suffix, so
+  // "multicolored" fell all the way through to the title-case passthrough.
+  const result = normalizeProductTextFields(product({color: "Multicolored"}))
+  assert.equal(result.product.color, "Multi")
+  assert.ok(result.reasons.includes("color_canonicalized"))
+})
+
+test("QC requires the word 'blue' for Sky Blue — bare 'Sky' is left alone, not force-matched", () => {
+  // Deliberate false-positive guard: canonicalColorFromText() also runs as a
+  // name-text fallback when the color field is empty, and bare "sky" collides
+  // with marketing phrases like "Sky High Heels" that say nothing about the
+  // item's actual color. Bare "Sky" isn't NOISE either (it's a plausible-
+  // looking word, same bucket as "Denim"/"Essential") — it's simply not
+  // confidently matched to anything, so it passes through unchanged rather
+  // than being rejected-for-review or miscanonicalized.
+  // name/category/subcategory left at the product() defaults deliberately —
+  // they're mutually consistent there (Black Wide Pants / bottoms /
+  // wide-pants), so this only exercises the color field, not an unrelated
+  // category-inference conflict.
+  const bare = normalizeProductTextFields(product({color: "Sky"}))
+  assert.equal(bare.product.color, "Sky")
+  assert.ok(!bare.changes.some((c) => c.field === "color"), "no color change should be recorded")
+  assert.ok(!bare.reasons.some((r) => r.startsWith("color_")), "no color-specific reason should fire")
+
+  const full = normalizeProductTextFields(product({color: "Sky Blue"}))
+  assert.equal(full.product.color, "Sky Blue")
+  assert.ok(full.reasons.includes("color_canonicalized"))
+})
+
+test("QC recognizes spelled-out size words as noise, not distinct colors", () => {
+  // "Small, Medium, Large" used to survive as a literal title-cased color
+  // value — only s/m/l abbreviations were covered before.
+  const result = normalizeProductTextFields(product({color: "Small, Medium, Large", name: "Archive Piece 001"}))
+  assert.ok(result.reasons.includes("color_non_color_unresolved"))
+})
+
+test("QC recognizes Roman numeral size tiers (Korean 사이즈 Ⅰ/Ⅱ/Ⅲ) as noise", () => {
+  const result = normalizeProductTextFields(product({color: "Ⅰ, Ⅱ", name: "Archive Piece 001"}))
+  assert.ok(result.reasons.includes("color_non_color_unresolved"))
+})
+
+test("QC recognizes a stringified-null placeholder as noise", () => {
+  const result = normalizeProductTextFields(product({color: "Null", name: "Archive Piece 001"}))
+  assert.ok(result.reasons.includes("color_non_color_unresolved"))
+})
+
+test("QC recognizes a bundled exchange/refund disclaimer as noise, including its 'Sale' lead-in", () => {
+  const result = normalizeProductTextFields(
+    product({color: "Sale, 세일 상품은 교환, 환불이 어렵습니다", name: "Archive Piece 001"}),
+  )
+  assert.ok(result.reasons.includes("color_non_color_unresolved"))
+})
+
