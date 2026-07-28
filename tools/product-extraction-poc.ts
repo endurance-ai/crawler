@@ -397,12 +397,23 @@ function getRuntime(stats: RuntimeStatsByBrand, brandKey: string, variant: Varia
   return stats[brandKey][variant]
 }
 
+/**
+ * POC 기본값은 "가볍게 한 페이지만" 이다 — 비교 실험용이라 카탈로그 전체를 받을
+ * 이유가 없다. 다만 scale 런(POC_UNSAFE_SCALE=1, onboard-batch.sh 가 켠다)에서는
+ * 이 클램프가 조용한 데이터 절단이 된다:
+ *   - maxPages 1 → crawlShopify 가 /products.json?limit=250 을 한 번만 부른다.
+ *     maxPages: 300 으로 등록된 브랜드도 250개에서 잘린다.
+ *   - crawlDelay 300ms → Cloudflare 뒤에 있어 1500ms 를 선언한 브랜드(browns 등)를
+ *     5배 빠르게 두드려 429 를 부른다.
+ * --limit 캡이 이미 같은 env 로 풀리므로(위 parseCliOptions) 동일하게 맞춘다.
+ */
 function clonePocConfig(config: SiteConfig, limit: number): SiteConfig {
+  const scaleRun = process.env.POC_UNSAFE_SCALE === "1"
   return {
     ...config,
     disabled: false,
-    maxPages: Math.min(config.maxPages ?? 1, 1),
-    crawlDelay: Math.min(config.crawlDelay ?? 300, 300),
+    maxPages: scaleRun ? (config.maxPages ?? 1) : Math.min(config.maxPages ?? 1, 1),
+    crawlDelay: scaleRun ? (config.crawlDelay ?? 300) : Math.min(config.crawlDelay ?? 300, 300),
     crawlReviews: false,
     crawlDetails: Boolean(config.crawlDetails),
     category: config.category ? {...config.category} : config.category,

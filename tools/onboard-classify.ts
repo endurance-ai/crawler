@@ -22,6 +22,17 @@ const clsModel = mk(uCls), colModel = mk(uCol)
 const ClsSchema = z.object({items: z.array(z.object({i: z.number(), category: z.string().nullable(), subcategory: z.string().nullable()}))}), ColSchema = z.object({color: z.string().nullable()})
 const CW = /^(black|white|ivory|cream|beige|tan|khaki|olive|green|blue|navy|sky ?blue|teal|indigo|red|pink|coral|burgundy|wine|purple|violet|grey|gray|charcoal|brown|camel|mocha|taupe|sand|bone|yellow|gold|orange|silver|melange|mint)$/i
 const detColor = (t: string) => { for (const r of t.split(/[\s,_/|.\-()]+/)) { const c = normalizeColorList(r); if (c && CW.test(c)) return c } return null }
+// hybrid variant 은 runHybridVariant / createInlineClassifier 가 **상세 페이지를 보고**
+// subcategory 를 뽑아 products.jsonl 에 실어 보낸다. 아래 classify() 는 이름만 보는
+// gpt-4.1-nano 배치 분류라 근거가 훨씬 약하므로, hybrid 일 때는 페이지 기반 값을 우선한다.
+// (existing variant 에는 이 필드가 없으므로 기존 경로는 바이트 동일하게 유지된다.)
+//
+// gender 는 일부러 건드리지 않는다: hybrid 도 per-product gender 를 만들지만,
+// products.gender_source 의 CHECK 제약(migration 093/094)에 "llm" 값이 없어서
+// 그대로 흘려보내면 import-products 가 출처를 "engine" 으로 귀속시킨다. 그건 PR #48이
+// 막은 성별 세탁을 되살리는 셈이라, 먼저 gender_source 값을 추가해야 한다.
+const hybridSubcategory = (r: any): string | null =>
+  VARIANT === "hybrid" && typeof r.subcategory === "string" && r.subcategory.trim() ? r.subcategory.trim() : null
 async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}], temperature: 0}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
 async function llmColor(page: Page, pr: any) { try { await page.goto(pr.product_url, {waitUntil: "domcontentloaded", timeout: 40000}).catch(() => {}); await page.waitForTimeout(300); const c = await page.evaluate(() => ({handle: location.pathname, options: Array.from(document.querySelectorAll("select option")).map((o) => (o.textContent || "").trim()).filter(Boolean).slice(0, 12), detail: (document.querySelector('#prdDetail, .xans-product-detail, .cont, [class*="detail" i]') as HTMLElement | null)?.innerText?.replace(/\s+/g, " ").slice(0, 800) || ""})).catch(() => ({handle: "", options: [] as string[], detail: ""})); const res = await generateText({model: colModel, output: Output.object({schema: ColSchema}), system: "Extract THIS product's primary color from name/handle/options/description. One color word. null ONLY if none.", messages: [{role: "user", content: JSON.stringify({name: pr.name, ...c})}], temperature: 0}); const col = (res.output as any)?.color; return col && String(col).trim() ? String(col).trim() : null } catch { return null } }
 async function main() {
@@ -52,7 +63,7 @@ async function main() {
   const perBrand: Record<string, any[]> = {}
   pass.forEach((r, i) => { const cfg = cfgByKey[r.brand_key], p = preds[i] || {}, cur = r.currency || "KRW", price = typeof r.price === "number" ? r.price : null
     if (!cfg.brand && !warnedNoBrand.has(r.brand_key)) { warnedNoBrand.add(r.brand_key); console.warn(`⚠️  ${r.brand_key}: platforms.ts has no config.brand — falling back to name "${cfg.name}". If this is a single-house-brand shop, add the brand field (see docs/bulk-onboarding.md §4-1); if it's multi-brand, this fallback is wrong and needs per-product brand extraction instead.`) }
-    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, gender: cfg.defaultGender ?? [], brand: cfg.brand || cfg.name, color: fc[i], description: r.description ?? null, crawledAt: new Date().toISOString()}) })
+    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: hybridSubcategory(r) ?? p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, gender: cfg.defaultGender ?? [], brand: cfg.brand || cfg.name, color: fc[i], description: r.description ?? null, crawledAt: new Date().toISOString()}) })
   fs.mkdirSync("data", {recursive: true}); const written: string[] = []
   for (const [key, prods] of Object.entries(perBrand)) { fs.writeFileSync(path.join("data", `${key}-products.json`), JSON.stringify(prods, null, 2)); written.push(key) }
   fs.writeFileSync(PASSOUT, JSON.stringify(written))
