@@ -1,0 +1,4 @@
+# 배치 4 (4,624개) — bodega 는 품절 83% 인 첫 사례.
+# --include-out-of-stock 이 실제로 동작하는지 여기서 확인된다.
+antonioli
+bodega

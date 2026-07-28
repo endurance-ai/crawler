@@ -1,0 +1,4 @@
+# 배치 6 (11,073개) — etcseoul 은 최대 cafe24.
+# cafe24 는 상세 크롤 중 30개마다 체크포인트가 찍히므로 중단에 강하다.
+slam-jam
+etcseoul
