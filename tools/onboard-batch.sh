@@ -13,6 +13,16 @@
 #   --start <n>           first chunk index to run (default 0)
 #   --end <n>             last chunk index to run, inclusive (default = last chunk)
 #   --out-root <dir>      crawl output root (default poc-runs; gitignored)
+#   --product-limit <n>   per-brand crawl cap (default 2000). Brands with more
+#                          products than this are silently truncated — raise it
+#                          for full-catalog re-collection.
+#   --pool-limit <n>      candidate pool cap (default 2000)
+#   --import-flags "<..>" flags passed to import-products.ts
+#                          (default "--no-new-brands --in-stock-only").
+#                          Re-collecting existing rows wants neither: the former
+#                          drops products whose brand is not yet in brand_nodes,
+#                          the latter skips out-of-stock rows so they keep
+#                          whatever data they already had.
 #   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
 #                          variant to crawl AND the one onboard-classify.ts reads
 #                          back out of products.jsonl (kept in lockstep — see
@@ -37,6 +47,9 @@ END=""
 OUT_ROOT="poc-runs"
 CONFIGS=""
 VARIANTS="existing"
+PRODUCT_LIMIT=2000
+POOL_LIMIT=2000
+IMPORT_FLAGS="--no-new-brands --in-stock-only"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,6 +60,9 @@ while [ $# -gt 0 ]; do
     --end) END="$2"; shift 2 ;;
     --out-root) OUT_ROOT="$2"; shift 2 ;;
     --variants) VARIANTS="$2"; shift 2 ;;
+    --product-limit) PRODUCT_LIMIT="$2"; shift 2 ;;
+    --pool-limit) POOL_LIMIT="$2"; shift 2 ;;
+    --import-flags) IMPORT_FLAGS="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -115,7 +131,7 @@ for c in $(seq "$START" "$END"); do
   else
     CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
       $PNPM tsx tools/product-extraction-poc.ts \
-      --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit=2000 --pool-limit=2000 \
+      --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit="$PRODUCT_LIMIT" --pool-limit="$POOL_LIMIT" \
       --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)
@@ -132,7 +148,7 @@ for c in $(seq "$START" "$END"); do
   : > "$OUT_ROOT/import-chunk-$c.log"
   OK=0
   for KEY in $(node -e 'try{require(require("path").resolve(process.argv[1])).forEach(k=>console.log(k))}catch(e){}' "$PASSKEYS_JSON"); do
-    R=$($PNPM tsx src/import-products.ts --site="$KEY" --no-new-brands --in-stock-only 2>&1 | grep -oE "[0-9]+개 성공" | grep -oE "[0-9]+" | tail -1)
+    R=$($PNPM tsx src/import-products.ts --site="$KEY" $IMPORT_FLAGS 2>&1 | grep -oE "[0-9]+개 성공" | grep -oE "[0-9]+" | tail -1)
     OK=$((OK + ${R:-0}))
     echo "$KEY -> ${R:-0}" >> "$OUT_ROOT/import-chunk-$c.log"
   done
