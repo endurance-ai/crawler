@@ -47,6 +47,40 @@ test("refresh 워크리스트는 brand status가 아니라 활성 config와 상�
   assert.ok(result.skipped.some((item) => item.includes("zara-us:no-products")))
 })
 
+test("excluded source는 워크리스트에서 빠지고 사유가 남는다", () => {
+  const result = buildRefreshWorklist({
+    configs,
+    sourceStates: [],
+    productCounts: new Map([
+      ["kith", 5814],
+      ["browns", 11455],
+    ]),
+    types: new Set(["shopify", "zara"]),
+    excluded: new Set(["kith"]),
+  })
+
+  assert.deepEqual(
+    result.entries.map((entry) => entry.platform_key),
+    ["browns"],
+  )
+  assert.ok(result.skipped.includes("kith:excluded"))
+})
+
+test("excluded가 비어 있으면 워크리스트는 그대로다", () => {
+  const args = {
+    configs,
+    sourceStates: [],
+    productCounts: new Map([["browns", 11455]]),
+    types: new Set(["shopify", "zara"]),
+  }
+  const withEmpty = buildRefreshWorklist({...args, excluded: new Set<string>()})
+
+  assert.deepEqual(
+    withEmpty.entries.map((entry) => entry.platform_key),
+    buildRefreshWorklist(args).entries.map((entry) => entry.platform_key),
+  )
+})
+
 test("refresh config는 동일 source 중복을 제거하고 충돌 키는 거부한다", () => {
   assert.equal(uniqueRefreshConfigs([...configs, {...configs[0]}]).length, configs.length)
   assert.throws(

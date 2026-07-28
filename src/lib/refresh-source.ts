@@ -85,6 +85,8 @@ export function buildRefreshWorklist(args: {
   sourceStates: RefreshSourceState[]
   productCounts: Map<string, number>
   types: Set<string>
+  /** 배포 호스트별로 제외할 source key. config 는 그대로 두고 실행만 건너뛴다. */
+  excluded?: Set<string>
 }): {entries: RefreshWorklistEntry[]; skipped: string[]} {
   const states = new Map(args.sourceStates.map((row) => [row.platform_key, row]))
   const entries: RefreshWorklistEntry[] = []
@@ -93,6 +95,10 @@ export function buildRefreshWorklist(args: {
   for (const config of uniqueRefreshConfigs(args.configs)) {
     if (config.disabled) {
       skipped.push(`${config.key}:disabled`)
+      continue
+    }
+    if (args.excluded?.has(config.key)) {
+      skipped.push(`${config.key}:excluded`)
       continue
     }
     if (!args.types.has(config.type)) {
