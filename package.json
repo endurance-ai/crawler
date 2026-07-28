@@ -23,6 +23,7 @@
     "refresh": "dotenv -e .env -e .env.local -- tsx src/refresh-listing.ts",
     "refresh:candidates": "dotenv -e .env -e .env.local -- tsx src/refresh-candidates.ts",
     "enrich:products": "dotenv -e .env -e .env.local -- tsx src/enrich-products-file.ts",
+    "recollect:metrics": "dotenv -e .env -e .env.local -- tsx tools/recollect-metrics.ts",
     "repair:product-platforms": "dotenv -e .env -e .env.local -- tsx tools/repair-product-platforms.ts",
     "repair:product-gender": "dotenv -e .env -e .env.local -- tsx src/repair-product-gender.ts",
     "repair:product-subcategory": "dotenv -e .env -e .env.local -- tsx src/repair-product-subcategory.ts",
