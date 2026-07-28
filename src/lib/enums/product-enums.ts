@@ -127,18 +127,25 @@ export function isValidColorFamily(v: string): v is ColorFamily {
 
 // ─── Prompt Builder ──────────────────────────────────────
 
-/** AI 프롬프트에 주입할 enum 레퍼런스 텍스트 생성 */
-export function buildEnumReference(): string {
-  const subcategoryLines = (Object.entries(SUBCATEGORIES) as [Category, readonly string[]][])
+/**
+ * "category: [subcategory, ...]" 블록만 뽑은 레퍼런스. buildEnumReference() 의
+ * 일부이자, subcategory 만 필요한 다른 프롬프트(예: llm-product-enrichment.ts)
+ * 가 fit/fabric/color_family 까지 포함한 전체 블록을 복제하지 않고 재사용하는 용도.
+ */
+export function buildSubcategoryReference(): string {
+  return (Object.entries(SUBCATEGORIES) as [Category, readonly string[]][])
     .filter(([, subs]) => subs.length > 0)
     .map(([cat, subs]) => `  ${cat}: ${subs.join(", ")}`)
     .join("\n")
+}
 
+/** AI 프롬프트에 주입할 enum 레퍼런스 텍스트 생성 */
+export function buildEnumReference(): string {
   return `category (pick one; use "other" for non-fashion / unclassifiable items):
   ${CATEGORIES.join(", ")}
 
 subcategory by category (null if none fits):
-${subcategoryLines}
+${buildSubcategoryReference()}
 
 fit (pick one):
   ${FITS.join(", ")}
