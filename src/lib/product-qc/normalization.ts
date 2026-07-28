@@ -1,12 +1,13 @@
-import {CATEGORIES, type Category} from "../enums/product-enums"
+import {CATEGORIES, isValidCategory, type Category} from "../enums/product-enums"
 import {emit} from "../core/observability"
 import {inferGenderFromText, normalizeGenderToken} from "../product-gender"
+import {resolveSubcategory} from "../subcategory-classifier"
 import {matchesAny, normalizeForMatch} from "../text-match"
 
 export type ProductQcAction = "keep" | "auto_fix" | "review" | "reject"
 
 export interface ProductQcFieldChange {
-  field: "category" | "color" | "gender"
+  field: "category" | "color" | "gender" | "subcategory"
   before: unknown
   after: unknown
   reason: string
@@ -51,10 +52,28 @@ const SIZE_TOKEN_RE =
 const SIZE_SUFFIX_RE =
   /(?:[-_\s/]+(?:xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|free|os|one\s*size|[0-9]{1,3}(?:\.[0-9])?))$/i
 
+// Money branch requires an actual currency signal (a minus sign not part of a
+// product code, a currency code, or a won/원 suffix) attached to the digits —
+// a bare digit run like "14" or "925" must NOT match here. It previously did
+// (all three signals were optional around `[0-9,]+`), which flagged
+// legitimate colors carrying a number — "14k Gold", "925 Sterling Silver" —
+// as price/noise text and dropped them into an unrelated text fallback
+// (repair-product-color plan review, 2026-07-27: same raw "14k Gold"
+// resolved to different colors across rows depending on incidental words
+// elsewhere in each product). The minus branch also requires the "-" not be
+// immediately preceded by a letter, so product codes like "OG-107 GREEN" or
+// "MA-1" aren't misread as a negative price adjustment either (same review —
+// "OG-107 GREEN" was losing its real "GREEN" to this false positive).
+// 사이즈("size") and quantity/empty widget-label noise were missing entirely
+// (2026-07-27 repair review: "사이즈", "사이즈 M L Empty(...)", "Quantity Up
+// Down" were passing isNonColorToken as if they were real distinct color
+// names — colorCandidates' SIZE_SUFFIX_RE-stripping then duplicated the
+// "사이즈 M L Empty M" variants into a mangled multi-value string instead of
+// dropping them, since neither half was ever recognized as noise).
 const NON_COLOR_RE =
-  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|품절|select|choose|option|참조|참고|제품명|상세\s*페이지|이미지|본문|select\s*option|옵션\s*선택|\+|-?\s*(?:krw|usd|eur|gbp|jpy|cny)?\s*[0-9,]+\s*(?:won|원)?)/i
+  /(?:sold\s*out|out\s*of\s*stock|low\s*in\s*stock|품절|select|choose|option|참조|참고|제품명|상세\s*페이지|이미지|본문|select\s*option|옵션\s*선택|사이즈|quantity|empty|\+|(?<![A-Za-z])-\s*[0-9,]+\s*(?:won|원)?|(?:krw|usd|eur|gbp|jpy|cny)\s*[0-9,]+|[0-9,]+\s*(?:won|원))/i
 
-const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: string[]}> = [
+export const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: string[]}> = [
   {
     canonical: "Black",
     patterns: [/\b(black|noir|noire|negro|negra|nero|nera|schwarz|preto|preta)\b/i],
@@ -89,6 +108,11 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
     canonical: "Navy",
     patterns: [/\b(navy|marine|marino|bleu\s+marine|azul\s+marino|midnight)\b/i],
     contains: ["\ub124\uc774\ube44", "\uac10\uc0c9"],
+  },
+  {
+    canonical: "Indigo",
+    patterns: [/\bindigo\b/i],
+    contains: ["\uc778\ub514\uace0"],
   },
   {
     canonical: "Blue",
@@ -181,6 +205,14 @@ const COLOR_RULES: Array<{canonical: string; patterns: RegExp[]; contains?: stri
     contains: ["\uba40\ud2f0", "\ub2e4\uc0c9"],
   },
 ]
+
+/**
+ * Canonical color names this gate recognizes, for reuse outside the gate
+ * (e.g. llm-product-enrichment.ts's system prompt) \u2014 so an LLM path can be
+ * steered toward the same vocabulary this gate already canonicalizes into,
+ * instead of duplicating the list or emitting names the gate can't match.
+ */
+export const COLOR_CANONICAL_NAMES: readonly string[] = COLOR_RULES.map((rule) => rule.canonical)
 
 // Name-text \u2192 family inference (fallback only). inferCategoryFromText returns a
 // family ONLY when exactly one entry matches; overlapping matches resolve to null
@@ -404,7 +436,7 @@ function isNonColorToken(token: string): boolean {
 }
 
 function colorCandidates(raw: string): string[] {
-  return raw
+  const candidates = raw
     .split(/[,/|;]+/)
     .map((part) => part.replace(/\[[^\]]*\]|\([^)]*\)/g, " ").trim())
     .flatMap((part) => {
@@ -413,9 +445,24 @@ function colorCandidates(raw: string): string[] {
     })
     .map((part) => part.trim())
     .filter(Boolean)
+  // Keeping both the size-suffix-stripped and original form of each part (above)
+  // means a raw value like "SKU123, SKU123 4" produces the stripped "SKU123"
+  // twice — once on its own, once from stripping " 4" off the second part.
+  // Neither half is noise or a known color, so both survive into the final
+  // joined string, and without a dedupe here the repeat compounds every time
+  // this pattern occurs (2026-07-27 color-repair review: raw comma lists
+  // where a SKU/style code is listed once bare and once with a trailing
+  // numeric size variant were coming out duplicated, e.g. "Fjs82itym07834,
+  // Fjs82itym07834, Fjs82itym07834 109" from a 2-part raw value).
+  return [...new Set(candidates)]
 }
 
-function normalizeColorField(product: ProductQcInput): {
+/**
+ * Exported for reuse by color-repair.ts (one-off backfill of already-imported
+ * rows) — same reasoning as resolveSubcategory: one classifier, no duplicated
+ * rules between the write path and the repair script.
+ */
+export function normalizeColorField(product: ProductQcInput): {
   value: string | null
   reason: string | null
   confidence: number
@@ -505,6 +552,31 @@ function normalizeCategoryField(product: ProductQcInput): {
   return {value: null, reason: "category_noncanonical_dropped", confidence: 0, needsReview: true}
 }
 
+// subcategory is optional (unlike category — no NOT NULL constraint, no
+// search-filter dependency), so an unresolved value never triggers review;
+// it just drops to null. canonicalCategory must be the QC-resolved category
+// (post normalizeCategoryField), not the raw input, so e.g. "Outer"/"sweater"
+// aliases still resolve their subcategory correctly.
+function normalizeSubcategoryField(
+  product: ProductQcInput,
+  canonicalCategory: Category | null,
+): {value: string | null; reason: string | null; confidence: number} {
+  const resolved = resolveSubcategory(product.subcategory, canonicalCategory, product.name)
+
+  switch (resolved.reason) {
+    case null:
+      return {value: resolved.value, reason: null, confidence: 1}
+    case "canonicalized":
+      return {value: resolved.value, reason: "subcategory_canonicalized", confidence: 0.92}
+    case "text_fallback":
+      return {value: resolved.value, reason: "subcategory_missing_text_fallback", confidence: 0.75}
+    case "no_category":
+      return {value: null, reason: "subcategory_no_category", confidence: 0.5}
+    case "noncanonical_dropped":
+      return {value: null, reason: "subcategory_noncanonical_dropped", confidence: 0.4}
+  }
+}
+
 function normalizeGenderField(product: ProductQcInput): {
   value: string[] | null
   reason: string | null
@@ -552,6 +624,28 @@ export function normalizeProductTextFields<T extends ProductQcInput>(product: T)
   if (category.value && category.value !== product.category) {
     changes.push({field: "category", before: product.category, after: category.value, reason: category.reason ?? "category_normalized", confidence: category.confidence})
     next.category = category.value
+  }
+
+  // Resolve subcategory against the QC-canonicalized category (next.category),
+  // not the raw input — an aliased category like "Outer"/"sweater" must still
+  // land its subcategory in the right family's vocabulary. next.category can
+  // still be a non-canonical raw string here (category normalization leaves it
+  // untouched when it needs review — see the truthy guard above), so re-check
+  // validity rather than trust the cast; SUBCATEGORIES[bogusKey] would throw.
+  const canonicalCategory: Category | null =
+    typeof next.category === "string" && isValidCategory(next.category) ? next.category : null
+  const subcategory = normalizeSubcategoryField(product, canonicalCategory)
+  confidences.push(subcategory.confidence)
+  if (subcategory.reason) reasons.push(subcategory.reason)
+  if (subcategory.value !== (product.subcategory ?? null)) {
+    changes.push({
+      field: "subcategory",
+      before: product.subcategory,
+      after: subcategory.value,
+      reason: subcategory.reason ?? "subcategory_normalized",
+      confidence: subcategory.confidence,
+    })
+    next.subcategory = subcategory.value
   }
 
   const gender = normalizeGenderField(product)
