@@ -165,7 +165,17 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
   else
     log "2/8 crawl — pnpm crawl --site=$KEY --detail --include-out-of-stock"
     CRAWL_START=$(date +%s)
-    CRAWLER_CAFE24_ENGINE="$ENGINE" $PNPM tsx src/crawl.ts \
+    # CRAWLER_QC_NORMALIZATION_ENABLED=false: 크롤 시점의 규칙 기반 QC 게이트를
+    # 끈다. 단일 카테고리 config(category.gender=["men"] 같은)를 쓰는 사이트는
+    # 상품명이 순수 스타일 코드("101","137CS")뿐이라 카테고리 텍스트 매칭이
+    # 안 되고, 크롤 시점 게이트가 "category_noncanonical_dropped" 로 전량
+    # 걸러버린다 — LLM 보강이 손쓸 기회조차 없이 파일이 통째로 안 써진다
+    # (2026-07-28 배치 1 실측: bastong 4823개 전량 드롭). import-products.ts
+    # 가 :541-542 에서 같은 게이트를 독립적으로 다시 돌리므로(이번엔 env var
+    # 없이, 기본 활성 상태), 보강이 category 를 canonical enum 값으로 채운
+    # 뒤 거기서 제대로 검증된다. gender 는 이 플래그와 무관하게 항상 켜져
+    # 있는 별도 스키마 검증(gender: min(1))이 계속 막으므로 세탁 위험 없음.
+    CRAWLER_CAFE24_ENGINE="$ENGINE" CRAWLER_QC_NORMALIZATION_ENABLED=false $PNPM tsx src/crawl.ts \
       --site="$KEY" --detail --include-out-of-stock > "$KEY_DIR/crawl.log" 2>&1
     CRAWL_CODE=$?
     if [ "$CRAWL_CODE" -ne 0 ]; then
