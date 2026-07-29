@@ -139,8 +139,6 @@ export function computeRecollectMetrics(rows: readonly MetricsRow[]): RecollectM
     // ── color ──
     const color = typeof row.color === "string" ? row.color.trim() : ""
     if (!color) metrics.colorMissing += 1
-    else if (!isCanonicalColor(row.color)) metrics.colorNonCanonical += 1
-    if (isMultiValueColor(row.color)) metrics.colorMultiValue += 1
     const colorRow: ProductColorRow = {
       id: row.id,
       color: row.color,
@@ -156,6 +154,21 @@ export function computeRecollectMetrics(rows: readonly MetricsRow[]): RecollectM
     const colorDecision = classifyColorRepair(colorRow)
     if (colorDecision.bucket !== "unchanged") metrics.colorRepairable += 1
     if (colorDecision.bucket === "unresolved_kept") metrics.colorUnresolved += 1
+    // KPI 판정은 raw row.color 가 아니라 "import 시점 QC 게이트를 거치면
+    // 어떤 값이 될지"를 봐야 한다. --file 모드(재수집 캠페인의 크롤+보강
+    // 직후 JSON)는 아직 이 게이트를 한 번도 안 거친 LLM 원본이라, 예를 들어
+    // "Rose"(정규화하면 Pink) 를 raw 그대로 검사하면 오탐이 난다 —
+    // 2026-07-28 noah-ny 재실행에서 실측: 게이트가 "비canonical 7.4%→20.6%,
+    // 개선 없음"으로 잘못 차단했다. classifyColorRepair 가 이미 계산한
+    // colorDecision.after(정규화 결과, unchanged/unresolved_kept 는 null)를
+    // 재사용해 "effective" 값을 만든다 — --platform 모드(이미 게이트를
+    // 통과한 DB 값)에서는 대부분 unchanged→after=null→raw 그대로라 기존
+    // 동작과 같다.
+    if (color) {
+      const effectiveColor = colorDecision.after ?? color
+      if (!isCanonicalColor(effectiveColor)) metrics.colorNonCanonical += 1
+      if (isMultiValueColor(effectiveColor)) metrics.colorMultiValue += 1
+    }
 
     // ── subcategory ──
     if (!row.subcategory) metrics.subcategoryMissing += 1

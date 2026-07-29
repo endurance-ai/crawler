@@ -61,6 +61,13 @@ export interface Product {
   llmEnrichedAt?: string
   /** 보강에 사용된 모델 (배치 간 결과를 비교할 때 필요). */
   llmModel?: string
+  /**
+   * color 필드의 출처. "vlm" = product_features.feature_metadata.primary_color
+   * (실제 이미지를 본 VLM 판정, 16개 COLOR_FAMILIES 어휘라 항상 검색에 걸림).
+   * "llm" = enrichProductWithLlm 의 텍스트 전용 추측(VLM 커버리지 없을 때
+   * 폴백). gender_source(product-gender.ts)와 같은 provenance 관례.
+   */
+  colorSource?: "vlm" | "llm"
   // ── 리뷰 데이터 (Phase 3) ──
   reviewCount?: number
   reviews?: Array<{
