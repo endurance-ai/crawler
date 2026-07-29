@@ -43,7 +43,7 @@ const db = createClient(process.env.DB_URL!, process.env.DB_TOKEN!)
 const usage = {i: 0, o: 0}
 const num = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0)
 const model = wrapLanguageModel({
-  model: openai("gpt-4.1-nano"),
+  model: openai("gpt-5.4-nano"),
   middleware: {
     specificationVersion: "v3",
     wrapGenerate: async ({doGenerate}) => {
