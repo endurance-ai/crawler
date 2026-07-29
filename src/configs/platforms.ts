@@ -761,6 +761,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
+    // 2026-07-28 재수집 배치 2에서 발견: URL/상품명에 성별 신호가 전혀 없어
+    // gender_missing 으로 크롤 634행 중 66행만 살아남았다(게이트가 정상
+    // 차단). 기존 DB 634행 실측: men=634, women=3(예외적 오분류로 보임),
+    // 상품명 women 계열 키워드 0건 — 사실상 남성 전용 헤리티지 멘즈웨어
+    // 브랜드(sack jacket/sport jacket 등 클래식 테일러링 어휘)라 men 으로 명시.
+    defaultGender: ["men"],
   },
   {
     key: "brain-dead",
@@ -793,6 +799,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "GBP",
     maxPages: 300,
     crawlDelay: 1500,
+    // 2026-07-28 재수집 배치 2에서 발견: gender_missing 으로 1816개 중
+    // 1639개 드랍(46→942행 게이트 실패). 기존 DB 942행 전량 men, women 0건
+    // — Drake's 는 영국 헤리티지 멘즈웨어 전문 브랜드라 men 으로 명시.
+    // (참고: 같은 배치의 stussy/aime-leon-dore 는 반대로 실제 혼성 브랜드라
+    // defaultGender 를 넣지 않았다 — men/women 이 둘 다 실측되는 곳에 일괄
+    // 기본값을 넣으면 그 다양성 자체를 세탁하게 된다.)
+    defaultGender: ["men"],
   },
   {
     key: "bodega",
