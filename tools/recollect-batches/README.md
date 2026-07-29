@@ -1,8 +1,16 @@
 # 2026-06 코호트 재수집 배치
 
-2026-06-22 전후에 옛 추출 로직으로 수집된 26개 platform key(60,634행)를 현재
-로직으로 처음부터 다시 수집한다. 이 코호트는 `products.created_at = 2026-06-24`,
-`crawled_at = 2026-06-21~23` 으로 나머지 343개 키(2026-07 생성분)와 명확히 구분된다.
+2026-06-22 전후에 옛 추출 로직으로 수집된 26개 platform key를 현재 로직으로
+처음부터 다시 수집한다. 이 페이지 하단의 platform key 목록(`batch-*.txt` 를
+`sort -u` 한 것)이 코호트의 유일한 정본이다.
+
+> **주의**: 한때 이 코호트를 `products.created_at = 2026-06-24` 로 식별할 수
+> 있다고 여겼으나 부정확하다(실측 2026-07-29: 이 조건으로는 21개 키/41,131행만
+> 잡히고 matteveil/blankroom/swallowlounge/bastong/etcseoul 5개 키가 통째로
+> 빠진다 — `refresh-candidates.ts` 가 캠페인 준비 이후에도 같은 platform key 에
+> 신규 상품을 계속 insert 하면서 키 내부에 여러 created_at 값이 섞였기 때문).
+> **platform key 로만 필터링할 것.** `crawler/sql/096_recollect_cohort_suppress.sql`
+> 참조. 실측 총량은 26개 키 61,801행 (아래 표의 합계와 근소한 드리프트 있음).
 
 전부 `src/configs/platforms.ts` 의 수기 등록 항목이다.
 
