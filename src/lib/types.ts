@@ -2,8 +2,6 @@
  * 크롤러 공통 타입
  */
 
-import type {GenderSource} from "./product-gender"
-
 // ─── 상품 ─────────────────────────────────────────────
 
 export interface Product {
@@ -19,18 +17,17 @@ export interface Product {
   sourceImageUrl?: string
   productUrl: string
   inStock: boolean
-  gender: string[]
-  /**
-   * `gender` 의 출처 (products.gender_source 로 적재). "모름"이 unisex 로
-   * 세탁되는 것을 사후에도 감사할 수 있게 하는 필드 — resolveProductGenderWithSource
-   * 가 채운다.
-   */
-  genderSource?: GenderSource
   platform: string
   crawledAt: string
   // ── 상세 페이지 데이터 (Phase 2) ──
-  description?: string
-  color?: string
+  /**
+   * 상세 페이지를 실제로 방문해 파싱한 시각 (ISO). 재시작 스킵 마커다.
+   *
+   * 2026-07-29 이전에는 `color` 가 비어있지 않은지로 "상세 수집 완료"를
+   * 판정했는데(crawl.ts loadExistingDetails), color 가 product_features(VLM)
+   * 로 이관되면서 그 마커가 사라졌다. 암묵적 마커를 명시적 필드로 교체한다.
+   */
+  detailFetchedAt?: string
   material?: string
   subcategory?: string
   images?: string[]
@@ -61,13 +58,6 @@ export interface Product {
   llmEnrichedAt?: string
   /** 보강에 사용된 모델 (배치 간 결과를 비교할 때 필요). */
   llmModel?: string
-  /**
-   * color 필드의 출처. "vlm" = product_features.feature_metadata.primary_color
-   * (실제 이미지를 본 VLM 판정, 16개 COLOR_FAMILIES 어휘라 항상 검색에 걸림).
-   * "llm" = enrichProductWithLlm 의 텍스트 전용 추측(VLM 커버리지 없을 때
-   * 폴백). gender_source(product-gender.ts)와 같은 provenance 관례.
-   */
-  colorSource?: "vlm" | "llm"
   // ── 리뷰 데이터 (Phase 3) ──
   reviewCount?: number
   reviews?: Array<{
@@ -105,10 +95,6 @@ export interface Cafe24Selectors {
 }
 
 export interface Cafe24DetailSelectors {
-  /** 상품 설명 영역 (기본: .cont_detail, #prdDetail) */
-  description?: string
-  /** 색상 옵션 (기본: select[name*="option"] option) */
-  colorOptions?: string
   /** 이미지 (기본: .product-detail img) */
   detailImages?: string
   /** 상품 코드 */
@@ -122,7 +108,7 @@ export interface CategoryConfig {
    * manual일 때: 고정 카테고리 번호 목록
    * auto일 때: 카테고리 링크를 찾을 CSS 셀렉터 (기본: a[href*="cate_no="])
    */
-  categories?: { name: string; cateNo: number; gender?: string[] }[]
+  categories?: { name: string; cateNo: number }[]
   /** auto 탐색 시 시작 URL (기본: baseUrl) */
   discoveryUrl?: string
   /** auto 탐색 시 카테고리 링크 셀렉터 */
@@ -140,10 +126,17 @@ export interface SiteConfig {
   type: PlatformType
   /** 사이트 기본 URL */
   baseUrl: string
-  /** 기본 성별 (사이트 전체 적용) */
-  defaultGender?: string[]
   /** 단일브랜드 자사몰의 하우스 브랜드명 (DOM에서 브랜드 추출 실패 시 폴백) */
   brand?: string
+  /**
+   * 멀티브랜드 편집샵 표시. 상품마다 브랜드가 다르며 상품명에 "[BRAND] 제품명"
+   * 형태로 박혀 있는 편집샵(예: 8division, visualaid). true 이면:
+   *  - 브랜드를 플랫폼명(config.name)으로 폴백하지 않는다(platform-as-brand 오염 방지).
+   *  - 온보딩 LLM 분류가 상품별 실제 브랜드를 추출하고, import 는 --no-new-brands 로
+   *    기존 KR brand_nodes 에 매칭되는 상품만 적재한다(해외 브랜드 자동 제외).
+   * 직접 크롤(Path A)이 아니라 온보딩 파이프라인(Path B)으로 수집해야 한다.
+   */
+  multiBrand?: boolean
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
   /** 카테고리 탐색 설정 */

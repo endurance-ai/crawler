@@ -1,6 +1,14 @@
 import {createClient, type SupabaseClient} from "@supabase/supabase-js"
 
-export type ProductCollectionStage = "detect" | "config" | "crawl" | "qc" | "import" | "embed" | "manual"
+export type ProductCollectionStage =
+  | "detect"
+  | "config"
+  | "crawl"
+  | "image_select"
+  | "qc"
+  | "import"
+  | "embed"
+  | "manual"
 export type ProductCollectionRunStatus = "queued" | "running" | "success" | "failed" | "skipped"
 
 export interface ProductCrawlBrand {

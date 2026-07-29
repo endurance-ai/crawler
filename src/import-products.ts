@@ -16,8 +16,6 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
-import {emit} from "./lib/core/observability"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -52,16 +50,12 @@ interface CrawledProduct {
   salePrice?: number | null
   priceFormatted: string
   imageUrl: string
+  sourceImageUrl?: string
   productUrl: string
   inStock: boolean
-  gender: string[]
-  /** gender 의 출처 (crawl.ts 가 stamp). 구 캐시 JSON 에는 없다. */
-  genderSource?: string
   platform: string
   crawledAt: string
   // 상세 페이지 데이터
-  description?: string
-  color?: string
   material?: string
   subcategory?: string
   images?: string[]
@@ -217,10 +211,8 @@ function trigramSimilarity(a: string, b: string): number {
 async function loadBrandNodes(): Promise<{
   rows: BrandNodeRow[]
   idMap: Map<string, number>
-  genderById: Map<number, string[]>
 }> {
   const idMap = new Map<string, number>()
-  const genderById = new Map<number, string[]>()
 
   // PostgREST default 1000 row limit — paginate to fetch all brand_nodes (~2,100 rows).
   // 062 마이그 이후 brand_nodes.style_node legacy text 컬럼 제거됨.
@@ -231,7 +223,7 @@ async function loadBrandNodes(): Promise<{
   for (;;) {
     const {data, error} = await db
       .from("brand_nodes")
-      .select("id, brand_name, brand_name_normalized, gender_scope")
+      .select("id, brand_name, brand_name_normalized")
       .range(offset, offset + PAGE - 1)
     if (error) {
       console.warn("⚠️ brand_nodes 조회 실패:", error.message)
@@ -248,11 +240,9 @@ async function loadBrandNodes(): Promise<{
       idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
     }
     idMap.set(bn.brand_name.toLowerCase(), bn.id)
-    const genderScope = cleanGenderScope(bn.gender_scope)
-    if (genderScope.length > 0) genderById.set(bn.id, genderScope)
   }
-  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size}, gender_scope=${genderById.size})`)
-  return {rows, idMap, genderById}
+  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
+  return {rows, idMap}
 }
 
 async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
@@ -386,9 +376,7 @@ async function main() {
   // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
   const inStockOnly = process.argv.includes("--in-stock-only")
 
-  // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수와 gender 출처 분포만 출력.
-  // gender 결의 규칙을 바꿀 때 어느 플랫폼이 얼마나 적재 제외되는지(= 수율 회귀)
-  // 를 배포 전에 계측하는 용도.
+  // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
   const dryRun = process.argv.includes("--dry-run")
 
   // data/ 내 *-products.json 파일 찾기
@@ -407,8 +395,8 @@ async function main() {
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
 
-  // ── brand_nodes 로드 (id_map + gender_scope — legacy style_node text 컬럼 062에서 drop) ─
-  const {rows: brandRows, idMap: brandIdMap, genderById: brandGenderById} = await loadBrandNodes()
+  // ── brand_nodes 로드 (id_map — legacy style_node text 컬럼 062에서 drop) ─
+  const {rows: brandRows, idMap: brandIdMap} = await loadBrandNodes()
   const platformBrandIdMap = await loadPlatformBrandNodeMap()
 
   // ── Pre-scan: 모든 파일에서 unique brand 문자열 수집 ──────
@@ -470,86 +458,15 @@ async function main() {
       continue
     }
     const rawAll: CrawledProduct[] = cached
-    // 성별 결의는 여기 한 번만 수행한다 — 아래 row mapper 는 결과를 읽기만 한다.
-    // crawl.ts 도 같은 결의를 돌리지만 브랜드 폴백은 이 단계에서만 유효하다:
-    // crawl.ts 의 gender_scope 는 플랫폼 단위인 반면 여기서는 상품별
-    // brand_node_id 를 해석하므로 멀티브랜드 편집샵에서도 올바른 브랜드다.
-    // --dry-run 계측용: 구 규칙(브랜드 gender_scope 무조건 폴백)이었다면 성별을
-    // 가졌을 상품 수. 신규 규칙과의 차이가 곧 이 변경의 수율 비용이다.
-    let legacyWouldHaveGender = 0
-    let newHasGender = 0
-    /** 구규칙에서는 성별을 얻었으나 신규칙에서 미확인이 된 상품의, 그 구규칙 출처값. */
-    const droppedLegacyScopes: Record<string, number> = {}
-
-    const rawWithGenderFallback: CrawledProduct[] = rawAll.map((p) => {
-      // crawl.ts 가 이미 stamp 한 상품은 재추론하지 않는다 (출처 오귀속 방지).
-      if (p.genderSource && Array.isArray(p.gender) && p.gender.length > 0) {
-        legacyWouldHaveGender += 1
-        newHasGender += 1
-        return p
-      }
-
-      const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
-      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      let legacyValue: string | null = null
-      if (dryRun) {
-        const productGender = cleanGenderScope(p.gender)
-        const legacyScope = cleanGenderScope(brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined)
-        // 구규칙 = 상품값 우선, 없으면 브랜드 스코프를 그대로 복사.
-        const legacy = productGender.length > 0 ? productGender : legacyScope
-        if (legacy.length > 0) {
-          legacyWouldHaveGender += 1
-          legacyValue = JSON.stringify(legacy)
-        }
-      }
-      const resolved = resolveProductGenderWithSource(
-        p.gender,
-        brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
-        {
-          name: p.name,
-          category: (p as {category?: string}).category,
-          subcategory: p.subcategory,
-          description: p.description,
-          tags: p.tags,
-          productUrl: p.productUrl,
-          useDescription: true,
-        },
-        (p.genderSource as GenderSource | undefined) ?? "engine",
-      )
-      if (resolved.conflict) {
-        emit({
-          kind: "gender_source_conflict",
-          site: platform,
-          sku: p.productUrl,
-          urlGender: resolved.conflict.url,
-          textGender: resolved.conflict.text,
-        })
-      }
-      if (resolved.gender.length > 0) {
-        newHasGender += 1
-        return {...p, gender: resolved.gender, genderSource: resolved.source ?? undefined}
-      }
-      if (legacyValue !== null) droppedLegacyScopes[legacyValue] = (droppedLegacyScopes[legacyValue] ?? 0) + 1
-      return p
-    })
     // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
     // product before the DB upsert. Valid products pass through
     // byte-identical into the existing .map(); invalid ones are excluded
     // + a structured reject event is emitted (does not crash the import
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
-    const qcRaw = applyProductQcGate(rawWithGenderFallback, platform)
+    const qcRaw = applyProductQcGate(rawAll, platform)
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
-    if (dryRun) {
-      const lost = legacyWouldHaveGender - newHasGender
-      const pct = legacyWouldHaveGender > 0 ? ((lost / legacyWouldHaveGender) * 100).toFixed(1) : "0.0"
-      console.log(`   📉 gender 보유: 구규칙 ${legacyWouldHaveGender} → 신규칙 ${newHasGender} (손실 ${lost}, ${pct}%)`)
-      const dropped = Object.entries(droppedLegacyScopes).sort((a, b) => b[1] - a[1])
-      if (dropped.length > 0) {
-        console.log(`   🔬 손실분의 구규칙 값: ${dropped.map(([v, n]) => `${v}=${n}`).join(" ")}`)
-      }
-    }
 
     // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
     // were generated BEFORE the engine native-currency unification.
@@ -574,38 +491,22 @@ async function main() {
 
     let fxSkipped = 0
     let priceSkipped = 0
-    let genderSkipped = 0
-    const genderSourceCounts: Record<string, number> = {}
     const priceSkipSamples: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       const productUrl = (p.productUrl as string) || ""
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      // 성별은 위 rawWithGenderFallback 단계에서 이미 결의됐다. 여기서 다시
-      // resolveProductGender 를 부르면 이미 채워진 값에 short-circuit 되어
-      // 출처가 전부 "engine" 으로 오귀속된다.
-      const gender = cleanGenderScope(p.gender)
-      const genderSource = typeof p.genderSource === "string" ? p.genderSource : null
 
       // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
       // 누출 가드(cafe24-engine.ts)가 오염된 값을 걸러내고 brand=""로 넘기는
-      // 경우 color와 동일하게 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
+      // 경우 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
       // 잘못 적재되는 것보다 재크롤 때까지 보류하는 편이 안전하다.
       if (!brand) return null
       // --no-new-brands: 미등록 brand 상품 적재 제외
       if (noNewBrands && brandNodeId === null) return null
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
-      // color NOT NULL — color 없는 상품은 스킵
-      if (!p.color) return null
-      // gender required. 미확인을 unisex 로 폴백하면 검색 RPC 가 그 상품을 남녀
-      // 양쪽에 노출시키므로, 확인되지 않은 성별은 적재하지 않는다.
-      if (gender.length === 0) {
-        genderSkipped += 1
-        return null
-      }
-      genderSourceCounts[genderSource ?? "unknown"] = (genderSourceCounts[genderSource ?? "unknown"] ?? 0) + 1
       // product_no 추출
       const pnoMatch = productUrl.match(/product_no=(\d+)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
@@ -680,16 +581,13 @@ async function main() {
         source_price: sanitizePrice(sourcePriceRaw),
         product_no: productNo,
         image_url: p.imageUrl as string,
+        source_image_url: (p.sourceImageUrl as string | undefined) || (p.imageUrl as string),
         product_url: productUrl,
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
-        gender,
-        gender_source: genderSource,
         brand_node_id: brandNodeId,
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
-        description: p.description?.slice(0, 2000) || null,
-        color: (p.color as string).slice(0, 500),
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
         subcategory: p.subcategory || null,
         images: p.images?.slice(0, 10) || null,
@@ -708,16 +606,6 @@ async function main() {
         `   ⚠️  ${priceSkipped} product(s) skipped due to missing/invalid price: ${priceSkipSamples.join(", ")}`,
       )
     }
-    if (genderSkipped > 0) {
-      console.log(`   ⚠️  ${genderSkipped} product(s) skipped — gender 미확인 (검증된 성별만 적재)`)
-    }
-    {
-      const summary = Object.entries(genderSourceCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([source, n]) => `${source}=${n}`)
-        .join(" ")
-      if (summary) console.log(`   🚻 gender 출처: ${summary}`)
-    }
 
     // Dedup by product_url — Postgres rejects ON CONFLICT batches that
     // contain the same conflict key twice ("cannot affect row a second
@@ -727,27 +615,7 @@ async function main() {
     //
     // Merge strategy (SPEC-005 P1 review 2026-05-06): instead of last-
     // wins, prefer non-null values when merging — sale_price, original_
-    // price, color, material, etc. from any duplicate row carry over.
-    // Everything but gender takes the last non-null.
-    //
-    // gender 는 union 하지 않는다 (2026-07-27): ZARA 처럼 같은 product_url 이
-    // /man/ 랜딩과 공용 랜딩 양쪽에서 잡히면 union 이 ['men','women'] 을 만들어
-    // 검색 RPC 의 `p.gender && ARRAY[p_gender,'unisex']` 에서 남녀 양쪽에
-    // 노출된다 — 브랜드 폴백과 똑같은 세탁이다. 대신 출처 신뢰도가 높은 쪽을
-    // 채택하고, 동순위인데 값이 다르면 판정 불가로 보고 기존 union 동작을
-    // 유지하면서 이벤트로 남긴다.
-    // resolveProductGenderWithSource 의 우선순위와 같은 순서. config_default 가
-    // url/text 아래인 것이 핵심 — 카테고리가 교차하는 사이트(yearsago 등)에서
-    // 여성 라인 상품은 "상의" 행에서 사이트 기본값(men)을, "Years Ago Women"
-    // 행에서 카테고리 유래 women 을 받는다. 동순위였다면 union 이 되어
-    // ['men','women'] 로 남녀 양쪽에 노출된다.
-    const GENDER_SOURCE_RANK: Record<string, number> = {
-      engine: 5,
-      url: 4,
-      text: 3,
-      config_default: 2,
-      brand_scope: 1,
-    }
+    // price, material, etc. from any duplicate row carry over.
     type Row = (typeof rows)[number]
     const merge = (a: Row, b: Row): Row => {
       const pickRicher = <K extends keyof Row>(key: K): Row[K] => {
@@ -758,33 +626,10 @@ async function main() {
         if (av === null || av === undefined || av === "") return bv
         return bv  // both non-null: take the later occurrence
       }
-      const genderWinner = (() => {
-        const ga = Array.isArray(a.gender) ? a.gender : []
-        const gb = Array.isArray(b.gender) ? b.gender : []
-        if (ga.length === 0) return {gender: gb, gender_source: b.gender_source}
-        if (gb.length === 0) return {gender: ga, gender_source: a.gender_source}
-
-        const ra = GENDER_SOURCE_RANK[a.gender_source ?? ""] ?? 0
-        const rb = GENDER_SOURCE_RANK[b.gender_source ?? ""] ?? 0
-        if (ra !== rb) return ra > rb ? {gender: ga, gender_source: a.gender_source} : {gender: gb, gender_source: b.gender_source}
-        if (ga.join() === gb.join()) return {gender: ga, gender_source: a.gender_source}
-
-        emit({
-          kind: "gender_merge_conflict",
-          site: platform,
-          sku: b.product_url,
-          genders: [...new Set([...ga, ...gb])],
-        })
-        return {gender: [...new Set([...ga, ...gb])], gender_source: a.gender_source}
-      })()
       return {
         ...b,
         sale_price: a.sale_price ?? b.sale_price,
         original_price: pickRicher("original_price"),
-        color: pickRicher("color"),
-        description: pickRicher("description"),
-        gender: genderWinner.gender,
-        gender_source: genderWinner.gender_source,
         category: pickRicher("category"),
         subcategory: pickRicher("subcategory"),
       }

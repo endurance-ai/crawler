@@ -31,7 +31,6 @@ import {fileURLToPath} from "node:url"
 
 import {
   buildZaraProductUrlPattern,
-  deriveGenderFromUrl,
   detectBmVerifyIntercept,
   formatZaraPrice,
   harvestRawProducts,
@@ -95,19 +94,6 @@ test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl
     assert.equal(p.brand, "ZARA")
     assert.ok(p.priceFormatted.startsWith("₩"), `priceFormatted should use ₩: ${p.priceFormatted}`)
   }
-})
-
-test("AC-2 parseProductsFromXhr: gender annotation derives from _gender field", () => {
-  const fixture = loadFixture()
-  const products = parseProductsFromXhr(fixture.samples, TEST_BASE_URL, TEST_KEY, "KR", "KRW")
-  const womenSamples = fixture.samples.filter((s) => s._gender === "women")
-  const menSamples = fixture.samples.filter((s) => s._gender === "men")
-  assert.ok(womenSamples.length > 0 && menSamples.length > 0, "fixture should cover both genders")
-  // Find at least one woman + one man in the parsed output.
-  const hasWomen = products.some((p) => p.gender.includes("women"))
-  const hasMen = products.some((p) => p.gender.includes("men"))
-  assert.ok(hasWomen, "expected at least one women product in parsed output")
-  assert.ok(hasMen, "expected at least one men product in parsed output")
 })
 
 test("AC-2 parseProductsFromXhr: accepts a deeply-nested raw payload via harvest", () => {
@@ -323,39 +309,6 @@ test("AC-4 formatZaraPrice: US emits $ + 2-decimal fixed", () => {
   assert.equal(formatZaraPrice(99, "US"), "$99.00")
 })
 
-// ─── SPEC-005: deriveGenderFromUrl region-agnostic ──
-
-test("deriveGenderFromUrl: derives gender from US locale URLs", () => {
-  assert.equal(
-    deriveGenderFromUrl("https://www.zara.com/us/en/woman-new-in-l1180.html"),
-    "women",
-  )
-  assert.equal(
-    deriveGenderFromUrl("https://www.zara.com/us/en/man-jackets-l640.html"),
-    "men",
-  )
-  assert.equal(
-    deriveGenderFromUrl("https://www.zara.com/us/en/kids-something-l999.html"),
-    "kids",
-  )
-})
-
-test("deriveGenderFromUrl: derives gender from KR locale URLs (regression)", () => {
-  assert.equal(
-    deriveGenderFromUrl("https://www.zara.com/kr/ko/woman-new-in-l1180.html"),
-    "women",
-  )
-  assert.equal(
-    deriveGenderFromUrl("https://www.zara.com/kr/ko/man-jackets-l717.html"),
-    "men",
-  )
-  assert.equal(
-    deriveGenderFromUrl("https://www.zara.com/kr/ko/kids-foo-l1.html"),
-    "kids",
-  )
-  assert.equal(deriveGenderFromUrl("https://www.zara.com/kr/ko/home-l9999.html"), "")
-})
-
 // ─── SPEC-005: buildZaraProductUrlPattern per-baseUrl validator ──
 
 test("buildZaraProductUrlPattern: KR base accepts KR URLs and rejects US URLs", () => {
@@ -430,11 +383,3 @@ test("AC-3 parseProductsFromXhr (US): every product has populated name/price/ima
   }
 })
 
-test("AC-3 parseProductsFromXhr (US): gender annotation derives from _gender field (women fixture)", () => {
-  const fixture = loadUsFixture()
-  assert.ok(fixture)
-  const products = parseProductsFromXhr(fixture!.samples, US_BASE_URL, US_KEY, "US", "USD")
-  // First-URL fixture is woman-new-in-l1180 → all _gender annotations should be "women"
-  const hasWomen = products.some((p) => p.gender.includes("women"))
-  assert.ok(hasWomen, "expected at least one women product in US fixture parsed output")
-})

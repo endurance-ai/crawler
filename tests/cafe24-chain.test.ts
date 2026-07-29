@@ -20,7 +20,6 @@ test("Cafe24 category chain parses pretty category URLs and rejects product deta
     {
       name: "TOPS",
       cateNo: 24,
-      gender: [],
       url: "https://example.com/category/tops/24/",
     },
   )
@@ -127,10 +126,8 @@ function product(overrides: Partial<Product>): Product {
     imageUrl: "https://example.com/image.jpg",
     productUrl: "https://example.com/product/1",
     inStock: true,
-    gender: ["unisex"],
     platform: "test",
     crawledAt: "2026-01-01T00:00:00.000Z",
-    color: "Black",
     ...overrides,
   }
 }

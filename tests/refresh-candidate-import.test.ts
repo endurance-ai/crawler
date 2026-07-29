@@ -27,10 +27,8 @@ const product: Product = {
   imageUrl: "https://cdn.example/a.jpg",
   productUrl: "https://kith.com/products/new-jacket",
   inStock: true,
-  gender: ["unisex"],
   platform: "kith",
   crawledAt: "2026-07-26T00:00:00Z",
-  color: "Black",
   sourceCurrency: "USD",
 }
 

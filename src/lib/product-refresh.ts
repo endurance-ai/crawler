@@ -117,6 +117,12 @@ export async function finishRefreshRun(
   if (sourceError) throw new Error(`refresh source finish update failed: ${sourceError.message}`)
 }
 
+/**
+ * 2026-07-29 버그 수정: `ORDER BY` 없는 `LIMIT/OFFSET` 페이지네이션은 페이지 사이에
+ * 정렬 순서가 안정적이라는 보장이 없다 — Postgres 는 그 경우 결과 순서를 보장하지
+ * 않으므로, 페이지 경계에서 행이 중복되거나 통째로 누락될 수 있다. brand_nodes 하나가
+ * 누락되면 그 브랜드의 신규 상품이 전량 brand_unmatched 로 파킹된다.
+ */
 export async function loadExistingBrands(
   db: ProductRefreshClient,
 ): Promise<BrandLookupRow[]> {
@@ -126,6 +132,7 @@ export async function loadExistingBrands(
     const {data, error} = await db
       .from("brand_nodes")
       .select("id,brand_name,brand_name_normalized")
+      .order("id", {ascending: true})
       .range(offset, offset + pageSize - 1)
     if (error) throw new Error(`brand lookup load failed: ${error.message}`)
     const page = (data ?? []) as BrandLookupRow[]

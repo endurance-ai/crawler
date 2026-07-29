@@ -7,15 +7,12 @@ import type {DetailData, IDetailParser} from "./types"
  * 구조 (.xans-product-additional):
  *   원단 / 소재 정보 (상단)
  *   상품 설명 텍스트
- *   상품명 끝부분 → 색상 (e.g., "베일 12 BLACK", "베일 1 GARGOYLE/GRAPHENE")
- *   option1 = 사이즈
+ *  *   option1 = 사이즈
  *   리뷰 없음
  */
 export class TriplestoreDetailParser implements IDetailParser {
   async parse(page: Cafe24Page, productUrl: string): Promise<DetailData> {
     const result: DetailData = {
-      description: null,
-      color: null,
       material: null,
       productCode: null,
     }
@@ -52,21 +49,9 @@ export class TriplestoreDetailParser implements IDetailParser {
           if (matLines.length) material = matLines.join(" / ").slice(0, 200)
         }
 
-        // ─── color (상품명 마지막 대문자 단어) ───
-        let color: string | null = null
-        const ogTitle = document.querySelector("meta[property=\"og:title\"]")
-        if (ogTitle) {
-          const title = (ogTitle as HTMLMetaElement).content || ""
-          // "베일 12 BLACK" → BLACK, "베일 1 GARGOYLE/GRAPHENE" → GARGOYLE/GRAPHENE
-          const match = title.match(/\s([A-Z][A-Z/\s]+)$/)
-          if (match) color = match[1].trim()
-        }
-
-        return {description, color, material, productCode: null as string | null}
+        return {description, material, productCode: null as string | null}
       })
 
-      result.description = extracted.description
-      result.color = extracted.color
       result.material = extracted.material
     } catch (err) {
       console.warn(`   ⚠️ 상세 파싱 실패: ${productUrl} — ${(err as Error).message}`)

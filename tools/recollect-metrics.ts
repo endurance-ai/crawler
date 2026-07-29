@@ -66,8 +66,8 @@ function parseFlags(): Flags {
 /**
  * 크롤 산출 Product 를 지표 입력으로 변환한다.
  *
- * id 는 배열 인덱스를 쓴다 — 분류기(classifyColorRepair 등)가 결정에 id 를 실어
- * 보낼 뿐 판정에 쓰지는 않으므로 파일 모드에서는 임의값이면 충분하다.
+ * id 는 배열 인덱스를 쓴다 — 분류기(classifySubcategoryRepair 등)가 결정에
+ * id 를 실어 보낼 뿐 판정에 쓰지는 않으므로 파일 모드에서는 임의값이면 충분하다.
  */
 function productToMetricsRow(product: Product, index: number): MetricsRow {
   return {
@@ -79,11 +79,7 @@ function productToMetricsRow(product: Product, index: number): MetricsRow {
     name: product.name ?? null,
     category: product.category ?? null,
     subcategory: product.subcategory ?? null,
-    color: product.color ?? null,
-    description: product.description ?? null,
     tags: product.tags ?? null,
-    gender: product.gender ?? null,
-    gender_source: product.genderSource ?? null,
     images: product.images ?? null,
     image_url: product.imageUrl ?? null,
     in_stock: product.inStock ?? null,
@@ -92,12 +88,11 @@ function productToMetricsRow(product: Product, index: number): MetricsRow {
 }
 
 const SELECT_COLUMNS =
-  "id,product_url,platform,brand,brand_node_id,name,category,subcategory,color,description,tags,gender,gender_source,images,image_url,in_stock,updated_at"
+  "id,product_url,platform,brand,brand_node_id,name,category,subcategory,tags,images,image_url,in_stock,updated_at"
 
 /**
  * keyset 페이징. offset 기반 .range() 는 페이지 사이에 행이 바뀌면 누락/중복이
- * 생기는데, 이 도구는 크롤 직후에도 돌기 때문에 id 커서를 쓴다
- * (src/repair-product-color-llm.ts 와 같은 패턴).
+ * 생기는데, 이 도구는 크롤 직후에도 돌기 때문에 id 커서를 쓴다.
  */
 async function fetchPlatformRows(db: SupabaseClient, platform: string): Promise<MetricsRow[]> {
   const rows: MetricsRow[] = []
@@ -127,17 +122,10 @@ const pct = (numerator: number, denominator: number): string =>
 function printMetrics(label: string, m: RecollectMetrics): void {
   console.log(`\n── ${label} ──`)
   console.log(`  행수                ${m.rows} (재고 ${m.inStock} / 품절 ${m.outOfStock})`)
-  console.log(`  비canonical color   ${m.colorNonCanonical} (${pct(m.colorNonCanonical, m.rows)})  ← 캠페인 KPI`)
-  console.log(`  repair 가능 color   ${m.colorRepairable} · 근거없음 ${m.colorUnresolved}`)
-  console.log(`  다중값 color        ${m.colorMultiValue} (${pct(m.colorMultiValue, m.rows)})`)
-  console.log(`  color 없음          ${m.colorMissing} (${pct(m.colorMissing, m.rows)})`)
   console.log(`  subcategory 없음    ${m.subcategoryMissing} (${pct(m.subcategoryMissing, m.rows)})`)
   console.log(`  비canonical subcat  ${m.subcategoryNonCanonical} (${pct(m.subcategoryNonCanonical, m.rows)})`)
   console.log(`  taxonomy 밖 category ${m.categoryInvalid} (${pct(m.categoryInvalid, m.rows)})`)
-  console.log(`  gender 없음         ${m.genderMissing} (${pct(m.genderMissing, m.rows)})`)
-  console.log(`  gender_source       ${Object.entries(m.genderSourceCounts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}=${v}`).join(" ") || "-"}`)
   console.log(`  대표이미지 없음     ${m.imageMissing} · images 빈배열 ${m.imagesEmpty} (${pct(m.imagesEmpty, m.rows)})`)
-  console.log(`  description 없음    ${m.descriptionMissing} (${pct(m.descriptionMissing, m.rows)})`)
   console.log(`  distinct brand      ${m.distinctBrands}`)
 }
 
@@ -150,12 +138,8 @@ function printDelta(before: RecollectMetrics, after: RecollectMetrics): void {
   }
   console.log(`\n── 변화 ──`)
   line("행수", before.rows, after.rows, false)
-  line("비canonical color", before.colorNonCanonical, after.colorNonCanonical)
-  line("다중값 color", before.colorMultiValue, after.colorMultiValue)
-  line("color 없음", before.colorMissing, after.colorMissing)
   line("subcategory 없음", before.subcategoryMissing, after.subcategoryMissing)
   line("taxonomy 밖 category", before.categoryInvalid, after.categoryInvalid)
-  line("gender 없음", before.genderMissing, after.genderMissing)
   line("images 빈배열", before.imagesEmpty, after.imagesEmpty)
   line("distinct brand", before.distinctBrands, after.distinctBrands, false)
 }

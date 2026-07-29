@@ -35,7 +35,6 @@ function product(overrides: Partial<Product> = {}): Product {
     imageUrl: "https://example.com/a.jpg",
     productUrl: "https://example.com/p/1",
     inStock: true,
-    gender: ["unisex"],
     platform: "example",
     crawledAt: "2026-07-28T00:00:00.000Z",
     ...overrides,

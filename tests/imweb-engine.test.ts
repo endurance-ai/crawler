@@ -38,10 +38,8 @@ test("maps data-product-properties to Product with sale price", () => {
   assert.equal(p.priceFormatted, "₩262,400")
   assert.equal(p.productUrl, "https://heretic.kr/203/?idx=640")
   assert.equal(p.inStock, true)
-  assert.deepEqual(p.gender, ["men"])
   assert.equal(p.platform, "heretic")
   assert.equal(p.productCode, "s202603271ebacb233f28d")
-  assert.equal(p.color, "Beige") // "/ light beige" suffix → CANONICAL 정규화
 })
 
 test("no sale: salePrice null, originalPrice mirrors price", () => {
@@ -55,10 +53,13 @@ test("no sale: salePrice null, originalPrice mirrors price", () => {
   assert.equal(p.originalPrice, 262400)
 })
 
-test("brand falls back to config.name when config.brand empty", () => {
+test("brand does NOT fall back to config.name when config.brand empty (platform-as-brand 오염 방지)", () => {
   const p = parseImwebListItem(item(), {...CONFIG, brand: undefined}, "")
   assert.ok(p)
-  assert.equal(p.brand, "헤레틱")
+  // 플랫폼명(config.name="헤레틱")으로 폴백하지 않고 빈 브랜드로 남긴다 —
+  // import provenance 가드가 미등록 brand 상품을 격리한다. 단일브랜드 imweb 몰은
+  // 반드시 config.brand 를 채워야 한다.
+  assert.equal(p.brand, "")
 })
 
 test("string prices are coerced; sold-out badge flips inStock", () => {

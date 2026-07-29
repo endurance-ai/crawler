@@ -15,13 +15,12 @@
 | 항목 | 규칙 | 근거 |
 |---|---|---|
 | **category 필수** | 없으면(빈문자/null) **적재 안 됨**. DB 컬럼도 `NOT NULL`. | validator `z.string().min(1)` + migration 091 |
-| **color 필수** | 없으면 **적재 안 됨**. DB 컬럼도 `NOT NULL`. | 동일 |
 | **품절 제외** | `inStock=false`(품절/sold out) 상품은 크롤·적재 모두에서 제외. | crawler `!inStock` 필터 + import `--in-stock-only` |
 | **신규 브랜드 차단(옵션)** | `--no-new-brands` 시 `brand_nodes` 미등록 브랜드는 INSERT 안 하고 해당 상품도 제외. | import `--no-new-brands` |
-| **색상 정규화** | 추출된 색상은 CANONICAL 맵으로 Title Case/동의어 통일. 새 색상값 발견 시 맵에 추가. | `src/lib/parsers/field-extractors/color-normalizer.ts` |
+| **색상은 크롤러가 안 뽑음** | 색상 단일 출처는 VLM `product_features.primary_color`. 크롤러 색상 로직은 2026-07-29 제거. | CLAUDE.md §18 |
 | **임베딩 이미지** | 대표 이미지 = `image_url` (== `images[0]`, 전 데이터셋 동일). `images` 비면 `image_url`로 폴백. | `embed_batch_devapp.py` fetch 쿼리 |
 
-> 의미: **category/color를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 크롤 단계에서 이 두 값을 최대한 채우는 게 핵심.
+> 의미: **category를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 색상·성별은 크롤러 책임이 아니다(VLM).
 
 ---
 
@@ -53,13 +52,7 @@ npm run scaffold:platform -- <key> --name "Display Name" --write  # 스텁 생�
 ```
 출력된 스니펫을 실제 파일에 붙여넣고 셀렉터를 채운다(상세는 add-platform.md §1~3).
 
-### 2-4. 색상 정규화 맵 갱신
-크롤 결과에 CANONICAL에 없는 색상값(한글 색상명, 브랜드 고유색, 오타 변형)이 보이면
-`src/lib/parsers/field-extractors/color-normalizer.ts` 의 `CANONICAL` 배열에 즉시 추가.
-- ⚠️ `\b`(word boundary)는 한글에 안 먹으므로 한글 대안은 `\b()` 그룹 **밖**에 둘 것.
-  - 올바름: `/\b(grey)\b|그레이/i` / 잘못됨: `/\b(grey|그레이)\b/i`
-
-### 2-5. 타입체크 + 테스트
+### 2-4. 타입체크 + 테스트
 ```bash
 npm run typecheck     # exit 0
 npm test              # 기존 golden 깨지면 안 됨
@@ -74,19 +67,16 @@ npm test              # 기존 golden 깨지면 안 됨
 npm run crawl -- --dry-run --site=<key>
 
 # 온보딩 크롤 — 기본으로 --detail (상세 페이지) 사용.
-# color·description은 상세 페이지에만 있어 온보딩 때 확보한다
-# (리스트-only는 description 0% / color ~58%, 상세는 description 100% / color ~83%).
 npm run crawl -- --site=<key> --detail
 ```
 출력: `data/<key>-products.json`
 
 > **온보딩 = 상세, 갱신 = 리스트.** 가격/재고 주기 갱신은 `--detail` 없이 실행한다
-> (리스트 페이지에서 price·stock만, 상품당 상세 로드 없이 빠르게). color·description·image는
+> (리스트 페이지에서 price·stock만, 상품당 상세 로드 없이 빠르게). image는
 > 거의 변하지 않으므로 온보딩 1회 상세크롤로 확정하고 갱신에서는 다시 긁지 않는다.
 
 ### 크롤 후 확인 사항
 - **category 채움률**: 출력 JSON에서 `category`가 비어있는 비율이 높으면 카테고리 매핑 점검.
-- **color 채움률**: 옵션/텍스트에서 색상이 안 잡히면 fallback·정규화 맵 점검.
 - **품절 제외 동작**: `[품절]` 로그가 보이고 해당 상품이 결과에서 빠졌는지.
 - **멈춤 없이 완료**: 한 상세 페이지가 멈춰도 timeout으로 넘어감(evaluate 20s / detail 25s / 사이트 전체 20분). 사이트가 통째로 안 끝나면 `SITE_TIMEOUT_MS` 안에 강제 종료됨.
 
@@ -113,7 +103,7 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
 - `--site=<key>` — 특정 플랫폼만 적재(생략 시 `data/` 전체)
 
 ### 4-3. 적재 중/후 확인 사항
-- **`validation_reject` 로그** = category/color 누락으로 버려진 상품. 다수면 크롤 추출 품질 문제 → 2단계로 회귀.
+- **`validation_reject` 로그** = category 누락으로 버려진 상품. 다수면 크롤 추출 품질 문제 → 2단계로 회귀.
 - **`style_node` 류 컬럼 에러 주의**: products에서 drop된 컬럼(`style_node`(081), `material`(079))을 payload에 넣으면
   `Could not find the 'X' column ... in schema cache` 로 **전 배치 실패**. import payload는 현 스키마와 일치해야 함.
 - psql로 결과 검증 (psql이 PATH에 없으면 전체 경로 사용):
@@ -121,13 +111,13 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
   export PGHOST=<host> PGPORT=5432 PGUSER=ai_user PGPASSWORD=<pw> PGDATABASE=kikoai PGSSLMODE=require PGCLIENTENCODING=UTF8
   LC_ALL=C "/c/Program Files/PostgreSQL/16/bin/psql.exe" -c \
     "SELECT count(*) total,
-            count(*) FILTER (WHERE category IS NULL OR color IS NULL) null_rows,
+            count(*) FILTER (WHERE category IS NULL) null_rows,
             count(*) FILTER (WHERE in_stock=false) out_of_stock
      FROM products WHERE platform='<key>';"
   ```
   → `null_rows=0`, `out_of_stock=0` 이어야 정상.
 
-> migration 091(category/color NOT NULL)은 이미 적용됨. validator가 막으니 신규 적재에서 null은 안 들어간다.
+> migration 091(category NOT NULL)은 이미 적용됨. validator가 막으니 신규 적재에서 null은 안 들어간다.
 
 ---
 
@@ -166,8 +156,8 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
 
 ```
 브랜드 선정(+brand_nodes 등록)
-  → 크롤 코드(config/셀렉터/색상맵) 작성 → npm run typecheck && npm test
-  → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/color/description/품절 확인)
+  → 크롤 코드(config/셀렉터) 작성 → npm run typecheck && npm test
+  → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/품절 확인)
   → import-products --no-new-brands --in-stock-only --site=<key>   (validation_reject/스키마 확인)
   → embed_batch_devapp.py --download-workers 8                     (재실행으로 커버리지 수렴)
 ```

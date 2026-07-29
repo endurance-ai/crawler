@@ -17,8 +17,6 @@ import {openai} from "@ai-sdk/openai"
 import {generateText, Output, wrapLanguageModel} from "ai"
 import {z} from "zod"
 import {CATEGORIES, SUBCATEGORIES, type Category} from "../src/lib/enums/product-enums"
-import {getSiteConfig} from "../src/configs/platforms"
-import {extractColorFromText, normalizeColorList} from "../src/lib/parsers/field-extractors/color-normalizer"
 
 const usage = {input: 0, output: 0}
 const model = wrapLanguageModel({
@@ -44,10 +42,6 @@ const Schema = z.object({
   ),
 })
 
-const ColorSchema = z.object({
-  items: z.array(z.object({i: z.number(), color: z.string().nullable()})),
-})
-
 const CATEGORY_SET = new Set<string>(CATEGORIES)
 const SUB_BY_CAT = new Map<string, Set<string>>(
   Object.entries(SUBCATEGORIES).map(([cat, subs]) => [cat, new Set(subs as readonly string[])]),
@@ -61,83 +55,7 @@ interface PilotProduct {
   name: string
   category?: string
   subcategory?: string
-  gender?: string[]
-  color?: string
-  description?: string
   [key: string]: unknown
-}
-
-/**
- * color 복구 — import 게이트가 color NOT NULL을 강제하므로(마이그레이션 091 계열
- * 정책), 비어있는 color를 ① name+description 텍스트 추출 → ② LLM 배치(25개/청크,
- * description은 상세 JSON-LD에서 이미 확보돼 있어 브라우저 불필요) 순서로 채운다.
- * 그래도 null이면 그대로 둔다 — 게이트에서 제외되는 것이 맞는 상품.
- */
-async function recoverColors(products: PilotProduct[]): Promise<{text: number; llm: number}> {
-  const stats = {text: 0, llm: 0}
-  const missing: Array<{i: number; p: PilotProduct}> = []
-  products.forEach((p, i) => {
-    if (typeof p.color === "string" && p.color.trim()) return
-    const found = extractColorFromText(`${p.name} ${p.description ?? ""}`)
-    if (found) {
-      p.color = found
-      stats.text++
-    } else {
-      missing.push({i, p})
-    }
-  })
-  for (let start = 0; start < missing.length; start += 25) {
-    const chunk = missing.slice(start, start + 25)
-    try {
-      const res = await generateText({
-        model,
-        output: Output.object({schema: ColorSchema}),
-        system:
-          "Extract each product's primary color from its name/description. " +
-          "Answer with one common English color word (black, ivory, beige, navy...). null ONLY if no color is stated or implied. One entry per index.",
-        messages: [
-          {
-            role: "user",
-            content: JSON.stringify(
-              chunk.map(({i, p}) => ({i, name: p.name, description: (p.description ?? "").slice(0, 300)})),
-            ),
-          },
-        ],
-        temperature: 0,
-      })
-      const byIndex = new Map(chunk.map(({i, p}) => [i, p]))
-      for (const item of (res.output as z.infer<typeof ColorSchema>).items) {
-        const p = byIndex.get(item.i)
-        if (!p || !item.color?.trim()) continue
-        const normalized = normalizeColorList(item.color)
-        if (normalized) {
-          p.color = normalized
-          stats.llm++
-        }
-      }
-    } catch (err) {
-      console.error(`  color chunk failed: ${err instanceof Error ? err.message : err}`)
-    }
-  }
-  return stats
-}
-
-/**
- * gender 백필 — products.gender DB CHECK(091: 비어있으면 안 됨, men/women/unisex만
- * 허용)를 통과하도록 빈 gender를 config.defaultGender(브랜드 gender_scope 유래)로
- * 채운다. config에도 없으면 unisex.
- */
-function backfillGender(products: PilotProduct[], key: string): number {
-  const fallback = getSiteConfig(key)?.defaultGender?.filter((g) => ["men", "women", "unisex"].includes(g))
-  const gender = fallback && fallback.length > 0 ? fallback : ["unisex"]
-  let filled = 0
-  for (const p of products) {
-    if (!Array.isArray(p.gender) || p.gender.length === 0) {
-      p.gender = [...gender]
-      filled++
-    }
-  }
-  return filled
 }
 
 async function classifyBatch(
@@ -175,15 +93,13 @@ async function processSite(key: string): Promise<void> {
     return
   }
   const products = JSON.parse(fs.readFileSync(file, "utf-8")) as PilotProduct[]
-  const genderFilled = backfillGender(products, key)
-  const colorStats = await recoverColors(products)
   const targets = products
     .map((p, i) => ({p, i}))
     .filter(({p}) => !CATEGORY_SET.has(p.category ?? ""))
   if (targets.length === 0) {
     fs.writeFileSync(file, JSON.stringify(products, null, 2))
     console.log(
-      `- ${key}: ${products.length}개 모두 canonical — 분류 스킵 (gender ${genderFilled} · color 텍스트 ${colorStats.text}/LLM ${colorStats.llm})`,
+      `- ${key}: ${products.length}개 모두 canonical — 분류 스킵`,
     )
     return
   }
@@ -201,9 +117,8 @@ async function processSite(key: string): Promise<void> {
   }
   fs.writeFileSync(file, JSON.stringify(products, null, 2))
   const other = products.filter((p) => p.category === "other").length
-  const colorNull = products.filter((p) => !(typeof p.color === "string" && p.color.trim())).length
   console.log(
-    `- ${key}: ${products.length}개 · 재분류 ${targets.length} · canonical 확정 ${filled} · other ${other} · gender ${genderFilled} · color 텍스트 ${colorStats.text}/LLM ${colorStats.llm}/null ${colorNull}`,
+    `- ${key}: ${products.length}개 · 재분류 ${targets.length} · canonical 확정 ${filled} · other ${other}`,
   )
 }
 

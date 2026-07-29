@@ -116,6 +116,5 @@ test("characterize: every product carries platform/key + KRW shape", () => {
       p.productUrl.startsWith(`${BASE_URL}/products/`),
       `productUrl base drift: ${p.productUrl}`,
     )
-    assert.ok(Array.isArray(p.gender), `gender must be array for ${p.productUrl}`)
   }
 })

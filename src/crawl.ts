@@ -33,7 +33,6 @@ import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
 import {
   crawl29cm,
-  genderFromCategoryCode as genderFor29cm,
   harvestRawItems as harvest29cmItems,
   is29cmCloudflareChallenge,
   parseProductsFromXhr as parse29cmXhr,
@@ -41,7 +40,6 @@ import {
 } from "./lib/29cm-engine"
 import {
   crawlFarfetch,
-  deriveGenderFromUrl as deriveFarfetchGender,
   detectChallengeIntercept as detectFarfetchChallenge,
   extractCardsFromDom as extractFarfetchCards,
   type FarfetchRegion,
@@ -56,9 +54,8 @@ import type {IReviewParser} from "./lib/parsers/review"
 import type {CrawlResult, Product, SiteConfig} from "./lib/types"
 import type {DetailData} from "./lib/parsers/detail/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
-import {emit, getValidationReport} from "./lib/core/observability"
+import {getValidationReport} from "./lib/core/observability"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGenderWithSource} from "./lib/product-gender"
 
 // 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
 // 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
@@ -68,7 +65,6 @@ const queueDb =
     ? createClient(process.env.DB_URL, process.env.DB_TOKEN)
     : null
 
-const brandGenderScopeCache = new Map<string, Promise<string[]>>()
 
 // platform_key → brand_node_id. 기존 status 행의 platform_key 로 resolve, 없으면
 // SiteConfig.brand 로 brand_nodes 를 매칭해 폴백.
@@ -138,30 +134,6 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
   }
 }
 
-async function loadBrandGenderScopeForPlatform(platform: string): Promise<string[]> {
-  if (!queueDb) return []
-  const brandNodeId = await resolveBrandNodeId(platform)
-  if (!brandNodeId) return []
-
-  const {data, error} = await queueDb
-    .from("brand_nodes")
-    .select("gender_scope")
-    .eq("id", brandNodeId)
-    .maybeSingle()
-  if (error) {
-    console.warn(`⚠️ brand_nodes.gender_scope 조회 실패 (${platform}): ${error.message}`)
-    return []
-  }
-  return cleanGenderScope((data as {gender_scope: unknown} | null)?.gender_scope)
-}
-
-function getBrandGenderScopeForPlatform(platform: string): Promise<string[]> {
-  const existing = brandGenderScopeCache.get(platform)
-  if (existing) return existing
-  const promise = loadBrandGenderScopeForPlatform(platform)
-  brandGenderScopeCache.set(platform, promise)
-  return promise
-}
 
 // ─── CLI 인자 파싱 ───────────────────────────────────
 
@@ -361,7 +333,6 @@ async function probeSite(config: SiteConfig) {
         const harvested = harvest29cmItems(xhrPayload)
         for (const it of harvested) {
           it._categoryCode = firstCode
-          it._gender = genderFor29cm(firstCode)
         }
         const products = parse29cmXhr(harvested.slice(0, 3), config.baseUrl, config.key)
         console.log(`   ✅ 29CM XHR OK: harvested ${harvested.length} raw items; sample 3:`)
@@ -433,8 +404,7 @@ async function probeSite(config: SiteConfig) {
           await page.waitForTimeout(400)
         }
         const cards = await extractFarfetchCards(page)
-        const gender = deriveFarfetchGender(url)
-        const products = parseFarfetchCards(cards, config.baseUrl, config.key, region, sourceCurrency, gender)
+        const products = parseFarfetchCards(cards, config.baseUrl, config.key, region, sourceCurrency)
         console.log(`      HTTP=${response?.status()} cards=${cards.length} products=${products.length}`)
         if (products.length > 0) {
           console.log(`   ✅ Farfetch DOM-scrape OK; sample 3:`)
@@ -901,56 +871,18 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
 async function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
   if (rawProducts.length === 0) return
 
-  // brand_nodes.gender_scope 는 **플랫폼** 단위로 조회된다 — 멀티브랜드 편집샵
-  // (29cm/farfetch/zara)에서는 그 브랜드가 상품의 브랜드가 아니므로 폴백 근거가
-  // 되지 못한다. 단일브랜드 자사몰(config.brand 설정됨)에서만 유효하고, 나머지는
-  // 상품별 brand_node_id 를 아는 import-products.ts 단계에 위임한다.
-  const brandGenderScope = await getBrandGenderScopeForPlatform(platform)
-  const scopeForFallback = getSiteConfig(platform)?.brand ? brandGenderScope : []
-
-  const genderSourceCounts: Record<string, number> = {}
-  const productsWithGenderFallback = rawProducts.map((product) => {
-    const resolved = resolveProductGenderWithSource(product.gender, scopeForFallback, {
-      name: product.name,
-      category: product.category,
-      subcategory: product.subcategory,
-      description: product.description,
-      tags: product.tags,
-      productUrl: product.productUrl,
-      useDescription: true,
-    }, product.genderSource ?? "engine")
-    genderSourceCounts[resolved.source ?? "unknown"] = (genderSourceCounts[resolved.source ?? "unknown"] ?? 0) + 1
-    if (resolved.conflict) {
-      emit({
-        kind: "gender_source_conflict",
-        site: platform,
-        sku: product.productUrl,
-        urlGender: resolved.conflict.url,
-        textGender: resolved.conflict.text,
-      })
-    }
-    return resolved.gender.length > 0
-      ? {...product, gender: resolved.gender, genderSource: resolved.source ?? undefined}
-      : product
-  })
-
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
   // product before it is written to JSON. Valid products pass through
   // byte-identical; invalid ones are excluded + a structured reject
   // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
   // exact legacy behavior (all products written, no gate).
-  const qcProducts = applyProductQcGate(productsWithGenderFallback, platform)
+  const qcProducts = applyProductQcGate(rawProducts, platform)
   const products = applyValidationGate(qcProducts, platform)
   if (products.length === 0) return
 
   const outPath = path.join(outDir, `${platform}-products.json`)
   fs.writeFileSync(outPath, JSON.stringify(products, null, 2), "utf-8")
-  const genderSourceSummary = Object.entries(genderSourceCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([source, n]) => `${source}=${n}`)
-    .join(" ")
   console.log(`   💾 저장: ${outPath}`)
-  console.log(`   🚻 gender 출처: ${genderSourceSummary}`)
 }
 
 async function saveResult(outDir: string, result: CrawlResult) {
@@ -977,10 +909,12 @@ function loadExistingDetails(outDir: string, platform: string): Map<string, Deta
   try {
     const prior = JSON.parse(fs.readFileSync(outPath, "utf-8")) as Product[]
     for (const p of prior) {
-      if (p.productUrl && p.color) {
+      // 재시작 스킵 마커: 2026-07-29 이전에는 `p.color` 유무로 "상세 수집 완료"를
+      // 판정했는데, color 가 product_features(VLM)로 이관되며 그 암묵적 마커가
+      // 사라졌다. 명시적 detailFetchedAt 으로 교체한다 — 마커가 없으면 상세를
+      // 다시 크롤한다(안전한 방향).
+      if (p.productUrl && p.detailFetchedAt) {
         map.set(p.productUrl, {
-          color: p.color,
-          description: p.description ?? null,
           material: p.material ?? null,
           productCode: p.productCode ?? null,
         })
@@ -1080,7 +1014,7 @@ function printTimingReport(results: CrawlResult[]) {
 
 /**
  * validation 게이트에서 드롭된 상품을 사이트별·사유별로 요약 출력.
- * "왜 안 적재됐지"를 로그를 뒤지지 않고 한눈에 보게 한다 (color/gender/category 공백 추적).
+ * "왜 안 적재됐지"를 로그를 뒤지지 않고 한눈에 보게 한다 (gender/category 공백 추적).
  */
 function printDropReport() {
   const report = getValidationReport()
@@ -1229,6 +1163,21 @@ async function main() {
     targets = targets.filter((c) => !excludeSites.has(c.key))
   }
 
+  // 멀티브랜드 편집샵은 직접 크롤(Path A)에서 제외한다. 상품별 실제 브랜드가
+  // 온보딩 LLM 추출(Path B)을 거쳐야 하며, 직접 크롤은 platform-as-brand 오염만
+  // 만든다. 온보딩 파이프라인(tools/onboard-batch.sh)으로 수집할 것.
+  // 긴급 복구 시에만 --allow-multibrand 로 강제(권장하지 않음).
+  if (!flags["allow-multibrand"]) {
+    const editshops = targets.filter((c) => c.multiBrand)
+    if (editshops.length > 0) {
+      console.warn(
+        `⚠️  멀티브랜드 편집샵 ${editshops.length}개는 직접 크롤에서 제외 — 온보딩 파이프라인으로 수집: ${editshops.map((c) => c.key).join(", ")}`,
+      )
+      console.warn(`   강제하려면 --allow-multibrand (권장하지 않음 — brand 오염 위험).`)
+      targets = targets.filter((c) => !c.multiBrand)
+    }
+  }
+
   if (targets.length === 0 && !flags.list && !flags.probe) {
     console.log(`
 🕷️ 범용 플랫폼 크롤러
@@ -1254,7 +1203,7 @@ async function main() {
   --exclude-site=KEY      선택된 타겟에서 사이트 제외
   --probe=KEY             사이트 구조 확인
   --dry-run               카테고리 탐색만 (상품 안 긁음)
-  --detail      상세 페이지 크롤링 (description, color, material 수집)
+  --detail      상세 페이지 크롤링 (material, productCode 수집)
   --reviews     리뷰 크롤링 (--detail 없이도 가능, 리뷰 보드 페이지 기반)
   --include-out-of-stock  품절 상품도 수집 (재수집 전용 — shopify/cafe24 엔진의
                           기본 품절 필터를 끈다. zara/uniqlo 는 원래 품절도 남긴다)
@@ -1287,7 +1236,6 @@ async function main() {
     }
   }
 
-  lintGenderConfig(targets)
 
   console.log(`\n🚀 크롤링 시작: ${targets.map((t) => t.name).join(", ")}`)
   if (dryRun) console.log("   (dry-run 모드 — 카테고리 탐색만)")
@@ -1299,30 +1247,6 @@ async function main() {
   await runCrawl(targets, dryRun, includeOutOfStock)
 }
 
-/**
- * 크롤 전 gender config 린트: manual 카테고리인데 gender 가 비어 있고
- * defaultGender 도 없는 사이트를 경고한다. 이런 상품은 gender=[] 로 나와
- * validation 에서 전량 드롭되므로, 크롤을 돌리기 전에 한 번만 설정하도록 유도.
- */
-function lintGenderConfig(targets: SiteConfig[]) {
-  const warnings: string[] = []
-  for (const c of targets) {
-    if (c.type !== "cafe24") continue
-    if (c.category?.discovery !== "manual" || !c.category.categories) continue
-    if (c.defaultGender && c.defaultGender.length > 0) continue
-    const missing = c.category.categories.filter((cat) => !cat.gender || cat.gender.length === 0)
-    if (missing.length > 0) {
-      const sample = missing.slice(0, 3).map((m) => `${m.name}(cate_no=${m.cateNo})`).join(", ")
-      warnings.push(
-        `   [${c.name}] gender 미지정 카테고리 ${missing.length}개 (예: ${sample}) — defaultGender 또는 각 카테고리 gender 설정 권장`
-      )
-    }
-  }
-  if (warnings.length > 0) {
-    console.log("\n⚠️ gender config 점검 (미설정 시 해당 상품 전량 적재 제외):")
-    for (const w of warnings) console.log(w)
-  }
-}
 
 // 안전망: 개별 사이트 크롤은 각자 try/catch로 감싸져 있지만, Playwright의 내부
 // CDP 이벤트 핸들링(예: dialog 처리 중 context가 닫히는 경우) 은 그 바깥에서

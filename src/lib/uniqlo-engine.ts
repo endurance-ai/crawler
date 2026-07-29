@@ -119,17 +119,6 @@ interface UniqloApiResponse {
 
 // ─── Field mapping ─────────────────────────────────────
 
-function mapGender(genderName?: string): string[] {
-  if (!genderName) return []
-  const g = genderName.toUpperCase()
-  if (g === "WOMEN") return ["women"]
-  if (g === "MEN") return ["men"]
-  if (g === "KIDS") return ["kids"]
-  if (g === "BABY") return ["baby"]
-  if (g === "UNISEX") return ["unisex"]
-  return [g.toLowerCase()]
-}
-
 function mapImages(item: UniqloItem): {primary: string; all: string[]} {
   const collected: string[] = []
   const main = item.images?.main
@@ -195,9 +184,6 @@ export function parseProducts(
 
     const {primary, all} = mapImages(item)
 
-    const colorNames = (item.colors ?? [])
-      .map((c) => c.name)
-      .filter((n): n is string => typeof n === "string" && n.length > 0)
     const sizeNames = (item.sizes ?? [])
       .map((s) => s.name)
       .filter((n): n is string => typeof n === "string" && n.length > 0)
@@ -213,11 +199,9 @@ export function parseProducts(
       imageUrl: primary,
       productUrl: `${baseUrl}/products/${item.productId}`,
       inStock: item.representative?.sales ?? true,
-      gender: mapGender(item.genderName),
       platform: platformKey,
       crawledAt,
       productCode: item.productId,
-      color: colorNames.length > 0 ? colorNames.join(", ").slice(0, 500) : undefined,
       sizeInfo: sizeNames.length > 0 ? sizeNames.join(", ").slice(0, 200) : undefined,
       images: all.length > 0 ? all : undefined,
       sourceCurrency,

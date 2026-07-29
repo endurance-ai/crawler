@@ -53,8 +53,6 @@ export class RegistryDetailParser implements IDetailParser {
 
   async parse(page: Cafe24Page, productUrl: string): Promise<DetailData> {
     const result: DetailData = {
-      description: null,
-      color: null,
       material: null,
       productCode: null,
     }
@@ -80,8 +78,6 @@ export class RegistryDetailParser implements IDetailParser {
 
       const strategy = STRATEGIES[this.entry.strategy]
       const extracted = await strategy(page, this.entry)
-      result.description = extracted.description
-      result.color = extracted.color
       result.material = extracted.material
       result.productCode = extracted.productCode
     } catch (err) {

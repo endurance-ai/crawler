@@ -8,15 +8,16 @@
  *   2. before/after 비교. 캠페인이 실제로 무엇을 고쳤는지(혹은 망가뜨렸는지)를
  *      브랜드별로 남긴다.
  *
- * 색상/서브카테고리 판정은 write-path 와 **같은** 분류기를 쓴다
- * (classifyColorRepair / classifySubcategoryRepair). 여기서 자체 정규식을
- * 만들면 게이트와 실제 적재 결과가 어긋나므로 절대 하지 않는다.
+ * subcategory 판정은 write-path 와 **같은** 분류기를 쓴다
+ * (classifySubcategoryRepair). 여기서 자체 정규식을 만들면 게이트와 실제
+ * 적재 결과가 어긋나므로 절대 하지 않는다.
+ *
+ * color/gender 는 더 이상 크롤러가 만들지 않는다(2026-07-29 VLM 이관) — 그 두
+ * 필드에 대한 KPI/게이트는 이 모듈에서 제거됐다.
  */
 
-import {classifyColorRepair, type ProductColorRow} from "./color-repair"
 import {classifySubcategoryRepair, type ProductSubcategoryRow} from "./subcategory-repair"
 import {CATEGORIES} from "./enums/product-enums"
-import {COLOR_CANONICAL_NAMES} from "./product-qc/normalization"
 
 /** 파일(Product)과 DB(row) 양쪽을 같은 모양으로 맞춘 입력. */
 export interface MetricsRow {
@@ -28,11 +29,7 @@ export interface MetricsRow {
   name: string | null
   category: string | null
   subcategory: string | null
-  color: string | null
-  description: string | null
   tags: string[] | null
-  gender: string[] | null
-  gender_source: string | null
   images: string[] | null
   image_url: string | null
   in_stock: boolean | null
@@ -44,39 +41,11 @@ export interface RecollectMetrics {
   inStock: number
   outOfStock: number
 
-  /** color 가 비어 있는 행 — import 단계에서 조용히 드랍된다. */
-  colorMissing: number
-  /**
-   * **캠페인 KPI.** COLOR_CANONICAL_NAMES 에 없는 값을 가진 행 수.
-   * 다중값("Black, Coffee Bean")은 한 조각이라도 벗어나면 비canonical로 센다.
-   *
-   * 주의: 이걸 classifyColorRepair 로 재면 안 된다. normalizeColorField 의
-   * 마지막 분기가 title-case passthrough(reason=null)라서, "Coffee Bean" 같은
-   * 값은 이미 title-case 이므로 repair 분류기가 "unchanged" 로 판정한다.
-   * 실제로 browns 11,455행은 repair 기준으로 0건이지만 canonical 기준으로는
-   * 11,443건이 벗어나 있다 — 지표를 잘못 고르면 캠페인의 성공 판정이 통째로
-   * 무력화된다.
-   */
-  colorNonCanonical: number
-  /**
-   * 기존 repair 스크립트(pnpm repair:product-color)가 손댈 수 있는 행 수.
-   * colorNonCanonical 과 다른 질문에 답한다 — "재수집 말고 repair 로도 고쳐지나".
-   */
-  colorRepairable: number
-  /** 근거를 못 찾아 손댈 수 없는 color — 재수집으로도 안 고쳐질 가능성이 큰 잔여물. */
-  colorUnresolved: number
-  /** "Black, White" 같은 다중값. 검색 RPC 의 정확 일치 필터에 절대 안 걸린다. */
-  colorMultiValue: number
-
   subcategoryMissing: number
   subcategoryNonCanonical: number
 
   /** taxonomy(CATEGORIES) 밖의 category. */
   categoryInvalid: number
-
-  /** gender 가 빈 배열 — import 단계에서 드랍된다. */
-  genderMissing: number
-  genderSourceCounts: Record<string, number>
 
   /** 대표 이미지가 없는 행 (images[0] 도 image_url 도 없음). */
   imageMissing: number
@@ -84,49 +53,22 @@ export interface RecollectMetrics {
   imagesEmpty: number
 
   distinctBrands: number
-  descriptionMissing: number
 }
 
 const CATEGORY_SET = new Set<string>(CATEGORIES)
-const CANONICAL_COLOR_SET = new Set(COLOR_CANONICAL_NAMES.map((name) => name.toLowerCase()))
-
-function isMultiValueColor(color: string | null): boolean {
-  return typeof color === "string" && color.includes(",")
-}
-
-/**
- * COLOR_CANONICAL_NAMES 순수 멤버십 판정. 다중값은 모든 조각이 canonical 이어야
- * canonical 로 친다 — 검색 RPC 는 `UPPER(p.color) = UPPER(p_color_family)` 로
- * 정확 일치를 보므로 "Black, White" 는 어느 필터에도 안 걸린다.
- */
-export function isCanonicalColor(color: string | null): boolean {
-  if (typeof color !== "string") return false
-  const parts = color.split(",").map((part) => part.trim()).filter(Boolean)
-  if (parts.length === 0) return false
-  return parts.every((part) => CANONICAL_COLOR_SET.has(part.toLowerCase()))
-}
 
 export function computeRecollectMetrics(rows: readonly MetricsRow[]): RecollectMetrics {
   const brands = new Set<string>()
-  const genderSourceCounts: Record<string, number> = {}
   const metrics: RecollectMetrics = {
     rows: rows.length,
     inStock: 0,
     outOfStock: 0,
-    colorMissing: 0,
-    colorNonCanonical: 0,
-    colorRepairable: 0,
-    colorUnresolved: 0,
-    colorMultiValue: 0,
     subcategoryMissing: 0,
     subcategoryNonCanonical: 0,
     categoryInvalid: 0,
-    genderMissing: 0,
-    genderSourceCounts,
     imageMissing: 0,
     imagesEmpty: 0,
     distinctBrands: 0,
-    descriptionMissing: 0,
   }
 
   for (const row of rows) {
@@ -134,41 +76,6 @@ export function computeRecollectMetrics(rows: readonly MetricsRow[]): RecollectM
     else metrics.inStock += 1
 
     if (row.brand) brands.add(row.brand)
-    if (!row.description) metrics.descriptionMissing += 1
-
-    // ── color ──
-    const color = typeof row.color === "string" ? row.color.trim() : ""
-    if (!color) metrics.colorMissing += 1
-    const colorRow: ProductColorRow = {
-      id: row.id,
-      color: row.color,
-      name: row.name,
-      description: row.description,
-      subcategory: row.subcategory,
-      tags: row.tags,
-      product_url: row.product_url,
-      platform: row.platform,
-      brand: row.brand,
-      brand_node_id: row.brand_node_id,
-    }
-    const colorDecision = classifyColorRepair(colorRow)
-    if (colorDecision.bucket !== "unchanged") metrics.colorRepairable += 1
-    if (colorDecision.bucket === "unresolved_kept") metrics.colorUnresolved += 1
-    // KPI 판정은 raw row.color 가 아니라 "import 시점 QC 게이트를 거치면
-    // 어떤 값이 될지"를 봐야 한다. --file 모드(재수집 캠페인의 크롤+보강
-    // 직후 JSON)는 아직 이 게이트를 한 번도 안 거친 LLM 원본이라, 예를 들어
-    // "Rose"(정규화하면 Pink) 를 raw 그대로 검사하면 오탐이 난다 —
-    // 2026-07-28 noah-ny 재실행에서 실측: 게이트가 "비canonical 7.4%→20.6%,
-    // 개선 없음"으로 잘못 차단했다. classifyColorRepair 가 이미 계산한
-    // colorDecision.after(정규화 결과, unchanged/unresolved_kept 는 null)를
-    // 재사용해 "effective" 값을 만든다 — --platform 모드(이미 게이트를
-    // 통과한 DB 값)에서는 대부분 unchanged→after=null→raw 그대로라 기존
-    // 동작과 같다.
-    if (color) {
-      const effectiveColor = colorDecision.after ?? color
-      if (!isCanonicalColor(effectiveColor)) metrics.colorNonCanonical += 1
-      if (isMultiValueColor(effectiveColor)) metrics.colorMultiValue += 1
-    }
 
     // ── subcategory ──
     if (!row.subcategory) metrics.subcategoryMissing += 1
@@ -185,11 +92,8 @@ export function computeRecollectMetrics(rows: readonly MetricsRow[]): RecollectM
     const subDecision = classifySubcategoryRepair(subcategoryRow)
     if (subDecision.bucket !== "unchanged") metrics.subcategoryNonCanonical += 1
 
-    // ── category / gender / image ──
+    // ── category / image ──
     if (!row.category || !CATEGORY_SET.has(row.category)) metrics.categoryInvalid += 1
-    if (!row.gender || row.gender.length === 0) metrics.genderMissing += 1
-    const source = row.gender_source ?? "unknown"
-    genderSourceCounts[source] = (genderSourceCounts[source] ?? 0) + 1
 
     const representative = row.images?.[0] || row.image_url
     if (!representative) metrics.imageMissing += 1
@@ -205,10 +109,6 @@ export function computeRecollectMetrics(rows: readonly MetricsRow[]): RecollectM
 export interface GateThresholds {
   /** 크롤 행수가 기존 대비 이 비율 미만이면 중단. */
   minRowRatio: number
-  /** color 없는 행 비율 상한 (import 에서 드랍됨). */
-  maxColorMissingRatio: number
-  /** gender 없는 행 비율 상한 (import 에서 드랍됨). */
-  maxGenderMissingRatio: number
   /** distinct brand 가 기존 대비 이 비율 미만이면 중단. */
   minBrandRatio: number
   /** taxonomy 밖 category 비율 상한. */
@@ -217,8 +117,6 @@ export interface GateThresholds {
 
 export const DEFAULT_GATE_THRESHOLDS: GateThresholds = {
   minRowRatio: 0.6,
-  maxColorMissingRatio: 0.2,
-  maxGenderMissingRatio: 0.1,
   minBrandRatio: 0.9,
   maxCategoryInvalidRatio: 0.05,
 }
@@ -250,22 +148,6 @@ export function evaluateGate(
 ): GateResult {
   const failures: GateFailure[] = []
 
-  const colorMissingRatio = ratio(after.colorMissing, after.rows)
-  if (colorMissingRatio > thresholds.maxColorMissingRatio) {
-    failures.push({
-      check: "color_missing",
-      detail: `color 없는 행 ${after.colorMissing}/${after.rows} (${pct(colorMissingRatio)}) > 상한 ${pct(thresholds.maxColorMissingRatio)} — import 에서 전량 드랍된다`,
-    })
-  }
-
-  const genderMissingRatio = ratio(after.genderMissing, after.rows)
-  if (genderMissingRatio > thresholds.maxGenderMissingRatio) {
-    failures.push({
-      check: "gender_missing",
-      detail: `gender 없는 행 ${after.genderMissing}/${after.rows} (${pct(genderMissingRatio)}) > 상한 ${pct(thresholds.maxGenderMissingRatio)} — import 에서 드랍된다`,
-    })
-  }
-
   const categoryInvalidRatio = ratio(after.categoryInvalid, after.rows)
   if (categoryInvalidRatio > thresholds.maxCategoryInvalidRatio) {
     failures.push({
@@ -288,16 +170,6 @@ export function evaluateGate(
       failures.push({
         check: "distinct_brands",
         detail: `브랜드 ${after.distinctBrands}개 / 기존 ${before.distinctBrands}개 (${pct(brandRatio)}) < 하한 ${pct(thresholds.minBrandRatio)} — 브랜드 추출 회귀 의심`,
-      })
-    }
-
-    // 캠페인의 존재 이유가 이 숫자를 낮추는 것이다. 안 낮아지면 적재할 이유가 없다.
-    const beforeColorRatio = ratio(before.colorNonCanonical, before.rows)
-    const afterColorRatio = ratio(after.colorNonCanonical, after.rows)
-    if (afterColorRatio >= beforeColorRatio && before.colorNonCanonical > 0) {
-      failures.push({
-        check: "color_not_improved",
-        detail: `비canonical color 비율 ${pct(beforeColorRatio)} → ${pct(afterColorRatio)} — 개선 없음, 적재할 이유가 없다`,
       })
     }
   }

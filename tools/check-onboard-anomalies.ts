@@ -24,8 +24,6 @@ interface ProductRow {
   brand: string
   price: number | null
   source_currency: string | null
-  color: string | null
-  gender: string[] | null
   in_stock: boolean
 }
 
@@ -35,7 +33,7 @@ async function checkPlatform(db: ReturnType<typeof createProductCollectionClient
   const findings: string[] = []
   const {data, error} = await db
     .from("products")
-    .select("id,platform,name,brand,price,source_currency,color,gender,in_stock")
+    .select("id,platform,name,brand,price,source_currency,in_stock")
     .eq("platform", platform)
     .limit(5000)
   if (error) {
@@ -69,18 +67,6 @@ async function checkPlatform(db: ReturnType<typeof createProductCollectionClient
   if (brandEmpty > 0) findings.push(`  ⚠️  brand 빈 문자열: ${brandEmpty}건`)
   if (brandEqualsName > 0) findings.push(`  ⚠️  brand === name (DOM 오인식 의심): ${brandEqualsName}건`)
   if (brandLabelLeak > 0) findings.push(`  ⚠️  brand에 spec 라벨 텍스트 누출: ${brandLabelLeak}건`)
-
-  // 3. 색상: null 비율
-  const colorNull = rows.filter((r) => !r.color).length
-  if (colorNull / rows.length > 0.3) {
-    findings.push(`  ⚠️  color 없음: ${colorNull}/${rows.length} (${((colorNull / rows.length) * 100).toFixed(1)}%)`)
-  }
-
-  // 4. 성별: 빈 배열
-  const genderEmpty = rows.filter((r) => !r.gender || r.gender.length === 0).length
-  if (genderEmpty > 0) {
-    findings.push(`  ⚠️  gender 빈 배열: ${genderEmpty}건`)
-  }
 
   if (findings.length === 0) {
     findings.push(`  ✅ 이상 없음 (${rows.length}건 검사)`)
