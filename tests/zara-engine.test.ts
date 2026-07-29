@@ -309,8 +309,6 @@ test("AC-4 formatZaraPrice: US emits $ + 2-decimal fixed", () => {
   assert.equal(formatZaraPrice(99, "US"), "$99.00")
 })
 
-// ─── SPEC-005: deriveGenderFromUrl region-agnostic ──
-
 // ─── SPEC-005: buildZaraProductUrlPattern per-baseUrl validator ──
 
 test("buildZaraProductUrlPattern: KR base accepts KR URLs and rejects US URLs", () => {

@@ -17,7 +17,6 @@ import {openai} from "@ai-sdk/openai"
 import {generateText, Output, wrapLanguageModel} from "ai"
 import {z} from "zod"
 import {CATEGORIES, SUBCATEGORIES, type Category} from "../src/lib/enums/product-enums"
-import {getSiteConfig} from "../src/configs/platforms"
 
 const usage = {input: 0, output: 0}
 const model = wrapLanguageModel({
@@ -56,10 +55,8 @@ interface PilotProduct {
   name: string
   category?: string
   subcategory?: string
-  description?: string
   [key: string]: unknown
 }
-
 
 async function classifyBatch(
   items: Array<{i: number; name: string; hint: string | null}>,

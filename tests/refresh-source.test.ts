@@ -172,6 +172,7 @@ test("멀티브랜드 상품의 vendor가 source fallback brand보다 우선한�
       type: "shopify",
       baseUrl: "https://multi.test",
       brand: "Store Operator",
+      multiBrand: true,
     },
     [
       {id: 10, brand_name: "Maison Margiela", brand_name_normalized: "maison margiela"},
@@ -181,4 +182,23 @@ test("멀티브랜드 상품의 vendor가 source fallback brand보다 우선한�
 
   assert.equal(rows[0].matched_brand_node_id, 10)
   assert.equal(rows[0].detected_brand, "Maison Margiela")
+})
+
+test("단일브랜드 자사몰은 DOM 오인식 brand보다 config.brand가 우선한다", () => {
+  // 2026-07-29 버그 수정: 자사몰(multiBrand 아님)에서 DOM 브랜드 추출이
+  // 상품명/채움문자 등을 브랜드로 잘못 주워도 config.brand 가 이긴다.
+  const rows = buildRefreshCandidateInputs(
+    [{productUrl: "https://house.test/products/a", brand: "카듄 뒷밴딩 포켓 미니 스커트"}],
+    {
+      key: "house",
+      name: "House Brand",
+      type: "shopify",
+      baseUrl: "https://house.test",
+      brand: "House Operator",
+    },
+    [{id: 30, brand_name: "House Operator", brand_name_normalized: "houseoperator"}],
+  )
+
+  assert.equal(rows[0].matched_brand_node_id, 30)
+  assert.equal(rows[0].detected_brand, "House Operator")
 })

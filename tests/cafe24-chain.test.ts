@@ -128,7 +128,6 @@ function product(overrides: Partial<Product>): Product {
     inStock: true,
     platform: "test",
     crawledAt: "2026-01-01T00:00:00.000Z",
-    color: "Black",
     ...overrides,
   }
 }

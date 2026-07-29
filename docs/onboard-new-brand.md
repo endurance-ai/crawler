@@ -19,7 +19,6 @@
 | **신규 브랜드 차단(옵션)** | `--no-new-brands` 시 `brand_nodes` 미등록 브랜드는 INSERT 안 하고 해당 상품도 제외. | import `--no-new-brands` |
 | **색상은 크롤러가 안 뽑음** | 색상 단일 출처는 VLM `product_features.primary_color`. 크롤러 색상 로직은 2026-07-29 제거. | CLAUDE.md §18 |
 | **임베딩 이미지** | 대표 이미지 = `image_url` (== `images[0]`, 전 데이터셋 동일). `images` 비면 `image_url`로 폴백. | `embed_batch_devapp.py` fetch 쿼리 |
-| **대표 이미지 선정 필수** | import 전에 Mac 로컬 Vision 단계가 모델 착장샷을 자동 선정. 미선정 artifact는 기본 import 거부. | `pnpm select:product-images` + migration 092 |
 
 > 의미: **category를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 색상·성별은 크롤러 책임이 아니다(VLM).
 
@@ -68,60 +67,24 @@ npm test              # 기존 golden 깨지면 안 됨
 npm run crawl -- --dry-run --site=<key>
 
 # 온보딩 크롤 — 기본으로 --detail (상세 페이지) 사용.
-# color·description은 상세 페이지에만 있어 온보딩 때 확보한다
-# (리스트-only는 description 0% / color ~58%, 상세는 description 100% / color ~83%).
 npm run crawl -- --site=<key> --detail
 ```
 출력: `data/<key>-products.json`
 
 > **온보딩 = 상세, 갱신 = 리스트.** 가격/재고 주기 갱신은 `--detail` 없이 실행한다
-> (리스트 페이지에서 price·stock만, 상품당 상세 로드 없이 빠르게). color·description·image는
+> (리스트 페이지에서 price·stock만, 상품당 상세 로드 없이 빠르게). image는
 > 거의 변하지 않으므로 온보딩 1회 상세크롤로 확정하고 갱신에서는 다시 긁지 않는다.
 
 ### 크롤 후 확인 사항
 - **category 채움률**: 출력 JSON에서 `category`가 비어있는 비율이 높으면 카테고리 매핑 점검.
-- **color 채움률**: 옵션/텍스트에서 색상이 안 잡히면 fallback·정규화 맵 점검.
 - **품절 제외 동작**: `[품절]` 로그가 보이고 해당 상품이 결과에서 빠졌는지.
 - **멈춤 없이 완료**: 한 상세 페이지가 멈춰도 timeout으로 넘어감(evaluate 20s / detail 25s / 사이트 전체 20분). 사이트가 통째로 안 끝나면 `SITE_TIMEOUT_MS` 안에 강제 종료됨.
 
 ---
 
-## 4. 대표 이미지 자동 선정
+## 4. DB 적재
 
-Apple Silicon Mac에서 외부 LLM 호출 없이 Apple Vision으로 실행한다.
-
-```bash
-# 먼저 소량 dry-run + before/after HTML 리포트 확인
-pnpm select:product-images --site=<key> --limit=50 --dry-run
-
-# 전체 artifact에 자동 반영
-pnpm select:product-images --site=<key>
-```
-
-- 후보는 기존 `imageUrl`/`images[]`, JSON-LD, OG, srcset, 상세 갤러리에서 최대 10장 수집한다.
-- 우선순위는 `상품이 크게 보이는 모델 착장샷 → 제품 단독 컷 → 기존 이미지 폴백`이다.
-- 결과는 `imageUrl`과 `images[0]`에 반영되고 원래 크롤 이미지는 `sourceImageUrl`에 남는다.
-- `data/<key>-image-selection-*.html`에서 최대 200건의 before/after를 확인할 수 있다.
-- 중단 후 같은 명령을 다시 실행하면 `mac-vision-v1` 완료 상품과 캐시된 URL을 건너뛴다.
-- 롤백은 해당 실행의 JSONL을 사용한다:
-  `pnpm select:product-images --site=<key> --rollback=data/<manifest>.jsonl`
-
-기존 DB 전체 backfill은 migration 092 적용 후 별도로 실행한다. 첫 명령은 읽기/리포트만
-수행하고, 두 번째 명령에만 DB 쓰기가 있다.
-
-```bash
-pnpm select:product-images --from-db --all --limit=1000 --dry-run
-pnpm select:product-images --from-db --all --apply
-
-# 실행 단위 DB 롤백
-pnpm select:product-images --from-db --apply --rollback=data/<manifest>.jsonl
-```
-
----
-
-## 5. DB 적재
-
-### 5-1. 환경 파일 준비
+### 4-1. 환경 파일 준비
 `crawler/.env.local` (gitignore됨):
 ```
 DB_URL=http://<PostgREST 게이트웨이>:3001     # 직접 Postgres가 아니라 REST 게이트웨이
@@ -129,7 +92,7 @@ DB_TOKEN=<service JWT>
 ```
 > import는 PostgREST(`@supabase/supabase-js`)로 붙는다. psql 직결(5432)과는 **다른 경로**.
 
-### 5-2. 적재 실행
+### 4-2. 적재 실행
 ```bash
 # .env.local 은 npm 스크립트(dotenv -e .env)가 안 읽으므로 명시 호출
 npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-stock-only --site=<key>
@@ -139,8 +102,8 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
 - `--in-stock-only` — 품절 상품 제외
 - `--site=<key>` — 특정 플랫폼만 적재(생략 시 `data/` 전체)
 
-### 5-3. 적재 중/후 확인 사항
-- **`validation_reject` 로그** = category/color 누락으로 버려진 상품. 다수면 크롤 추출 품질 문제 → 2단계로 회귀.
+### 4-3. 적재 중/후 확인 사항
+- **`validation_reject` 로그** = category 누락으로 버려진 상품. 다수면 크롤 추출 품질 문제 → 2단계로 회귀.
 - **`style_node` 류 컬럼 에러 주의**: products에서 drop된 컬럼(`style_node`(081), `material`(079))을 payload에 넣으면
   `Could not find the 'X' column ... in schema cache` 로 **전 배치 실패**. import payload는 현 스키마와 일치해야 함.
 - psql로 결과 검증 (psql이 PATH에 없으면 전체 경로 사용):
@@ -148,21 +111,21 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
   export PGHOST=<host> PGPORT=5432 PGUSER=ai_user PGPASSWORD=<pw> PGDATABASE=kikoai PGSSLMODE=require PGCLIENTENCODING=UTF8
   LC_ALL=C "/c/Program Files/PostgreSQL/16/bin/psql.exe" -c \
     "SELECT count(*) total,
-            count(*) FILTER (WHERE category IS NULL OR color IS NULL) null_rows,
+            count(*) FILTER (WHERE category IS NULL) null_rows,
             count(*) FILTER (WHERE in_stock=false) out_of_stock
      FROM products WHERE platform='<key>';"
   ```
   → `null_rows=0`, `out_of_stock=0` 이어야 정상.
 
-> migration 091(category/color NOT NULL)은 이미 적용됨. validator가 막으니 신규 적재에서 null은 안 들어간다.
+> migration 091(category NOT NULL)은 이미 적용됨. validator가 막으니 신규 적재에서 null은 안 들어간다.
 
 ---
 
-## 6. 임베딩
+## 5. 임베딩
 
 `ai-server` 리포에서 실행. 로컬 FashionSigLIP로 인코딩 → `bulk_update_product_embeddings` RPC upsert.
 
-### 6-1. 준비
+### 5-1. 준비
 ```bash
 cd <repo>/ai-server
 uv sync --group embed
@@ -170,7 +133,7 @@ export KIKOAI_DEVAPP_DSN='postgresql://ai_user:<pw>@<host>:5432/kikoai?sslmode=r
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1 HF_HUB_DISABLE_SYMLINKS_WARNING=1              # Windows cp949 크래시 방지
 ```
 
-### 6-2. 검증 → 실행
+### 5-2. 검증 → 실행
 ```bash
 uv run python scripts/embed_batch_devapp.py --limit 50 --dry-run   # 대상 수 확인(쓰기 없음)
 uv run python scripts/embed_batch_devapp.py --limit 50             # 50건 end-to-end 테스트
@@ -180,7 +143,7 @@ uv run python scripts/embed_batch_devapp.py --download-workers 8   # 전체 배�
 - **DNS `getaddrinfo failed` skip이 잦으면** `--download-workers`를 낮춰라(8 → 4). 죽은 호스트가 아니라 동시성에 의한 로컬 DNS 과부하임. skip된 건 재실행 시 자동 보충.
 - CPU 인코딩은 느림(대략 0.3~0.4s/건). GPU/MPS 있으면 훨씬 빠름.
 
-### 6-3. 검증
+### 5-3. 검증
 ```sql
 SELECT count(*) FROM product_embeddings;                       -- 전체
 SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼별 커버리지
@@ -189,13 +152,12 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
 
 ---
 
-## 7. 한 줄 요약 파이프라인
+## 6. 한 줄 요약 파이프라인
 
 ```
 브랜드 선정(+brand_nodes 등록)
-  → 크롤 코드(config/셀렉터/색상맵) 작성 → npm run typecheck && npm test
-  → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/color/description/품절 확인)
-  → pnpm select:product-images --site=<key>   (Mac Vision 모델 착장샷 자동 선정)
+  → 크롤 코드(config/셀렉터) 작성 → npm run typecheck && npm test
+  → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/품절 확인)
   → import-products --no-new-brands --in-stock-only --site=<key>   (validation_reject/스키마 확인)
   → embed_batch_devapp.py --download-workers 8                     (재실행으로 커버리지 수렴)
 ```

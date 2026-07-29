@@ -199,21 +199,67 @@ export function normalizeBrandName(value: string): string {
 }
 
 /**
+ * 브랜드 대조 키 — 대소문자·공백·구두점을 모두 제거한 형태.
+ *
+ * 2026-07-29 버그 수정: `brand_nodes.brand_name_normalized` 는 이미 공백·구두점을
+ * **제거한** 형태로 저장된다 (`"032c READYTOWEAR"` → `"032creadytowear"`,
+ * `"Drakes - UK/ROW"` → `"drakesukrow"`). 그런데 matchExistingBrand 는 여기에
+ * `normalizeBrandName`(공백을 collapse 만 하고 제거하지는 않음)을 적용해
+ * 비교했다 → `"032c readytowear"` vs `"032creadytowear"` 로 **영원히 불일치**.
+ * 공백이나 구두점이 들어간 브랜드명은 전부 매칭에 실패해 brand_unmatched 로
+ * 파킹됐다.
+ *
+ * 양쪽에 동일한 제거 정규화를 적용해 형식 차이를 없앤다. NFKC 로 전각/호환 문자를
+ * 먼저 접어 크롤러가 주워온 이형 문자도 흡수한다.
+ */
+export function brandMatchKey(value: string): string {
+  return value.normalize("NFKC").toLowerCase().replace(/[^a-z0-9가-힣]/g, "")
+}
+
+/**
  * Automatic new-product import requires one unambiguous existing brand. Fuzzy
  * matching is deliberately excluded: a false positive is worse than leaving
  * the candidate in brand_unmatched for review.
+ *
+ * 구두점 제거로 서로 다른 브랜드가 같은 키로 접히면 매칭이 1건을 넘어 null 이
+ * 되고 후보는 그대로 파킹된다 — 완화가 아니라 강화 방향이라 안전하다.
  */
 export function matchExistingBrand(
   brand: string,
   rows: BrandLookupRow[],
 ): BrandLookupRow | null {
-  const wanted = normalizeBrandName(brand)
+  const wanted = brandMatchKey(brand)
   if (!wanted) return null
-  const matches = rows.filter((row) => {
-    const normalized = row.brand_name_normalized || row.brand_name
-    return normalizeBrandName(normalized) === wanted
-  })
-  return matches.length === 1 ? matches[0] : null
+  // brand_name_normalized 와 brand_name 어느 쪽으로든 일치하면 후보로 본다.
+  // 같은 row 가 두 조건을 다 만족할 수 있으므로 id 로 중복 제거한 뒤 센다.
+  const matches = new Map<number, BrandLookupRow>()
+  for (const row of rows) {
+    const keys = [row.brand_name_normalized ?? "", row.brand_name ?? ""]
+    if (keys.some((k) => k && brandMatchKey(k) === wanted)) matches.set(row.id, row)
+  }
+  return matches.size === 1 ? [...matches.values()][0] : null
+}
+
+/**
+ * 신규상품 후보의 브랜드 결정 — CLAUDE.md "Brand Name Fixing" 정책을 따른다.
+ *
+ * 우선순위:
+ *   1) `config.brand` (하우스 브랜드) — 단, `multiBrand` 가 아닌 경우에만
+ *   2) 상품에서 뽑은 brand (멀티브랜드 편집샵 / config.brand 미설정 자사몰)
+ *
+ * 2026-07-29 수정: 원래는 상품 brand 가 무조건 먼저였는데, 이는 정책과 정반대다.
+ * 단일브랜드 자사몰에서 DOM 브랜드 추출은 상품마다 브랜드가 다른 멀티브랜드
+ * 편집샵 전용 폴백인데, 그 오인식 값이 신뢰할 수 있는 `config.brand` 를 이겨서
+ * 후보가 통째로 brand_unmatched 로 파킹됐다.
+ */
+export function resolveCandidateBrand(
+  productBrand: unknown,
+  config: Pick<SiteConfig, "brand" | "multiBrand">,
+): string {
+  const fromProduct = typeof productBrand === "string" ? productBrand.trim() : ""
+  const house = config.brand?.trim() ?? ""
+  if (house && !config.multiBrand) return house
+  return fromProduct || house
 }
 
 export function buildRefreshCandidateInputs(
@@ -228,13 +274,7 @@ export function buildRefreshCandidateInputs(
     const identityKey = candidateIdentity(config.key, product.productUrl)
     if (seen.has(identityKey)) continue
     seen.add(identityKey)
-    // Multi-brand storefronts (Kith, Farfetch, 29CM, ...) must use the
-    // product/vendor brand. config.brand is only a fallback for single-brand
-    // engines that could not extract a brand from the listing.
-    const detectedBrand =
-      (typeof product.brand === "string" ? product.brand.trim() : "") ||
-      config.brand?.trim() ||
-      ""
+    const detectedBrand = resolveCandidateBrand(product.brand, config)
     const matched = detectedBrand ? matchExistingBrand(detectedBrand, brands) : null
     rows.push({
       platform_key: config.key,

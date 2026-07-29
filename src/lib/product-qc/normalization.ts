@@ -6,7 +6,7 @@ import {matchesAny, normalizeForMatch} from "../text-match"
 export type ProductQcAction = "keep" | "auto_fix" | "review" | "reject"
 
 export interface ProductQcFieldChange {
-  field: "category"
+  field: "category" | "subcategory"
   before: unknown
   after: unknown
   reason: string

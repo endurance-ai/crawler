@@ -54,7 +54,6 @@ const BASE_URL = "https://shop.example-store.com"
 const KEY = "shopify-test"
 const PARSE_OPTIONS = {
   sourceCurrency: "USD" as const,
-  defaultGender: [] as string[],
   brandFallback: "Example Store",
 }
 // Production shopify sites default to KRW (`config.sourceCurrency || "KRW"`
@@ -64,7 +63,6 @@ const PARSE_OPTIONS = {
 // extraction; do NOT regenerate on drift (must be byte-identical).
 const KRW_PARSE_OPTIONS = {
   sourceCurrency: "KRW" as const,
-  defaultGender: [] as string[],
   brandFallback: "Example Store",
 }
 

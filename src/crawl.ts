@@ -96,7 +96,6 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
 
   const success = result.errors.length === 0 && result.stats.totalProducts > 0
   const status = success ? "crawled" : "qc_failed"
-  const config = getSiteConfig(result.platform)
 
   // product_crawl_status 에는 crawled_at 컬럼이 없다(크롤 시각은 product_crawl_runs 가
   // 담당). 과거에 crawled_at 을 넣어 upsert 전체가 400 으로 조용히 실패했었다 — 여기
@@ -106,12 +105,6 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
       brand_node_id: brandNodeId,
       status,
       platform_key: result.platform,
-      ...(config
-        ? {
-            platform_type: queuePlatformType(config.type),
-            config_status: config.disabled ? "blocked" : "ready",
-          }
-        : {}),
       last_error: result.errors[0] ?? null,
     },
     {onConflict: "brand_node_id"},

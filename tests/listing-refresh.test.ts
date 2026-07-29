@@ -28,8 +28,6 @@ const product = (over: Partial<Product> = {}): Product =>
     imageUrl: "https://x/i.jpg",
     productUrl: "https://x/p/1",
     inStock: true,
-    gender: ["women"],
-    color: "black",
     platform: "cafe24",
     crawledAt: "2026-07-19T00:00:00Z",
     ...over,
