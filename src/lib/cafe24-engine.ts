@@ -14,8 +14,6 @@ import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
 import type {DetailData} from "./parsers/detail/types"
 import type {IReviewParser} from "./parsers/review"
-import {extractColorFromText, isNonColorOptionText, normalizeCafe24DetailColorList, normalizeColor} from "./parsers/field-extractors/color-normalizer"
-import {genericCafe24Color} from "./parsers/field-extractors/generic-color"
 import {
   applyCafe24DetailFallbacks,
   assessCafe24ProductQuality,
@@ -95,12 +93,32 @@ const DEFAULT_SELECTORS = {
   ],
 }
 
+const CAFE24_LIST_READY_SELECTOR = [
+  'li[id^="anchorBoxId"] a[href*="/product/"]',
+  'li[id^="anchorBoxId"] a[href*="product_no="]',
+  'li.xans-record- a[href*="/product/"]',
+  'li.xans-record- a[href*="product_no="]',
+  'ul.thumbnail > li a[href*="/product/"]',
+  'ul.prdList > li a[href*="/product/"]',
+  '.product-list .item a[href*="/product/"]',
+  '.product_listnormal_list > li a[href*="/product/"]',
+  '.grid-list > li a[href*="/product/"]',
+].join(", ")
+
+/**
+ * Cafe24 목록은 대부분 domcontentloaded 시점에 상품 카드가 이미 있고, 일부 테마만
+ * AJAX로 늦게 붙인다. 고정 3초 sleep 대신 실제 상품 링크를 기다리면 SSR 목록은 즉시
+ * 진행하고 AJAX/빈 페이지는 기존과 같은 최대 3초 경계를 유지한다.
+ */
+export async function waitForCafe24ListReady(page: Cafe24Page, timeoutMs = 3000): Promise<void> {
+  await page.waitForSelector(CAFE24_LIST_READY_SELECTOR, {timeout: timeoutMs}).catch(() => undefined)
+}
+
 // ─── 카테고리 자동 탐색 ───────────────────────────────
 
 interface DiscoveredCategory {
   name: string
   cateNo: number
-  gender: string[]
   url: string
 }
 
@@ -265,7 +283,6 @@ async function collectProductsFromPage(
   page: Cafe24Page,
   config: SiteConfig,
   categoryName: string,
-  categoryGender: string[],
   brandOverride?: string,
   timing?: CrawlTiming
 ): Promise<Product[]> {
@@ -305,10 +322,6 @@ async function collectProductsFromPage(
       : DEFAULT_SELECTORS.productLink,
     categoryName,
     brandNameOverride: brandOverride || "",
-    gender: categoryGender.length > 0 ? categoryGender : (config.defaultGender || []),
-    // 카테고리 유래(상품 단위 근거)와 사이트 전역 기본값을 구분한다 — 후자는
-    // 카테고리가 교차하는 사이트에서 URL/텍스트 추론보다 낮은 순위로 쓰인다.
-    genderSource: categoryGender.length > 0 ? "engine" : "config_default",
     baseUrl: config.baseUrl,
     platformKey: config.key,
     pricePatternStr: config.pricePattern?.source || null,
@@ -530,26 +543,6 @@ async function collectProductsFromPage(
           if (leaksSpecLabel || duplicatesName || brand.length > 40) brand = ""
         }
 
-        // 색상 후보 원문: 목록 카드의 옵션/스와치 이미지 alt·title + 색상 칩 링크 title.
-        // Node 측에서 extractColorFromText 로 정규화한다(브라우저 컨텍스트에서는 import 불가).
-        var swatchParts: string[] = []
-        var swatchSel = [
-          ".xans-product-option img",
-          "[class*=color] img",
-          "[class*=Color] img",
-          "li[class*=color] a",
-          ".chips img",
-          ".swatch img",
-        ]
-        for (var ci = 0; ci < swatchSel.length; ci++) {
-          var chips = el.querySelectorAll(swatchSel[ci])
-          for (var cj = 0; cj < chips.length; cj++) {
-            var chipTxt = (chips[cj].getAttribute("alt") || chips[cj].getAttribute("title") || "").trim()
-            if (chipTxt) swatchParts.push(chipTxt)
-          }
-        }
-        var swatchText = swatchParts.slice(0, 20).join(", ")
-
         // 세일가: price2 div 체크
         const price2El = el.querySelector(".price2, .sale_price, [class*=sale]")
         let originalPrice = price
@@ -591,10 +584,9 @@ async function collectProductsFromPage(
           originalPrice, salePrice,
           priceFormatted,
           imageUrl, productUrl, inStock,
-          gender: args.gender, genderSource: args.genderSource, platform: args.platformKey,
+          platform: args.platformKey,
           sourceCurrency: args.sourceCurrency,
           sourcePrice: salePrice || price || undefined,
-          swatchText,
           crawledAt: new Date().toISOString(),
         })
       }
@@ -613,16 +605,9 @@ async function collectProductsFromPage(
     return []
   }
 
-  // 목록 단계 color 확정: 스와치/옵션 alt·title 우선, 없으면 상품명 키워드.
-  // swatchText 는 전송용 임시 필드 → Product 로 넘기기 전 제거한다.
   const products = (evalResult.products || []) as Array<Record<string, unknown>>
   for (const p of products) {
     if (typeof p.name === "string") p.name = cleanCafe24ProductName(p.name)
-    const swatch = typeof p.swatchText === "string" ? p.swatchText : ""
-    const nm = typeof p.name === "string" ? p.name : ""
-    const color = extractColorFromText(swatch) ?? extractColorFromText(nm)
-    if (color) p.color = color
-    delete p.swatchText
   }
 
   return products as unknown as Product[]
@@ -634,7 +619,8 @@ async function crawlCategory(
   page: Cafe24Page,
   config: SiteConfig,
   category: DiscoveredCategory,
-  timing?: CrawlTiming
+  timing?: CrawlTiming,
+  listingOnly = false,
 ): Promise<Product[]> {
   const allProducts: Product[] = []
   const maxPages = config.maxPages || 10
@@ -649,13 +635,13 @@ async function crawlCategory(
 
     try {
       await page.goto(url, {waitUntil: "domcontentloaded", timeout: 60000})
-      await page.waitForTimeout(3000) // JS 렌더링 대기
+      if (listingOnly) await waitForCafe24ListReady(page)
+      else await page.waitForTimeout(3000) // 상세/온보딩 경로의 기존 대기 보존
 
       const products = await collectProductsFromPage(
         page,
         config,
         category.name,
-        category.gender,
         config.brand,
         timing
       )
@@ -715,7 +701,6 @@ export async function crawlCafe24(
     categories = config.category.categories.map((c) => ({
       name: c.name,
       cateNo: c.cateNo,
-      gender: c.gender || [],
       url: `${config.baseUrl}/product/list.html?cate_no=${c.cateNo}`,
     }))
     console.log(`${tag} 📋 수동 카테고리 ${categories.length}개`)
@@ -739,7 +724,7 @@ export async function crawlCafe24(
         timeout: 30000,
       })
       await page.waitForTimeout(1500)
-      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [], config.brand, timing)
+      const products = await collectProductsFromPage(page, config, config.name, config.brand, timing)
       allProducts.push(...products)
       console.log(`${tag} 📦 메인: ${products.length}개 상품`)
     } catch (err) {
@@ -751,15 +736,14 @@ export async function crawlCafe24(
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]
     const delay = config.crawlDelay || 2000
-    const gender = cat.gender.length > 0 ? cat.gender.join("/") : "all"
 
     try {
-      const products = await crawlCategory(page, config, cat, timing)
+      const products = await crawlCategory(page, config, cat, timing, options.listingOnly)
       allProducts.push(...products)
 
       const inStockCount = products.filter((p) => p.inStock).length
       console.log(
-        `${tag} [${i + 1}/${categories.length}] ${gender} > ${cat.name} — ${products.length}개 (재고 ${inStockCount})`
+        `${tag} [${i + 1}/${categories.length}] ${cat.name} — ${products.length}개 (재고 ${inStockCount})`
       )
 
       for (const p of products) {
@@ -827,11 +811,12 @@ export async function crawlCafe24(
         const batch = uniqueProducts.slice(i, i + DETAIL_CONCURRENCY)
         const results = await Promise.all(
           batch.map(async (product, slot) => {
-            // 재시작 스킵: 이전 체크포인트/결과 파일에 이미 색상까지 확보된 상품이면
+            // 재시작 스킵: 이전 체크포인트/결과 파일에서 이미 상세를 끝낸 상품이면
             // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
-            // 상세크롤을 반복하지 않기 위함).
+            // 상세크롤을 반복하지 않기 위함). 마커는 Product.detailFetchedAt 이다
+            // (2026-07-29 이전에는 color 유무로 판정 → color 가 VLM 으로 이관되며 교체).
             const known = options.existingDetails?.get(product.productUrl)
-            if (known && known.color) {
+            if (known && product.detailFetchedAt) {
               return {product, detail: known, detailFallbacks: null}
             }
             const lease = externalDetailFactory ? await externalDetailFactory() : workerLeases[slot]!
@@ -842,20 +827,11 @@ export async function crawlCafe24(
                 25_000,
                 `detail:${product.productUrl.slice(-50)}`
               )
-              // 사이트별 전략이 color 를 못 뽑았을 때만 범용 폴백 발동 (golden 무영향).
-              if (!detail.color) {
-                detail.color = await genericCafe24Color(pg).catch(() => null)
-              }
               const detailFallbacks = await extractCafe24DetailFallbacks(pg)
               if (options.enrichDetailPage) {
                 await options.enrichDetailPage(pg, product).catch(() => {})
-                // The outer loop below unconditionally does `if (detail?.description)
-                // product.description = detail.description` -- without this sync that
-                // would immediately clobber whatever enrichDetailPage just set back to
-                // the raw (possibly junk) deterministic value (2026-07-22 regression
-                // found via live smoke test: LLM-written description never survived).
-                detail.description = product.description ?? null
               }
+              product.detailFetchedAt = new Date().toISOString()
               return {product, detail, detailFallbacks}
             } catch {
               // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서
@@ -874,39 +850,16 @@ export async function crawlCafe24(
 
         for (const {product, detail, detailFallbacks} of results) {
           if (!detail && !detailFallbacks) continue
-          if (detail?.description) product.description = detail.description
-          // color 우선순위: 상세(전략+범용폴백) → 목록 스와치(이미 세팅됨) → 상품명 → "_COLOR"/"[COLOR]" 패턴.
-          const detailColor = detail?.color ? normalizeCafe24DetailColorList(detail.color) : ""
-          if (detailColor) {
-            product.color = detailColor
-          }
           if (detailFallbacks) {
             applyCafe24DetailFallbacks(product, detailFallbacks)
-          }
-          if (!product.color && product.name) {
-            const nameColor = extractColorFromText(product.name)
-            if (nameColor) {
-              product.color = nameColor
-            } else {
-              const m =
-                product.name.match(/_([A-Za-z][A-Za-z ]{1,29})$/) ??
-                product.name.match(/\[([A-Za-z][A-Za-z ]{1,29})\]/)
-              // Bracket/suffix content isn't guaranteed to be a color — e.g. hamsaseyo
-              // prefixes out-of-stock items with "[soldout]", which normalizeColor()
-              // would otherwise Title-Case into a fake "Soldout" color (2026-07-06).
-              if (m && !isNonColorOptionText(m[1].trim())) product.color = normalizeColor(m[1].trim())
-            }
           }
           if (detail?.material) product.material = detail.material
           if (detail?.productCode) product.productCode = detail.productCode
           if (
-            detail?.description ||
-            detailColor ||
             detail?.material ||
             detail?.productCode ||
             detailFallbacks?.name ||
             detailFallbacks?.price != null ||
-            detailFallbacks?.color ||
             detailFallbacks?.descriptionFirstLine
           ) {
             detailSuccess++

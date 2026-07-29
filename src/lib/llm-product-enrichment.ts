@@ -5,8 +5,6 @@ import type {Page} from "playwright"
 import {z} from "zod"
 
 import {CATEGORIES, buildSubcategoryReference} from "./enums/product-enums"
-import {COLOR_CANONICAL_NAMES} from "./product-qc/normalization"
-import {PRODUCT_GENDER_VALUES} from "./product-gender"
 import type {Product, SiteConfig} from "./types"
 
 export interface LlmTokenUsage {
@@ -24,19 +22,14 @@ export interface LlmProductEnrichment {
 const EnrichmentSchema = z.object({
   category: z.enum(CATEGORIES),
   subcategory: z.string().nullable(),
-  color: z.string().nullable(),
-  description: z.string().nullable(),
-  gender: z.array(z.enum(PRODUCT_GENDER_VALUES)).min(1),
 })
 
-// subcategory/color stay freeform strings in EnrichmentSchema (not z.enum) —
-// subcategory's valid set depends on the predicted category, and color
-// intentionally keeps room for a specific real name when nothing canonical
-// fits (see product-qc/normalization.ts's COLOR_RULES policy comment). Both
-// get a canonical-strict second pass in the QC gate every write path already
-// runs through (normalizeSubcategoryField / normalizeColorField), so this
-// prompt only needs to steer the *common* case toward the same vocabulary
-// instead of leaving it fully freeform.
+// subcategory stays a freeform string in EnrichmentSchema (not z.enum) — its
+// valid set depends on the predicted category. It gets a canonical-strict
+// second pass in the QC gate every write path already runs through
+// (normalizeSubcategoryField), so this prompt only needs to steer the
+// *common* case toward the same vocabulary instead of leaving it fully
+// freeform.
 const SYSTEM = `Classify one fashion product using only the supplied name, brand, breadcrumb, metadata and description.
 Do not invent material, origin, fit or other factual claims absent from the context.
 
@@ -45,24 +38,12 @@ category must be exactly one of: ${CATEGORIES.join(", ")}.
 subcategory must be one of the values below for the chosen category, or null if none fits — do not invent a value outside this list:
 ${buildSubcategoryReference()}
 
-color: use one of these canonical names when the product's color matches: ${COLOR_CANONICAL_NAMES.join(", ")}. Only return a different, more specific name when the actual color clearly isn't one of these. Return null if no color is stated or shown.
-CRITICAL — do not infer color from technical/marketing phrases that merely happen to contain a color word: "블루라이트 차단"(blue-light-filtering lens coating, not the item's color), "UV차단", "골드메달 수상"(gold medal award), "블랙프라이데이"(Black Friday sale), "그린워싱", "레드카펫" and similar are NOT color evidence. Only report a color when something explicitly and unambiguously names the physical color/appearance of THIS item — a stated color/variant option, a color word in the product title/breadcrumb describing the item itself, or a tag naming the color. If no such explicit, unambiguous signal exists, return null. Do not guess.
-You may receive "tags" (site-provided product tags) and "existingColorHint" (a previously scraped color value) as extra signal. Tags are a genuine site-provided signal — a tag like "black" or "color-navy" is real evidence. existingColorHint is NOT reliable — it is frequently a size/stock/UI label ("사이즈", "Quantity Up Down", a bare SKU code) rather than an actual color, so only use it when it plainly names a color; otherwise ignore it and rely on tags/name/breadcrumb/description instead.
-
-Return a concise useful description, canonical category, specific subcategory when known, primary color, and audience.
 Return only JSON matching the schema.`
 
 function clean(value: unknown): string | null {
   if (typeof value !== "string") return null
   const result = value.replace(/\s+/g, " ").trim()
   return result || null
-}
-
-function junkDescription(value: string, name: string): boolean {
-  if (/[₩$€£]\s*[\d,]+/.test(value)) return true
-  const normalize = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "")
-  const normalizedName = normalize(name)
-  return normalizedName.length >= 8 && normalize(value).startsWith(normalizedName.slice(0, normalizedName.length - 4))
 }
 
 function numberValue(value: unknown): number {
@@ -191,8 +172,7 @@ export async function enrichProductWithLlm(
   const scraper = new LLMScraper(wrapped)
   // Reasoning models (gpt-5.x, o1/o3, ...) reject the `temperature` sampling
   // param outright — the AI SDK only warns and ignores it, but the warning
-  // fires on every single call and pollutes batch-repair logs (2026-07-28
-  // color-repair review, switching the default model to gpt-5.4-nano).
+  // fires on every single call and pollutes batch logs.
   const isReasoningModel = /^(?:gpt-5|o1|o3)/.test(model)
   const result = await scraper.run(page, Output.object({schema: EnrichmentSchema}), {
     format: "custom",
@@ -201,24 +181,16 @@ export async function enrichProductWithLlm(
         name: product.name,
         brand: product.brand,
         tags: product.tags ?? [],
-        existingColorHint: product.color ?? null,
         page: context,
       }),
     system: SYSTEM,
     ...(isReasoningModel ? {} : {temperature: 0}),
   })
   const parsed = EnrichmentSchema.parse(result.data)
-  const description = clean(parsed.description)
   const enriched: Product = {
     ...product,
     category: parsed.category,
     subcategory: clean(parsed.subcategory) ?? undefined,
-    color: clean(parsed.color) ?? product.color,
-    description:
-      description && !junkDescription(description, product.name)
-        ? description
-        : product.description,
-    gender: parsed.gender,
   }
   return {product: enriched, model, usage, costUsd: estimateCost(usage)}
 }

@@ -73,7 +73,7 @@ interface CandidateRow {
   platform_key: string | null
   platform_type: string
   category_discovery: "manual" | "auto"
-  categories: Array<{cateNo: number; gender?: string[]}>
+  categories: Array<{cateNo: number}>
   status: string
   config_status: string
   detection: Record<string, unknown>
@@ -230,9 +230,8 @@ function buildEntrySource(
       lines.push('      discovery: "manual",')
       lines.push("      categories: [")
       for (const c of row.categories) {
-        const gender = c.gender && c.gender.length > 0 ? c.gender : ["unisex"]
         lines.push(
-          `        {name: ${JSON.stringify(`Cat${c.cateNo}`)}, cateNo: ${c.cateNo}, gender: ${JSON.stringify(gender)}},`,
+          `        {name: ${JSON.stringify(`Cat${c.cateNo}`)}, cateNo: ${c.cateNo}},`,
         )
       }
       lines.push("      ],")
@@ -244,12 +243,6 @@ function buildEntrySource(
     lines.push(`    sourceCurrency: ${JSON.stringify(shopifyCurrencyResult?.currency ?? "KRW")},`)
     lines.push("    maxPages: 300,")
     lines.push("    crawlDelay: 1500,")
-  } else {
-    const genders = row.categories.flatMap((category) => category.gender ?? [])
-    const defaultGender = [...new Set(genders)]
-    if (defaultGender.length > 0) {
-      lines.push(`    defaultGender: ${JSON.stringify(defaultGender)},`)
-    }
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected

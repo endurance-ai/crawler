@@ -8,7 +8,7 @@
  * PURPOSE (DDD PRESERVE phase)
  * ---------------------------
  * The Shopify variant→Product mapping (variant pick, price/option
- * handling, image-host whitelist, gender/tag/description) was formerly
+ * handling, image-host whitelist, tag/description) was formerly
  * private inside the un-exported `crawlShopify()` consuming live `fetch`.
  * SPEC-ARCH-CRAWLER-001's HARD characterization gate (cafe24 + shopify +
  * uniqlo) requires a byte-identical Shopify snapshot before the
@@ -192,7 +192,6 @@ test("characterize: every shopify product carries platform/key + USD shape + whi
       `productUrl base drift: ${p.productUrl}`,
     )
     assert.equal(typeof p.inStock, "boolean")
-    assert.ok(Array.isArray(p.gender), `gender must be array for ${p.productUrl}`)
     assert.equal(p.platform, KEY, `platform drift for ${p.productUrl}`)
     assert.equal(p.sourceCurrency, "USD", `sourceCurrency drift for ${p.productUrl}`)
 

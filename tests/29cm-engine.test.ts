@@ -21,7 +21,6 @@ import * as path from "node:path"
 import {fileURLToPath} from "node:url"
 
 import {
-  genderFromCategoryCode,
   harvestRawItems,
   is29cmCloudflareChallenge,
   isSafe29cmImageUrl,
@@ -74,11 +73,9 @@ test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl
   assert.equal(fixture.meta?.result, "SUCCESS")
   const list = fixture.data?.list ?? []
   assert.ok(list.length >= 30, `expected >=30 fixture items, got ${list.length}`)
-  // Annotate items with category code for gender derivation.
   const annotated: RawTwentyninecmItem[] = list.map((it) => ({
     ...it,
     _categoryCode: FIXTURE_CATEGORY_CODE,
-    _gender: genderFromCategoryCode(FIXTURE_CATEGORY_CODE),
   }))
   const products = parseProductsFromXhr(annotated, TEST_BASE_URL, TEST_KEY)
   assert.ok(products.length > 0, `parser produced 0 Products from ${list.length} fixture items`)
@@ -105,40 +102,12 @@ test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl
   }
 })
 
-test("AC-2 parseProductsFromXhr: gender derives from L1 category code", () => {
-  const fixture = loadFixture()
-  const list = fixture.data?.list ?? []
-  // Women code → "women"
-  const womenAnnotated = list.map((it) => ({
-    ...it,
-    _categoryCode: 268100100,
-    _gender: genderFromCategoryCode(268100100),
-  }))
-  const womenProducts = parseProductsFromXhr(womenAnnotated, TEST_BASE_URL, TEST_KEY)
-  assert.ok(womenProducts.length > 0)
-  for (const p of womenProducts) {
-    assert.deepEqual(p.gender, ["women"], `expected ["women"] for code 268100100, got ${JSON.stringify(p.gender)}`)
-  }
-  // Men code → "men"
-  const menAnnotated = list.map((it) => ({
-    ...it,
-    _categoryCode: 272100100,
-    _gender: genderFromCategoryCode(272100100),
-  }))
-  const menProducts = parseProductsFromXhr(menAnnotated, TEST_BASE_URL, TEST_KEY)
-  assert.ok(menProducts.length > 0)
-  for (const p of menProducts) {
-    assert.deepEqual(p.gender, ["men"], `expected ["men"] for code 272100100, got ${JSON.stringify(p.gender)}`)
-  }
-})
-
 test("AC-2 parseProductsFromXhr: salePrice set when displayPrice < originalPrice", () => {
   const fixture = loadFixture()
   const list = fixture.data?.list ?? []
   const annotated = list.map((it) => ({
     ...it,
     _categoryCode: FIXTURE_CATEGORY_CODE,
-    _gender: "women" as const,
   }))
   const products = parseProductsFromXhr(annotated, TEST_BASE_URL, TEST_KEY)
   let saleCount = 0
@@ -181,7 +150,6 @@ test("AC-2 parseProductsFromXhr: skips non-PRODUCT items", () => {
       },
       itemEvent: {eventProperties: {largeCategoryName: "여성의류", brandName: "TestBrand"}},
       _categoryCode: 268100100,
-      _gender: "women",
     },
   ]
   const products = parseProductsFromXhr(synthetic, TEST_BASE_URL, TEST_KEY)
@@ -213,7 +181,6 @@ test("AC-2b parseProductsFromDom: extracts product from synthetic HTML card", ()
   assert.equal(first.productCode, "12345")
   assert.equal(first.name, "테스트 블라우스")
   assert.equal(first.price, 88740)
-  assert.deepEqual(first.gender, ["women"])
   assert.ok(isSafe29cmImageUrl(first.imageUrl))
   assert.ok(isSafe29cmProductUrl(first.productUrl))
 })
@@ -306,17 +273,6 @@ test("AC-4 harvestRawItems ignores prototype-pollution keys", () => {
   assert.equal((Object.prototype as Record<string, unknown>).polluted, undefined)
 })
 
-// ─── AC-5: gender mapping ───────────────────────────────────
-
-test("AC-5 genderFromCategoryCode covers Women + Men L1 codes", () => {
-  for (const code of [268100100, 269100100, 270100100, 271100100, 305100100]) {
-    assert.equal(genderFromCategoryCode(code), "women", `expected women for ${code}`)
-  }
-  for (const code of [272100100, 273100100, 274100100, 275100100, 306100100]) {
-    assert.equal(genderFromCategoryCode(code), "men", `expected men for ${code}`)
-  }
-  assert.equal(genderFromCategoryCode(999999999), "")
-})
 
 // ─── AC-6: harvest helper ───────────────────────────────────
 

@@ -19,7 +19,6 @@
 import {chromium, type Browser, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {extractStructuredProduct} from "./parsers/structured-data"
-import {extractColorFromText, normalizeColor} from "./parsers/field-extractors/color-normalizer"
 import {CURRENCY_SYMBOL} from "./fx"
 
 const USER_AGENT =
@@ -82,7 +81,7 @@ function toNumber(value: number | string | undefined): number | null {
  */
 export function parseImwebListItem(
   item: ImwebListItem,
-  config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender" | "sourceCurrency">,
+  config: Pick<SiteConfig, "key" | "name" | "brand" | "sourceCurrency">,
   category: string,
 ): Product | null {
   const props = item.properties
@@ -96,9 +95,6 @@ export function parseImwebListItem(
   const onSale = originalPrice !== null && price !== null && price < originalPrice
   const imageUrl = typeof props.image_url === "string" && /^https?:\/\//.test(props.image_url) ? props.image_url : ""
 
-  // 상품명 뒤 "/ color" 패턴이 흔함 (예: "JACKET / light beige") → 색상 추출
-  const colorFromName = extractColorFromText(name)
-
   // imweb 위젯 JSON의 price/original_price는 항상 스토어 원본 통화값이다.
   // 이전에는 sourceCurrency를 전혀 판정하지 않고 KRW로 단정해 저장했는데,
   // 604service(config.sourceCurrency="USD")처럼 원화가 아닌 스토어에서
@@ -108,7 +104,11 @@ export function parseImwebListItem(
   const sourceCurrency = config.sourceCurrency || "KRW"
 
   return {
-    brand: config.brand || config.name,
+    // 하우스 브랜드만 사용한다. config.brand 가 없으면 플랫폼명(config.name)으로
+    // 폴백하지 않고 빈 브랜드로 남긴다 — platform-as-brand 오염 방지. 단일브랜드
+    // imweb 자사몰은 반드시 config.brand 를 설정해야 하며(미설정 시 import 단계에서
+    // 격리), 멀티브랜드 편집샵은 온보딩 LLM 브랜드 추출로 처리한다.
+    brand: config.brand || "",
     name,
     category,
     price,
@@ -120,12 +120,8 @@ export function parseImwebListItem(
     imageUrl,
     productUrl: item.link,
     inStock: !item.soldOutBadge,
-    gender: [...(config.defaultGender ?? [])],
-    // imweb 은 카테고리 성별 신호가 없어 항상 사이트 전역 기본값이다.
-    genderSource: "config_default" as const,
     platform: config.key,
     crawledAt: new Date().toISOString(),
-    color: colorFromName ?? undefined,
     images: imageUrl ? [imageUrl] : undefined,
     productCode: typeof props.code === "string" ? props.code : undefined,
     sourceCurrency,
@@ -231,15 +227,10 @@ async function enrichFromDetail(product: Product, delay: number): Promise<void> 
   const structured = extractStructuredProduct(html)
   if (!structured) return
 
-  if (structured.description && !product.description) product.description = structured.description
   if (structured.inStock !== null) product.inStock = structured.inStock
   if (structured.images.length > 0) {
     product.images = [...new Set([...(product.images ?? []), ...structured.images])].slice(0, 10)
     if (!product.imageUrl) product.imageUrl = structured.images[0]
-  }
-  if (!product.color) {
-    const raw = structured.color ?? (structured.name ? extractColorFromText(structured.name) : null)
-    if (raw) product.color = normalizeColor(raw)
   }
   if (structured.sku && !product.productCode) product.productCode = structured.sku
 }
@@ -302,7 +293,7 @@ export async function crawlImweb(config: SiteConfig): Promise<CrawlResult> {
       }
     }
 
-    // 3. 상세 보강 (온보딩: description/color/availability — 서버렌더 JSON-LD, fetch 기반)
+    // 3. 상세 보강 (온보딩: availability/images — 서버렌더 JSON-LD, fetch 기반)
     if (config.crawlDetails) {
       console.log(`   상세 크롤: ${products.length}개 (fetch)`)
       for (const product of products) {

@@ -17,9 +17,6 @@
 import type {Cafe24Page} from "../../cafe24-page"
 import type {DetailData} from "../detail/types"
 import type {RegistryEntry, StrategyId} from "../detail/selector-registry"
-import {colorFromOptionList} from "./color"
-import {normalizeColor} from "./color-normalizer"
-import {baseDescriptionInPage} from "./description"
 import {baseMaterialFromDescription} from "./material"
 
 /** SPEC-CRAWLER-DETAIL-FIX-001 review P1: ReDoS guard — bound untrusted section input before [\s\S]*? regexes */
@@ -32,8 +29,6 @@ function guardSectionInput(s: string): string {
 type Strategy = (page: Cafe24Page, entry: RegistryEntry) => Promise<DetailData>
 
 const empty = (): DetailData => ({
-  description: null,
-  color: null,
   material: null,
   productCode: null,
 })
@@ -53,26 +48,6 @@ const baseStrategy: Strategy = async (page, entry) => {
           const text = (el as HTMLElement).innerText?.trim()
           if (text && text.length > 10) {
             description = text.slice(0, 2000)
-            break
-          }
-        } catch {
-          /* next */
-        }
-      }
-
-      // color
-      let color: string | null = null
-      for (const sel of args.colorSels) {
-        try {
-          const options = document.querySelectorAll(sel)
-          if (options.length === 0) continue
-          const colors: string[] = []
-          options.forEach((opt) => {
-            const t = (opt as HTMLElement).innerText?.trim() || ""
-            if (t && !t.includes("선택") && !t.includes("Select") && t !== "*") colors.push(t)
-          })
-          if (colors.length > 0) {
-            color = colors.slice(0, 20).join(", ").slice(0, 500)
             break
           }
         } catch {
@@ -128,23 +103,19 @@ const baseStrategy: Strategy = async (page, entry) => {
         }
       }
 
-      return {description, color, material, productCode}
+      return {description, material, productCode}
     },
     {
       descSels: entry.descriptionSelectors ?? [],
-      colorSels: entry.colorSelectors ?? [],
       codeSels: entry.codeSelectors ?? [],
       matPattern: entry.materialPatternSrc ?? "",
       matKeywords: entry.materialKeywords ?? [],
     },
   )
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   result.productCode = extracted.productCode
-  // Equivalent to baseDescriptionInPage/baseMaterialFromDescription
-  // (referenced to keep the shared helpers wired into the engine).
-  void baseDescriptionInPage
+  // description 은 material 추출의 입력으로만 in-page 에서 계산되고 밖으로
+  // 나오지 않는다 (2026-07-29: DetailData.description 제거).
   void baseMaterialFromDescription
   return result
 }
@@ -186,18 +157,8 @@ const eightDivisionStrategy: Strategy = async (page) => {
       }
     }
 
-    let color: string | null = null
-    const ogTitle = document.querySelector('meta[property="og:title"]')
-    if (ogTitle) {
-      const title = (ogTitle as HTMLMetaElement).content || ""
-      const match = title.match(/\(([^)]+)\)\s*$/)
-      if (match) color = match[1].trim()
-    }
-
-    return {description, color, material, productCode: null as string | null}
+    return {description, material, productCode: null as string | null}
   })
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   return result
 }
@@ -210,7 +171,6 @@ const adekuverStrategy: Strategy = async (page) => {
     const descEl = document.querySelector(".item.open .content")
     const description = descEl ? (descEl as HTMLElement).innerText?.trim().slice(0, 2000) : null
 
-    let color: string | null = null
     let material: string | null = null
     const codes: string[] = []
 
@@ -229,11 +189,6 @@ const adekuverStrategy: Strategy = async (page) => {
         .filter((l) => l)
 
       for (const seg of segments) {
-        if (!color) {
-          const cm = seg.match(/^(.+?)\s*컬러\s*$/)
-          if (cm?.[1]?.trim()) color = cm[1].trim() || null
-        }
-
         if (!material && /^\d+\s*%\s*[A-Za-z가-힣]/.test(seg)) {
           material = seg.slice(0, 200)
         }
@@ -246,13 +201,10 @@ const adekuverStrategy: Strategy = async (page) => {
 
     return {
       description,
-      color,
       material,
       productCode: codes.length ? codes.join(", ") : null,
     }
   })
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   result.productCode = extracted.productCode
   return result
@@ -292,9 +244,7 @@ const anotherofficeStrategy: Strategy = async (page, entry) => {
 
     return {description, material}
   })
-  result.description = extracted.description
   result.material = extracted.material
-  result.color = await colorFromOptionList(page, entry.optionColorMode ?? "anotheroffice")
   return result
 }
 
@@ -302,14 +252,6 @@ const anotherofficeStrategy: Strategy = async (page, entry) => {
 
 const bastongStrategy: Strategy = async (page, entry) => {
   const result = empty()
-  const descSel = entry.descriptionSelectors?.[0] ?? "#prdDetail"
-  result.description = await page
-    .$eval(descSel, (el) => {
-      const text = (el as HTMLElement).innerText?.trim()
-      return text && text.length > 10 ? text.slice(0, 2000) : null
-    })
-    .catch(() => null)
-
   const additional = await page
     .$eval(".xans-product-additional", (el) => (el as HTMLElement).innerText?.trim() || "")
     .catch(() => "")
@@ -322,7 +264,6 @@ const bastongStrategy: Strategy = async (page, entry) => {
     }
   }
 
-  result.color = await colorFromOptionList(page, entry.optionColorMode ?? "bastong")
   return result
 }
 
@@ -347,18 +288,12 @@ const chanceclothingStrategy: Strategy = async (page, entry) => {
       result.material = matMatch[1].trim().slice(0, 500)
     }
 
-    const descMatch = additional.match(/상품\s*설명\s+([\s\S]*?)\s*(?:더보기|$)/)
-    if (descMatch?.[1]?.trim()) {
-      result.description = descMatch[1].trim().slice(0, 2000)
-    }
-
     const codeMatch = additional.match(/브랜드\s*품번\s*[:：]\s*(.+)/)
     if (codeMatch?.[1]) {
       result.productCode = codeMatch[1].trim()
     }
   }
 
-  result.color = await colorFromOptionList(page, entry.optionColorMode ?? "chanceclothing")
   return result
 }
 
@@ -400,21 +335,8 @@ const eastlogueStrategy: Strategy = async (page) => {
       }
     }
 
-    let color: string | null = null
-    const ogTitle = document.querySelector('meta[property="og:title"]')
-    if (ogTitle) {
-      const title = (ogTitle as HTMLMetaElement).content || ""
-      const cleaned = title.replace(/\s*-\s*EASTLOGUE\s*$/i, "")
-      const slashIdx = cleaned.lastIndexOf("/")
-      if (slashIdx > 0) {
-        color = cleaned.slice(slashIdx + 1).trim().slice(0, 100) || null
-      }
-    }
-
-    return {description, color, material, productCode: null as string | null}
+    return {description, material, productCode: null as string | null}
   })
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   return result
 }
@@ -456,22 +378,9 @@ const etcseoulStrategy: Strategy = async (page) => {
       if (matLine) material = matLine.replace(/^소재\s*[-–]\s*/, "").trim()
     }
 
-    const colorLine = lines.find((l) => /^색상\s*[-–]\s*.+/.test(l))
-    let color = colorLine ? colorLine.replace(/^색상\s*[-–]\s*/, "").trim() : null
-
-    // fallback: extract [COLOR] from product title (og:title)
-    if (!color) {
-      const ogTitle = document.querySelector('meta[property="og:title"]')
-      const title = (ogTitle as HTMLMetaElement | null)?.content || ""
-      const m = title.match(/\[([^\]]+)\]\s*$/)
-      if (m?.[1]) color = m[1].trim()
-    }
-
-    return {description, material, color}
+    return {description, material}
   })
-  result.description = extracted.description
   result.material = extracted.material
-  result.color = extracted.color
   return result
 }
 
@@ -489,16 +398,6 @@ const fr8ightStrategy: Strategy = async (page) => {
     if (rawDesc) {
       const cutIdx = rawDesc.search(/제조원\s*[:：]|품질보증\s*[:：]|A\/S\s*문의/i)
       description = (cutIdx > 0 ? rawDesc.slice(0, cutIdx).trim() : rawDesc).slice(0, 2000)
-    }
-
-    let color: string | null = null
-    const ogTitle = document.querySelector('meta[property="og:title"]')
-    if (ogTitle) {
-      const title = (ogTitle as HTMLMetaElement).content || ""
-      const slashIdx = title.lastIndexOf("/")
-      if (slashIdx > 0) {
-        color = title.slice(slashIdx + 1).trim().slice(0, 100) || null
-      }
     }
 
     let material: string | null = null
@@ -519,10 +418,8 @@ const fr8ightStrategy: Strategy = async (page) => {
       }
     }
 
-    return {description, color, material, productCode: null as string | null}
+    return {description, material, productCode: null as string | null}
   })
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   return result
 }
@@ -554,16 +451,9 @@ const havatiStrategy: Strategy = async (page) => {
     }
     const material = matLines.length > 0 ? matLines.join("\n").slice(0, 500) : null
 
-    const opts = Array.from(document.querySelectorAll('select[name*="option"] option'))
-      .map((el) => (el as HTMLElement).innerText?.trim())
-      .filter((t) => t && !t.startsWith("-") && t !== "empty" && !t.includes("선택") && t !== "*")
-    const color = opts.length > 0 ? opts.slice(0, 20).join(", ") : null
-
-    return {description, material, color}
+    return {description, material}
   })
-  result.description = extracted.description
   result.material = extracted.material
-  result.color = extracted.color
   return result
 }
 
@@ -581,18 +471,6 @@ const roughsideStrategy: Strategy = async (page) => {
       description = (cutIdx > 0 ? rawDesc.slice(0, cutIdx).trim() : rawDesc).slice(0, 2000)
     }
 
-    let color: string | null = null
-    const titleWrappers = document.querySelectorAll("div.title-wrapper")
-    for (const tw of titleWrappers) {
-      if ((tw as HTMLElement).innerText?.includes("상품 색상")) {
-        const next = tw.nextElementSibling
-        if (next) {
-          color = (next as HTMLElement).innerText?.trim().slice(0, 100) || null
-        }
-        break
-      }
-    }
-
     let material: string | null = null
     if (rawDesc) {
       const lines = rawDesc.split("\n")
@@ -606,10 +484,8 @@ const roughsideStrategy: Strategy = async (page) => {
       if (matLines.length) material = matLines.join(" / ").slice(0, 200)
     }
 
-    return {description, color, material, productCode: null as string | null}
+    return {description, material, productCode: null as string | null}
   })
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   return result
 }
@@ -618,25 +494,6 @@ const roughsideStrategy: Strategy = async (page) => {
 
 const sculpstoreStrategy: Strategy = async (page, entry) => {
   const result = empty()
-  result.description = await page
-    .$eval(".xans-product-detaildesign", (el) => {
-      const rows = el.querySelectorAll("tr")
-      for (const row of Array.from(rows)) {
-        const th = row.querySelector("th")
-        if (th && th.innerText.includes("상품간략설명")) {
-          const td = row.querySelector("td")
-          if (!td) return null
-          let text = td.innerText?.trim() || ""
-          const cutoff = text.indexOf("배송 안내")
-          if (cutoff > 0) text = text.slice(0, cutoff).trim()
-          text = text.replace(/^브랜드\s*설명\s*/, "").trim()
-          return text.slice(0, 2000) || null
-        }
-      }
-      return null
-    })
-    .catch(() => null)
-
   const extracted = await page.evaluate(() => {
     const text = document.body.innerText || ""
     const matMatch = text.match(/혼용률\s*[:：]?\s*([^\n]{3,100})/)
@@ -653,7 +510,6 @@ const sculpstoreStrategy: Strategy = async (page, entry) => {
 
   result.material = extracted.material
   result.productCode = extracted.productCode
-  result.color = await colorFromOptionList(page, entry.optionColorMode ?? "swallowlounge")
   return result
 }
 
@@ -675,13 +531,6 @@ const shopamomentoStrategy: Strategy = async (page) => {
     // section segmentation bounded by the next known label. color and
     // productCode genuinely have no source (no <select>, no product-code
     // element) and stay null — REQ-DFIX-004, do not invent.
-    const descMatch = additional.match(
-      /Product Note\s+([\s\S]*?)\s*(?:Made In|Composition|Size Measurement|$)/,
-    )
-    if (descMatch?.[1]?.trim()) {
-      result.description = descMatch[1].trim().slice(0, 2000)
-    }
-
     const matMatch = additional.match(
       /Composition\s+([\s\S]*?)\s*(?:Size Measurement|$)/,
     )
@@ -696,28 +545,6 @@ const shopamomentoStrategy: Strategy = async (page) => {
 
 const sienneboutiqueStrategy: Strategy = async (page, entry) => {
   const result = empty()
-  const descSel = entry.descriptionSelectors?.[0] ?? ".product-tabs-detail"
-  result.description = await page
-    .$eval(descSel, (el) => {
-      const text = (el as HTMLElement).innerText?.trim()
-      return text && text.length > 10 ? text.slice(0, 2000) : null
-    })
-    .catch(() => null)
-
-  // sienneboutique has no dedicated color <select> — option1 is always
-  // "Size" (e.g. FREE(2차)). colorFromOptionList("swallowlounge") was
-  // grabbing that size select and mislabeling it as color. The real color
-  // is appended to the product title in parens, e.g.
-  // og:title="Camellia Cardigan (Cream)". Parse it from there instead.
-  result.color = await page
-    .$eval('meta[property="og:title"]', (el) => el.getAttribute("content") ?? null)
-    .catch(() => null)
-    .then((title) => {
-      if (!title) return null
-      const m = title.match(/\(([^()]+)\)\s*$/)
-      return m?.[1]?.trim() ? normalizeColor(m[1].trim()) : null
-    })
-
   result.material = await page
     .$$eval(".tabs-content", (els) => {
       if (els.length < 2) return null
@@ -756,20 +583,11 @@ const slowsteadyclubStrategy: Strategy = async (page) => {
         ? descMatch[1].trim().slice(0, 2000)
         : null
 
-      const opts = Array.from(document.querySelectorAll('select[name*="option"] option'))
-        .map((el2) => (el2 as HTMLElement).innerText?.trim())
-        .filter(
-          (t) => t && !t.startsWith("-") && t !== "empty" && !t.includes("선택") && t !== "*",
-        )
-      const color = opts.length > 0 ? [...new Set(opts)].slice(0, 20).join(", ") : null
-
-      return {description, material, color}
+      return {description, material}
     })
-    .catch(() => ({description: null, material: null, color: null}))
+    .catch(() => ({description: null, material: null}))
 
-  result.description = extracted.description
   result.material = extracted.material
-  result.color = extracted.color
   return result
 }
 
@@ -777,13 +595,6 @@ const slowsteadyclubStrategy: Strategy = async (page) => {
 
 const swallowloungeStrategy: Strategy = async (page, entry) => {
   const result = empty()
-  result.description = await page
-    .$eval(
-      'li[data-name="details"] > div',
-      (el) => (el as HTMLElement).innerText?.trim().slice(0, 2000) || null,
-    )
-    .catch(() => null)
-
   result.material = await page
     .$eval(
       'li[data-name="material"] > div',
@@ -791,7 +602,6 @@ const swallowloungeStrategy: Strategy = async (page, entry) => {
     )
     .catch(() => null)
 
-  result.color = await colorFromOptionList(page, entry.optionColorMode ?? "swallowlounge")
   return result
 }
 
@@ -804,7 +614,6 @@ const takeastreetStrategy: Strategy = async (page) => {
     const rawDesc = descEl ? (descEl as HTMLElement).innerText?.trim() : null
 
     let description: string | null = null
-    let color: string | null = null
     let material: string | null = null
 
     if (rawDesc) {
@@ -820,11 +629,6 @@ const takeastreetStrategy: Strategy = async (page) => {
       // null). Match the labels mid-line with whitespace-tolerant
       // boundaries instead. description cut at MODEL SIZE is unchanged;
       // productCode has no source and stays null (REQ-DFIX-004).
-      const colorMatch = safeDesc.match(/컬러\s*[:：]\s*([\s\S]*?)\s*(?:소재|MODEL SIZE|$)/)
-      if (colorMatch?.[1]?.trim()) {
-        color = colorMatch[1].trim().slice(0, 200)
-      }
-
       const matMatch = safeDesc.match(/소재\s*[:：]\s*([\s\S]*?)\s*(?:MODEL SIZE|$)/)
       if (matMatch?.[1]?.trim()) {
         material = matMatch[1].trim().slice(0, 200)
@@ -837,10 +641,8 @@ const takeastreetStrategy: Strategy = async (page) => {
       }
     }
 
-    return {description, color, material, productCode: null as string | null}
+    return {description, material, productCode: null as string | null}
   })
-  result.description = extracted.description
-  result.color = extracted.color
   result.material = extracted.material
   return result
 }

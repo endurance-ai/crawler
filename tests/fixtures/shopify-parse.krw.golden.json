@@ -11,14 +11,8 @@
     "imageUrl": "https://cdn.shopify.com/s/files/1/0001/ocs-front.jpg",
     "productUrl": "https://shop.example-store.com/products/oxford-cotton-shirt",
     "inStock": true,
-    "gender": [
-      "women",
-      "men"
-    ],
     "platform": "shopify-test",
     "crawledAt": "<<NORMALIZED>>",
-    "description": "Crisp oxford cotton. Slim fit everyday wear. alert(1) 5 &lt; 10",
-    "color": "White, Blue",
     "sizeInfo": "S, M, L",
     "images": [
       "https://cdn.shopify.com/s/files/1/0001/ocs-front.jpg",
@@ -44,7 +38,6 @@
     "imageUrl": "",
     "productUrl": "https://shop.example-store.com/products/plain-basic-tee",
     "inStock": true,
-    "gender": [],
     "platform": "shopify-test",
     "crawledAt": "<<NORMALIZED>>",
     "sourceCurrency": "KRW",
@@ -62,13 +55,8 @@
     "imageUrl": "https://acme.myshopify.com/cdn/trs-1.jpg",
     "productUrl": "https://shop.example-store.com/products/trail-running-shoe",
     "inStock": true,
-    "gender": [
-      "women",
-      "men"
-    ],
     "platform": "shopify-test",
     "crawledAt": "<<NORMALIZED>>",
-    "description": "Grippy trail shoe for men and women.",
     "sizeInfo": "8, 9",
     "images": [
       "https://acme.myshopify.com/cdn/trs-1.jpg",

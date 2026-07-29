@@ -1,6 +1,6 @@
 /**
  * 크롤 산출 JSON 을 LLM 보강할 때 쓰는 순수 로직 + 파일 I/O.
- * CLI 는 src/enrich-products-file.ts (repair-product-color.ts / color-repair.ts 와 같은 분리).
+ * CLI 는 src/enrich-products-file.ts.
  */
 
 import * as fs from "node:fs"

@@ -19,7 +19,6 @@
  * by index.ts but are NOT deleted in this phase.
  */
 
-import {OptionColorMode} from "../field-extractors/color"
 
 /** Page-load wait recipe (the only three variants the 18 sites use). */
 export type WaitStrategy =
@@ -69,10 +68,7 @@ export interface RegistryEntry {
   wait: WaitStrategy
   /** Description container selectors (base family + bastong/sienneboutique). */
   descriptionSelectors?: string[]
-  /** Option-list color filter mode (shared colorFromOptionList). */
-  optionColorMode?: OptionColorMode
-  /** BaseDetailParser color/code/material params (base family). */
-  colorSelectors?: string[]
+  /** BaseDetailParser code/material params (base family). */
   codeSelectors?: string[]
   materialPatternSrc?: string
   materialKeywords?: string[]
@@ -84,12 +80,6 @@ const DOM_DEFAULT: WaitStrategy = {kind: "dom", timeout: 15000, pauseMs: 800}
 // / visualaid. preserve-findings 유형 1: blankroom & visualaid inherit the
 // material-pollution path; the only per-site difference is description
 // selectors, captured here as data (genuine 3→1 collapse).
-const BASE_COLOR_SELECTORS = [
-  'select[name*="option1"] option',
-  'select[id*="option1"] option',
-  ".opt_list li",
-  ".product-option li",
-]
 const BASE_CODE_SELECTORS = [".product_code", ".prd_code"]
 const BASE_MATERIAL_PATTERN = String.raw`(?:소재|원단|Material|Fabric|Composition)\s*[:：]?\s*([^\n<]{3,80})`
 const BASE_MATERIAL_KEYWORDS = [
@@ -119,7 +109,6 @@ function baseEntry(descriptionSelectors: string[]): RegistryEntry {
     strategy: "base",
     wait: DOM_DEFAULT,
     descriptionSelectors,
-    colorSelectors: BASE_COLOR_SELECTORS,
     codeSelectors: BASE_CODE_SELECTORS,
     materialPatternSrc: BASE_MATERIAL_PATTERN,
     materialKeywords: BASE_MATERIAL_KEYWORDS,
@@ -145,31 +134,19 @@ export const BASE_DESCRIPTION_SELECTORS = [
 export const DETAIL_REGISTRY: Record<string, RegistryEntry> = {
   // ── base family: genuine 3→1 collapse (params only) ──
   // blankroom/visualaid keep the BaseDetailParser material-pollution path.
-  // blankroom: option1 = SIZE (not color). Color is in .color-name span (JS-rendered).
-  // dom-then-selector waits up to 5s for the span; .catch(null) lets it fall through
-  // to cafe24-engine name-based extraction when the span is absent.
-  blankroom: {
-    ...baseEntry([".product-description"]),
-    colorSelectors: [".color-name"],
-    wait: {kind: "dom-then-selector", timeout: 15000, selector: ".color-name", selectorTimeout: 5000},
-  },
+  // blankroom 은 .color-name span(JS 렌더)을 기다리던 dom-then-selector 였다.
+  // 색상 추출이 VLM 으로 이관되면서(2026-07-29) 그 대기 이유가 사라져 기본
+  // DOM 대기로 되돌린다.
+  blankroom: baseEntry([".product-description"]),
   visualaid: baseEntry([".tab_wrap"]),
 
-  // 2026-07-02 온보딩: ojos/goyowear 둘 다 option1 = SIZE (색상 셀렉트 없음).
-  // 실제 색상은 상품명에 있음 (ojos: "Name / Color", goyowear: "Name (COLOR)").
-  // colorSelectors: [] → BaseDetailParser가 null 반환 → cafe24-engine.ts의
-  // extractColorFromText 상품명 기반 폴백으로 자연스럽게 넘어감.
-  ojos: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
-  goyowear: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
+  ojos: baseEntry(BASE_DESCRIPTION_SELECTORS),
+  goyowear: baseEntry(BASE_DESCRIPTION_SELECTORS),
 
-  // 2026-07-06 검증: taats도 동일 패턴. option1 select에 SIZE만 있고(S/M/L/XL)
-  // 별도 색상 옵션/스와치가 없음 — 색상별로 아예 다른 상품 페이지("Name (Color)",
-  // 예: "Washed Cotton Pajama Set (Dark Navy)")로 분리되어 있다. colorSelectors: []
-  // 로 option1(사이즈) 오염을 막고 cafe24-engine.ts의 extractColorFromText
-  // 상품명 폴백으로 넘긴다. .xans-product-detaildesign은 텍스트 설명이 아니라
+  // taats: .xans-product-detaildesign은 텍스트 설명이 아니라
   // "판매가\n129,000원"만 담고 있어(실제 설명은 이미지 배너) description은
   // 개선 대상에서 제외 — 우선순위 낮음.
-  taats: {...baseEntry(BASE_DESCRIPTION_SELECTORS), colorSelectors: []},
+  taats: baseEntry(BASE_DESCRIPTION_SELECTORS),
 
   // ── per-site algorithms (verbatim, selectors externalized) ──
   "8division": {strategy: "8division", wait: DOM_DEFAULT},
@@ -177,28 +154,24 @@ export const DETAIL_REGISTRY: Record<string, RegistryEntry> = {
   anotheroffice: {
     strategy: "anotheroffice",
     wait: DOM_DEFAULT,
-    optionColorMode: "anotheroffice",
   },
   bastong: {
     strategy: "bastong",
     wait: DOM_DEFAULT,
     descriptionSelectors: ["#prdDetail"],
-    optionColorMode: "bastong",
   },
   chanceclothing: {
     strategy: "chanceclothing",
     wait: DOM_DEFAULT,
-    optionColorMode: "chanceclothing",
   },
   eastlogue: {strategy: "eastlogue", wait: DOM_DEFAULT},
   etcseoul: {strategy: "etcseoul", wait: DOM_DEFAULT},
   fr8ight: {strategy: "fr8ight", wait: DOM_DEFAULT},
-  havati: {strategy: "havati", wait: DOM_DEFAULT, optionColorMode: "havati"},
+  havati: {strategy: "havati", wait: DOM_DEFAULT},
   roughside: {strategy: "roughside", wait: DOM_DEFAULT},
   sculpstore: {
     strategy: "sculpstore",
     wait: DOM_DEFAULT,
-    optionColorMode: "swallowlounge", // sculpstore uses the same filter as swallowlounge
   },
   // @MX:NOTE: [AUTO] shopamomento uses commit-then-selector wait and
   // regexes that miss this site's structure → all 4 fields stay null.
@@ -226,12 +199,10 @@ export const DETAIL_REGISTRY: Record<string, RegistryEntry> = {
   slowsteadyclub: {
     strategy: "slowsteadyclub",
     wait: DOM_DEFAULT,
-    optionColorMode: "slowsteadyclub",
   },
   swallowlounge: {
     strategy: "swallowlounge",
     wait: DOM_DEFAULT,
-    optionColorMode: "swallowlounge",
   },
   // @MX:NOTE: [AUTO] takeastreet runs the MODEL SIZE description cut on
   // rawDesc BEFORE the color/material line scan also uses rawDesc; the

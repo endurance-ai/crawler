@@ -45,8 +45,6 @@ export function productToCandidateDbRow(
   const sourceCurrency = selected.sourceCurrency ?? config.sourceCurrency ?? "KRW"
   const prices = toPriceFields(selected, sourceCurrency)
   if (!prices) throw new Error("candidate price is missing or invalid")
-  if (!selected.color?.trim()) throw new Error("candidate color is required")
-  if (!selected.gender.length) throw new Error("candidate gender is required")
   const now = new Date().toISOString()
   return {
     brand: selected.brand,
@@ -63,11 +61,8 @@ export function productToCandidateDbRow(
     product_url: selected.productUrl,
     in_stock: selected.inStock,
     platform: config.key,
-    gender: selected.gender,
     brand_node_id: brandNodeId,
     crawled_at: selected.crawledAt,
-    description: selected.description?.slice(0, 2000) ?? null,
-    color: selected.color.slice(0, 500),
     subcategory: selected.subcategory ?? null,
     images: selected.images?.slice(0, 10) ?? null,
     image_selection_kind: selected.imageSelection!.kind,
