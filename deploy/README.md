@@ -99,9 +99,19 @@ journalctl -u kiko-refresh -f
 journalctl -u kiko-refresh-candidates -f
 ```
 
-`kiko-recrawl.*` 는 온보딩급 재수집(상세 크롤 + LLM 재분류) 이라 **타이머로 돌리지
-않는다** — 카테고리/색상을 다시 만들어야 할 때만 수동 실행한다. 두 경로의 차이는
-`src/refresh-listing.ts` 헤더 참조.
+`kiko-recrawl.*` 는 온보딩급 재수집(상세 크롤 + LLM 재분류) 이라 설계상 **타이머로
+돌리지 않는다** — 카테고리/색상을 다시 만들어야 할 때만 수동 실행하는 것이 원칙이다.
+두 경로의 차이는 `src/refresh-listing.ts` 헤더 참조.
+
+> **주의 (문서/실제 불일치)**: §5 배포 기록에 있듯 `kiko-recrawl.timer` 는 실제로는
+> `enabled` 상태로 매일 04:00 KST 발화하도록 설치돼 있다 — 위 원칙과 어긋난다.
+> `products` 를 건드리는 작업(예: 2026-06 코호트 재수집 캠페인, 사전 `in_stock`
+> 차단) 전에는 반드시 `systemctl list-timers --all | grep kiko` 로 실제 상태를
+> 확인할 것. 문서만 보고 "타이머 없음"으로 가정하지 않는다.
+
+> **배치 이전 예정**: `kiko-refresh`/`kiko-recrawl` 배치는 향후 전용 배치 서버로
+> 옮긴다. 이전 전까지는 dev-app EC2 가 유일한 실행 위치이므로, `products` 데이터를
+> 직접 조작하는 작업은 이 EC2 의 타이머 상태에 의존한다.
 
 ## 4. 운영 규칙
 

@@ -6,6 +6,42 @@
 
 전부 `src/configs/platforms.ts` 의 수기 등록 항목이다.
 
+## 사전 준비 — 배치 정지 + in_stock 차단
+
+재수집이 끝날 때까지 이 26개 키를 검색/큐레이션에서 숨긴다. 방법은
+`products.in_stock` 을 미리 `false` 로 플립해두는 것이다 — 재수집이 키별로 다시
+`true` 로 되돌리므로 재수집 자체가 복구 메커니즘이 된다.
+
+**전제조건: dev-app EC2 의 배치 타이머를 전부 죽여야 한다.** 살아있으면
+`kiko-refresh.timer` 가 15분마다 "리스트에 살아있는데 DB 는 false" 인 상품을
+재입고로 되돌려(`src/lib/listing-refresh.ts:177-180`) 플립이 무효화된다.
+
+```bash
+ssh ec2-user@15.165.107.28
+
+# 현재 상태 확인 — deploy/README.md 는 kiko-recrawl 을 "타이머로 안 돌린다"고
+# 하지만 실제 유닛은 매일 04:00 발화하게 설치돼 있다(§5 배포 기록). 문서를
+# 믿지 말고 실제 상태를 본다.
+systemctl list-timers --all | grep kiko
+systemctl is-enabled kiko-refresh.timer kiko-recrawl.timer
+
+sudo systemctl disable --now kiko-refresh.timer kiko-recrawl.timer
+sudo systemctl stop kiko-refresh.service kiko-recrawl.service kiko-refresh-candidates.service
+
+# 진행 중인 런이 없는지 확인 후에 플립한다 (진행 중 런이 플립을 되돌린다)
+systemctl is-active kiko-refresh.service kiko-recrawl.service
+
+crontab -l   # daily-onboard.sh 등 products 에 쓰는 cron 항목을 주석 처리
+```
+
+정지를 확인했으면 `crawler/sql/096_recollect_cohort_suppress.sql` 을 실행해
+스냅샷 → 플립 → 검증한다 (해당 파일 헤더 주석에 전체 절차와 롤백 SQL 포함).
+
+**전용 배치 서버로 이전한 뒤에는** refresh 를 다시 켤 때 아직 재수집되지 않은
+코호트 키를 반드시 `REFRESH_EXCLUDE` 로 제외해야 한다
+(`src/refresh-listing.ts:85-93`, `src/lib/refresh-source.ts:100-103`) —
+안 그러면 그 시점에 숨김이 풀린다.
+
 ## 실행
 
 ```bash
@@ -40,8 +76,10 @@ tools/recollect-batch.sh --keys-file tools/recollect-batches/batch-1.txt \
 
 ## 캠페인 중 주의사항
 
-- **`daily-onboard.sh` 및 `data/*-products.json` 을 쓰는 cron 을 정지한다.**
-  `data/` 는 공유 네임스페이스이고 `import-products.ts` 가 이 디렉터리를 glob 한다.
+- **`kiko-refresh.timer`/`kiko-recrawl.timer` 및 `daily-onboard.sh` 등
+  `data/*-products.json` 을 쓰는 cron 을 정지한다.** `data/` 는 공유 네임스페이스이고
+  `import-products.ts` 가 이 디렉터리를 glob 한다. 타이머가 살아있으면 사전에 걸어둔
+  `in_stock=false` 차단이 15분 안에 되돌아간다 (위 "사전 준비" 참조).
 - **분류 로직을 바꾸지 않는다.** 바꾸면 배치 0과 배치 8의 결과를 비교할 수 없다.
   드라이버가 시작 시점 커밋을 `manifest.json` 에 남긴다.
 - 기존 repair 스크립트(`repair:product-color` 등)를 이 26개 키에 중복 적용하지
