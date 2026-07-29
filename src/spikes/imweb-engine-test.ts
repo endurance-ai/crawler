@@ -26,11 +26,9 @@ async function main(): Promise<void> {
         name: p.name,
         price: p.price,
         salePrice: p.salePrice,
-        color: p.color,
         inStock: p.inStock,
         url: p.productUrl,
         img: p.imageUrl.slice(0, 60),
-        desc: p.description?.slice(0, 50),
       }),
     )
   }
@@ -42,7 +40,7 @@ async function main(): Promise<void> {
     return `${((100 * n) / Math.max(result.products.length, 1)).toFixed(0)}%`
   }
   console.log(
-    `fill rates: name=${fill("name")} price=${fill("price")} image=${fill("imageUrl")} color=${fill("color")} desc=${fill("description")}`,
+    `fill rates: name=${fill("name")} price=${fill("price")} image=${fill("imageUrl")}`,
   )
 }
 

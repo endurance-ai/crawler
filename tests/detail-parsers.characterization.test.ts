@@ -166,13 +166,15 @@ for (const site of SITES) {
 
 // ─── Shape invariant: DetailData contract ──────────────────────
 
-test("characterize: every parser returns the DetailData 4-field shape", async () => {
+// 2026-07-29: color/description 이 DetailData 에서 제거되며 4→2 필드.
+// color 는 VLM(product_features.primary_color), description 은 폐기.
+test("characterize: every parser returns the DetailData 2-field shape", async () => {
   for (const site of SITES) {
     const r = await runParser(site)
     const keys = Object.keys(r).sort()
     assert.deepEqual(
       keys,
-      ["color", "description", "material", "productCode"],
+      ["material", "productCode"],
       `DetailData shape changed for ${site}: ${JSON.stringify(keys)}`,
     )
   }

@@ -457,21 +457,33 @@ Resume interrupted agent work using agentId:
 
 ## 18. Project-Specific Rules (kiko crawler)
 
-### Color Normalization
+### 색상·성별 출처 (2026-07-29 VLM 이관 완료)
 
-색상 관련 작업 중 CANONICAL 맵에 없는 색상값이 발견되면 (`src/lib/parsers/field-extractors/color-normalizer.ts` 의 `CANONICAL` 배열) 즉시 해당 파일에 추가한다.
+**크롤러는 더 이상 색상·설명을 추출하지 않는다.** 색상의 단일 출처는 VLM이 만드는
+`product_features.feature_metadata->>'primary_color'` (16 canonical family,
+UPPERCASE: BLACK/WHITE/GREY/BLUE/BROWN/CREAM/NAVY/GREEN/BEIGE/KHAKI/PINK/RED/
+YELLOW/PURPLE/MULTI/ORANGE) 다.
 
-- 실제 크롤링 결과나 golden 파일에서 정규화되지 않은 색상이 보이면 → CANONICAL에 엔트리 추가
-- 한글 색상명, 브랜드 고유 색상명(예: "Cobalt Strike", "Sahara"), 오타 변형(예: "Grreen") 발견 시 해당 canonical 색상으로 매핑
-- `\b` word boundary는 한글에 적용되지 않으므로, 한글 대안은 반드시 `\b()` 그룹 밖에 위치시킨다
-  - 올바름: `/\b(grey)\b|그레이/i`
-  - 잘못됨: `/\b(grey|그레이)\b/i`
-- 신규 사이트 온보딩 시 color 필드에 사이즈(`ONE SIZE`, `S/M/L`)나 재고상태(`품절`,
-  `sold out`)가 들어오면 → 색상 매핑 문제가 아니라 `isNonColorOptionText()`
-  (같은 파일) 로 걸러야 할 노이즈다. 단일브랜드몰이 색상 전용 select 없이 option1을
-  사이즈/재고 텍스트로 채우는 경우 흔히 발생 (2026-07-06: demoshop/franksupply/
-  hamsaseyo/nnpcs/piscess/seygun 온보딩에서 확인). CANONICAL에 추가하지 말고
-  `isNonColorOptionText()`의 패턴 목록에 추가할 것.
+배경: 크롤러가 뽑던 `products.color` 는 VLM `primary_color` 와 일치율이 **54.8%**
+(71,775 / 131,058) 에 불과했다 — 옵션 select/스와치/상품명 폴백을 아무리 쌓아도
+사이트마다 색상 표기 방식이 달라 한계였다. 그래서 `color-normalizer.ts`
+(CANONICAL 맵 + `isNonColorOptionText()`), `color.ts`, `generic-color.ts`,
+per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
+
+- 색상 관련 버그가 보이면 크롤러가 아니라 **VLM 파이프라인** 쪽 문제다. 여기에
+  색상 추출 코드를 다시 추가하지 말 것.
+- `description` 도 함께 제거됐다 (소비처 없음 — 모바일 PDP 미렌더). 단
+  `material` 추출은 in-page description 텍스트를 입력으로 쓰므로 evaluate 본문
+  안에서만 계산된다 (`DetailData` 에는 노출되지 않음).
+- 상세 크롤 재시작 스킵 마커는 `Product.detailFetchedAt` 이다. 예전에는 `color`
+  가 비어있지 않은지로 판정했는데 그 필드가 사라져 명시 필드로 교체했다.
+- `gender` 도 2026-07-29 함께 제거됐다. `products.gender` 의
+  `chk_products_gender_required` CHECK 은 migration 096 에서 해제됐고,
+  `search_products_v6` 는 VLM → `products.gender` → fail-open 3단 다리로 읽는다.
+  크롤러는 gender 를 만들지 않는다 — `defaultGender`/`category.gender` 설정,
+  엔진별 추론(`inferGender`/`deriveGenderFromUrl`/`mapGender`/
+  `genderFromCategoryCode`), QC `GENDER_RULES` 전부 삭제됨.
+  `brand_nodes.gender_scope` 는 브랜드 레벨 신호로 유지한다(상품에 안 씀).
 
 ### Product Crawl Status Sync (admin 동기화)
 

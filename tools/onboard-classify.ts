@@ -1,14 +1,13 @@
 #!/usr/bin/env npx tsx
-// existing-crawl output → QC gate → anomaly filter → batch classify → color recovery
+// existing-crawl output → QC gate → anomaly filter → batch classify
 // → write data/<key>-products.json in the full import schema.
 import * as fs from "fs"; import * as path from "path"
-import {openai} from "@ai-sdk/openai"; import {generateText, Output, wrapLanguageModel} from "ai"; import {chromium, type Page} from "playwright"; import {z} from "zod"
-import {normalizeColorList} from "../src/lib/parsers/field-extractors/color-normalizer"
+import {openai} from "@ai-sdk/openai"; import {generateText, Output, wrapLanguageModel} from "ai"; import {z} from "zod"
 const RUN = process.argv[2], CONFIGS = process.argv[3], PASSOUT = process.argv[4]
 // Which product-extraction-poc.ts variant to consume from products.jsonl.
 // Default "existing" preserves current behavior; "hybrid" picks up the
-// llm-scraper-enhanced rows (category/subcategory/color/description/gender
-// already LLM-filled during crawl — see runHybridVariant in product-extraction-poc.ts).
+// llm-scraper-enhanced rows (category/subcategory already LLM-filled during
+// crawl — see runHybridVariant in product-extraction-poc.ts).
 const VARIANT = process.env.ONBOARD_VARIANT || "existing"
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 const CANON = ["tops", "knitwear", "bottoms", "dresses", "outerwear", "underwear", "swimwear", "activewear", "shoes", "bags", "accessories", "eyewear", "jewelry", "headwear", "other"], SYM: Record<string, string> = {KRW: "₩", USD: "$", EUR: "€", GBP: "£"}
@@ -16,14 +15,11 @@ const configs: any[] = JSON.parse(fs.readFileSync(CONFIGS, "utf8")); const cfgBy
 const has = (v: any) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)
 const NOUN = /jacket|coat|pant|trouser|short|tee|shirt|top|knit|sweat|hoodie|cardigan|blouse|dress|skirt|bag|hat|cap|belt|scarf|sock|shoe|sneaker|boot|loafer|sandal|jean|denim|vest|blazer|parka|jersey|셔츠|팬츠|자켓|재킷|코트|니트|맨투맨|후드|원피스|스커트|가방|모자|바지|티셔츠/i
 const isAnomaly = (rows: any[]) => rows.length >= 3 && rows.filter((r) => { const n = (r.name || "").trim(); return n.split(/\s+/).length <= 2 && !NOUN.test(n) }).length / rows.length >= 0.6
-const uCls = {i: 0, o: 0}, uCol = {i: 0, o: 0}
-const mk = (s: {i: number; o: number}) => wrapLanguageModel({model: openai("gpt-4.1-nano"), middleware: {specificationVersion: "v3", wrapGenerate: async ({doGenerate}) => { const r = await doGenerate(); const u = r.usage as any; const n = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0); s.i += n(u?.inputTokens); s.o += n(u?.outputTokens); return r }}})
-const clsModel = mk(uCls), colModel = mk(uCol)
-const ClsSchema = z.object({items: z.array(z.object({i: z.number(), category: z.string().nullable(), subcategory: z.string().nullable()}))}), ColSchema = z.object({color: z.string().nullable()})
-const CW = /^(black|white|ivory|cream|beige|tan|khaki|olive|green|blue|navy|sky ?blue|teal|indigo|red|pink|coral|burgundy|wine|purple|violet|grey|gray|charcoal|brown|camel|mocha|taupe|sand|bone|yellow|gold|orange|silver|melange|mint)$/i
-const detColor = (t: string) => { for (const r of t.split(/[\s,_/|.\-()]+/)) { const c = normalizeColorList(r); if (c && CW.test(c)) return c } return null }
-async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}], temperature: 0}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
-async function llmColor(page: Page, pr: any) { try { await page.goto(pr.product_url, {waitUntil: "domcontentloaded", timeout: 40000}).catch(() => {}); await page.waitForTimeout(300); const c = await page.evaluate(() => ({handle: location.pathname, options: Array.from(document.querySelectorAll("select option")).map((o) => (o.textContent || "").trim()).filter(Boolean).slice(0, 12), detail: (document.querySelector('#prdDetail, .xans-product-detail, .cont, [class*="detail" i]') as HTMLElement | null)?.innerText?.replace(/\s+/g, " ").slice(0, 800) || ""})).catch(() => ({handle: "", options: [] as string[], detail: ""})); const res = await generateText({model: colModel, output: Output.object({schema: ColSchema}), system: "Extract THIS product's primary color from name/handle/options/description. One color word. null ONLY if none.", messages: [{role: "user", content: JSON.stringify({name: pr.name, ...c})}], temperature: 0}); const col = (res.output as any)?.color; return col && String(col).trim() ? String(col).trim() : null } catch { return null } }
+const uCls = {i: 0, o: 0}
+const mk = (s: {i: number; o: number}) => wrapLanguageModel({model: openai("gpt-5.4-nano"), middleware: {specificationVersion: "v3", wrapGenerate: async ({doGenerate}) => { const r = await doGenerate(); const u = r.usage as any; const n = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0); s.i += n(u?.inputTokens); s.o += n(u?.outputTokens); return r }}})
+const clsModel = mk(uCls)
+const ClsSchema = z.object({items: z.array(z.object({i: z.number(), category: z.string().nullable(), subcategory: z.string().nullable(), brand: z.string().nullable()}))})
+async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. Also extract "brand": when the name is formatted like "[BRAND] product name", "BRAND - product name", or otherwise starts with an explicit brand/label (common on multi-brand editorial shops), return that brand string; return null if no brand is discernible from the name alone. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}], temperature: 0}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
 async function main() {
   const rows = fs.readFileSync(`${RUN}/products.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r: any) => r.variant === VARIANT)
   const seen = new Set<string>(); const uniq = rows.filter((r: any) => { const k = `${r.brand_key}|${r.product_url || r.name}`; if (seen.has(k)) return false; seen.add(k); return true })
@@ -36,11 +32,9 @@ async function main() {
   // feed it as the hint so this pass mostly just normalizes it into the canonical
   // taxonomy instead of re-classifying blind from name alone.
   const preds = await classify(pass.map((r) => ({name: r.name, hint: r.raw_category ?? r.category ?? null})))
-  const browser = await chromium.launch({headless: true}); const fc: Record<number, string | null> = {}; let det = 0, llm = 0
-  try { const ctx = await browser.newContext({userAgent: UA, locale: "ko-KR"}); await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2}", (r) => r.abort()); const page = await ctx.newPage(); page.on("dialog", (d) => d.dismiss().catch(() => {}))
-    for (let i = 0; i < pass.length; i++) { const r = pass[i]; let c = has(r.color) ? (normalizeColorList(r.color) || null) : null; if (!c) { c = detColor(`${r.name} ${r.product_url} ${r.description || ""}`); if (c) det++ } if (!c) { c = await llmColor(page, r); if (c) { c = normalizeColorList(c) || c; llm++ } await page.goto("about:blank", {timeout: 5000}).catch(() => {}) } fc[i] = c }
-    await ctx.close().catch(() => {}) } finally { await browser.close().catch(() => {}) }
-  console.log(`color: det +${det} · llm +${llm}`)
+  // 2026-07-29: 색상 복구 단계 제거. 색상 출처가 VLM(product_features.primary_color)
+  // 으로 이관되면서 여기서 브라우저를 띄우고 상품마다 LLM 을 호출하던 3단계 복구
+  // (텍스트 추출 → 상세 재방문 → LLM)가 통째로 불필요해졌다.
   // brand is a required non-nullable field downstream (product-validator.ts
   // ProductSchema). cfg.brand is unset for multi-brand editorial shops (correct —
   // they need per-product DOM brand extraction, not a single config value) and
@@ -51,12 +45,17 @@ async function main() {
   const warnedNoBrand = new Set<string>()
   const perBrand: Record<string, any[]> = {}
   pass.forEach((r, i) => { const cfg = cfgByKey[r.brand_key], p = preds[i] || {}, cur = r.currency || "KRW", price = typeof r.price === "number" ? r.price : null
-    if (!cfg.brand && !warnedNoBrand.has(r.brand_key)) { warnedNoBrand.add(r.brand_key); console.warn(`⚠️  ${r.brand_key}: platforms.ts has no config.brand — falling back to name "${cfg.name}". If this is a single-house-brand shop, add the brand field (see docs/bulk-onboarding.md §4-1); if it's multi-brand, this fallback is wrong and needs per-product brand extraction instead.`) }
-    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, gender: cfg.defaultGender ?? [], brand: cfg.brand || cfg.name, color: fc[i], description: r.description ?? null, crawledAt: new Date().toISOString()}) })
+    // brand 결정: 단일브랜드몰은 config.brand. 멀티브랜드 편집샵(cfg.multiBrand)은
+    // LLM 이 상품명에서 추출한 브랜드(p.brand)를 쓰고, 추출 실패 시 "" 로 남겨
+    // import 단계에서 격리한다(플랫폼명으로 폴백하지 않음). config.brand 도 없고
+    // multiBrand 도 아닌 하우스브랜드몰은 종전처럼 cfg.name 폴백 + 경고.
+    const brand = cfg.brand || (cfg.multiBrand ? (p.brand ?? "") : cfg.name)
+    if (!cfg.brand && !cfg.multiBrand && !warnedNoBrand.has(r.brand_key)) { warnedNoBrand.add(r.brand_key); console.warn(`⚠️  ${r.brand_key}: platforms.ts has no config.brand — falling back to name "${cfg.name}". If this is a single-house-brand shop, add the brand field (see docs/bulk-onboarding.md §4-1); if it's multi-brand, mark it multiBrand:true so per-product LLM brand extraction is used instead.`) }
+    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, brand, crawledAt: new Date().toISOString()}) })
   fs.mkdirSync("data", {recursive: true}); const written: string[] = []
   for (const [key, prods] of Object.entries(perBrand)) { fs.writeFileSync(path.join("data", `${key}-products.json`), JSON.stringify(prods, null, 2)); written.push(key) }
   fs.writeFileSync(PASSOUT, JSON.stringify(written))
   const all = Object.values(perBrand).flat(); const fill = (f: string) => all.length ? Math.round(all.filter((p: any) => has(p[f])).length / all.length * 100) : 0
-  console.log(`=== ${written.length} files · ${all.length} products · fill price=${fill("price")} category=${fill("category")} color=${fill("color")} · color null ${all.filter((p: any) => !has(p.color)).length} · LLM $${((uCls.i + uCol.i) / 1e6 * 0.1 + (uCls.o + uCol.o) / 1e6 * 0.4).toFixed(4)}`)
+  console.log(`=== ${written.length} files · ${all.length} products · fill price=${fill("price")} category=${fill("category")} · LLM $${(uCls.i / 1e6 * 0.1 + uCls.o / 1e6 * 0.4).toFixed(4)}`)
 }
 main().catch((e) => { console.error(e); process.exitCode = 1 })

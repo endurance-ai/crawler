@@ -8,7 +8,6 @@
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
-import {normalizeColorList, extractColorFromText, normalizeColor, isNonColorOptionText} from "./parsers/field-extractors/color-normalizer"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
 //
@@ -104,8 +103,7 @@ interface ShopifyResponse {
  * Shopify-specific per-call dials extracted verbatim from `crawlShopify`'s
  * config reads. The mapping consumes ONLY these from `SiteConfig`:
  *   - sourceCurrency  → `config.sourceCurrency`  (price symbol + format)
- *   - defaultGender   → `config.defaultGender`   (gender seed)
- *   - brandFallback   → `config.name`            (brand when vendor empty)
+ *   - brandFallback   → `config.brand`           (house brand when vendor empty)
  * `region` is intentionally absent — Shopify has no region concept (unlike
  * the uniqlo engine). The fetch-only dials (`country` /
  * `localizationCookie`) stay in `crawlShopify` because they shape request
@@ -114,9 +112,10 @@ interface ShopifyResponse {
 export interface ShopifyParseOptions {
   /** Native source currency. Undefined → "KRW" (preserves original `config.sourceCurrency || "KRW"`). */
   sourceCurrency?: SiteConfig["sourceCurrency"]
-  /** Site-wide default gender seed (preserves original `config.defaultGender || []`). */
-  defaultGender?: string[]
-  /** Brand used when `product.vendor` is empty (preserves original `sp.vendor || config.name`). */
+  /**
+   * House brand used when `product.vendor` is empty. Set from `config.brand`
+   * (single-brand mall). Multi-brand editshops leave this undefined so the
+   * brand stays "" rather than leaking the platform name. */
   brandFallback?: string
   /**
    * 품절 상품을 결과에 남긴다 (갱신 전용). 기본 false — 일반 크롤 출력은 종전과
@@ -151,12 +150,8 @@ export function parseShopifyProducts(
     try { return new URL(baseUrl).hostname } catch { return "" }
   })()
 
-  // options.name에서 색상/사이즈 포지션 식별 (Shopify는 옵션명이 store마다 다름)
-  // 1차: 옵션명 기반 (빠름, 확실할 때)
-  const COLOR_NAMES = [
-    "color", "colour", "colorway", "shade", "colore", "couleur", "farbe", "color option",
-    "색상", "컬러", "칼라", "색깔",
-  ]
+  // options.name에서 사이즈 포지션 식별 (Shopify는 옵션명이 store마다 다름).
+  // 색상 포지션 식별은 2026-07-29 제거 — 색상 출처가 VLM(product_features)로 이관됐다.
   const SIZE_NAMES = [
     "size", "length", "shoe size", "us size", "eu size", "uk size", "taille", "größe", "taglia", "talla",
     "사이즈", "치수",
@@ -185,80 +180,16 @@ export function parseShopifyProducts(
       continue
     }
 
-    // 옵션 포지션 결정: 1차 이름 매칭 → 2차 값 기반 추론
-    // 2차: 스토어가 다국어 옵션명(Colore, Couleur, 색상 등)을 쓸 때
-    //   각 포지션 값의 50% 이상이 CANONICAL 색상 키워드면 color 포지션으로 판단.
-    const optionPositions: {color?: number; size?: number} = {}
+    const optionPositions: {size?: number} = {}
     for (const opt of sp.options ?? []) {
       const n = opt.name.toLowerCase()
-      if (COLOR_NAMES.some((c) => n.includes(c))) optionPositions.color = opt.position
-      else if (SIZE_NAMES.some((s) => n.includes(s))) optionPositions.size = opt.position
-    }
-    if (!optionPositions.color) {
-      for (const opt of sp.options ?? []) {
-        const pos = opt.position
-        if (pos === optionPositions.size) continue
-        const vals = [...new Set(
-          sp.variants.map((v) => pickOption(v, pos)).filter((x): x is string => !!x && x !== "Default Title")
-        )]
-        if (vals.length === 0) continue
-        // Reject size/stock/price noise before the value-based heuristic: the
-        // `normalizeColor(v) !== v` check fires on any case-reformatted token
-        // (e.g. "36 EU" → "36 Eu"), which would misclassify a size option as
-        // color when its name is unrecognized (2026-07-07: becay "Talla").
-        const colorHits = vals.filter(
-          (v) => !isNonColorOptionText(v) && (extractColorFromText(v) !== null || normalizeColor(v) !== v),
-        ).length
-        if (colorHits / vals.length >= 0.5) {
-          optionPositions.color = pos
-          break
-        }
-      }
+      if (SIZE_NAMES.some((s) => n.includes(s))) optionPositions.size = opt.position
     }
 
     const firstVariant = sp.variants[0]
     const srcPrice = firstVariant ? parseFloat(firstVariant.price) : null
     const inStock = sp.variants.some((v) => v.available)
     if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
-
-    // gender 추론 (태그에서)
-    const gender: string[] = [...(options.defaultGender || [])]
-    const tagsLower = sp.tags.map((t) => t.toLowerCase())
-    if (tagsLower.some((t) => t.includes("women") || t.includes("female"))) {
-      if (!gender.includes("women")) gender.push("women")
-    }
-    if (tagsLower.some((t) => t.includes("men") || t.includes("male"))) {
-      if (!gender.includes("men")) gender.push("men")
-    }
-
-    // description — HTML 태그 제거 + 잔여 "<" 인코딩 (downstream XSS 방지)
-    const bodyHtml = sp.body_html || ""
-    const description = bodyHtml
-      .replace(/<[^>]*>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&#?\w+;/g, " ")
-      .replace(/</g, "&lt;")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 2000) || undefined
-
-    // color: options 메타데이터로 정확한 포지션 사용; 없으면 텍스트 fallback
-    let color: string | undefined
-    if (optionPositions.color) {
-      const colors = [...new Set(
-        sp.variants.map((v) => pickOption(v, optionPositions.color)).filter((x): x is string => !!x && x !== "Default Title")
-      )]
-      if (colors.length > 0) color = normalizeColorList(colors.join(", ").slice(0, 500))
-    }
-    if (!color) {
-      const searchText = [
-        sp.title,
-        sp.tags.join(" "),
-        bodyHtml.replace(/<[^>]+>/g, " "),
-      ].join(" ")
-      const found = extractColorFromText(searchText)
-      if (found) color = found
-    }
 
     // sizeInfo: options 메타데이터로 정확한 포지션 사용
     let sizeInfo: string | undefined
@@ -300,11 +231,8 @@ export function parseShopifyProducts(
       imageUrl,
       productUrl: `${baseUrl}/products/${sp.handle}`,
       inStock,
-      gender,
       platform: platformKey,
       crawledAt: new Date().toISOString(),
-      description,
-      color,
       sizeInfo,
       images: images.length > 0 ? images : undefined,
       tags,
@@ -374,7 +302,7 @@ export async function crawlShopify(
       if (!data.products || data.products.length === 0) break
 
       // Stage-0 PRESERVE seam: per-product mapping (variant pick, price,
-      // option positions, image-host whitelist, gender/tag/description)
+      // option positions, image-host whitelist, tag/description)
       // was extracted VERBATIM into `parseShopifyProducts`. The crawl
       // path delegates ALL mapping to it; output is byte-identical to the
       // pre-extraction inline loop (golden:
@@ -383,8 +311,11 @@ export async function crawlShopify(
       allProducts.push(
         ...parseShopifyProducts(data, config.baseUrl, config.key, {
           sourceCurrency: currency,
-          defaultGender: config.defaultGender,
-          brandFallback: config.name,
+          // 멀티브랜드 편집샵 오염 방지: vendor 가 비면 플랫폼명(config.name)이
+          // 아니라 하우스 브랜드(config.brand)로만 폴백한다. config.brand 가 없는
+          // 멀티브랜드 편집샵은 brand="" 로 남겨 import 단계에서 격리/온보딩
+          // LLM 브랜드 추출로 처리한다. (platform-as-brand 폴백 제거)
+          brandFallback: config.brand,
           keepOutOfStock: options.listingOnly,
         }),
       )

@@ -23,7 +23,6 @@ import {fileURLToPath} from "node:url"
 
 import {
     buildFarfetchProductUrlPattern,
-    deriveGenderFromUrl,
     detectChallengeIntercept,
     formatFarfetchPrice,
     isSafeFarfetchImageUrl,
@@ -110,14 +109,6 @@ test("fixture: every price is a positive KRW integer in sanity range [1000, 100M
     assert.ok(typeof p.price === "number" && Number.isInteger(p.price), `non-integer price: ${p.price}`)
     assert.ok((p.price ?? 0) >= 1_000, `price below KRW_MIN: ${p.price}`)
     assert.ok((p.price ?? 0) <= 100_000_000, `price above KRW_MAX: ${p.price}`)
-  }
-})
-
-test("fixture: every gender contains 'men' (category was /men/clothing-2)", () => {
-  const fx = loadFixture()
-  const products = parseProductsFromCards(fx.cards, KR_BASE, "farfetch-kr", "KR", "KRW", "men")
-  for (const p of products) {
-    assert.ok(p.gender.includes("men"), `gender missing 'men' for ${p.productUrl}`)
   }
 })
 
@@ -222,22 +213,6 @@ test("detectChallengeIntercept rejects non-string body", () => {
   // @ts-expect-error testing non-string input
   const result = detectChallengeIntercept(null, "")
   assert.equal(result.isIntercept, true)
-})
-
-test("deriveGenderFromUrl extracts gender from KR path", () => {
-  assert.equal(deriveGenderFromUrl("https://www.farfetch.com/kr/shopping/men/items.aspx"), "men")
-  assert.equal(deriveGenderFromUrl("https://www.farfetch.com/kr/shopping/women/clothing-1/items.aspx"), "women")
-  assert.equal(deriveGenderFromUrl("https://www.farfetch.com/kr/shopping/kids/items.aspx"), "kids")
-})
-
-test("deriveGenderFromUrl extracts gender from US path", () => {
-  assert.equal(deriveGenderFromUrl("https://www.farfetch.com/shopping/men/items.aspx"), "men")
-  assert.equal(deriveGenderFromUrl("https://www.farfetch.com/shopping/women/clothing-1/items.aspx"), "women")
-})
-
-test("deriveGenderFromUrl returns empty for non-shopping URL", () => {
-  assert.equal(deriveGenderFromUrl("https://www.farfetch.com/kr/terms-and-conditions/"), "")
-  assert.equal(deriveGenderFromUrl(""), "")
 })
 
 test("parseFarfetchPrice parses KRW with comma separator", () => {

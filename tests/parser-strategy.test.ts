@@ -218,8 +218,6 @@ test("REQ-004 Cafe24DetailParserStrategy.parse delegates verbatim to getDetailPa
     "Cafe24DetailParserStrategy MUST delegate verbatim to getDetailParser(site).parse",
   )
   assert.deepEqual(viaStrategy, {
-    description: null,
-    color: null,
     material: null,
     productCode: null,
   })

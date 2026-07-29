@@ -21,13 +21,6 @@ export class BaseDetailParser implements IDetailParser {
     ".prd_detail_box",
   ]
 
-  protected colorSelectors: string[] = [
-    'select[name*="option1"] option',
-    'select[id*="option1"] option',
-    ".opt_list li",
-    ".product-option li",
-  ]
-
   protected codeSelectors: string[] = [
     ".product_code",
     ".prd_code",
@@ -46,8 +39,6 @@ export class BaseDetailParser implements IDetailParser {
 
   async parse(page: Cafe24Page, productUrl: string): Promise<DetailData> {
     const result: DetailData = {
-      description: null,
-      color: null,
       material: null,
       productCode: null,
     }
@@ -72,49 +63,6 @@ export class BaseDetailParser implements IDetailParser {
             if (!el) continue
             const text = (el as HTMLElement).innerText?.trim()
             if (text && text.length > 10) { description = text.slice(0, 2000); break }
-          } catch { /* next */ }
-        }
-
-        // color
-        // Noise check mirrors isNonColorOptionText() in field-extractors/color-normalizer.ts,
-        // inlined directly into the condition below (no helper function/const declared here) —
-        // see the NOTE in cafe24-engine.ts's collectProductsFromPage: page.evaluate 안에
-        // function/const 선언 금지, tsx의 __name 변환이 브라우저에서 ReferenceError 유발.
-        // Single-brand malls without a dedicated color <select> reuse option1 for
-        // size/stock-status/price-adjustment values; without this filter those get
-        // scraped as "color" (e.g. "ONE SIZE", "1(low in stock) [sold out]", "2 (+₩5,000)").
-        let color: string | null = null
-        for (const sel of args.colorSels) {
-          try {
-            const options = document.querySelectorAll(sel)
-            if (options.length === 0) continue
-            const colors: string[] = []
-            options.forEach((opt) => {
-              const t = (opt as HTMLElement).innerText?.trim() || ""
-              if (
-                t &&
-                !/^empty$/i.test(t) &&
-                !t.includes("선택") &&
-                !t.includes("Select") &&
-                t !== "*" &&
-                !/^-{3,}$/.test(t) &&
-                !/^(?:color|colour|색상|컬러)\s*[-/:：]?\s*(?:size|사이즈)?$/i.test(t) &&
-                !/^\d+$/.test(t) &&
-                !/^\d+\s*(size|사이즈)$/i.test(t) &&
-                !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|f|free|os|one\s*size)$/i.test(t) &&
-                !/^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl)\s*[/(]/i.test(t) &&
-                // "SIZE" / "Size, 43cm, 45cm" / "Size, US 5.5, US 6.5" — the literal
-                // word "size" (any case) as the whole token or leading token, not
-                // just abbreviations like S/M/L (2026-07-06: rollingstudios/enlowool/
-                // leete/waineke/jungdo onboarding).
-                !/^(size|사이즈)\b/i.test(t) &&
-                !/사이즈\s*기준/.test(t) &&
-                !/품절|sold\s*out|재고|low in stock/i.test(t) &&
-                !/[+-]\s*₩[\d,]+/.test(t)
-              )
-                colors.push(t)
-            })
-            if (colors.length > 0) { color = colors.slice(0, 20).join(", ").slice(0, 500); break }
           } catch { /* next */ }
         }
 
@@ -151,17 +99,14 @@ export class BaseDetailParser implements IDetailParser {
           }
         }
 
-        return { description, color, material, productCode }
+        return { description, material, productCode }
       }, {
         descSels: this.descriptionSelectors,
-        colorSels: this.colorSelectors,
         codeSels: this.codeSelectors,
         matPattern: this.materialPatternSrc,
         matKeywords: this.materialKeywords,
       })
 
-      result.description = extracted.description
-      result.color = extracted.color
       result.material = extracted.material
       result.productCode = extracted.productCode
     } catch (err) {

@@ -99,8 +99,6 @@ async function main() {
       const detailParser = getDetailParser(site)
       const detail = await detailParser.parse(page, url)
       console.log(`   📖 상세 데이터:`)
-      console.log(`      설명: ${detail.description ? detail.description.slice(0, 100) + "..." : "없음"}`)
-      console.log(`      색상: ${detail.color || "없음"}`)
       console.log(`      소재: ${detail.material || "없음"}`)
       console.log(`      상품코드: ${detail.productCode || "없음"}`)
 

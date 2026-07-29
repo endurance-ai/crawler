@@ -5,6 +5,7 @@
  * Examples:
  *   pnpm brand-crawl -- list --status=not_started
  *   pnpm brand-crawl -- detect --brand-id=123
+ *   pnpm brand-crawl -- detect --status=imported --platform-type=unknown --preserve-status
  *   pnpm brand-crawl -- detect --status=not_started --url=present --limit=20
  *   pnpm brand-crawl -- qc --brand-id=123 --site=matteveil
  *   pnpm brand-crawl -- mark --brand-id=123 --status=crawled --platform-key=matteveil
@@ -40,15 +41,12 @@ interface DetectResult {
 interface CrawledProduct {
   category?: unknown
   categories?: unknown
-  color?: unknown
-  colors?: unknown
-  gender?: unknown
-  gender_scope?: unknown
   price?: unknown
   source_price?: unknown
   imageUrl?: unknown
   image_url?: unknown
   images?: unknown
+  imageSelection?: unknown
   inStock?: unknown
   in_stock?: unknown
 }
@@ -252,10 +250,7 @@ async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
   const jsonldProduct = /"@type"\s*:\s*"?Product"?/.test(html)
 
   const uniqueCateNos = extractCafe24CateNos(html)
-  const categories = uniqueCateNos.map((cateNo) => ({
-    cateNo,
-    gender: brand.gender_scope && brand.gender_scope.length > 0 ? brand.gender_scope : undefined,
-  }))
+  const categories = uniqueCateNos.map((cateNo) => ({cateNo}))
 
   const categoryDiscovery = platformType === "cafe24" && categories.length > 0 ? "manual" : "auto"
   return {
@@ -302,29 +297,33 @@ function analyzeArtifact(filePath: string, platformKey?: string): {metrics: Reco
 
   const total = products.length
   const categoryPresent = products.filter((p) => hasValue(p.category) || hasValue(p.categories)).length
-  const colorPresent = products.filter((p) => hasValue(p.color) || hasValue(p.colors)).length
-  const genderPresent = products.filter((p) => hasValue(p.gender) || hasValue(p.gender_scope)).length
   const pricePresent = products.filter((p) => hasValue(p.price) || hasValue(p.source_price)).length
   const imagePresent = products.filter((p) => hasValue(p.imageUrl) || hasValue(p.image_url) || hasValue(p.images)).length
+  const imageSelected = products.filter((p) => {
+    if (!p.imageSelection || typeof p.imageSelection !== "object") return false
+    const selection = p.imageSelection as Record<string, unknown>
+    return typeof selection.version === "string" && selection.version.length > 0
+  }).length
   const inStock = products.filter((p) => p.inStock !== false && p.in_stock !== false).length
 
   const pct = (count: number): number => (total === 0 ? 0 : Math.round((10000 * count) / total) / 100)
   const metrics: Record<string, unknown> = {
     total,
     category_present: categoryPresent,
-    color_present: colorPresent,
-    gender_present: genderPresent,
     price_present: pricePresent,
     image_present: imagePresent,
+    image_selected: imageSelected,
     in_stock: inStock,
     category_fill_rate: pct(categoryPresent),
-    color_fill_rate: pct(colorPresent),
-    gender_fill_rate: pct(genderPresent),
     price_fill_rate: pct(pricePresent),
     image_fill_rate: pct(imagePresent),
+    image_selection_rate: pct(imageSelected),
   }
 
-  let passed = total > 0 && categoryPresent === total && colorPresent === total && genderPresent === total
+  let passed =
+    total > 0 &&
+    categoryPresent === total &&
+    imageSelected === total
   const config = platformKey ? getSiteConfig(platformKey) : undefined
   if (config?.type === "cafe24") {
     const quality = assessCafe24ProductQuality(products as Product[], config)
@@ -356,13 +355,8 @@ async function selectBrands(db: ProductCollectionClient, flags: Flags): Promise<
   const status = stringFlag(flags, "status") ?? stringFlag(flags, "tech-status")
   const platformType = stringFlag(flags, "platform-type")
   const urlFilter = stringFlag(flags, "url")
-  // wiki.origin_country is populated independently of detection (brand-wiki
-  // enrichment runs before tech-detect), so it's safe to pre-filter here --
-  // avoids detect wasting a network probe on brands generate-platform-configs.ts
-  // can never turn into a config anyway (it's hard-scoped to KR-origin;
-  // non-KR brands just accumulate as permanently-unusable tech_detected rows
-  // and show up as confusing "missing config" noise in daily-onboard runs,
-  // 2026-07-23 observed).
+  // Optional onboarding scope. Durable configs from already-collected sources
+  // are no longer country-scoped by generate-platform-configs.ts.
   const country = stringFlag(flags, "country")
   const q = cleanSearch(stringFlag(flags, "q") ?? "")
   if (status) query = query.eq("status", status)
@@ -401,7 +395,11 @@ async function listBrands(flags: Flags): Promise<void> {
   console.log(`total=${brands.length}`)
 }
 
-async function detectOneBrand(db: ProductCollectionClient, brand: ProductCrawlBrand): Promise<void> {
+async function detectOneBrand(
+  db: ProductCollectionClient,
+  brand: ProductCrawlBrand,
+  preserveStatus: boolean,
+): Promise<void> {
   const startedAt = Date.now()
   const runId = await startProductRun(db, {
     brandNodeId: brand.brand_node_id,
@@ -416,11 +414,11 @@ async function detectOneBrand(db: ProductCollectionClient, brand: ProductCrawlBr
       category_discovery: result.category_discovery,
       categories: result.categories,
       detection: result.detection,
-      status: "tech_detected",
       config_status: "needed",
       detected_at: new Date().toISOString(),
       last_error: null,
       blocked_reason: null,
+      ...(preserveStatus ? {} : {status: "tech_detected"}),
     })
     await finishProductRun(db, runId, {
       status: "success",
@@ -442,10 +440,9 @@ async function detectOneBrand(db: ProductCollectionClient, brand: ProductCrawlBr
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     await upsertProductCrawlStatus(db, brand.brand_node_id, {
-      status: "blocked",
-      config_status: "blocked",
       last_error: message,
       blocked_reason: message,
+      ...(preserveStatus ? {} : {status: "blocked", config_status: "blocked"}),
     })
     await finishProductRun(db, runId, {status: "failed", errorMessage: message, startedAt})
     console.error(`#${brand.brand_node_id} ${brand.brand_name}: ${message}`)
@@ -456,11 +453,12 @@ async function detectBrands(flags: Flags): Promise<void> {
   const db = createProductCollectionClient()
   const brands = await selectBrands(db, flags)
   const concurrency = Math.min(numberFlag(flags, "concurrency") ?? 1, 12)
+  const preserveStatus = flags["preserve-status"] === true
   let cursor = 0
   const workers = Array.from({length: Math.max(1, concurrency)}, async () => {
     while (cursor < brands.length) {
       const brand = brands[cursor++]
-      await detectOneBrand(db, brand)
+      await detectOneBrand(db, brand, preserveStatus)
     }
   })
   await Promise.all(workers)
@@ -498,13 +496,13 @@ async function qcBrand(flags: Flags): Promise<void> {
       qc_summary: {...metrics, passed},
       ...(passed
         ? {last_error: null}
-        : {status: "qc_failed", last_error: "QC failed: category/color/gender fill must be 100%"}),
+        : {status: "qc_failed", last_error: "QC failed: category fill must be 100%"}),
     })
     await finishProductRun(db, runId, {
       status: passed ? "success" : "failed",
       metrics: {...metrics, passed},
       artifactPath: artifactRelPath,
-      errorMessage: passed ? null : "category/color/gender fill below threshold",
+      errorMessage: passed ? null : "category fill below threshold",
       startedAt,
     })
     console.log(`#${brandNodeId} ${platformKey}: qc ${passed ? "passed" : "failed"} ${JSON.stringify(metrics)}`)

@@ -270,7 +270,6 @@ export interface RawZaraProduct {
   availability?: string
   availableColors?: Array<{colorName?: string; hexColor?: string}>
   /** Engine-attached annotation; not part of the canonical ZARA payload. */
-  _gender?: string
   _category?: string
 }
 
@@ -305,16 +304,6 @@ function buildProductUrl(baseUrl: string, seo: RawZaraProduct["seo"]): string {
   return `${trimmed}/${seo.keyword}-p${seo.seoProductId}.html`
 }
 
-function mapGender(p: RawZaraProduct): string[] {
-  // Prefer engine-attached _gender (derived from URL section). Fall back
-  // to sectionName which is "WOMAN" / "MAN" in the live payload.
-  if (p._gender) return [p._gender]
-  const sn = (p.sectionName || "").toUpperCase()
-  if (sn === "WOMAN") return ["women"]
-  if (sn === "MAN") return ["men"]
-  if (sn === "KID" || sn === "KIDS") return ["kids"]
-  return []
-}
 
 /**
  * Walk an arbitrary XHR JSON payload and harvest leaf objects whose
@@ -380,9 +369,6 @@ export function parseProductsFromXhr(
     const xm = raw.detail?.colors?.[0]?.xmedia?.[0]
     const imageUrl = buildImageUrl(xm)
     if (!imageUrl || !isSafeZaraImageUrl(imageUrl)) continue
-    const colorNames = (raw.availableColors ?? [])
-      .map((c) => c.colorName)
-      .filter((n): n is string => typeof n === "string" && n.length > 0)
     const inStock = (raw.availability ?? "").toLowerCase() === "in_stock"
     const normalizedPrice = normalizeZaraPrice(raw.price, region)
     out.push({
@@ -396,11 +382,9 @@ export function parseProductsFromXhr(
       imageUrl,
       productUrl,
       inStock,
-      gender: mapGender(raw),
       platform: platformKey,
       crawledAt,
       productCode: raw.seo?.seoProductId ?? String(raw.id),
-      color: colorNames.length > 0 ? colorNames.join(", ").slice(0, 500) : undefined,
       sourceCurrency,
       sourcePrice: normalizedPrice,
     })
@@ -438,7 +422,6 @@ async function crawlOneCategory(
   categoryUrl: string,
   baseUrl: string,
   platformKey: string,
-  gender: string,
   region: ZaraRegion,
   sourceCurrency: "KRW" | "USD",
 ): Promise<CategoryScrapeResult> {
@@ -507,7 +490,6 @@ async function crawlOneCategory(
     }
     // Parse — annotate each raw with _gender so the parser maps it correctly.
     const harvested = harvestRawProducts(xhrPayload)
-    for (const r of harvested) r._gender = gender
     const products = parseProductsFromXhr(harvested, baseUrl, platformKey, region, sourceCurrency)
     result.products = products
     return result
@@ -519,23 +501,6 @@ async function crawlOneCategory(
   }
 }
 
-/**
- * Region-agnostic gender derivation. Matches any 2-letter country/2-letter
- * language locale prefix (e.g. `/kr/ko/`, `/us/en/`) followed by the gender
- * slug. Return values are unchanged from the KR-only predecessor so that
- * downstream `mapGender` semantics are preserved bit-for-bit.
- *
- * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-002
- */
-export function deriveGenderFromUrl(url: string): string {
-  if (typeof url !== "string") return ""
-  const m = url.match(/\/(?:[a-z]{2})\/(?:[a-z]{2})\/(woman|women|man|men|kids|kid)/)
-  if (!m) return ""
-  const slug = m[1]
-  if (slug === "woman" || slug === "women") return "women"
-  if (slug === "man" || slug === "men") return "men"
-  return "kids"
-}
 
 /**
  * @MX:ANCHOR: [AUTO] ZARA crawler entry point. Invariant: ALWAYS returns
@@ -586,14 +551,22 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
 
   let browser: Browser | null = null
   try {
-    browser = await chromium.launch({headless: true, channel: "chrome"})
+    browser = await chromium.launch(
+      process.env.CRAWLER_BROWSER_CHANNEL === "chromium"
+        ? {headless: true}
+        : {headless: true, channel: "chrome"},
+    )
   } catch (err) {
+    const runtime =
+      process.env.CRAWLER_BROWSER_CHANNEL === "chromium"
+        ? "Playwright bundled Chromium"
+        : "system Chrome"
     errors.push(
       JSON.stringify({
         type: "browser-launch-failed",
         detail:
-          `${String(err).slice(0, 200)}. ZARA engine requires a real Chrome ` +
-          `binary on the host system; install Chrome OR run \`npx playwright install chrome\`.`,
+          `${String(err).slice(0, 200)}. ZARA engine tried ${runtime}; ` +
+          `install the selected browser runtime or change CRAWLER_BROWSER_CHANNEL.`,
         timestamp: new Date().toISOString(),
       }),
     )
@@ -605,7 +578,6 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
     for (let i = 0; i < categoryUrls.length; i++) {
       const categoryUrl = categoryUrls[i]!
       const ua = pickZaraUserAgent(i)
-      const gender = deriveGenderFromUrl(categoryUrl)
 
       // 2 sec/page pacing between consecutive page navigations
       // (REQ-003). First request runs immediately.
@@ -628,7 +600,6 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
           categoryUrl,
           config.baseUrl,
           config.key,
-          gender,
           region,
           sourceCurrency,
         )

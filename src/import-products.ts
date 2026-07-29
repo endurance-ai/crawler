@@ -16,7 +16,8 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGender} from "./lib/product-gender"
+import {getSiteConfig} from "./configs/platforms"
+import {queuePlatformType} from "./lib/platform-config-lifecycle"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -51,17 +52,22 @@ interface CrawledProduct {
   salePrice?: number | null
   priceFormatted: string
   imageUrl: string
+  sourceImageUrl?: string
   productUrl: string
   inStock: boolean
-  gender: string[]
   platform: string
   crawledAt: string
   // 상세 페이지 데이터
-  description?: string
-  color?: string
   material?: string
   subcategory?: string
   images?: string[]
+  imageSelection?: {
+    kind: "model" | "product" | "fallback"
+    score: number
+    version: string
+    candidateCount: number
+    selectedAt: string
+  }
   sizeInfo?: string
   tags?: string[]
   productCode?: string
@@ -91,6 +97,18 @@ const SELF_BRANDED: Record<string, string> = {
   yuse: "YUSE",
   ojos: "OJOS",
   goyowear: "GOYOWEAR",
+}
+
+// provenance 가드: 어떤 플랫폼이 "신규 brand_nodes 자동 생성"을 신뢰할 수 있는
+// 출처인가? 단일브랜드 자사몰만 신뢰한다 — 하우스 브랜드가 config 로 큐레이션돼
+// 있기 때문(config.brand 또는 SELF_BRANDED 맵). 멀티브랜드 편집샵(config.brand
+// 없음)은 상품마다 브랜드가 달라 DOM/플랫폼명 스크래핑 오염 위험이 있으므로
+// 신규 브랜드를 자동 생성하지 않고, 미등록 브랜드 상품은 격리(import 스킵)한다.
+// 편집샵의 실제 상품별 브랜드는 온보딩 LLM 추출 → 기존 KR brand_nodes 매칭
+// (--no-new-brands) 경로로만 적재되며, 이 과정에서 해외 브랜드가 자동 제외된다.
+function isTrustedBrandPlatform(platform: string): boolean {
+  if (platform in SELF_BRANDED) return true
+  return !!getSiteConfig(platform)?.brand
 }
 
 // ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
@@ -154,6 +172,7 @@ async function syncProductCrawlStatus(
   const lowYield = result.qcPassRate < MIN_QC_PASS_RATE
   const success = inserted && !lowYield
   const status = success ? "imported" : "qc_failed"
+  const config = getSiteConfig(platform)
   if (inserted && lowYield) {
     console.warn(
       `   ⚠️  ${platform}: QC 통과율 ${(result.qcPassRate * 100).toFixed(1)}% (<${MIN_QC_PASS_RATE * 100}%) — imported 대신 qc_failed로 기록, 재시도 대상에 남김`,
@@ -165,6 +184,12 @@ async function syncProductCrawlStatus(
       brand_node_id: brandNodeId,
       status,
       platform_key: platform,
+      ...(config
+        ? {
+            platform_type: queuePlatformType(config.type),
+            config_status: config.disabled ? "blocked" : "ready",
+          }
+        : {}),
       imported_at: success ? new Date().toISOString() : null,
       qc_summary: {
         rows_total: result.total,
@@ -214,10 +239,8 @@ function trigramSimilarity(a: string, b: string): number {
 async function loadBrandNodes(): Promise<{
   rows: BrandNodeRow[]
   idMap: Map<string, number>
-  genderById: Map<number, string[]>
 }> {
   const idMap = new Map<string, number>()
-  const genderById = new Map<number, string[]>()
 
   // PostgREST default 1000 row limit — paginate to fetch all brand_nodes (~2,100 rows).
   // 062 마이그 이후 brand_nodes.style_node legacy text 컬럼 제거됨.
@@ -228,7 +251,7 @@ async function loadBrandNodes(): Promise<{
   for (;;) {
     const {data, error} = await db
       .from("brand_nodes")
-      .select("id, brand_name, brand_name_normalized, gender_scope")
+      .select("id, brand_name, brand_name_normalized")
       .range(offset, offset + PAGE - 1)
     if (error) {
       console.warn("⚠️ brand_nodes 조회 실패:", error.message)
@@ -245,11 +268,9 @@ async function loadBrandNodes(): Promise<{
       idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
     }
     idMap.set(bn.brand_name.toLowerCase(), bn.id)
-    const genderScope = cleanGenderScope(bn.gender_scope)
-    if (genderScope.length > 0) genderById.set(bn.id, genderScope)
   }
-  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size}, gender_scope=${genderById.size})`)
-  return {rows, idMap, genderById}
+  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
+  return {rows, idMap}
 }
 
 async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
@@ -382,6 +403,10 @@ async function main() {
   // --in-stock-only: 품절(in_stock=false) 상품을 적재에서 제외.
   // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
   const inStockOnly = process.argv.includes("--in-stock-only")
+  // Representative-image selection is a required pre-import stage. The
+  // escape hatch exists only for emergency legacy recovery and is deliberately
+  // explicit so a normal recrawl cannot silently revert a curated image_url.
+  const allowUnselectedImages = process.argv.includes("--allow-unselected-images")
 
   // data/ 내 *-products.json 파일 찾기
   const files = fs.readdirSync(dataDir)
@@ -399,15 +424,17 @@ async function main() {
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
 
-  // ── brand_nodes 로드 (id_map + gender_scope — legacy style_node text 컬럼 062에서 drop) ─
-  const {rows: brandRows, idMap: brandIdMap, genderById: brandGenderById} = await loadBrandNodes()
+  // ── brand_nodes 로드 (id_map — legacy style_node text 컬럼 062에서 drop) ─
+  const {rows: brandRows, idMap: brandIdMap} = await loadBrandNodes()
   const platformBrandIdMap = await loadPlatformBrandNodeMap()
 
   // ── Pre-scan: 모든 파일에서 unique brand 문자열 수집 ──────
   // 미존재 brand 는 한 번에 resolve (fuzzy + insert + alias_candidate enqueue).
   // 파일 JSON 은 캐시해서 main loop 에서 재사용 (디스크 IO 1회).
   const fileCache = new Map<string, CrawledProduct[]>()
-  const unknownBrands = new Map<string, string>() // brand → first-seen platform
+  // brand → {대표 platform, 신뢰 출처 여부}. trusted 는 이 brand 를 내보낸 소스
+  // 플랫폼 중 하나라도 단일브랜드 자사몰이면 true (first-seen 충돌 방지).
+  const unknownBrands = new Map<string, {platform: string; trusted: boolean}>()
 
   for (const file of files) {
     const platform = file.replace("-products.json", "")
@@ -424,8 +451,11 @@ async function main() {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       if (!brand) continue
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      if (brandNodeId === null && !unknownBrands.has(brand)) {
-        unknownBrands.set(brand, platform)
+      if (brandNodeId === null) {
+        const trusted = isTrustedBrandPlatform(platform)
+        const existing = unknownBrands.get(brand)
+        if (!existing) unknownBrands.set(brand, {platform, trusted})
+        else if (trusted && !existing.trusted) unknownBrands.set(brand, {platform, trusted: true})
       }
     }
   }
@@ -435,15 +465,25 @@ async function main() {
       console.log(`⚠️  미등록 brand ${unknownBrands.size}개 발견 — --no-new-brands 모드: INSERT 건너뜀, 해당 상품 적재 제외`)
       console.log(`   제외 브랜드: ${[...unknownBrands.keys()].slice(0, 10).join(", ")}${unknownBrands.size > 10 ? ` 외 ${unknownBrands.size - 10}개` : ""}\n`)
     } else {
-      console.log(`🆕 미등록 brand ${unknownBrands.size}개 발견 — 자동 INSERT + alias 검사`)
-      const resolveResult = await resolveUnknownBrands(
-        [...unknownBrands.entries()].map(([raw, platform]) => ({raw, platform})),
-        brandRows,
-        brandIdMap,
-      )
-      console.log(
-        `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
-      )
+      // provenance 가드: 신뢰 출처(단일브랜드 자사몰)의 미등록 brand 만 자동 생성.
+      // 멀티브랜드/비신뢰 출처는 INSERT 하지 않고 상품을 격리(main loop 스킵)한다.
+      const insertable = [...unknownBrands.entries()].filter(([, v]) => v.trusted)
+      const blocked = [...unknownBrands.entries()].filter(([, v]) => !v.trusted)
+      if (blocked.length > 0) {
+        console.log(`⛔ 미등록 brand ${blocked.length}개 — 멀티브랜드/비신뢰 출처: 자동 INSERT 제외(상품 격리)`)
+        console.log(`   격리 브랜드: ${blocked.map(([b]) => b).slice(0, 10).join(", ")}${blocked.length > 10 ? ` 외 ${blocked.length - 10}개` : ""}`)
+      }
+      if (insertable.length > 0) {
+        console.log(`🆕 미등록 brand ${insertable.length}개(신뢰 출처) — 자동 INSERT + alias 검사`)
+        const resolveResult = await resolveUnknownBrands(
+          insertable.map(([raw, v]) => ({raw, platform: v.platform})),
+          brandRows,
+          brandIdMap,
+        )
+        console.log(
+          `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
+        )
+      }
     }
   }
 
@@ -462,24 +502,26 @@ async function main() {
       continue
     }
     const rawAll: CrawledProduct[] = cached
-    const rawWithGenderFallback: CrawledProduct[] = rawAll.map((p) => {
-      const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
-      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      const gender = resolveProductGender(
-        p.gender,
-        brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
-      )
-      return gender.length > 0 ? {...p, gender} : p
-    })
     // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
     // product before the DB upsert. Valid products pass through
     // byte-identical into the existing .map(); invalid ones are excluded
     // + a structured reject event is emitted (does not crash the import
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
-    const qcRaw = applyProductQcGate(rawWithGenderFallback, platform)
+    const qcRaw = applyProductQcGate(rawAll, platform)
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
+
+    const unselected = raw.filter((p) => !p.imageSelection?.version)
+    if (!allowUnselectedImages && unselected.length > 0) {
+      console.error(
+        `   ❌ ${file}: 대표 이미지 미선정 ${unselected.length}/${raw.length}건. ` +
+          `먼저 pnpm select:product-images --site=${platform} 를 실행하세요. ` +
+          `긴급 레거시 복구에만 --allow-unselected-images 를 사용합니다.`,
+      )
+      totalErrors++
+      continue
+    }
 
     // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
     // were generated BEFORE the engine native-currency unification.
@@ -504,30 +546,29 @@ async function main() {
 
     let fxSkipped = 0
     let priceSkipped = 0
+    let brandQuarantined = 0
     const priceSkipSamples: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       const productUrl = (p.productUrl as string) || ""
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      const gender = resolveProductGender(
-        p.gender,
-        brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
-      )
 
       // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
       // 누출 가드(cafe24-engine.ts)가 오염된 값을 걸러내고 brand=""로 넘기는
-      // 경우 color와 동일하게 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
+      // 경우 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
       // 잘못 적재되는 것보다 재크롤 때까지 보류하는 편이 안전하다.
       if (!brand) return null
-      // --no-new-brands: 미등록 brand 상품 적재 제외
-      if (noNewBrands && brandNodeId === null) return null
+      // provenance 가드 + --no-new-brands: brand_node 로 해석되지 않는 상품 격리.
+      // 신뢰 출처(단일브랜드몰)는 위에서 자동 생성돼 non-null 로 해석되고, 멀티
+      // 브랜드 편집샵/비신뢰 출처의 미등록 brand 는 여기서 스킵된다. 편집샵의 실제
+      // 브랜드는 온보딩 LLM 추출 → 기존 KR brand_nodes 매칭으로만 적재된다.
+      if (brandNodeId === null && (noNewBrands || !isTrustedBrandPlatform(platform))) {
+        brandQuarantined += 1
+        return null
+      }
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
-      // color NOT NULL — color 없는 상품은 스킵
-      if (!p.color) return null
-      // gender required — product value first, brand_nodes.gender_scope fallback.
-      if (gender.length === 0) return null
       // product_no 추출
       const pnoMatch = productUrl.match(/product_no=(\d+)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
@@ -602,18 +643,21 @@ async function main() {
         source_price: sanitizePrice(sourcePriceRaw),
         product_no: productNo,
         image_url: p.imageUrl as string,
+        source_image_url: (p.sourceImageUrl as string | undefined) || (p.imageUrl as string),
         product_url: productUrl,
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
-        gender,
         brand_node_id: brandNodeId,
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
-        description: p.description?.slice(0, 2000) || null,
-        color: (p.color as string).slice(0, 500),
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
         subcategory: p.subcategory || null,
         images: p.images?.slice(0, 10) || null,
+        image_selection_kind: p.imageSelection?.kind ?? null,
+        image_selection_score: p.imageSelection?.score ?? null,
+        image_selection_version: p.imageSelection?.version ?? null,
+        image_selection_candidate_count: p.imageSelection?.candidateCount ?? null,
+        image_selected_at: p.imageSelection?.selectedAt ?? null,
         size_info: p.sizeInfo?.slice(0, 2000) || null,
         tags: p.tags?.slice(0, 50) || null,
         product_code: p.productCode?.slice(0, 100) || null,
@@ -621,6 +665,9 @@ async function main() {
         updated_at: new Date().toISOString(),
       }
     }).filter((r): r is NonNullable<typeof r> => r !== null)
+    if (brandQuarantined > 0) {
+      console.log(`   ⛔ ${brandQuarantined} product(s) quarantined — brand not a registered brand_node (multi-brand/untrusted source)`)
+    }
     if (fxSkipped > 0) {
       console.log(`   ⚠️  ${fxSkipped} product(s) skipped due to unknown source currency`)
     }
@@ -638,7 +685,7 @@ async function main() {
     //
     // Merge strategy (SPEC-005 P1 review 2026-05-06): instead of last-
     // wins, prefer non-null values when merging — sale_price, original_
-    // price, color, material, etc. from any duplicate row carry over.
+    // price, material, etc. from any duplicate row carry over.
     // gender arrays are merged; everything else takes the last non-null.
     type Row = (typeof rows)[number]
     const merge = (a: Row, b: Row): Row => {
@@ -650,18 +697,10 @@ async function main() {
         if (av === null || av === undefined || av === "") return bv
         return bv  // both non-null: take the later occurrence
       }
-      const mergedGender = (() => {
-        const ga = Array.isArray(a.gender) ? a.gender : []
-        const gb = Array.isArray(b.gender) ? b.gender : []
-        return [...new Set([...ga, ...gb])]
-      })()
       return {
         ...b,
         sale_price: a.sale_price ?? b.sale_price,
         original_price: pickRicher("original_price"),
-        color: pickRicher("color"),
-        description: pickRicher("description"),
-        gender: mergedGender,
         category: pickRicher("category"),
         subcategory: pickRicher("subcategory"),
       }

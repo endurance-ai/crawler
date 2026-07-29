@@ -28,55 +28,6 @@ function product(overrides: Partial<Product> = {}): Product {
   }
 }
 
-test("QC canonicalizes multilingual black variants", () => {
-  const result = normalizeProductTextFields(product({color: "Noir"}))
-  assert.equal(result.action, "auto_fix")
-  assert.equal(result.product.color, "Black")
-  assert.deepEqual(result.changes.map((c) => c.field), ["color"])
-})
-
-test("QC fixes size captured as color when product text has a clear color", () => {
-  const result = normalizeProductTextFields(product({name: "Negro Wide Pants", color: "M"}))
-  assert.equal(result.action, "auto_fix")
-  assert.equal(result.product.color, "Black")
-  assert.ok(result.reasons.includes("color_noise_text_fallback"))
-})
-
-test("QC sends unresolved size-color noise to review and drops it from the gate", () => {
-  resetProductQcReport()
-  const input = product({
-    name: "Wide Pants",
-    color: "ONE SIZE",
-    productUrl: "https://example.com/product/review",
-  })
-  const out = applyProductQcGate([input], "test-shop")
-  assert.equal(out.length, 0)
-})
-
-test("QC keeps unknown real color names instead of over-normalizing", () => {
-  const result = normalizeProductTextFields(product({color: "light taupe"}))
-  assert.equal(result.action, "auto_fix")
-  assert.equal(result.product.color, "Beige")
-})
-
-test("QC holds Korean placeholder color for review (제품명 참조 not loaded)", () => {
-  const result = normalizeProductTextFields(product({name: "Archive Bag", color: "제품명 참조"}))
-  assert.equal(result.action, "review")
-  assert.ok(result.reasons.includes("color_non_color_unresolved"))
-})
-
-test("QC canonicalizes gender aliases", () => {
-  const result = normalizeProductTextFields(product({gender: ["male"]}))
-  assert.equal(result.action, "auto_fix")
-  assert.deepEqual(result.product.gender, ["men"])
-})
-
-test("QC infers missing gender from text", () => {
-  const result = normalizeProductTextFields(product({name: "Women's Navy Coat", category: "Outer", gender: []}))
-  assert.equal(result.action, "auto_fix")
-  assert.deepEqual(result.product.gender, ["women"])
-})
-
 test("QC reviews category conflicts instead of overwriting them", () => {
   const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "accessories"}))
   assert.equal(result.action, "review")

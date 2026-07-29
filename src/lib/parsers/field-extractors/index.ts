@@ -7,9 +7,6 @@
  * (../detail/registry-detail-parser.ts).
  */
 
-export {colorFromOptionList, type OptionColorMode} from "./color"
-export {normalizeColor, normalizeColorList, extractColorFromText} from "./color-normalizer"
-export {baseDescriptionInPage} from "./description"
 export {baseMaterialFromDescription} from "./material"
 export {baseProductCodeInPage} from "./productCode"
 export {STRATEGIES} from "./strategies"

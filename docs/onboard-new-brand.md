@@ -15,13 +15,13 @@
 | 항목 | 규칙 | 근거 |
 |---|---|---|
 | **category 필수** | 없으면(빈문자/null) **적재 안 됨**. DB 컬럼도 `NOT NULL`. | validator `z.string().min(1)` + migration 091 |
-| **color 필수** | 없으면 **적재 안 됨**. DB 컬럼도 `NOT NULL`. | 동일 |
 | **품절 제외** | `inStock=false`(품절/sold out) 상품은 크롤·적재 모두에서 제외. | crawler `!inStock` 필터 + import `--in-stock-only` |
 | **신규 브랜드 차단(옵션)** | `--no-new-brands` 시 `brand_nodes` 미등록 브랜드는 INSERT 안 하고 해당 상품도 제외. | import `--no-new-brands` |
-| **색상 정규화** | 추출된 색상은 CANONICAL 맵으로 Title Case/동의어 통일. 새 색상값 발견 시 맵에 추가. | `src/lib/parsers/field-extractors/color-normalizer.ts` |
+| **색상은 크롤러가 안 뽑음** | 색상 단일 출처는 VLM `product_features.primary_color`. 크롤러 색상 로직은 2026-07-29 제거. | CLAUDE.md §18 |
 | **임베딩 이미지** | 대표 이미지 = `image_url` (== `images[0]`, 전 데이터셋 동일). `images` 비면 `image_url`로 폴백. | `embed_batch_devapp.py` fetch 쿼리 |
+| **대표 이미지 선정 필수** | import 전에 Mac 로컬 Vision 단계가 모델 착장샷을 자동 선정. 미선정 artifact는 기본 import 거부. | `pnpm select:product-images` + migration 092 |
 
-> 의미: **category/color를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 크롤 단계에서 이 두 값을 최대한 채우는 게 핵심.
+> 의미: **category를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 색상·성별은 크롤러 책임이 아니다(VLM).
 
 ---
 
@@ -53,13 +53,7 @@ npm run scaffold:platform -- <key> --name "Display Name" --write  # 스텁 생�
 ```
 출력된 스니펫을 실제 파일에 붙여넣고 셀렉터를 채운다(상세는 add-platform.md §1~3).
 
-### 2-4. 색상 정규화 맵 갱신
-크롤 결과에 CANONICAL에 없는 색상값(한글 색상명, 브랜드 고유색, 오타 변형)이 보이면
-`src/lib/parsers/field-extractors/color-normalizer.ts` 의 `CANONICAL` 배열에 즉시 추가.
-- ⚠️ `\b`(word boundary)는 한글에 안 먹으므로 한글 대안은 `\b()` 그룹 **밖**에 둘 것.
-  - 올바름: `/\b(grey)\b|그레이/i` / 잘못됨: `/\b(grey|그레이)\b/i`
-
-### 2-5. 타입체크 + 테스트
+### 2-4. 타입체크 + 테스트
 ```bash
 npm run typecheck     # exit 0
 npm test              # 기존 golden 깨지면 안 됨
@@ -92,9 +86,42 @@ npm run crawl -- --site=<key> --detail
 
 ---
 
-## 4. DB 적재
+## 4. 대표 이미지 자동 선정
 
-### 4-1. 환경 파일 준비
+Apple Silicon Mac에서 외부 LLM 호출 없이 Apple Vision으로 실행한다.
+
+```bash
+# 먼저 소량 dry-run + before/after HTML 리포트 확인
+pnpm select:product-images --site=<key> --limit=50 --dry-run
+
+# 전체 artifact에 자동 반영
+pnpm select:product-images --site=<key>
+```
+
+- 후보는 기존 `imageUrl`/`images[]`, JSON-LD, OG, srcset, 상세 갤러리에서 최대 10장 수집한다.
+- 우선순위는 `상품이 크게 보이는 모델 착장샷 → 제품 단독 컷 → 기존 이미지 폴백`이다.
+- 결과는 `imageUrl`과 `images[0]`에 반영되고 원래 크롤 이미지는 `sourceImageUrl`에 남는다.
+- `data/<key>-image-selection-*.html`에서 최대 200건의 before/after를 확인할 수 있다.
+- 중단 후 같은 명령을 다시 실행하면 `mac-vision-v1` 완료 상품과 캐시된 URL을 건너뛴다.
+- 롤백은 해당 실행의 JSONL을 사용한다:
+  `pnpm select:product-images --site=<key> --rollback=data/<manifest>.jsonl`
+
+기존 DB 전체 backfill은 migration 092 적용 후 별도로 실행한다. 첫 명령은 읽기/리포트만
+수행하고, 두 번째 명령에만 DB 쓰기가 있다.
+
+```bash
+pnpm select:product-images --from-db --all --limit=1000 --dry-run
+pnpm select:product-images --from-db --all --apply
+
+# 실행 단위 DB 롤백
+pnpm select:product-images --from-db --apply --rollback=data/<manifest>.jsonl
+```
+
+---
+
+## 5. DB 적재
+
+### 5-1. 환경 파일 준비
 `crawler/.env.local` (gitignore됨):
 ```
 DB_URL=http://<PostgREST 게이트웨이>:3001     # 직접 Postgres가 아니라 REST 게이트웨이
@@ -102,7 +129,7 @@ DB_TOKEN=<service JWT>
 ```
 > import는 PostgREST(`@supabase/supabase-js`)로 붙는다. psql 직결(5432)과는 **다른 경로**.
 
-### 4-2. 적재 실행
+### 5-2. 적재 실행
 ```bash
 # .env.local 은 npm 스크립트(dotenv -e .env)가 안 읽으므로 명시 호출
 npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-stock-only --site=<key>
@@ -112,7 +139,7 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
 - `--in-stock-only` — 품절 상품 제외
 - `--site=<key>` — 특정 플랫폼만 적재(생략 시 `data/` 전체)
 
-### 4-3. 적재 중/후 확인 사항
+### 5-3. 적재 중/후 확인 사항
 - **`validation_reject` 로그** = category/color 누락으로 버려진 상품. 다수면 크롤 추출 품질 문제 → 2단계로 회귀.
 - **`style_node` 류 컬럼 에러 주의**: products에서 drop된 컬럼(`style_node`(081), `material`(079))을 payload에 넣으면
   `Could not find the 'X' column ... in schema cache` 로 **전 배치 실패**. import payload는 현 스키마와 일치해야 함.
@@ -131,11 +158,11 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
 
 ---
 
-## 5. 임베딩
+## 6. 임베딩
 
 `ai-server` 리포에서 실행. 로컬 FashionSigLIP로 인코딩 → `bulk_update_product_embeddings` RPC upsert.
 
-### 5-1. 준비
+### 6-1. 준비
 ```bash
 cd <repo>/ai-server
 uv sync --group embed
@@ -143,7 +170,7 @@ export KIKOAI_DEVAPP_DSN='postgresql://ai_user:<pw>@<host>:5432/kikoai?sslmode=r
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1 HF_HUB_DISABLE_SYMLINKS_WARNING=1              # Windows cp949 크래시 방지
 ```
 
-### 5-2. 검증 → 실행
+### 6-2. 검증 → 실행
 ```bash
 uv run python scripts/embed_batch_devapp.py --limit 50 --dry-run   # 대상 수 확인(쓰기 없음)
 uv run python scripts/embed_batch_devapp.py --limit 50             # 50건 end-to-end 테스트
@@ -153,7 +180,7 @@ uv run python scripts/embed_batch_devapp.py --download-workers 8   # 전체 배�
 - **DNS `getaddrinfo failed` skip이 잦으면** `--download-workers`를 낮춰라(8 → 4). 죽은 호스트가 아니라 동시성에 의한 로컬 DNS 과부하임. skip된 건 재실행 시 자동 보충.
 - CPU 인코딩은 느림(대략 0.3~0.4s/건). GPU/MPS 있으면 훨씬 빠름.
 
-### 5-3. 검증
+### 6-3. 검증
 ```sql
 SELECT count(*) FROM product_embeddings;                       -- 전체
 SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼별 커버리지
@@ -162,12 +189,13 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
 
 ---
 
-## 6. 한 줄 요약 파이프라인
+## 7. 한 줄 요약 파이프라인
 
 ```
 브랜드 선정(+brand_nodes 등록)
   → 크롤 코드(config/셀렉터/색상맵) 작성 → npm run typecheck && npm test
   → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/color/description/품절 확인)
+  → pnpm select:product-images --site=<key>   (Mac Vision 모델 착장샷 자동 선정)
   → import-products --no-new-brands --in-stock-only --site=<key>   (validation_reject/스키마 확인)
   → embed_batch_devapp.py --download-workers 8                     (재실행으로 커버리지 수렴)
 ```

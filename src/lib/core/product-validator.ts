@@ -6,9 +6,12 @@
  * 규칙 도입도 하지 않는다. 유효 product 는 변형 없이 그대로 통과하고, 무효
  * product (필수 필드 누락 / 타입 불일치) 만 write 에서 차단된다.
  *
- * 방침 A 예외 — category / color / gender:
- * products 테이블에 필수 제약 적용(migration 091) 에 따라 세 필드는
- * 빈 문자열·null 모두 거부한다. 추출 불가 상품은 적재하지 않는다.
+ * 방침 A 예외 — category:
+ * products.category 는 검색 필터 신뢰성 때문에 빈 문자열·null 을 거부한다.
+ *
+ * 2026-07-29: color 와 gender 는 이 게이트에서 빠졌다. 두 필드 모두 출처가
+ * 크롤러 → product_features(VLM) 로 이관됐고, 크롤러는 더 이상 만들지 않는다.
+ * DB 쪽 `chk_products_gender_required` 도 migration 096 에서 해제됐다.
  *
  * 방침 A 예외 (category canonical-strict): category 는 QC 정규화
  * (product-qc/normalization.ts normalizeCategoryField)에서 CATEGORIES(enums)
@@ -20,8 +23,8 @@
  *  - `src/lib/types.ts` 의 `Product` 인터페이스 (현재 출력 형 계약).
  *  - `tests/fixtures/uniqlo-kr-parse.golden.json` (100개 실제 출력 product —
  *    base 필드 항상 존재, salePrice 는 null 가능, 선택 detail 필드는 존재 시만).
- *  - `tests/fixtures/detail/*.golden.json` (18개 detail 스냅샷 — description /
- *    color / material / productCode 는 string 또는 null. preserve-findings 의
+ *  - `tests/fixtures/detail/*.golden.json` (18개 detail 스냅샷 — material /
+ *    productCode 는 string 또는 null. preserve-findings 의
  *    "오염된 material 잡텍스트" / "전부 null" 같은 현재 깨진 동작도 통과해야 함).
  *
  * 따라서 detail 류 선택 필드는 `string | null` 을 모두 수용하고, price 류는
@@ -30,7 +33,6 @@
 
 import {z} from "zod"
 import type {Product} from "../types.js"
-import {PRODUCT_GENDER_VALUES} from "../product-gender.js"
 
 // @MX:ANCHOR: [AUTO] validateProduct() is the crawler write-boundary contract —
 //   every product crossing into JSON output or DB upsert passes through here.
@@ -48,7 +50,6 @@ const optionalStringOrNull = z.string().nullish()
  *
  * - base 필드: golden 상 100% 존재. 단 `Product` 타입상 price 3종은
  *   `number | null`, salePrice 는 null 빈번 → number|null 수용.
- * - gender: `men|women|unisex` 중 하나 이상 (recommendation 필수 신호).
  * - detail/리뷰 필드: 모두 선택. 현재 출력에서 null 또는 잡텍스트가 나올 수
  *   있으므로 reject 하지 않는다 (방침 A — 깨진 동작 보존).
  * - passthrough: 알 수 없는 추가 키가 있어도 reject 하지 않고 그대로 통과
@@ -64,17 +65,24 @@ export const ProductSchema = z
     salePrice: z.number().nullable(),
     priceFormatted: z.string(),
     imageUrl: z.string(),
+    sourceImageUrl: z.string().optional(),
     productUrl: z.string(),
     inStock: z.boolean(),
-    gender: z.array(z.enum(PRODUCT_GENDER_VALUES)).min(1),
     platform: z.string(),
     crawledAt: z.string(),
     // ── 상세 페이지 데이터 (선택) ──
-    description: optionalStringOrNull,
-    color: z.string().min(1),
     material: optionalStringOrNull,
     subcategory: optionalStringOrNull,
     images: z.array(z.string()).nullish(),
+    imageSelection: z
+      .object({
+        kind: z.enum(["model", "product", "fallback"]),
+        score: z.number().min(0).max(100),
+        version: z.string().min(1),
+        candidateCount: z.number().int().min(1).max(10),
+        selectedAt: z.string().min(1),
+      })
+      .optional(),
     sizeInfo: optionalStringOrNull,
     tags: z.array(z.string()).nullish(),
     productCode: optionalStringOrNull,

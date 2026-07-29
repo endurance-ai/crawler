@@ -13,17 +13,32 @@ export interface Product {
   salePrice: number | null
   priceFormatted: string
   imageUrl: string
+  /** Crawler-provided primary URL before representative-image selection. */
+  sourceImageUrl?: string
   productUrl: string
   inStock: boolean
-  gender: string[]
   platform: string
   crawledAt: string
   // ── 상세 페이지 데이터 (Phase 2) ──
-  description?: string
-  color?: string
+  /**
+   * 상세 페이지를 실제로 방문해 파싱한 시각 (ISO). 재시작 스킵 마커다.
+   *
+   * 2026-07-29 이전에는 `color` 가 비어있지 않은지로 "상세 수집 완료"를
+   * 판정했는데(crawl.ts loadExistingDetails), color 가 product_features(VLM)
+   * 로 이관되면서 그 마커가 사라졌다. 암묵적 마커를 명시적 필드로 교체한다.
+   */
+  detailFetchedAt?: string
   material?: string
   subcategory?: string
   images?: string[]
+  /** Local Apple Vision representative-image selection metadata. */
+  imageSelection?: {
+    kind: "model" | "product" | "fallback"
+    score: number
+    version: string
+    candidateCount: number
+    selectedAt: string
+  }
   sizeInfo?: string
   tags?: string[]
   productCode?: string
@@ -68,10 +83,6 @@ export interface Cafe24Selectors {
 }
 
 export interface Cafe24DetailSelectors {
-  /** 상품 설명 영역 (기본: .cont_detail, #prdDetail) */
-  description?: string
-  /** 색상 옵션 (기본: select[name*="option"] option) */
-  colorOptions?: string
   /** 이미지 (기본: .product-detail img) */
   detailImages?: string
   /** 상품 코드 */
@@ -85,7 +96,7 @@ export interface CategoryConfig {
    * manual일 때: 고정 카테고리 번호 목록
    * auto일 때: 카테고리 링크를 찾을 CSS 셀렉터 (기본: a[href*="cate_no="])
    */
-  categories?: { name: string; cateNo: number; gender?: string[] }[]
+  categories?: { name: string; cateNo: number }[]
   /** auto 탐색 시 시작 URL (기본: baseUrl) */
   discoveryUrl?: string
   /** auto 탐색 시 카테고리 링크 셀렉터 */
@@ -103,10 +114,17 @@ export interface SiteConfig {
   type: PlatformType
   /** 사이트 기본 URL */
   baseUrl: string
-  /** 기본 성별 (사이트 전체 적용) */
-  defaultGender?: string[]
   /** 단일브랜드 자사몰의 하우스 브랜드명 (DOM에서 브랜드 추출 실패 시 폴백) */
   brand?: string
+  /**
+   * 멀티브랜드 편집샵 표시. 상품마다 브랜드가 다르며 상품명에 "[BRAND] 제품명"
+   * 형태로 박혀 있는 편집샵(예: 8division, visualaid). true 이면:
+   *  - 브랜드를 플랫폼명(config.name)으로 폴백하지 않는다(platform-as-brand 오염 방지).
+   *  - 온보딩 LLM 분류가 상품별 실제 브랜드를 추출하고, import 는 --no-new-brands 로
+   *    기존 KR brand_nodes 에 매칭되는 상품만 적재한다(해외 브랜드 자동 제외).
+   * 직접 크롤(Path A)이 아니라 온보딩 파이프라인(Path B)으로 수집해야 한다.
+   */
+  multiBrand?: boolean
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
   /** 카테고리 탐색 설정 */

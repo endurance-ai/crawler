@@ -149,11 +149,6 @@ export function is29cmCloudflareChallenge(html: string): InterceptCheck {
 const WOMEN_L1_CODES = new Set([268100100, 269100100, 270100100, 271100100, 305100100])
 const MEN_L1_CODES = new Set([272100100, 273100100, 274100100, 275100100, 306100100])
 
-export function genderFromCategoryCode(code: number): "women" | "men" | "" {
-  if (WOMEN_L1_CODES.has(code)) return "women"
-  if (MEN_L1_CODES.has(code)) return "men"
-  return ""
-}
 
 // ─── Raw payload shape (subset of display-bff-api JSON) ─────
 
@@ -189,7 +184,6 @@ export interface RawTwentyninecmItem {
   itemEvent?: {eventProperties?: RawTwentyninecmEventProps}
   itemInfo?: RawTwentyninecmItemInfo
   /** Engine-attached annotation; not part of the canonical payload. */
-  _gender?: "women" | "men" | ""
   _categoryCode?: number
 }
 
@@ -307,7 +301,6 @@ export function parseProductsFromXhr(
     if (!isSafe29cmImageUrl(imageUrl)) continue
     const ev = raw.itemEvent?.eventProperties
     const categoryCode = raw._categoryCode ?? ev?.largeCategoryNo ?? 0
-    const gender = raw._gender ?? genderFromCategoryCode(categoryCode)
     const salePrice = originalPrice !== null && originalPrice > price ? price : null
     out.push({
       brand: info.brandName ?? ev?.brandName ?? "29CM",
@@ -320,7 +313,6 @@ export function parseProductsFromXhr(
       imageUrl,
       productUrl,
       inStock: info.isSoldOut !== true,
-      gender: gender ? [gender] : [],
       platform: platformKey,
       crawledAt,
       productCode: String(raw.itemId),
@@ -360,7 +352,6 @@ export function parseProductsFromDom(
   html: string,
   baseUrl: string,
   platformKey: string,
-  gender: "women" | "men" | "",
 ): Product[] {
   void baseUrl
   if (typeof html !== "string" || html.length === 0) return []
@@ -401,7 +392,6 @@ export function parseProductsFromDom(
       imageUrl,
       productUrl,
       inStock: true,
-      gender: gender ? [gender] : [],
       platform: platformKey,
       crawledAt,
       productCode: itemId,
@@ -510,7 +500,6 @@ async function crawlOneCategory(
         const items = harvestRawItems(payload)
         for (const it of items) {
           it._categoryCode = categoryCode
-          it._gender = genderFromCategoryCode(categoryCode)
           harvested.push(it)
         }
       }
@@ -525,8 +514,7 @@ async function crawlOneCategory(
       products = parseProductsFromXhr(unique, baseUrl, platformKey)
     } else {
       const html = await page.content()
-      const gender = genderFromCategoryCode(categoryCode)
-      products = parseProductsFromDom(html, baseUrl, platformKey, gender)
+      products = parseProductsFromDom(html, baseUrl, platformKey)
     }
 
     if (products.length === 0) {

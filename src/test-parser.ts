@@ -36,9 +36,7 @@ const urls = products.slice(0, count).map((p: {productUrl: string}) => p.product
     for (const url of urls) {
       const result = await parser.parse(page, url)
       console.log(`── ${url}`)
-      console.log(`   desc: ${result.description?.slice(0, 120) ?? "null"}`)
       console.log(`   material: ${result.material ?? "null"}`)
-      console.log(`   color: ${result.color ?? "null"}`)
       console.log(`   code: ${result.productCode ?? "null"}`)
       console.log()
     }

@@ -1,6 +1,5 @@
 import type {Cafe24Page} from "./cafe24-page"
 import type {Product, SiteConfig} from "./types"
-import {extractColorFromText, normalizeCafe24DetailColorList} from "./parsers/field-extractors/color-normalizer"
 
 export interface Cafe24ChainStep<TContext, TValue> {
   name: string
@@ -34,7 +33,6 @@ export async function runFirstUsefulCafe24Step<TContext, TValue>(
 export interface Cafe24CategoryCandidate {
   name: string
   cateNo: number
-  gender: string[]
   url: string
 }
 
@@ -67,7 +65,7 @@ export function parseCafe24CategoryHref(
   if (!Number.isInteger(cateNo) || cateNo <= 0) return null
 
   const name = cleanCategoryName(text) || nameFromPrettyCategoryPath(pathname) || `cate_no=${cateNo}`
-  return {name, cateNo, gender: inferGender(name), url: url.href}
+  return {name, cateNo, url: url.href}
 }
 
 function cleanCategoryName(raw: string): string {
@@ -92,18 +90,6 @@ function nameFromPrettyCategoryPath(pathname: string): string {
   }
 }
 
-function inferGender(text: string): string[] {
-  const hay = text.toLowerCase()
-  if (/unisex|유니섹스|공용|남녀/.test(hay)) return ["unisex"]
-
-  const gender: string[] = []
-  const isWomen = /women|woman|female|우먼|여성|여자/.test(hay)
-  const menHay = hay.replace(/wom[ae]n|우먼/g, " ")
-  const isMen = /\bmen\b|men'|man'|\bmale\b|맨즈|남성|남자/.test(menHay)
-  if (isWomen) gender.push("women")
-  if (isMen) gender.push("men")
-  return gender
-}
 
 export function isNoisyCafe24CategoryName(name: string, ignorePatterns: string[] = []): boolean {
   const lower = cleanCategoryName(name).toLowerCase()
@@ -204,7 +190,6 @@ export interface Cafe24DetailFallbacks {
   priceFormatted: string | null
   sourceCurrency: Product["sourceCurrency"] | null
   sourcePrice: number | null
-  color: string | null
   descriptionFirstLine: string | null
 }
 
@@ -265,14 +250,6 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         if (descFirstLine) break
       }
 
-      var colorText = ""
-      var rows = document.querySelectorAll("tr, li, .xans-product-detail li")
-      for (var cr = 0; cr < rows.length; cr++) {
-        var txt = (rows[cr].textContent || "").replace(/\s+/g, " ").trim()
-        var m = txt.match(/(?:색상|컬러|color)\s*[:：]?\s*([^\n]{1,80})/i)
-        if (m && m[1]) colorText += " " + m[1]
-      }
-
       var metaPrice = ""
       var metaSalePrice = ""
       var metaCurrency = ""
@@ -330,7 +307,6 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         scriptProductPrice,
         scriptSalePrice,
         detailPriceText,
-        colorText,
         descFirstLine,
       }
       /* eslint-enable no-var */
@@ -346,7 +322,6 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       scriptProductPrice: "",
       scriptSalePrice: "",
       detailPriceText: "",
-      colorText: "",
       descFirstLine: "",
     }))
 
@@ -372,7 +347,6 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     : null
   const price = salePrice ?? basePrice
   const originalPrice = basePrice
-  const color = extractColorFromText(raw.colorText) ?? extractColorFromText(raw.descFirstLine)
   const formatted = price === null ? null : formatCafe24Price(price, sourceCurrency ?? "KRW")
 
   return {
@@ -383,7 +357,6 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     priceFormatted: formatted,
     sourceCurrency,
     sourcePrice: price,
-    color,
     descriptionFirstLine: firstUsefulName([raw.descFirstLine]),
   }
 }
@@ -507,13 +480,6 @@ export function applyCafe24DetailFallbacks(
     product.sourcePrice = detailFallbacks.sourcePrice ?? detailFallbacks.price ?? undefined
   }
 
-  if (!product.color) {
-    const color =
-      detailFallbacks.color ??
-      extractColorFromText(product.name) ??
-      extractColorFromText(detailFallbacks.descriptionFirstLine ?? "")
-    if (color) product.color = normalizeCafe24DetailColorList(color)
-  }
 }
 
 export interface Cafe24QualityAssessment {
