@@ -41,11 +41,25 @@
  *                        SPA/봇차단 사이트(zara)의 탈출구
  *   --force              llmEnrichedAt 이 있어도 다시 보강
  *   --preflight          1개만 보강해보고 결과를 출력한 뒤 종료 (파일 미변경)
+ *   --no-vlm-color       product_features 의 VLM color 조회를 끄고 텍스트
+ *                        LLM 추측만 쓴다 (기본은 VLM 우선, 커버리지 없으면
+ *                        자동 폴백이므로 평소엔 끌 이유가 없다)
+ *
+ * color 소스 우선순위 (2026-07-28 배치 2 중 추가 — product_features 발견):
+ *   1. product_features.feature_metadata.primary_color — 실제 이미지를 본
+ *      VLM 판정. 16개 COLOR_FAMILIES 어휘라 canonical 이 보장되고 검색
+ *      필터에도 항상 걸린다. 재수집 대상(이미 DB에 있던 product_url)만
+ *      매칭되며, 26개 코호트 키 대부분 70~100% 커버리지 실측.
+ *   2. enrichProductWithLlm 의 텍스트 추측 — 위 커버리지가 없을 때만
+ *      (신규 상품, 또는 mohawk-general 처럼 VLM 배치가 아직 안 돈 브랜드).
+ * 어느 쪽이든 category/subcategory/description/gender 는 항상 텍스트 LLM
+ * 이 채운다 — VLM 은 color 전용이다.
  */
 
 import * as fs from "node:fs"
 import * as path from "node:path"
 
+import {createClient} from "@supabase/supabase-js"
 import {chromium, type Browser, type Page} from "playwright"
 
 import {getSiteConfig} from "./configs/platforms"
@@ -59,6 +73,7 @@ import {
 } from "./lib/enrich-file"
 import {enrichProductWithLlm, type LlmTokenUsage} from "./lib/llm-product-enrichment"
 import type {Product, SiteConfig} from "./lib/types"
+import {fetchVlmColorsByPlatform} from "./lib/vlm-color-lookup"
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -77,6 +92,7 @@ interface Flags {
   visitPage: boolean
   force: boolean
   preflight: boolean
+  vlmColor: boolean
 }
 
 function parseFlags(): Flags {
@@ -116,6 +132,7 @@ function parseFlags(): Flags {
     visitPage: raw["no-visit-page"] !== true,
     force: raw.force === true,
     preflight: raw.preflight === true,
+    vlmColor: raw["no-vlm-color"] !== true,
   }
 }
 
@@ -147,6 +164,41 @@ async function enrichWithoutPage(
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]!)
+}
+
+/**
+ * VLM color 가 있으면 텍스트 LLM 의 color 추측을 덮어쓰고 출처를 찍는다.
+ * category/subcategory/description 은 항상 텍스트 LLM 결과 그대로 — VLM 은
+ * color 전용 신호다.
+ */
+function applyVlmColor(product: Product, productUrl: string, vlmColors: Map<string, string>): Product {
+  const vlmColor = vlmColors.get(productUrl)
+  if (!vlmColor) return {...product, colorSource: "llm"}
+  return {...product, color: vlmColor, colorSource: "vlm"}
+}
+
+/**
+ * enrichProductWithLlm 의 gender 는 무조건 텍스트 LLM 결과로 덮어쓴다
+ * (parsed.gender, product.gender 폴백 없음 — llm-product-enrichment.ts:221).
+ * 이 모듈의 다른 호출자인 refresh-candidates.ts 에서는 그게 맞다 — 거기서
+ * 넘기는 raw_product 는 리스팅 단계 최소 정보뿐이라 LLM 추측이 사실상
+ * 유일한 신호이기 때문. 하지만 재수집 파이프라인의 입력은 다르다 —
+ * crawl.ts 가 이미 resolveProductGenderWithSource(engine>url>text>
+ * config_default>brand_scope)를 거쳐 genderSource 까지 찍은 값이고, 여기
+ * 도달했다는 것 자체가 validation 게이트(gender: min(1))를 통과했다는
+ * 뜻이다. 반면 LLM 은 "모르겠다"를 표현할 스키마가 없어(min(1) 강제) 근거
+ * 없이도 항상 뭔가 답한다 — 2026-07-28 noah-ny 실측: "Short Sleeve
+ * Thermal"(성별 신호가 페이지 어디에도 없음)에 defaultGender=men 을
+ * config_default 로 정확히 찍어 넘겼는데 LLM 이 "men/women/unisex" 로
+ * 되돌려 보냈다. PR #48 이 막은 "근거 없이 넓게 얼버무리기"가 보강
+ * 단계에서 재발하는 것과 같은 모양이라, 재수집 경로에서는 크롤 시점 값을
+ * 그대로 지킨다.
+ */
+function preserveCrawlGender(product: Product, original: Product): Product {
+  if (original.gender && original.gender.length > 0) {
+    return {...product, gender: original.gender, genderSource: original.genderSource}
+  }
+  return product
 }
 
 // ─── 메인 ────────────────────────────────────────────
@@ -209,6 +261,17 @@ async function main(): Promise<void> {
   // --wait-ms 미지정(0)이면 enrich 모듈 기본값(800ms)을 그대로 쓴다.
   const enrichOptions = flags.waitMs > 0 ? {waitMs: flags.waitMs} : {}
 
+  // product_features 의 VLM color 를 미리 한 번에 가져온다 (상품마다 DB
+  // 왕복하지 않도록 배치 조회). DB_URL/DB_TOKEN 없으면 조용히 건너뛰고
+  // 텍스트 LLM 추측만 쓴다 — 로컬에서 --preflight 만 찍어볼 때처럼 DB 접근이
+  // 없는 상황도 있다.
+  let vlmColors = new Map<string, string>()
+  if (flags.vlmColor && process.env.DB_URL && process.env.DB_TOKEN) {
+    const db = createClient(process.env.DB_URL, process.env.DB_TOKEN)
+    vlmColors = await fetchVlmColorsByPlatform(db, flags.site)
+    console.log(`🎨 VLM color 커버리지: ${vlmColors.size}/${products.length}`)
+  }
+
   const totals: Totals = {
     enriched: 0,
     skipped: 0,
@@ -238,14 +301,19 @@ async function main(): Promise<void> {
         const result = flags.visitPage
           ? await enrichProductWithLlm(page, product, config, enrichOptions)
           : await enrichWithoutPage(page, product, config, flags.waitMs)
+        const finalProduct = preserveCrawlGender(
+          applyVlmColor(result.product, product.productUrl, vlmColors),
+          product,
+        )
         console.log(`   model=${result.model} usage=${JSON.stringify(result.usage)} cost=${result.costUsd ?? "n/a"}`)
         console.log(
           `   before: category=${product.category} subcategory=${product.subcategory ?? "-"}` +
             ` color=${product.color ?? "-"} gender=${(product.gender ?? []).join("/")}`,
         )
         console.log(
-          `   after : category=${result.product.category} subcategory=${result.product.subcategory ?? "-"}` +
-            ` color=${result.product.color ?? "-"} gender=${(result.product.gender ?? []).join("/")}`,
+          `   after : category=${finalProduct.category} subcategory=${finalProduct.subcategory ?? "-"}` +
+            ` color=${finalProduct.color ?? "-"} (${finalProduct.colorSource})` +
+            ` gender=${(finalProduct.gender ?? []).join("/")}`,
         )
         console.log("✅ preflight 통과 — 파일은 변경하지 않았습니다")
       } catch (error) {
@@ -285,9 +353,13 @@ async function main(): Promise<void> {
           const result = flags.visitPage
             ? await enrichProductWithLlm(page, product, config, enrichOptions)
             : await enrichWithoutPage(page, product, config, flags.waitMs)
+          const finalProduct = preserveCrawlGender(
+            applyVlmColor(result.product, product.productUrl, vlmColors),
+            product,
+          )
 
           products[index] = {
-            ...result.product,
+            ...finalProduct,
             llmEnrichedAt: new Date().toISOString(),
             llmModel: result.model,
           }
