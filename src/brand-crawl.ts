@@ -30,7 +30,7 @@ import type {Product} from "./lib/types"
 
 type Flags = Record<string, string | boolean>
 
-interface DetectResult {
+export interface DetectResult {
   platform_type: "cafe24" | "shopify" | "custom"
   category_discovery: "manual" | "auto"
   platform_key: string
@@ -256,8 +256,15 @@ async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
   if (cafe24Signals.some(Boolean)) platformType = "cafe24"
   else if (shopifySignals.some(Boolean)) platformType = "shopify"
 
+  // 429 를 넣는 이유: 레이트리밋도 "페이지를 못 봤다" 는 뜻이다. 빠져 있던 동안
+  // 429 응답이 bot_protected=false 로 기록돼 아무 신호도 못 찾은 결과가
+  // platform_type='custom' 이라는 **단정**으로 남았다 (실측 2026-07-30:
+  // rasario / harriet-allure).
   const botProtected =
-    htmlResult.status === 403 || htmlResult.status === 503 || BOT_CHALLENGE_PATTERN.test(html)
+    htmlResult.status === 403 ||
+    htmlResult.status === 429 ||
+    htmlResult.status === 503 ||
+    BOT_CHALLENGE_PATTERN.test(html)
   let platformFamily: string | null = platformType !== "custom" ? platformType : null
   if (!platformFamily && !botProtected) {
     platformFamily = FAMILY_FINGERPRINTS.find(({pattern}) => pattern.test(html))?.family ?? null
@@ -401,6 +408,67 @@ async function listBrands(flags: Flags): Promise<void> {
   console.log(`total=${brands.length}`)
 }
 
+/**
+ * detect 결과 → `product_crawl_status` patch.
+ *
+ * @MX:ANCHOR: [AUTO] `--preserve-status` 의 유일한 판정 지점. 순수 함수로 뽑아
+ * 테스트로 고정한다.
+ * @MX:REASON: 2026-07-30 이전 이 로직은 `status`/`config_status` 를 **무조건**
+ * 세팅한 뒤 `...(preserveStatus ? {} : {status: "tech_detected"})` 를 뒤에 붙였다.
+ * 두 분기가 같은 값이라 spread 가 양쪽 다 no-op 이었고, `--preserve-status` 는
+ * 아무것도 보존하지 못했다.
+ *
+ * 조용한 피해: `imported` 브랜드에 detect 를 재실행하면 status 가
+ * `tech_detected` 로 되돌아간다. 그런데 `shouldGeneratePlatformConfig` 는
+ * `tech_detected` 를 **origin_country==='KR' 일 때만** 통과시킨다
+ * (`imported` 는 COLLECTED_STATUSES 라 무조건 통과). 즉 비KR 브랜드는 detect 를
+ * 돌리는 순간 config 생성 대상에서 빠져 refresh 워크리스트에서 조용히 사라진다.
+ * 실측 2026-07-30: orphan 대상 47개 중 19개(재고 2,513건)가 이 경로였다.
+ *
+ * patch 는 upsert(onConflict=brand_node_id) 로 나가므로 키를 빼면 기존 값이 남는다.
+ */
+export function detectStatusPatch(args: {
+  platformKey: string
+  result: DetectResult
+  detectedAt: string
+  preserveStatus: boolean
+}): Record<string, unknown> {
+  const inconclusive = isInconclusiveDetection(args.result)
+  return {
+    platform_key: args.platformKey,
+    // 판정 실패면 플랫폼 관련 필드를 아예 쓰지 않는다 — 기존 값이 남는다.
+    ...(inconclusive
+      ? {}
+      : {
+          platform_type: args.result.platform_type,
+          category_discovery: args.result.category_discovery,
+          categories: args.result.categories,
+        }),
+    // detection 은 실패 근거(status/bot_protected)를 담으므로 항상 기록한다.
+    detection: args.result.detection,
+    detected_at: args.detectedAt,
+    ...(inconclusive
+      ? {last_error: "detection inconclusive: homepage bot-protected or rate-limited"}
+      : {last_error: null, blocked_reason: null}),
+    // 이미 수집 단계를 지난 브랜드(imported/embedded/active)를 되돌리지 않는다.
+    ...(args.preserveStatus
+      ? {}
+      : {status: "tech_detected" as const, config_status: "needed" as const}),
+  }
+}
+
+/**
+ * 홈페이지를 사실상 못 본 탐지인가.
+ *
+ * `platform_type='custom'` 은 "cafe24 도 shopify 도 아니다" 라는 **단정**이다.
+ * 403/429/503 이나 챌린지 페이지를 받아 아무 신호도 못 찾은 경우까지 custom 으로
+ * 기록하면, 아직 탐지되지 않았다는 뜻인 `unknown` 을 거짓 단정으로 덮어쓴다.
+ * 신호가 하나라도 잡혔다면(cafe24/shopify) 차단 페이지였어도 그 판정은 유효하다.
+ */
+export function isInconclusiveDetection(result: DetectResult): boolean {
+  return result.platform_type === "custom" && result.detection.bot_protected === true
+}
+
 async function detectOneBrand(
   db: ProductCollectionClient,
   brand: ProductCrawlBrand,
@@ -420,19 +488,8 @@ async function detectOneBrand(
     // 폴백이 없으면 upsert 가 throw 되고 바깥 catch 가 정상 감지된 브랜드를
     // "blocked" 로 잘못 마킹해 이후 크롤 배치에서 조용히 누락된다.
     const detectedAt = new Date().toISOString()
-    const statusFor = (platformKey: string) => ({
-      platform_key: platformKey,
-      platform_type: result.platform_type,
-      category_discovery: result.category_discovery,
-      categories: result.categories,
-      detection: result.detection,
-      status: "tech_detected" as const,
-      config_status: "needed" as const,
-      detected_at: detectedAt,
-      last_error: null,
-      blocked_reason: null,
-      ...(preserveStatus ? {} : {status: "tech_detected"}),
-    })
+    const statusFor = (platformKey: string) =>
+      detectStatusPatch({platformKey, result, detectedAt, preserveStatus})
     try {
       await upsertProductCrawlStatus(db, brand.brand_node_id, statusFor(result.platform_key))
     } catch (keyErr) {
@@ -454,9 +511,12 @@ async function detectOneBrand(
     })
     const family = result.detection.platform_family
     const familyNote = family && family !== result.platform_type ? ` family=${family}` : ""
-    console.log(
-      `#${brand.brand_node_id} ${brand.brand_name}: ${result.platform_type}${familyNote} (${result.platform_key})`,
-    )
+    // 판정 실패는 platform_type 을 쓰지 않으므로 로그도 그렇게 말해야 한다 —
+    // "custom" 으로 찍으면 저장된 값과 어긋난다.
+    const verdict = isInconclusiveDetection(result)
+      ? `inconclusive(http=${result.detection.homepage_status ?? "?"}) — platform_type 유지`
+      : `${result.platform_type}${familyNote}`
+    console.log(`#${brand.brand_node_id} ${brand.brand_name}: ${verdict} (${result.platform_key})`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     await upsertProductCrawlStatus(db, brand.brand_node_id, {
