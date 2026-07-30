@@ -1,0 +1,13 @@
+# 한 런이 끝난 뒤 15분 쉬고 다음 런을 시작한다 — EC2 프로필과 동일 정책.
+# 간격을 줄이기 전에 한 바퀴 실소요를 먼저 잰다 (deploy/lab-server-migration.md §5).
+[Unit]
+Description=Continuous kiko.ai listing refresh — lab batch host
+
+[Timer]
+OnBootSec=10min
+OnUnitInactiveSec=15min
+AccuracySec=1min
+Unit=kiko-refresh.service
+
+[Install]
+WantedBy=timers.target
