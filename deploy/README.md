@@ -112,6 +112,12 @@ journalctl -u kiko-refresh-candidates -f
 > **배치 이전 예정**: `kiko-refresh`/`kiko-recrawl` 배치는 향후 전용 배치 서버로
 > 옮긴다. 이전 전까지는 dev-app EC2 가 유일한 실행 위치이므로, `products` 데이터를
 > 직접 조작하는 작업은 이 EC2 의 타이머 상태에 의존한다.
+>
+> **이사 절차는 [`lab-server-migration.md`](lab-server-migration.md) 를 볼 것.**
+> 이 문서(§1·§4)의 리소스 캡·동시성 값은 **4GB 에서 Postgres 와 동거**한다는 전제에서
+> 나온 것이라 배치 서버에 그대로 옮기면 근거 없이 처리량만 깎는다. 특히 **이사 후 첫
+> 실행은 `--ignore-backoff` 가 필요하다** — 서킷브레이커가 EC2 네트워크에서 쌓인 실패
+> 연쇄를 그대로 물려받아, 연구실에서는 닿는 소스를 최대 14일까지 격리한다.
 
 ## 4. 운영 규칙
 
