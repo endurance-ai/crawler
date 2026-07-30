@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import {chunkByEncodedLength} from "../src/lib/product-refresh"
 import {
   backoffReason,
   backoffWaitMs,
@@ -328,4 +329,29 @@ test("streaks 를 주지 않으면 종전대로 전부 시도한다", () => {
     result.entries.map((entry) => entry.platform_key).sort(),
     ["browns", "kith"],
   )
+})
+
+// ── C1 선행: last_seen_at PATCH 필터 청킹 ────────────────────────────────────
+
+test("chunkByEncodedLength: 인코딩 길이 예산으로 자르고 순서를 보존한다", () => {
+  // PostgREST 는 PATCH 필터를 쿼리스트링에 싣는다. 개수로 자르면 한글 슬러그가
+  // 퍼센트 인코딩된 cafe24 rewrite URL 에서 예산을 넘긴다.
+  const short = ["a", "b", "c", "d"]
+  assert.deepEqual(chunkByEncodedLength(short, 100), [short])
+
+  const chunks = chunkByEncodedLength(short, 8) // 개당 비용 1+3=4 → 청크당 2개
+  assert.deepEqual(chunks, [["a", "b"], ["c", "d"]])
+  assert.deepEqual(chunks.flat(), short)
+})
+
+test("chunkByEncodedLength: 예산을 혼자 넘기는 값도 버리지 않는다", () => {
+  // 한 개만으로 예산 초과라도 반드시 한 청크로 나가야 한다 — 조용히 누락되면
+  // 그 상품은 생존 확인이 안 돼 sweep 대상이 된다.
+  const huge = "가".repeat(500)
+  const chunks = chunkByEncodedLength([huge, "b"], 10)
+  assert.deepEqual(chunks, [[huge], ["b"]])
+})
+
+test("chunkByEncodedLength: 빈 입력은 빈 배열", () => {
+  assert.deepEqual(chunkByEncodedLength([], 100), [])
 })

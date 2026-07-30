@@ -48,6 +48,67 @@ export async function loadRefreshSourceStates(
 }
 
 /**
+ * PostgREST 는 PATCH 필터를 쿼리스트링에 싣는다. `in.(...)` 에 URL 을 몇 개
+ * 넣을지 개수로 정하면 안 된다 — cafe24 rewrite URL 은 한글 슬러그가
+ * 퍼센트 인코딩되어 개당 250 자를 넘기기도 한다. 그래서 바이트 예산으로 자른다.
+ * nginx 기본 `large_client_header_buffers 4 8k` 보다 넉넉히 아래로 잡았다.
+ */
+const LAST_SEEN_FILTER_BUDGET_BYTES = 4000
+
+export function chunkByEncodedLength(
+  values: string[],
+  budgetBytes = LAST_SEEN_FILTER_BUDGET_BYTES,
+): string[][] {
+  const chunks: string[][] = []
+  let current: string[] = []
+  let size = 0
+  for (const value of values) {
+    // +3 = 인코딩된 값 사이의 구분자·인용부호 여유분.
+    const cost = encodeURIComponent(value).length + 3
+    if (current.length > 0 && size + cost > budgetBytes) {
+      chunks.push(current)
+      current = []
+      size = 0
+    }
+    current.push(value)
+    size += cost
+  }
+  if (current.length > 0) chunks.push(current)
+  return chunks
+}
+
+/**
+ * 이번 리스트에서 살아있음이 확인된 상품의 `last_seen_at` 을 올린다.
+ *
+ * 왜 필요한가: `applyUpdates` 는 **변경된 행만** 쓴다(실측 평균 32행/런). 값이
+ * 그대로인 상품은 `updated_at` 조차 안 올라가므로, 지금 DB 에는 상품별 생존
+ * 신호가 아예 없다. 그 결과 `docs/operations.md` §6 의 soft-delete sweep 스펙을
+ * 그대로 실행하면 재고 상품 88,411 중 75,235(85%)가 품절 처리된다 (실측
+ * 2026-07-30). sweep 을 만들기 전에 이 타임스탬프를 먼저 믿을 수 있게 해야 한다.
+ *
+ * 부분 실패한 크롤에서도 호출해도 된다 — 확인된 상품은 실제로 살아있고, 사라진
+ * 상품을 죽이는 판단(완전성 가드)과는 별개다.
+ */
+export async function touchProductsLastSeen(
+  db: ProductRefreshClient,
+  productUrls: string[],
+  seenAt: string,
+): Promise<{ok: number; failed: number}> {
+  let ok = 0
+  let failed = 0
+  for (const chunk of chunkByEncodedLength(productUrls)) {
+    const {error} = await db.from("products").update({last_seen_at: seenAt}).in("product_url", chunk)
+    if (error) {
+      failed += chunk.length
+      if (failed <= chunk.length) console.error(`   ❌ last_seen_at 갱신 실패: ${error.message}`)
+    } else {
+      ok += chunk.length
+    }
+  }
+  return {ok, failed}
+}
+
+/**
  * 서킷브레이커용 런 이력. 조회 창을 두는 이유는 두 가지다 — 이력 테이블이 무한히
  * 커져도 요청 수가 일정하고, 창보다 오래된 성공은 "지금 살아있다" 는 근거가 못 된다.
  * 창 안에 아무 기록이 없으면 스트릭이 안 잡혀 그대로 시도된다 (fail-open).

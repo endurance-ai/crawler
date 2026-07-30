@@ -602,6 +602,50 @@ export default async function CrawlerRunsPage() {
 
 ## 6. 스코프 (d) 데이터 신선도 + 삭제 (soft-delete sweep)
 
+> ## ⛔ 2026-07-30 실측 판정 — §6.2~6.4 SQL 을 그대로 실행하지 말 것
+>
+> 아래 스펙은 `import-products` 가 유일한 적재 경로였던 시절에 쓰였다. 그 뒤
+> 일상 배치가 `refresh-listing`(리스트-only)으로 바뀌었고, **refresh 는
+> `last_seen_at` 을 쓰지 않았다.** 그래서 §6.4 SQL 을 지금 실행하면:
+>
+> ```
+> 재고 상품 88,411 중 75,235건(85%)이 품절 처리된다 — 292개 플랫폼
+> ```
+>
+> 근거: `updated_at > last_seen_at + 1h` 인 재고 상품이 73,974건이었다. refresh 가
+> 살아있음을 확인하고 가격까지 갱신했는데 `last_seen_at` 만 옛날 import 시각에
+> 멈춰 있었다는 뜻이다. **`last_seen_at` 신선도를 baseline 으로 쓰는 §6.2 의 전제가
+> 깨져 있었다.**
+>
+> ### 무엇이 바뀌었나 (2026-07-30)
+>
+> `refresh-listing` 이 이번 리스트에서 확인된 상품의 `last_seen_at` 을 올린다
+> (`diffListing().confirmedUrls` → `touchProductsLastSeen`). **변경된 행만이 아니라
+> 값이 그대로인 상품까지** 포함한다 — `applyUpdates` 는 평균 32행/런만 쓰므로
+> 생존 신호가 될 수 없었다. 타임스탬프가 신뢰 가능해지는 시점은 이 배포 후
+> **전체 소스를 한 바퀴 돈 다음**이다. 그 전에는 어떤 staleness sweep 도 위험하다.
+>
+> ### 그리고 sweep 은 이미 있다
+>
+> 품절 처리는 타임스탬프가 아니라 **리스트 이탈 감지**로 한다
+> (`listing-refresh.ts` `markMissingOutOfStock`). 실적 12,181건 / 944런, 완전성
+> 가드가 148런에서 발동해 부분 실패 크롤을 막았다. 크롤한 리스트와 직접 비교하므로
+> 타임스탬프 방식보다 엄격하고 안전하다.
+>
+> ### 남은 구멍은 sweep 이 아니라 커버리지 문제다
+>
+> refresh 가 **한 번도 성공하지 못한** 플랫폼의 재고 상품 13,176건(14.9%)은
+> 재고 확인이 안 된다. 분해하면:
+>
+> | 원인 | 건수 | 조치 |
+> |---|---|---|
+> | config 자체가 없는 orphan platform label (`cafe24` 3,647, `shopify` 1,858) | 5,505 | `tools/repair-product-platforms.ts` (§C3) |
+> | config 있으나 한 번도 성공 못함 | 7,671 | 서킷브레이커가 격리 중 · 항구 불가면 `REFRESH_EXCLUDE` |
+>
+> **확인이 안 된다는 이유로 죽이면 안 된다** — 도달시켜야 하는 상품이다. 향후
+> staleness sweep 을 만들 때도 "성공한 refresh 런이 있는 플랫폼" 으로 한정하고,
+> 없는 플랫폼은 skip 해야 한다 (그러지 않으면 위 13,176건이 그대로 날아간다).
+
 ### 6.1 문제
 
 현재 import 는 **upsert-only** (`product_url` UNIQUE 자연키). 재크롤에서 사라진(품절/delisting) SKU 는 DB에 `in_stock=true` 로 영원히 남아 검색 RPC(=`in_stock=true`만 노출)에 죽은 상품이 뜬다.

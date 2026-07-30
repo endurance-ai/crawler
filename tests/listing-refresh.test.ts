@@ -234,3 +234,71 @@ test("diffListing: 리스트 중복 URL 은 한 번만 반영한다", () => {
   })
   assert.equal(diff.updates.length, 1)
 })
+
+// ── C1 선행: last_seen_at 을 올릴 대상 (생존 확인) ─────────────────────────────
+
+test("diffListing: confirmedUrls 는 값이 안 바뀐 상품까지 포함한다", () => {
+  // updates 는 변경된 행만 담으므로 생존 신호로 쓸 수 없다 — 실측 평균 32행/런.
+  // last_seen_at 을 올릴 대상은 confirmedUrls 다.
+  const diff = diffListing({
+    crawled: [
+      {productUrl: "https://s.test/a", price: 1000, inStock: true} as never,
+      {productUrl: "https://s.test/b", price: 2000, inStock: true} as never,
+    ],
+    existing: [
+      // a: 완전히 동일 → updates 에 안 들어간다
+      {product_url: "https://s.test/a", price: 1000, original_price: 1000, sale_price: null, in_stock: true},
+      // b: 가격 변동 → updates 에 들어간다
+      {product_url: "https://s.test/b", price: 9999, original_price: 9999, sale_price: null, in_stock: true},
+    ],
+    markMissingOutOfStock: false,
+  })
+
+  assert.deepEqual(diff.updates.map((u) => u.productUrl), ["https://s.test/b"])
+  assert.deepEqual(diff.confirmedUrls.sort(), ["https://s.test/a", "https://s.test/b"])
+})
+
+test("diffListing: confirmedUrls 와 missingUrls 는 DB 보유분의 정확한 분할이다", () => {
+  const existing = [
+    {product_url: "https://s.test/a", price: 1, original_price: 1, sale_price: null, in_stock: true},
+    {product_url: "https://s.test/gone", price: 1, original_price: 1, sale_price: null, in_stock: true},
+  ]
+  const diff = diffListing({
+    crawled: [{productUrl: "https://s.test/a", price: 1, inStock: true} as never],
+    existing,
+    markMissingOutOfStock: false,
+  })
+
+  assert.deepEqual(diff.confirmedUrls, ["https://s.test/a"])
+  assert.deepEqual(diff.missingUrls, ["https://s.test/gone"])
+  assert.equal(diff.confirmedUrls.length + diff.missingUrls.length, existing.length)
+})
+
+test("diffListing: 카테고리별 중복 적재된 같은 상품 행 전부가 생존 확인된다", () => {
+  // 한 행만 확인 처리하면 나머지가 stale 로 남아 sweep 이 멀쩡한 상품을 죽인다.
+  const diff = diffListing({
+    crawled: [
+      {productUrl: "https://s.test/product/x/878/category/50/display/1/", price: 1, inStock: true} as never,
+    ],
+    existing: [
+      {
+        product_url: "https://s.test/product/x/878/category/50/display/1/",
+        price: 1,
+        original_price: 1,
+        sale_price: null,
+        in_stock: true,
+      },
+      {
+        product_url: "https://s.test/product/x/878/category/99/display/1/",
+        price: 1,
+        original_price: 1,
+        sale_price: null,
+        in_stock: true,
+      },
+    ],
+    markMissingOutOfStock: true,
+  })
+
+  assert.equal(diff.confirmedUrls.length, 2)
+  assert.equal(diff.missingUrls.length, 0)
+})

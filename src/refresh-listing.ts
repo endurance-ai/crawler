@@ -27,6 +27,7 @@ import {
   loadRefreshSourceStates,
   startRefreshRun,
   syncRefreshSources,
+  touchProductsLastSeen,
 } from "./lib/product-refresh"
 import {
   buildRefreshWorklist,
@@ -317,6 +318,9 @@ async function main() {
           update.reasons.some((reason) => reason.includes("품절") || reason.includes("재입고")),
         ).length
         const applied = await applyUpdates(db, diff.updates)
+        // 살아있음이 확인된 상품의 생존 타임스탬프. 완전성 가드와 무관하게 올린다 —
+        // 확인된 상품은 실제로 살아있고, 사라진 상품을 죽이는 판단은 가드가 따로 한다.
+        const seen = await touchProductsLastSeen(db, diff.confirmedUrls, new Date(run.startedAt).toISOString())
         const queued = await enqueueRefreshCandidates(db, {
           products: unknownProducts(crawled, diff.unknownUrls),
           config: entry.config,
@@ -327,10 +331,11 @@ async function main() {
         stockChanged += stockN
         candidateTotal += queued.discovered
         brandUnmatchedTotal += queued.brandUnmatched
-        const failed = applied.failed > 0 || crawlResult.errors.length > 0
+        const failed = applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0
         console.log(
           `✓ ${label}: 리스트 ${crawled.length} · DB ${existing.length}` +
             ` · 변경 ${diff.updates.length}(가격 ${priceN}, 재고 ${stockN})` +
+            ` · 생존확인 ${seen.ok}` +
             ` · LLM후보 ${queued.discovered} · 브랜드불일치 ${queued.brandUnmatched}` +
             ` · ${minutes(Date.now() - run.startedAt)}`,
         )
@@ -340,7 +345,11 @@ async function main() {
           status: failed ? "failed" : "success",
           startedAt: run.startedAt,
           errorMessage: failed
-            ? [...crawlResult.errors, applied.failed > 0 ? `update failures=${applied.failed}` : ""]
+            ? [
+                ...crawlResult.errors,
+                applied.failed > 0 ? `update failures=${applied.failed}` : "",
+                seen.failed > 0 ? `last_seen failures=${seen.failed}` : "",
+              ]
                 .filter(Boolean)
                 .join(" | ")
             : null,
@@ -348,6 +357,7 @@ async function main() {
             crawled: crawled.length,
             db_rows: existing.length,
             updated: applied.ok,
+            last_seen_touched: seen.ok,
             price_changed: priceN,
             stock_changed: stockN,
             candidates: queued.discovered,
