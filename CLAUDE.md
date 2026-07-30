@@ -528,6 +528,22 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
 - 신규 브랜드 온보딩 체크리스트: `platforms.ts`에 항목 추가 시 단일브랜드 자사몰이면
   반드시 `brand` 필드를 채운다. 비워두면 DOM 오인식 리스크를 그대로 안고 크롤링하게 된다.
 
+### 휴면 코드: 모델컷 이미지 선별 (2026-07-30)
+
+`src/select-product-images.ts` 와 `src/lib/product-image-*`, `src/lib/select-product-image.ts`,
+`tools/product-image-vision/` 는 **어떤 배치에도 배선되지 않은 휴면 코드다.** 크롤/갱신
+경로 어디서도 import 하지 않으므로 운영 동작에 영향이 없다.
+
+- **살아있는 코드로 오해하지 말 것.** 실험이며 완성 전이다. dev 에 두는 이유는
+  브랜치에 방치하면 `Product`/파서 변경 때 조용히 깨지기 때문 — CI typecheck 가 지켜준다.
+- **macOS 15+ 전용** (Apple Vision). 배치 서버(연구실 리눅스)에서 돌지 않는다.
+  네이티브 테스트는 `{skip: process.platform !== "darwin"}` 가드가 있다.
+- **다시 살릴 때의 필수 선행 작업**: `image_url` 을 바꾸면 그 상품의 이미지 파생
+  산출물이 전부 무효가 된다 — `product_embeddings`(검색 모수)와
+  `product_features`(색·성별의 단일 출처, §18). 재임베딩 + VLM 재생성 큐 없이
+  돌리면 검색 품질이 조용히 나빠진다. 상세는 `src/select-product-images.ts` 헤더.
+- DB 쪽 절반은 이미 머지돼 있다 (`kiko.ai-app` migration 092/093).
+
 ---
 
 ## 12. MCP Servers & Deep Analysis Modes
