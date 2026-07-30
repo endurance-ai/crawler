@@ -169,7 +169,12 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
         })
         await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
         const page = await context.newPage()
-        return await crawlCafe24(page, listingConfig, undefined, undefined, {listingOnly: true})
+        return await crawlCafe24(page, listingConfig, undefined, undefined, {
+          listingOnly: true,
+          // 가격을 리스트에 안 띄우는 상점 대응 — 가격이 빠진 상품만 상세를 본다.
+          // 건강한 상점은 방문 0회다. shopify/imweb 는 JSON/API 에서 가격이 나오므로 대상 아님.
+          recoverMissingPriceFromDetail: true,
+        })
       } finally {
         await browser.close()
       }
@@ -295,6 +300,11 @@ async function main() {
           sourceCurrency: entry.config.sourceCurrency,
           markMissingOutOfStock: false,
         })
+        // 완전성 가드는 "리스트가 끝까지 열렸는가"만 본다 — `errors`(엔진/네트워크
+        // 실패)와 coverage 다. 품질 경고(`qualityWarnings`, 예: price_missing_rate)는
+        // 보지 않는다. 섞여 있던 동안 가격을 못 읽는 것이 재고 이탈 감지까지 막았고
+        // 런이 failed 로 남아 성공 이력이 영구히 안 쌓였다 (실측 42개 소스).
+        const qualityWarnings = crawlResult.qualityWarnings ?? []
         const guardOk =
           crawlResult.errors.length === 0 &&
           provisional.coverage >= flags.minCoverage
@@ -331,12 +341,15 @@ async function main() {
         stockChanged += stockN
         candidateTotal += queued.discovered
         brandUnmatchedTotal += queued.brandUnmatched
+        // 런 성패도 품질 경고를 보지 않는다 — 가격을 못 읽어도 재고 갱신은 성공한 것이다.
+        // 경고는 아래 메트릭에 남겨 추적 가능하게 둔다.
         const failed = applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0
         console.log(
           `✓ ${label}: 리스트 ${crawled.length} · DB ${existing.length}` +
             ` · 변경 ${diff.updates.length}(가격 ${priceN}, 재고 ${stockN})` +
             ` · 생존확인 ${seen.ok}` +
             ` · LLM후보 ${queued.discovered} · 브랜드불일치 ${queued.brandUnmatched}` +
+            (qualityWarnings.length > 0 ? ` · ⚠️ ${qualityWarnings.join("; ")}` : "") +
             ` · ${minutes(Date.now() - run.startedAt)}`,
         )
         await finishRefreshRun(db, {
@@ -365,6 +378,7 @@ async function main() {
             coverage: Number(diff.coverage.toFixed(3)),
             guard_tripped: !guardOk,
             engine_errors: crawlResult.errors,
+            quality_warnings: qualityWarnings,
           },
         })
         done += 1

@@ -228,5 +228,18 @@ export interface CrawlResult {
     /** 상세 페이지 내비게이션 시도 횟수(증분 크롤이 제거할 대상 비용). */
     detailNavCount?: number
   }
+  /** 크롤이 실패했거나 불완전하다는 신호 — 엔진/네트워크 오류. */
   errors: string[]
+  /**
+   * 크롤은 온전히 됐지만 **수집된 내용의 품질**이 낮다는 신호
+   * (예: `price_missing_rate=100`, `generic_name_rate`).
+   *
+   * `errors` 와 분리한 이유: 갱신 경로의 완전성 가드는 "리스트가 끝까지 열렸는가"만
+   * 봐야 하는데, 품질 경고가 `errors` 에 섞이면서 **가격을 못 읽는 것이 재고 이탈
+   * 감지까지 막고** 런을 failed 로 만들어 성공 이력이 영구히 안 쌓였다
+   * (실측 2026-07-30: 42개 소스가 이 경로로 갱신 불가 상태였다).
+   * 온보딩(`crawl.ts`)은 품질 실패를 계속 qc_failed 로 봐야 하므로 그쪽에서는
+   * `errors` 와 함께 판정한다.
+   */
+  qualityWarnings?: string[]
 }
