@@ -19,8 +19,17 @@
 | **신규 브랜드 차단(옵션)** | `--no-new-brands` 시 `brand_nodes` 미등록 브랜드는 INSERT 안 하고 해당 상품도 제외. | import `--no-new-brands` |
 | **색상은 크롤러가 안 뽑음** | 색상 단일 출처는 VLM `product_features.primary_color`. 크롤러 색상 로직은 2026-07-29 제거. | CLAUDE.md §18 |
 | **임베딩 이미지** | 대표 이미지 = `image_url` (== `images[0]`, 전 데이터셋 동일). `images` 비면 `image_url`로 폴백. | `embed_batch_devapp.py` fetch 쿼리 |
+| **신규 브랜드는 신뢰 출처만** (2026-07-30) | 미등록 브랜드의 `brand_nodes` 자동 INSERT 는 **단일브랜드 자사몰**(`config.brand` 또는 `SELF_BRANDED`, `multiBrand` 아님)에서만 한다. 멀티브랜드 편집샵의 미등록 브랜드는 INSERT 없이 **상품이 격리**된다. | `lib/brand-provenance.ts` |
 
 > 의미: **category를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 색상·성별은 크롤러 책임이 아니다(VLM).
+
+> **provenance 가드가 왜 필요했나**: 편집샵은 상품마다 브랜드가 달라, 크롤러가 DOM 에서
+> 브랜드를 잘못 주워오면 그 쓰레기가 그대로 신규 `brand_nodes` 가 됐다. 실측 오염 —
+> 플랫폼명이 브랜드로 적재(8division 계열, `tools/cleanup-platform-as-brand.ts` 가 치움),
+> `glowny` 1,345건 brand = `"ㅤ"`(U+3164 채움문자), `etce` 1,604건 brand = `"판매가 : …"`.
+> 적재 로그에 `⛔ 미등록 brand N개 … 자동 INSERT 제외(상품 격리)` 가 뜨면 이 가드가 동작한 것이다.
+> 편집샵의 실제 상품별 브랜드는 온보딩 LLM 추출 → 기존 `brand_nodes` 매칭(`--no-new-brands`)
+> 경로로만 적재된다.
 
 ---
 

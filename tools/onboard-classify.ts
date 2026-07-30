@@ -52,7 +52,10 @@ async function main() {
   const perBrand: Record<string, any[]> = {}
   pass.forEach((r, i) => { const cfg = cfgByKey[r.brand_key], p = preds[i] || {}, cur = r.currency || "KRW", price = typeof r.price === "number" ? r.price : null
     if (!cfg.brand && !warnedNoBrand.has(r.brand_key)) { warnedNoBrand.add(r.brand_key); console.warn(`⚠️  ${r.brand_key}: platforms.ts has no config.brand — falling back to name "${cfg.name}". If this is a single-house-brand shop, add the brand field (see docs/bulk-onboarding.md §4-1); if it's multi-brand, this fallback is wrong and needs per-product brand extraction instead.`) }
-    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: hybridSubcategory(r) ?? p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, brand: cfg.brand || cfg.name, crawledAt: new Date().toISOString()}) })
+    // 멀티브랜드 편집샵은 스토어명으로 폴백하지 않는다 — LLM 이 상품에서 뽑은
+    // 브랜드를 쓰고, 못 뽑으면 "" 로 남겨 import 의 provenance 가드가 격리한다
+    // (`lib/brand-provenance.ts`). 단일브랜드몰은 종전대로 cfg.name 폴백 + 경고.
+    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: hybridSubcategory(r) ?? p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, brand: cfg.brand || (cfg.multiBrand ? ((p as {brand?: string}).brand ?? "") : cfg.name), crawledAt: new Date().toISOString()}) })
   fs.mkdirSync("data", {recursive: true}); const written: string[] = []
   for (const [key, prods] of Object.entries(perBrand)) { fs.writeFileSync(path.join("data", `${key}-products.json`), JSON.stringify(prods, null, 2)); written.push(key) }
   fs.writeFileSync(PASSOUT, JSON.stringify(written))

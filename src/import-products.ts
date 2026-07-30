@@ -16,6 +16,14 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
+import {getSiteConfig} from "./configs/platforms"
+import {queuePlatformType} from "./lib/platform-config-lifecycle"
+import {
+  isTrustedBrandSource,
+  partitionUnknownBrands,
+  recordUnknownBrand,
+  type UnknownBrandEntry,
+} from "./lib/brand-provenance"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -157,11 +165,23 @@ async function syncProductCrawlStatus(
     )
   }
 
+  // config 를 알고 있으면 platform_type/config_status 도 같이 채운다.
+  // 이 배선이 없던 동안 detect 를 거치지 않고 적재된 브랜드가 platform_type='unknown'
+  // 으로 남았고, generate-platform-configs 의 generatedPlatformType 이 null 을 돌려
+  // config 가 생성되지 않았다 → 그 브랜드는 refresh 워크리스트에 못 들어가 가격·재고가
+  // 영구 미갱신 (실측 2026-07-30: 47개 브랜드 / 재고 5,505건).
+  const config = getSiteConfig(platform)
   await db.from("product_crawl_status").upsert(
     {
       brand_node_id: brandNodeId,
       status,
       platform_key: platform,
+      ...(config
+        ? {
+            platform_type: queuePlatformType(config.type),
+            config_status: config.disabled ? "blocked" : "ready",
+          }
+        : {}),
       imported_at: success ? new Date().toISOString() : null,
       qc_summary: {
         rows_total: result.total,
@@ -403,7 +423,9 @@ async function main() {
   // 미존재 brand 는 한 번에 resolve (fuzzy + insert + alias_candidate enqueue).
   // 파일 JSON 은 캐시해서 main loop 에서 재사용 (디스크 IO 1회).
   const fileCache = new Map<string, CrawledProduct[]>()
-  const unknownBrands = new Map<string, string>() // brand → first-seen platform
+  // brand → {대표 platform, 신뢰 출처 여부}. 신뢰 판정 근거는
+  // `lib/brand-provenance.ts` 헤더 참조 (편집샵 브랜드 오염 방지).
+  const unknownBrands = new Map<string, UnknownBrandEntry>()
 
   for (const file of files) {
     const platform = file.replace("-products.json", "")
@@ -420,8 +442,18 @@ async function main() {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       if (!brand) continue
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      if (brandNodeId === null && !unknownBrands.has(brand)) {
-        unknownBrands.set(brand, platform)
+      if (brandNodeId === null) {
+        const config = getSiteConfig(platform)
+        recordUnknownBrand(
+          unknownBrands,
+          brand,
+          platform,
+          isTrustedBrandSource({
+            selfBranded: platform in SELF_BRANDED,
+            configBrand: config?.brand,
+            multiBrand: config?.multiBrand,
+          }),
+        )
       }
     }
   }
@@ -431,15 +463,25 @@ async function main() {
       console.log(`⚠️  미등록 brand ${unknownBrands.size}개 발견 — --no-new-brands 모드: INSERT 건너뜀, 해당 상품 적재 제외`)
       console.log(`   제외 브랜드: ${[...unknownBrands.keys()].slice(0, 10).join(", ")}${unknownBrands.size > 10 ? ` 외 ${unknownBrands.size - 10}개` : ""}\n`)
     } else {
-      console.log(`🆕 미등록 brand ${unknownBrands.size}개 발견 — 자동 INSERT + alias 검사`)
-      const resolveResult = await resolveUnknownBrands(
-        [...unknownBrands.entries()].map(([raw, platform]) => ({raw, platform})),
-        brandRows,
-        brandIdMap,
-      )
-      console.log(
-        `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
-      )
+      // provenance 가드: 신뢰 출처(단일브랜드 자사몰)의 미등록 brand 만 자동 생성한다.
+      // 편집샵/비신뢰 출처는 INSERT 하지 않고 상품을 격리한다 — brandNodeId 가 계속
+      // null 이라 main loop 가 알아서 제외한다.
+      const {insertable, blocked} = partitionUnknownBrands(unknownBrands)
+      if (blocked.length > 0) {
+        console.log(
+          `⛔ 미등록 brand ${blocked.length}개 — 멀티브랜드/비신뢰 출처: 자동 INSERT 제외(상품 격리)`,
+        )
+        console.log(
+          `   격리 브랜드: ${blocked.slice(0, 10).join(", ")}${blocked.length > 10 ? ` 외 ${blocked.length - 10}개` : ""}`,
+        )
+      }
+      if (insertable.length > 0) {
+        console.log(`🆕 미등록 brand ${insertable.length}개(신뢰 출처) — 자동 INSERT + alias 검사`)
+        const resolveResult = await resolveUnknownBrands(insertable, brandRows, brandIdMap)
+        console.log(
+          `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
+        )
+      }
     }
   }
 
