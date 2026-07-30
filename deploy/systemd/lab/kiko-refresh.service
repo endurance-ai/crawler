@@ -23,9 +23,13 @@ Type=oneshot
 User=kjk
 WorkingDirectory=/opt/kiko-crawler
 EnvironmentFile=/etc/kiko-crawler.env
-ExecStart=/opt/kiko-crawler/scripts/run-refresh.sh --budget-minutes=240
-# 예산 240분 + wrapper 오버헤드 여유
-TimeoutStartSec=18000
+ExecStart=/opt/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=4
+# 예산 480분 + wrapper 오버헤드 여유
+TimeoutStartSec=32400
+# 동시성 4 + 예산 480분의 근거: 한 패스 총 크롤시간 실측 30.6h(357 소스) →
+# 4 에서 7.7h. 연속 타이머와 합쳐 하루 ~3바퀴로 '매일 한 바퀴' 목표를 넘긴다.
+# 보수적 시작값이다 — 한 패스 완주 후 메모리/부하를 보고 6 → 8 로 올린다
+# (deploy/lab-server-migration.md §5).
 # ⚠️ 리소스 캡은 의도적으로 비워 뒀다. DB 동거가 없으므로 EC2 값을 그대로
 # 옮기면 근거 없이 처리량만 깎는다. 첫 런 관측 후 필요하면 여기에 추가한다.
 
