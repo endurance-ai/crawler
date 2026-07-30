@@ -39,6 +39,13 @@ export interface RefreshDiff {
   updates: RefreshUpdate[]
   /** 리스트에는 있으나 DB 에 없는 URL — 신규 상품 후보 (여기서 적재하지 않는다). */
   unknownUrls: string[]
+  /**
+   * 이번 리스트에서 살아있음이 확인된 DB URL — 값이 안 바뀐 것까지 포함한다.
+   *
+   * `updates` 는 **변경된 행만** 담으므로 생존 신호로 쓸 수 없다. `last_seen_at`
+   * 을 올릴 대상은 이쪽이다 (`missingUrls` 의 정확한 여집합).
+   */
+  confirmedUrls: string[]
   /** DB 에는 있으나 리스트에서 사라진 URL. */
   missingUrls: string[]
   /** DB 보유분 중 리스트에서 다시 확인된 비율 (0~1). DB 가 비면 1. */
@@ -201,7 +208,12 @@ export function diffListing(args: {
     }
   }
 
-  const missingUrls = args.existing.filter((r) => !seen.has(r.product_url)).map((r) => r.product_url)
+  const missingUrls: string[] = []
+  const confirmedUrls: string[] = []
+  for (const row of args.existing) {
+    if (seen.has(row.product_url)) confirmedUrls.push(row.product_url)
+    else missingUrls.push(row.product_url)
+  }
   const coverage =
     args.existing.length === 0 ? 1 : (args.existing.length - missingUrls.length) / args.existing.length
 
@@ -213,5 +225,5 @@ export function diffListing(args: {
     }
   }
 
-  return {updates, unknownUrls, missingUrls, coverage}
+  return {updates, unknownUrls, confirmedUrls, missingUrls, coverage}
 }

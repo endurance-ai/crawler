@@ -1,14 +1,19 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import {chunkByEncodedLength} from "../src/lib/product-refresh"
 import {
+  backoffReason,
+  backoffWaitMs,
   buildPlatformRepairPlan,
   buildRefreshCandidateInputs,
   buildRefreshWorklist,
   candidateIdentity,
+  computeFailureStreaks,
   matchExistingBrand,
   uniqueRefreshConfigs,
   type BrandLookupRow,
+  type RefreshRunOutcome,
   type RefreshSourceState,
 } from "../src/lib/refresh-source"
 import type {SiteConfig} from "../src/lib/types"
@@ -201,4 +206,152 @@ test("단일브랜드 자사몰은 DOM 오인식 brand보다 config.brand가 우
 
   assert.equal(rows[0].matched_brand_node_id, 30)
   assert.equal(rows[0].detected_brand, "House Operator")
+})
+
+// ── C5 서킷브레이커 ──────────────────────────────────────────────────────────
+
+const run = (
+  platform_key: string,
+  status: string,
+  started_at: string | null,
+): RefreshRunOutcome => ({platform_key, status, started_at})
+
+test("연속 실패는 마지막 성공 이후만 센다", () => {
+  const streaks = computeFailureStreaks([
+    run("a", "failed", "2026-07-29T03:00:00Z"),
+    run("a", "failed", "2026-07-29T02:00:00Z"),
+    run("a", "success", "2026-07-29T01:00:00Z"),
+    run("a", "failed", "2026-07-28T00:00:00Z"), // 성공 이전 — 세지 않는다
+  ])
+  assert.deepEqual(streaks.get("a"), {failures: 2, lastFailedAt: "2026-07-29T03:00:00Z"})
+})
+
+test("성공 기록이 없으면 전체 실패가 연쇄가 된다", () => {
+  // 실측 2026-07-29: 연쇄 중인 49개 소스 대부분이 한 번도 성공한 적 없다.
+  const streaks = computeFailureStreaks([
+    run("kith", "failed", "2026-07-29T03:00:00Z"),
+    run("kith", "failed", "2026-07-29T02:00:00Z"),
+    run("kith", "failed", "2026-07-29T01:00:00Z"),
+  ])
+  assert.equal(streaks.get("kith")?.failures, 3)
+})
+
+test("성공만 있는 소스는 연쇄가 잡히지 않고 running/skipped는 연쇄를 바꾸지 않는다", () => {
+  const streaks = computeFailureStreaks([
+    run("ok", "success", "2026-07-29T01:00:00Z"),
+    run("mid", "running", "2026-07-29T03:00:00Z"),
+    run("mid", "failed", "2026-07-29T02:00:00Z"),
+    run("mid", "success", "2026-07-29T01:00:00Z"),
+  ])
+  assert.equal(streaks.has("ok"), false)
+  assert.equal(streaks.get("mid")?.failures, 1)
+})
+
+test("backoff 계단은 2회까지 쉬지 않고 3회부터 늘어난다", () => {
+  assert.equal(backoffWaitMs(0), 0)
+  assert.equal(backoffWaitMs(2), 0)
+  assert.equal(backoffWaitMs(3), 12 * 3_600_000)
+  assert.equal(backoffWaitMs(4), 24 * 3_600_000)
+  assert.equal(backoffWaitMs(99), 14 * 24 * 3_600_000)
+})
+
+test("backoff 잔여시간이 남았을 때만 스킵 사유를 돌려준다", () => {
+  const streak = {failures: 4, lastFailedAt: "2026-07-29T00:00:00Z"}
+  // 4회 → 24시간. 12시간 경과 시점에는 아직 대기.
+  const during = backoffReason(streak, new Date("2026-07-29T12:00:00Z"))
+  assert.match(String(during), /backoff\(4연속실패/)
+  // 25시간 경과 시점에는 다시 시도 대상.
+  assert.equal(backoffReason(streak, new Date("2026-07-30T01:00:00Z")), null)
+  assert.equal(backoffReason(undefined, new Date()), null)
+})
+
+test("lastFailedAt 을 모르면 backoff 하지 않는다 (fail-open)", () => {
+  // 언제부터 쉬어야 할지 계산할 수 없는데 스킵하면 소스가 영구히 사라진다.
+  assert.equal(backoffReason({failures: 9, lastFailedAt: null}, new Date()), null)
+  assert.equal(backoffReason({failures: 9, lastFailedAt: "not-a-date"}, new Date()), null)
+})
+
+test("워크리스트는 backoff 중인 소스를 사유와 함께 제외하고 --ignore-backoff 로 되돌린다", () => {
+  const args = {
+    configs,
+    sourceStates: [] as RefreshSourceState[],
+    productCounts: new Map([
+      ["kith", 5814],
+      ["browns", 11455],
+    ]),
+    types: new Set(["shopify", "zara"]),
+    streaks: new Map([["kith", {failures: 4, lastFailedAt: "2026-07-29T00:00:00Z"}]]),
+    now: new Date("2026-07-29T06:00:00Z"),
+  }
+
+  const gated = buildRefreshWorklist(args)
+  assert.deepEqual(
+    gated.entries.map((entry) => entry.platform_key),
+    ["browns"],
+  )
+  assert.ok(gated.skipped.some((item) => item.startsWith("kith:backoff(4연속실패")))
+
+  const forced = buildRefreshWorklist({...args, ignoreBackoff: true})
+  assert.deepEqual(
+    forced.entries.map((entry) => entry.platform_key).sort(),
+    ["browns", "kith"],
+  )
+})
+
+test("상품이 없는 소스는 backoff 가 아니라 no-products 로 보고한다", () => {
+  // 사유가 겹치면 운영자가 원인을 잘못 짚는다.
+  const result = buildRefreshWorklist({
+    configs,
+    sourceStates: [],
+    productCounts: new Map([["browns", 11455]]),
+    types: new Set(["shopify", "zara"]),
+    streaks: new Map([["kith", {failures: 9, lastFailedAt: "2026-07-29T00:00:00Z"}]]),
+    now: new Date("2026-07-29T01:00:00Z"),
+  })
+  assert.ok(result.skipped.includes("kith:no-products"))
+  assert.equal(
+    result.skipped.some((item) => item.startsWith("kith:backoff")),
+    false,
+  )
+})
+
+test("streaks 를 주지 않으면 종전대로 전부 시도한다", () => {
+  const result = buildRefreshWorklist({
+    configs,
+    sourceStates: [],
+    productCounts: new Map([
+      ["kith", 5814],
+      ["browns", 11455],
+    ]),
+    types: new Set(["shopify", "zara"]),
+  })
+  assert.deepEqual(
+    result.entries.map((entry) => entry.platform_key).sort(),
+    ["browns", "kith"],
+  )
+})
+
+// ── C1 선행: last_seen_at PATCH 필터 청킹 ────────────────────────────────────
+
+test("chunkByEncodedLength: 인코딩 길이 예산으로 자르고 순서를 보존한다", () => {
+  // PostgREST 는 PATCH 필터를 쿼리스트링에 싣는다. 개수로 자르면 한글 슬러그가
+  // 퍼센트 인코딩된 cafe24 rewrite URL 에서 예산을 넘긴다.
+  const short = ["a", "b", "c", "d"]
+  assert.deepEqual(chunkByEncodedLength(short, 100), [short])
+
+  const chunks = chunkByEncodedLength(short, 8) // 개당 비용 1+3=4 → 청크당 2개
+  assert.deepEqual(chunks, [["a", "b"], ["c", "d"]])
+  assert.deepEqual(chunks.flat(), short)
+})
+
+test("chunkByEncodedLength: 예산을 혼자 넘기는 값도 버리지 않는다", () => {
+  // 한 개만으로 예산 초과라도 반드시 한 청크로 나가야 한다 — 조용히 누락되면
+  // 그 상품은 생존 확인이 안 돼 sweep 대상이 된다.
+  const huge = "가".repeat(500)
+  const chunks = chunkByEncodedLength([huge, "b"], 10)
+  assert.deepEqual(chunks, [[huge], ["b"]])
+})
+
+test("chunkByEncodedLength: 빈 입력은 빈 배열", () => {
+  assert.deepEqual(chunkByEncodedLength([], 100), [])
 })

@@ -23,11 +23,17 @@ import {
   finishRefreshRun,
   loadExistingBrands,
   loadRefreshProductCounts,
+  loadRefreshRunOutcomes,
   loadRefreshSourceStates,
   startRefreshRun,
   syncRefreshSources,
+  touchProductsLastSeen,
 } from "./lib/product-refresh"
-import {buildRefreshWorklist, type RefreshWorklistEntry} from "./lib/refresh-source"
+import {
+  buildRefreshWorklist,
+  computeFailureStreaks,
+  type RefreshWorklistEntry,
+} from "./lib/refresh-source"
 import {crawlShopify} from "./lib/shopify-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
@@ -51,6 +57,7 @@ interface Flags {
   minCoverage: number
   concurrency: number
   dryRun: boolean
+  ignoreBackoff: boolean
 }
 
 function parseFlags(): Flags {
@@ -62,9 +69,11 @@ function parseFlags(): Flags {
     minCoverage: 0.7,
     concurrency: 2,
     dryRun: false,
+    ignoreBackoff: false,
   }
   for (const arg of process.argv.slice(2)) {
     if (arg === "--dry-run") flags.dryRun = true
+    else if (arg === "--ignore-backoff") flags.ignoreBackoff = true
     else if (arg.startsWith("--budget-minutes=")) flags.budgetMinutes = Number(arg.split("=")[1])
     else if (arg.startsWith("--limit=")) flags.limit = Number(arg.split("=")[1])
     else if (arg.startsWith("--type=")) flags.types = arg.split("=")[1].split(",").filter(Boolean)
@@ -95,10 +104,12 @@ function parseExcluded(): Set<string> {
 async function fetchWorklist(
   db: ProductCollectionClient,
   types: string[],
+  ignoreBackoff: boolean,
 ): Promise<{entries: RefreshWorklistEntry[]; skipped: string[]}> {
-  const [sourceStates, productCounts] = await Promise.all([
+  const [sourceStates, productCounts, runOutcomes] = await Promise.all([
     loadRefreshSourceStates(db),
     loadRefreshProductCounts(db),
+    loadRefreshRunOutcomes(db),
   ])
   return buildRefreshWorklist({
     configs: PLATFORMS,
@@ -106,6 +117,8 @@ async function fetchWorklist(
     productCounts,
     types: new Set(types),
     excluded: parseExcluded(),
+    streaks: computeFailureStreaks(runOutcomes),
+    ignoreBackoff,
   })
 }
 
@@ -202,7 +215,7 @@ async function main() {
 
   if (!flags.dryRun) await syncRefreshSources(db, PLATFORMS)
   const [worklist, brands] = await Promise.all([
-    fetchWorklist(db, flags.types),
+    fetchWorklist(db, flags.types, flags.ignoreBackoff),
     flags.dryRun ? Promise.resolve([]) : loadExistingBrands(db),
   ])
 
@@ -213,7 +226,8 @@ async function main() {
     const entry = entries.find((item) => item.platform_key === flags.site)
     if (!entry) {
       const reason = worklist.skipped.find((item) => item.startsWith(`${flags.site}:`)) ?? "no-products"
-      throw new Error(`refresh 대상 아님: ${flags.site} (${reason})`)
+      const hint = reason.includes("backoff") ? " — 강제 실행은 --ignore-backoff" : ""
+      throw new Error(`refresh 대상 아님: ${flags.site} (${reason})${hint}`)
     }
     entries = [entry]
   } else if (flags.limit > 0) {
@@ -226,6 +240,14 @@ async function main() {
       ` (스킵 ${worklist.skipped.length}) | 예산 ${flags.budgetMinutes}분` +
       ` | 동시 ${flags.concurrency}개 | 완전성 가드 ${flags.minCoverage}`,
   )
+  // 서킷브레이커가 무엇을 억누르고 있는지 항상 보여준다 — 조용히 사라지는 소스가
+  // 생기면 이 기능이 오히려 커버리지 구멍을 만든다.
+  const backoffSkips = worklist.skipped.filter((item) => item.includes(":backoff("))
+  if (backoffSkips.length > 0) {
+    const shown = backoffSkips.slice(0, 8).join(", ")
+    const rest = backoffSkips.length > 8 ? ` …외 ${backoffSkips.length - 8}개` : ""
+    console.log(`   🔌 서킷브레이커 대기 ${backoffSkips.length}개: ${shown}${rest}`)
+  }
   if (flags.dryRun) {
     for (const [index, entry] of entries.entries()) {
       console.log(
@@ -296,6 +318,9 @@ async function main() {
           update.reasons.some((reason) => reason.includes("품절") || reason.includes("재입고")),
         ).length
         const applied = await applyUpdates(db, diff.updates)
+        // 살아있음이 확인된 상품의 생존 타임스탬프. 완전성 가드와 무관하게 올린다 —
+        // 확인된 상품은 실제로 살아있고, 사라진 상품을 죽이는 판단은 가드가 따로 한다.
+        const seen = await touchProductsLastSeen(db, diff.confirmedUrls, new Date(run.startedAt).toISOString())
         const queued = await enqueueRefreshCandidates(db, {
           products: unknownProducts(crawled, diff.unknownUrls),
           config: entry.config,
@@ -306,10 +331,11 @@ async function main() {
         stockChanged += stockN
         candidateTotal += queued.discovered
         brandUnmatchedTotal += queued.brandUnmatched
-        const failed = applied.failed > 0 || crawlResult.errors.length > 0
+        const failed = applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0
         console.log(
           `✓ ${label}: 리스트 ${crawled.length} · DB ${existing.length}` +
             ` · 변경 ${diff.updates.length}(가격 ${priceN}, 재고 ${stockN})` +
+            ` · 생존확인 ${seen.ok}` +
             ` · LLM후보 ${queued.discovered} · 브랜드불일치 ${queued.brandUnmatched}` +
             ` · ${minutes(Date.now() - run.startedAt)}`,
         )
@@ -319,7 +345,11 @@ async function main() {
           status: failed ? "failed" : "success",
           startedAt: run.startedAt,
           errorMessage: failed
-            ? [...crawlResult.errors, applied.failed > 0 ? `update failures=${applied.failed}` : ""]
+            ? [
+                ...crawlResult.errors,
+                applied.failed > 0 ? `update failures=${applied.failed}` : "",
+                seen.failed > 0 ? `last_seen failures=${seen.failed}` : "",
+              ]
                 .filter(Boolean)
                 .join(" | ")
             : null,
@@ -327,6 +357,7 @@ async function main() {
             crawled: crawled.length,
             db_rows: existing.length,
             updated: applied.ok,
+            last_seen_touched: seen.ok,
             price_changed: priceN,
             stock_changed: stockN,
             candidates: queued.discovered,
