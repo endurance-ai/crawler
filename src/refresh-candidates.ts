@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 
-import {chromium} from "playwright"
+import {chromium, type Browser} from "playwright"
 
 import {getSiteConfig} from "./configs/platforms"
 import {applyValidationGate} from "./lib/core/validation-gate"
@@ -153,30 +153,31 @@ async function processCandidate(
   if (candidateError) throw new Error(`candidate imported update failed: ${candidateError.message}`)
 }
 
-async function main(): Promise<void> {
-  const limit = Math.min(intFlag("limit", 50), 200)
-  const maxAttempts = Math.min(intFlag("max-attempts", 3), 10)
-  const concurrency = Math.min(intFlag("concurrency", 1), 4)
-  const db = createProductCollectionClient()
-  const candidates = await claimCandidates(db, limit, maxAttempts)
-  if (candidates.length === 0) {
-    console.log("신규상품 LLM 후보 없음")
-    return
-  }
+interface BatchTotals {
+  imported: number
+  failed: number
+  rejected: number
+}
 
-  const browser = await chromium.launch({headless: true})
+async function processBatch(
+  db: ProductCollectionClient,
+  browser: Browser,
+  candidates: CandidateRow[],
+  concurrency: number,
+  maxAttempts: number,
+  totals: BatchTotals,
+): Promise<void> {
   let cursor = 0
   let imported = 0
   let failed = 0
   let rejected = 0
-  try {
-    const workers = Array.from({length: Math.min(concurrency, candidates.length)}, async () => {
+  const workers = Array.from({length: Math.min(concurrency, candidates.length)}, async () => {
       const context = await browser.newContext({
         userAgent:
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         locale: "ko-KR",
       })
-      await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2}", (route) => route.abort())
+      await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2}", (route: {abort: () => unknown}) => route.abort())
       const page = await context.newPage()
       try {
         while (cursor < candidates.length) {
@@ -203,13 +204,54 @@ async function main(): Promise<void> {
         await context.close()
       }
     })
-    await Promise.all(workers)
+  await Promise.all(workers)
+  totals.imported += imported
+  totals.failed += failed
+  totals.rejected += rejected
+}
+
+async function main(): Promise<void> {
+  // 상한을 두지 않는다. 예전에는 Math.min(limit,200) / Math.min(concurrency,4) 로
+  // 코드에 박혀 있어 systemd 플래그를 올려도 무시됐고, 워커가 claim 배치 1회만 돌고
+  // 끝나 처리량이 ~250건/일에 묶였다 (적체 실측 2026-07-30: discovered 31,901 → 넉 달).
+  const batchSize = Math.max(1, intFlag("limit", 200))
+  const maxAttempts = Math.max(1, intFlag("max-attempts", 3))
+  const concurrency = Math.max(1, intFlag("concurrency", 4))
+  // 예산 기반 루프. 0(기본)이면 종전대로 배치 1회만 돌고 끝난다 — 무제한으로 두면
+  // 한 런이 끝나지 않아 다음 refresh 를 막는다(같은 이유로 refresh 도 예산제다).
+  const budgetMs = Math.max(0, intFlag("budget-minutes", 0)) * 60_000
+  const startedAt = Date.now()
+  const withinBudget = () => budgetMs > 0 && Date.now() - startedAt < budgetMs
+
+  const db = createProductCollectionClient()
+  const totals: BatchTotals = {imported: 0, failed: 0, rejected: 0}
+  let claimed = 0
+  let batches = 0
+  let browser: Browser | null = null
+
+  try {
+    for (;;) {
+      const candidates = await claimCandidates(db, batchSize, maxAttempts)
+      if (candidates.length === 0) {
+        if (batches === 0) console.log("신규상품 LLM 후보 없음")
+        break
+      }
+      // 브라우저는 배치마다 새로 띄우지 않는다 — 예산 루프에서 반복 기동은 비싸다.
+      browser ??= await chromium.launch({headless: true})
+      claimed += candidates.length
+      batches += 1
+      await processBatch(db, browser, candidates, concurrency, maxAttempts, totals)
+      if (!withinBudget()) break
+    }
   } finally {
-    await browser.close()
+    if (browser) await browser.close()
   }
+
+  const elapsed = Math.round((Date.now() - startedAt) / 1000)
   console.log(
-    `신규상품 worker 완료: claimed=${candidates.length} imported=${imported}` +
-      ` failed=${failed} rejected=${rejected}`,
+    `신규상품 worker 완료: batches=${batches} claimed=${claimed} imported=${totals.imported}` +
+      ` failed=${totals.failed} rejected=${totals.rejected} · ${elapsed}초` +
+      (budgetMs > 0 && !withinBudget() && claimed > 0 ? ` (예산 ${budgetMs / 60_000}분 소진)` : ""),
   )
 }
 
