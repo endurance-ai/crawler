@@ -14,6 +14,103 @@ export interface RefreshWorklistEntry {
   config: SiteConfig
 }
 
+/** product_refresh_runs 한 행 중 서킷브레이커가 보는 것만. */
+export interface RefreshRunOutcome {
+  platform_key: string
+  status: string
+  started_at: string | null
+}
+
+export interface RefreshFailureStreak {
+  /** 마지막 성공 이후 연속 실패 횟수. 성공 기록이 없으면 전체 실패 횟수. */
+  failures: number
+  lastFailedAt: string | null
+}
+
+/**
+ * 마지막 성공 이후 연속 실패 횟수를 런 이력에서 뽑는다.
+ *
+ * `product_refresh_sources` 에 카운터 컬럼을 두지 않은 것은 의도적이다 — 이력이
+ * 이미 `product_refresh_runs` 에 다 있고, 마이그레이션 없이 계산할 수 있다.
+ * 성공 기록이 아예 없는 소스는 전체 실패 횟수가 연쇄가 된다 (실측 2026-07-29:
+ * 연쇄 중인 49개 소스 중 대부분이 한 번도 성공한 적 없다).
+ */
+export function computeFailureStreaks(runs: RefreshRunOutcome[]): Map<string, RefreshFailureStreak> {
+  const byPlatform = new Map<string, RefreshRunOutcome[]>()
+  for (const run of runs) {
+    if (!run.platform_key) continue
+    const bucket = byPlatform.get(run.platform_key)
+    if (bucket) bucket.push(run)
+    else byPlatform.set(run.platform_key, [run])
+  }
+
+  const streaks = new Map<string, RefreshFailureStreak>()
+  for (const [platformKey, platformRuns] of byPlatform) {
+    // 최신순으로 훑다가 success 를 만나면 멈춘다. started_at 이 없는 행(비정상
+    // 종료)은 순서를 알 수 없으므로 가장 오래된 것으로 취급한다.
+    const ordered = [...platformRuns].sort((a, b) =>
+      (b.started_at ?? "").localeCompare(a.started_at ?? ""),
+    )
+    let failures = 0
+    let lastFailedAt: string | null = null
+    for (const run of ordered) {
+      if (run.status === "success") break
+      if (run.status !== "failed") continue // running/skipped 는 연쇄를 끊지도 늘리지도 않는다
+      failures += 1
+      lastFailedAt ??= run.started_at
+    }
+    if (failures > 0) streaks.set(platformKey, {failures, lastFailedAt})
+  }
+  return streaks
+}
+
+/**
+ * 연속 실패 횟수 → 다음 시도까지 쉬는 시간(ms).
+ *
+ * 2회까지는 쉬지 않는다 — 네트워크 순간 장애나 사이트 일시 점검을 영구 격리하면
+ * 안 된다. 3회부터 계단식으로 늘린다.
+ *
+ * 실측 2026-07-29 근거: 전체 런 76.8시간 중 연속 3회 이상 실패 중인 소스가
+ * 5.8시간(7.6%)을 태우고 있었고, 그 대부분이 호스트 네트워크에서 아예 닿지 않는
+ * 해외 사이트(kith, browns, zara-kr, zara-us, end)였다. 재시도해도 영원히 실패한다.
+ */
+const BACKOFF_LADDER_MS: Array<{minFailures: number; waitMs: number}> = [
+  {minFailures: 7, waitMs: 14 * 24 * 3_600_000},
+  {minFailures: 6, waitMs: 7 * 24 * 3_600_000},
+  {minFailures: 5, waitMs: 3 * 24 * 3_600_000},
+  {minFailures: 4, waitMs: 24 * 3_600_000},
+  {minFailures: 3, waitMs: 12 * 3_600_000},
+]
+
+export function backoffWaitMs(failures: number): number {
+  return BACKOFF_LADDER_MS.find((step) => failures >= step.minFailures)?.waitMs ?? 0
+}
+
+/**
+ * 지금 이 소스를 건너뛰어야 하는지. 건너뛴다면 사람이 읽을 사유를 돌려준다.
+ *
+ * `lastFailedAt` 을 모르면 건너뛰지 않는다 (fail-open) — 쉬어야 할 시점을 계산할
+ * 수 없는데 영구 스킵하면 소스가 조용히 사라진다.
+ */
+export function backoffReason(
+  streak: RefreshFailureStreak | undefined,
+  now: Date,
+): string | null {
+  if (!streak) return null
+  const waitMs = backoffWaitMs(streak.failures)
+  if (waitMs === 0 || !streak.lastFailedAt) return null
+  const lastFailed = Date.parse(streak.lastFailedAt)
+  if (Number.isNaN(lastFailed)) return null
+  const remainingMs = lastFailed + waitMs - now.getTime()
+  if (remainingMs <= 0) return null
+  return `backoff(${streak.failures}연속실패, ${formatWait(remainingMs)} 남음)`
+}
+
+function formatWait(ms: number): string {
+  const hours = ms / 3_600_000
+  return hours >= 24 ? `${(hours / 24).toFixed(1)}일` : `${Math.ceil(hours)}시간`
+}
+
 export interface ProductPlatformRow {
   id: number
   platform: string
@@ -87,8 +184,14 @@ export function buildRefreshWorklist(args: {
   types: Set<string>
   /** 배포 호스트별로 제외할 source key. config 는 그대로 두고 실행만 건너뛴다. */
   excluded?: Set<string>
+  /** 연속 실패 이력. 주면 서킷브레이커가 작동한다 (없으면 종전대로 전부 시도). */
+  streaks?: Map<string, RefreshFailureStreak>
+  /** backoff 무시 강제 재시도 (`--ignore-backoff`). */
+  ignoreBackoff?: boolean
+  now?: Date
 }): {entries: RefreshWorklistEntry[]; skipped: string[]} {
   const states = new Map(args.sourceStates.map((row) => [row.platform_key, row]))
+  const now = args.now ?? new Date()
   const entries: RefreshWorklistEntry[] = []
   const skipped: string[] = []
 
@@ -109,6 +212,15 @@ export function buildRefreshWorklist(args: {
     if (productCount <= 0) {
       skipped.push(`${config.key}:no-products`)
       continue
+    }
+    // 상품 수 확인 뒤에 본다 — 상품이 없어 스킵되는 소스까지 backoff 로 보고하면
+    // 사유가 흐려진다.
+    if (!args.ignoreBackoff) {
+      const reason = backoffReason(args.streaks?.get(config.key), now)
+      if (reason) {
+        skipped.push(`${config.key}:${reason}`)
+        continue
+      }
     }
     entries.push({
       platform_key: config.key,

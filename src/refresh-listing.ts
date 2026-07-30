@@ -23,11 +23,16 @@ import {
   finishRefreshRun,
   loadExistingBrands,
   loadRefreshProductCounts,
+  loadRefreshRunOutcomes,
   loadRefreshSourceStates,
   startRefreshRun,
   syncRefreshSources,
 } from "./lib/product-refresh"
-import {buildRefreshWorklist, type RefreshWorklistEntry} from "./lib/refresh-source"
+import {
+  buildRefreshWorklist,
+  computeFailureStreaks,
+  type RefreshWorklistEntry,
+} from "./lib/refresh-source"
 import {crawlShopify} from "./lib/shopify-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
@@ -51,6 +56,7 @@ interface Flags {
   minCoverage: number
   concurrency: number
   dryRun: boolean
+  ignoreBackoff: boolean
 }
 
 function parseFlags(): Flags {
@@ -62,9 +68,11 @@ function parseFlags(): Flags {
     minCoverage: 0.7,
     concurrency: 2,
     dryRun: false,
+    ignoreBackoff: false,
   }
   for (const arg of process.argv.slice(2)) {
     if (arg === "--dry-run") flags.dryRun = true
+    else if (arg === "--ignore-backoff") flags.ignoreBackoff = true
     else if (arg.startsWith("--budget-minutes=")) flags.budgetMinutes = Number(arg.split("=")[1])
     else if (arg.startsWith("--limit=")) flags.limit = Number(arg.split("=")[1])
     else if (arg.startsWith("--type=")) flags.types = arg.split("=")[1].split(",").filter(Boolean)
@@ -95,10 +103,12 @@ function parseExcluded(): Set<string> {
 async function fetchWorklist(
   db: ProductCollectionClient,
   types: string[],
+  ignoreBackoff: boolean,
 ): Promise<{entries: RefreshWorklistEntry[]; skipped: string[]}> {
-  const [sourceStates, productCounts] = await Promise.all([
+  const [sourceStates, productCounts, runOutcomes] = await Promise.all([
     loadRefreshSourceStates(db),
     loadRefreshProductCounts(db),
+    loadRefreshRunOutcomes(db),
   ])
   return buildRefreshWorklist({
     configs: PLATFORMS,
@@ -106,6 +116,8 @@ async function fetchWorklist(
     productCounts,
     types: new Set(types),
     excluded: parseExcluded(),
+    streaks: computeFailureStreaks(runOutcomes),
+    ignoreBackoff,
   })
 }
 
@@ -202,7 +214,7 @@ async function main() {
 
   if (!flags.dryRun) await syncRefreshSources(db, PLATFORMS)
   const [worklist, brands] = await Promise.all([
-    fetchWorklist(db, flags.types),
+    fetchWorklist(db, flags.types, flags.ignoreBackoff),
     flags.dryRun ? Promise.resolve([]) : loadExistingBrands(db),
   ])
 
@@ -213,7 +225,8 @@ async function main() {
     const entry = entries.find((item) => item.platform_key === flags.site)
     if (!entry) {
       const reason = worklist.skipped.find((item) => item.startsWith(`${flags.site}:`)) ?? "no-products"
-      throw new Error(`refresh 대상 아님: ${flags.site} (${reason})`)
+      const hint = reason.includes("backoff") ? " — 강제 실행은 --ignore-backoff" : ""
+      throw new Error(`refresh 대상 아님: ${flags.site} (${reason})${hint}`)
     }
     entries = [entry]
   } else if (flags.limit > 0) {
@@ -226,6 +239,14 @@ async function main() {
       ` (스킵 ${worklist.skipped.length}) | 예산 ${flags.budgetMinutes}분` +
       ` | 동시 ${flags.concurrency}개 | 완전성 가드 ${flags.minCoverage}`,
   )
+  // 서킷브레이커가 무엇을 억누르고 있는지 항상 보여준다 — 조용히 사라지는 소스가
+  // 생기면 이 기능이 오히려 커버리지 구멍을 만든다.
+  const backoffSkips = worklist.skipped.filter((item) => item.includes(":backoff("))
+  if (backoffSkips.length > 0) {
+    const shown = backoffSkips.slice(0, 8).join(", ")
+    const rest = backoffSkips.length > 8 ? ` …외 ${backoffSkips.length - 8}개` : ""
+    console.log(`   🔌 서킷브레이커 대기 ${backoffSkips.length}개: ${shown}${rest}`)
+  }
   if (flags.dryRun) {
     for (const [index, entry] of entries.entries()) {
       console.log(

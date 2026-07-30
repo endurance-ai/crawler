@@ -4,6 +4,7 @@ import {
   buildRefreshCandidateInputs,
   uniqueRefreshConfigs,
   type BrandLookupRow,
+  type RefreshRunOutcome,
   type RefreshSourceState,
 } from "./refresh-source"
 import type {Product, SiteConfig} from "./types"
@@ -40,6 +41,33 @@ export async function loadRefreshSourceStates(
       .range(offset, offset + pageSize - 1)
     if (error) throw new Error(`refresh source state load failed: ${error.message}`)
     const page = (data ?? []) as RefreshSourceState[]
+    rows.push(...page)
+    if (page.length < pageSize) break
+  }
+  return rows
+}
+
+/**
+ * 서킷브레이커용 런 이력. 조회 창을 두는 이유는 두 가지다 — 이력 테이블이 무한히
+ * 커져도 요청 수가 일정하고, 창보다 오래된 성공은 "지금 살아있다" 는 근거가 못 된다.
+ * 창 안에 아무 기록이 없으면 스트릭이 안 잡혀 그대로 시도된다 (fail-open).
+ */
+export async function loadRefreshRunOutcomes(
+  db: ProductRefreshClient,
+  lookbackDays = 30,
+): Promise<RefreshRunOutcome[]> {
+  const since = new Date(Date.now() - lookbackDays * 24 * 3_600_000).toISOString()
+  const rows: RefreshRunOutcome[] = []
+  const pageSize = 1000
+  for (let offset = 0; ; offset += pageSize) {
+    const {data, error} = await db
+      .from("product_refresh_runs")
+      .select("platform_key,status,started_at")
+      .gte("started_at", since)
+      .order("started_at", {ascending: false})
+      .range(offset, offset + pageSize - 1)
+    if (error) throw new Error(`refresh run history load failed: ${error.message}`)
+    const page = (data ?? []) as RefreshRunOutcome[]
     rows.push(...page)
     if (page.length < pageSize) break
   }
