@@ -24,6 +24,7 @@
  *
  * Usage:
  *   npx dotenv -e .env.local -- tsx tools/select-onboard-batch.ts --limit=5 --out=path.json
+ *   npx dotenv -e .env.local -- tsx tools/select-onboard-batch.ts --limit=20 --country=KR --out=path.json
  */
 import * as fs from "fs"
 import {createProductCollectionClient} from "../src/lib/product-collection"
@@ -44,6 +45,18 @@ async function main() {
   // disabled/config-누락/재시도-소진 후보를 걸러내고도 limit개를 채울 수 있도록 넉넉히
   // 뽑는다 (10배, 최소 50) — 이 뷰는 소량이라 과다조회 비용이 무시할 만한 수준이다.
   const fetchSize = Math.max(limit * 10, 50)
+  // origin 을 쿼리에서 건다. generate-platform-configs 의 shouldGeneratePlatformConfig
+  // 이 tech_detected/qc_failed 를 **origin_country='KR' 일 때만** config 로 만들므로,
+  // 여기서 안 걸면 config 가 절대 안 생기는 해외 브랜드가 최신순 창을 가득 채워
+  // 정작 온보딩 가능한 KR 후보를 밀어낸다.
+  //
+  // 실측 2026-07-31: --limit=40 요청에 1건만 확보됐다. 검토 400건 중 391건이
+  // "config 없음" 이었고 전부 해외였다. 실제 KR 후보는 208건(config 보유 120,
+  // enabled 101)이 멀쩡히 남아 있었는데 창 밖으로 밀려 있었을 뿐이다.
+  //
+  // ⚠️ 이 필터는 shouldGeneratePlatformConfig 의 스코프와 **한 쌍**이다. 그쪽
+  // 스코프를 넓히면 여기 기본값도 같이 넓혀야 한다.
+  const country = (flag("country", "KR") ?? "KR").toUpperCase()
   const db = createProductCollectionClient()
   const {data, error} = await db
     .from("product_crawl_brands")
@@ -51,6 +64,7 @@ async function main() {
     .in("status", ["tech_detected", "qc_failed"])
     .in("platform_type", ["cafe24", "shopify"])
     .not("homepage_url", "is", null)
+    .eq("wiki->>origin_country", country)
     .order("status_updated_at", {ascending: false, nullsFirst: false})
     .limit(fetchSize)
   if (error) throw new Error(`select failed: ${error.message}`)
