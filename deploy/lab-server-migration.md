@@ -8,6 +8,24 @@
 
 ---
 
+## 0. 실측한 서버 상태 (2026-07-31)
+
+```
+호스트   gpusystem (kjk@100.70.101.17)   Ubuntu 22.04.1 LTS · x86_64 · 12 core · 62GB
+체크아웃 /home/kjk/kiko-crawler  (dev)   ← /opt 아님. 유닛 경로가 이걸 따라야 한다
+툴체인   node v22.23.1 · corepack · pnpm  (모두 ~/.local/bin — systemd 기본 PATH 에 없음)
+브라우저 playwright chromium-1217 설치됨 + /usr/bin/google-chrome 존재
+env      .env / .env.local 존재. REFRESH_EXCLUDE 에 이미 연구실 전용 값(032c 차단)
+sudo     비밀번호 필요 — 유닛 설치는 사람이 해야 한다
+```
+
+이미 이 서버에서 refresh 를 돌려본 흔적이 있다(`REFRESH_EXCLUDE` 의 032c 주석).
+체크아웃은 #54 시점이었고 `REFRESH_EXCLUDE` 로컬 수정으로 **dirty** 상태였다 —
+그 상태로는 `git pull --ff-only` 가 막힌다(§1 의 바로 그 함정). 해당 수정은 이미
+dev(#55)에 있어 stash 후 pull 했다.
+
+---
+
 ## 1. 왜 그냥 복사하면 안 되나
 
 EC2 유닛의 값 대부분이 **"4GB 호스트에서 Postgres 와 동거"** 라는 전제에서 나왔다.
@@ -48,12 +66,18 @@ sudo systemctl stop kiko-refresh.timer
 EC2 안에서는 사실상 localhost 였기에 문제가 아니었다. 연구실에서 이대로 붙으면
 **인터넷 구간에 서비스 토큰이 평문으로 흐른다.**
 
-배치 서버가 tailnet(`100.70.x.x`)에 있으므로 dev-app 도 tailnet 주소로 붙이는 것이 맞다.
+> ⚠️ **정정 (2026-07-31 실측)**: 처음엔 "tailnet 주소로 붙여라" 라고 적었으나
+> **dev-app 은 tailnet 에 없다.** `tailscale status` 상 노드는 gpusystem 과 macOS
+> 하나뿐이다. 즉 현재로선 실행 불가능한 권고였다. 선택지는 셋이다 —
+> (a) dev-app 을 tailnet 에 넣는다(인프라 작업), (b) shim 에 TLS 를 붙인다,
+> (c) dev 환경이므로 감수한다. 어느 쪽이든 **평문 HTTP + Bearer 토큰이 공인
+> 인터넷을 지난다**는 사실은 그대로다.
 
-성능은 문제없다 — 원격 왕복 실측:
+성능은 문제없다 — 연구실 서버에서 dev-app 까지 실측:
 
 ```
-단건 왕복  min=8ms  p50=13ms  max=77ms
+HTTP 404 (PostgREST 루트 정상 응답) · 8.6ms
+참고: 개발 맥에서 잰 값은 p50 13ms
 ```
 
 | 작업 | 왕복 수 | 추정 |
@@ -121,14 +145,27 @@ Playwright chromium 이 소스마다 뜨므로 **CPU 보다 메모리가 먼저 
 4. **첫 실행 --ignore-backoff** (§2). 타이머 미기동 상태에서 수동 1회
 5. 결과 검토 → REFRESH_EXCLUDE 확정, concurrency/리소스 캡 결정
 6. deploy/systemd/lab/* 설치 → timer enable
-7. EC2 쪽 timer disable (⚠️ 아래)
+7. (EC2 timer disable — **이미 완료됨**, 아래)
 ```
 
-> ⚠️ **EC2 타이머를 반드시 끌 것.** 두 호스트가 동시에 돌면 같은 소스를 중복 크롤하고
-> `product_refresh_runs` 이력이 섞여 서킷브레이커 판정이 오염된다.
-> `deploy/README.md` 에 기록된 대로 `kiko-recrawl.timer` 는 문서상 "타이머로 안 돌림"
-> 인데 실제로는 enabled 로 04:00 KST 발화하도록 설치돼 있다. 컷오버 전
-> `systemctl list-timers --all | grep kiko` 로 **실제 상태를 확인**하고 끈다.
+> ✅ **EC2 배치는 이미 정지했다 (2026-07-29 09:38 KST 이후).** 확인 근거는
+> `systemctl` 이 아니라 **DB 실행 이력**이다 — 타이머가 enabled 여도 서비스가 죽어
+> 있으면 `systemctl` 만으로는 판단이 안 되기 때문이다.
+>
+> ```
+> refresh-listing 런 (KST)
+>   07-27  275건  00:01~23:44   ← 24시간 순환 = EC2 타이머 가동 중
+>   07-28  391건  00:00~23:57
+>   07-29  213건  00:01~09:38   ← 09:38 이후 중단
+>   07-30    0건                 ← 타이머가 살아있다면 200~400건이 찍혀야 한다
+> ```
+>
+> `product_crawl_runs` 의 `recrawl` 스테이지는 기록 자체가 없다.
+>
+> **EC2 는 영구 퇴역한다** (2026-07-31 결정). 갱신 배치의 유일한 실행 위치는 이제
+> 연구실 서버다. 그래도 두 호스트 동시 실행이 위험하다는 사실은 남는다 — 중복
+> 크롤에 `product_refresh_runs` 이력이 섞여 서킷브레이커 판정이 오염된다. EC2 에
+> 다시 손댈 일이 생기면 `systemctl list-timers --all | grep kiko` 로 실제 상태부터 본다.
 
 ## 7. 커버리지 — 전 브랜드가 갱신되게 하는 나머지
 

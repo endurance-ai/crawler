@@ -90,6 +90,20 @@ graph TB
 
 ## 2. 목표 아키텍처 (to-be)
 
+> ### 📌 실제 귀결 (2026-07-31)
+>
+> 아래 §2 의 EC2 이중화(크롤러 전용 EC2 + dev-app EC2) 설계는 **그대로 실현되지
+> 않았다.** 갱신 배치는 **연구실 서버**(`kjk@100.70.101.17`, gpusystem ·
+> Ubuntu 22.04 · x86_64 · 12 core · 62GB)로 이관됐고 **EC2 배치는 영구 퇴역**했다.
+> DB(PostgREST shim)만 dev-app EC2 에 남아 있고, 배치는 공인 IP 경유로 붙는다
+> (실측 왕복 8.6ms).
+>
+> 현행 절차·유닛: **[`../deploy/lab-server-migration.md`](../deploy/lab-server-migration.md)**
+> 와 `deploy/systemd/lab/`. `deploy/README.md`(EC2 절차서)는 과거 기록이다.
+>
+> 아래 다이어그램은 **설계 의도와 R-NET 등 네트워크 요건의 근거**로 남긴다 —
+> 지금의 배치 배치도로 읽지 말 것.
+
 ### 2.1 dev-app EC2 + systemd 토폴로지
 
 ```mermaid
