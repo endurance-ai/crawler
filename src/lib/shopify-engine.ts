@@ -322,7 +322,16 @@ export async function crawlShopify(
       allProducts.push(
         ...parseShopifyProducts(data, config.baseUrl, config.key, {
           sourceCurrency: currency,
-          brandFallback: config.name,
+          // vendor 가 빈 경우의 폴백. 멀티브랜드 편집샵에서는 **플랫폼명으로
+          // 폴백하지 않는다** — 스토어명이 브랜드로 적재되는 platform-as-brand
+          // 오염의 원인이다 (`tools/cleanup-platform-as-brand.ts` 가 치우는 그것).
+          // 그 경우 brand="" 로 남겨 import 의 provenance 가드가 격리하게 한다
+          // (`lib/brand-provenance.ts`).
+          // ⚠️ 현재 `multiBrand: true` 로 표시된 config 는 visualaid 하나뿐이다.
+          // kith/browns/bodega/slam-jam/antonioli/union-la/concepts/
+          // the-broken-arm/mohawk-general 은 실제로 편집샵인데 표시가 없어 여전히
+          // config.name 으로 폴백한다 — config 쪽 데이터 갭이다.
+          brandFallback: config.brand ?? (config.multiBrand ? undefined : config.name),
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )

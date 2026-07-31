@@ -19,6 +19,7 @@ import * as fs from "fs"
 import * as path from "path"
 import {createClient} from "@supabase/supabase-js"
 import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "./configs/platforms"
+import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlCafe24WithLightpanda} from "./lib/cafe24-lightpanda"
 import {
@@ -100,11 +101,23 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
   // product_crawl_status 에는 crawled_at 컬럼이 없다(크롤 시각은 product_crawl_runs 가
   // 담당). 과거에 crawled_at 을 넣어 upsert 전체가 400 으로 조용히 실패했었다 — 여기
   // 필드를 추가할 때는 실제 테이블 컬럼 존재를 먼저 확인할 것.
+  // config 를 알면 platform_type/config_status 도 같이 채운다 — 이 배선이 없던 동안
+  // detect 를 거치지 않고 적재된 브랜드가 platform_type='unknown' 으로 남아
+  // generate-platform-configs 가 config 를 만들지 못했고, 그 브랜드는 refresh
+  // 워크리스트에 못 들어가 가격·재고가 영구 미갱신이었다 (실측 2026-07-30:
+  // 47개 브랜드 / 재고 5,505건). import-products.ts 의 syncProductCrawlStatus 와 같은 처리.
+  const crawledConfig = getSiteConfig(result.platform)
   const {error: statusError} = await queueDb.from("product_crawl_status").upsert(
     {
       brand_node_id: brandNodeId,
       status,
       platform_key: result.platform,
+      ...(crawledConfig
+        ? {
+            platform_type: queuePlatformType(crawledConfig.type),
+            config_status: crawledConfig.disabled ? "blocked" : "ready",
+          }
+        : {}),
       last_error: result.errors[0] ?? null,
     },
     {onConflict: "brand_node_id"},
