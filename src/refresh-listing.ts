@@ -134,6 +134,14 @@ async function fetchExistingRows(
       .from("products")
       .select("product_url, price, original_price, sale_price, in_stock")
       .eq("platform", platformKey)
+      // ORDER BY 없는 LIMIT/OFFSET 은 페이지 간 행 순서가 보장되지 않아 누락이 생긴다.
+      // 누락된 행은 existing 에 없으므로 크롤된 그 URL 이 **신규 상품으로 오인**되어
+      // 후보 큐에 들어가고, 워커가 상세 크롤 + LLM 을 태운 뒤에야 중복임을 안다.
+      // 실측 2026-07-31: 이미 products 에 있는 URL 이 후보로 3,996건 쌓여 있었고
+      // 그중 3,892건이 상품 1,000행을 넘는 platform(=페이지네이션이 도는 경우)에서
+      // 나왔다 — sculpstore 3,622행→2,527건, drakes 1,608행→666건.
+      // loadExistingBrands 는 같은 이유로 이미 .order("id") 를 붙여 뒀다.
+      .order("product_url", {ascending: true})
       .range(offset, offset + pageSize - 1)
     if (error) throw new Error(`products 조회 실패: ${error.message}`)
     const page = (data ?? []) as RefreshableRow[]
