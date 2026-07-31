@@ -89,6 +89,38 @@ async function markFailed(
   if (updateError) throw new Error(`candidate failure update failed: ${updateError.message}`)
 }
 
+async function findExistingProductId(
+  db: ProductCollectionClient,
+  productUrl: string,
+): Promise<number | null> {
+  const {data, error} = await db
+    .from("products")
+    .select("id")
+    .eq("product_url", productUrl)
+    .maybeSingle()
+  if (error) throw new Error(`product lookup failed: ${error.message}`)
+  return data ? Number((data as {id: number}).id) : null
+}
+
+async function markImported(
+  db: ProductCollectionClient,
+  candidate: CandidateRow,
+  productId: number,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  const {error} = await db
+    .from("product_refresh_candidates")
+    .update({
+      status: "imported",
+      imported_product_id: productId,
+      last_error: null,
+      next_attempt_at: null,
+      ...extra,
+    })
+    .eq("id", candidate.id)
+  if (error) throw new Error(`candidate imported update failed: ${error.message}`)
+}
+
 async function processCandidate(
   db: ProductCollectionClient,
   candidate: CandidateRow,
@@ -99,6 +131,18 @@ async function processCandidate(
     throw new PermanentCandidateError("source config missing or disabled")
   }
   await ensureExistingBrand(db, candidate)
+
+  // LLM 호출 **전에** 중복을 거른다. 후보 1건 = 상세 크롤 + LLM 1회이므로, 이미
+  // products 에 있는 URL 을 그대로 태우면 돈만 쓰고 아무것도 안 하는 호출이 된다.
+  // 예전에는 upsert(ignoreDuplicates) 뒤에야 중복을 알았다 — 그때는 이미 비용을
+  // 다 치른 뒤다. 실측 2026-07-31: fetchExistingRows 의 ORDER BY 누락으로 이미
+  // products 에 있는 URL 이 후보로 3,996건 쌓여 있었다.
+  const alreadyImported = await findExistingProductId(db, candidate.product_url)
+  if (alreadyImported !== null) {
+    await markImported(db, candidate, alreadyImported)
+    return
+  }
+
   const raw: Product = {
     ...candidate.raw_product,
     productUrl: candidate.product_url,
@@ -121,36 +165,19 @@ async function processCandidate(
     .maybeSingle()
   if (error) throw new Error(`candidate product insert failed: ${error.message}`)
 
-  let productId = (inserted as {id: number} | null)?.id
-  if (!productId) {
-    // Another importer won the race. Treat the candidate as complete without
-    // rewriting that already-existing product row.
-    const {data: existing, error: existingError} = await db
-      .from("products")
-      .select("id")
-      .eq("product_url", candidate.product_url)
-      .maybeSingle()
-    if (existingError || !existing) {
-      throw new Error(
-        `candidate product race lookup failed: ${existingError?.message ?? "no data"}`,
-      )
-    }
-    productId = Number((existing as {id: number}).id)
+  let productId: number | null = (inserted as {id: number} | null)?.id ?? null
+  if (productId === null) {
+    // 위 사전 확인 이후에 다른 임포터가 이겼다. 이미 존재하는 행을 덮어쓰지 않고
+    // 후보만 완료 처리한다.
+    productId = await findExistingProductId(db, candidate.product_url)
+    if (productId === null) throw new Error("candidate product race lookup failed: no data")
   }
-  const {error: candidateError} = await db
-    .from("product_refresh_candidates")
-    .update({
-      status: "imported",
-      imported_product_id: productId,
-      enriched_product: validated[0],
-      llm_model: enrichment.model,
-      llm_usage: enrichment.usage,
-      llm_cost_usd: enrichment.costUsd,
-      last_error: null,
-      next_attempt_at: null,
-    })
-    .eq("id", candidate.id)
-  if (candidateError) throw new Error(`candidate imported update failed: ${candidateError.message}`)
+  await markImported(db, candidate, productId, {
+    enriched_product: validated[0],
+    llm_model: enrichment.model,
+    llm_usage: enrichment.usage,
+    llm_cost_usd: enrichment.costUsd,
+  })
 }
 
 interface BatchTotals {
