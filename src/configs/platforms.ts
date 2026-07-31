@@ -716,6 +716,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "the-broken-arm",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 상품 0건 — 편집샵 성격은 동일).
+    multiBrand: true,
     name: "THE BROKEN ARM",
     type: "shopify",
     baseUrl: "https://www.the-broken-arm.com",
@@ -734,6 +736,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "kith",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 286개).
+    multiBrand: true,
     name: "Kith",
     type: "shopify",
     baseUrl: "https://kith.com",
@@ -802,6 +806,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "bodega",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 172개).
+    multiBrand: true,
     name: "Bodega",
     type: "shopify",
     baseUrl: "https://bdgastore.com",
@@ -841,6 +847,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   // (×1750) and EUR→KRW (×1560) at upsert time per SPEC-002 hook.
   {
     key: "slam-jam",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 212개).
+    multiBrand: true,
     name: "Slam Jam",
     type: "shopify",
     baseUrl: "https://slamjam.com",
@@ -851,6 +859,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "antonioli",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 165개).
+    multiBrand: true,
     name: "Antonioli",
     type: "shopify",
     baseUrl: "https://antonioli.eu",
@@ -861,6 +871,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "browns",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 390개).
+    multiBrand: true,
     name: "Browns Fashion",
     type: "shopify",
     baseUrl: "https://brownsfashion.com",
@@ -875,6 +887,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   // Selected for minimum brand overlap with existing 42 platforms.
   {
     key: "mohawk-general",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 215개).
+    multiBrand: true,
     name: "Mohawk General Store",
     type: "shopify",
     baseUrl: "https://www.mohawkgeneralstore.com",
@@ -885,6 +899,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "union-la",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 52개).
+    multiBrand: true,
     name: "Union LA",
     type: "shopify",
     baseUrl: "https://store.unionlosangeles.com",
@@ -895,6 +911,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "concepts",
+    // 멀티브랜드 편집샵 — 상품마다 브랜드가 다르다 (실측 2026-07-31 고유 브랜드 77개).
+    multiBrand: true,
     name: "Concepts",
     type: "shopify",
     baseUrl: "https://cncpts.com",
