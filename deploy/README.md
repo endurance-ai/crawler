@@ -1,4 +1,17 @@
-# dev-app EC2 재수집 배치 셋업 (Phase 0 + Phase 1)
+# dev-app EC2 재수집 배치 셋업 (Phase 0 + Phase 1) — 🗄️ 퇴역, 과거 기록
+
+> ## ⛔ 이 문서는 더 이상 현행 절차가 아니다 (2026-07-31)
+>
+> 갱신 배치는 **연구실 서버로 완전히 이관**됐고 EC2 배치는 **영구 퇴역**했다.
+> 현행 절차는 **[`lab-server-migration.md`](lab-server-migration.md)** 를 볼 것.
+>
+> EC2 타이머는 **2026-07-29 09:38 KST 이후 정지** 상태다(DB `product_refresh_runs`
+> 이력으로 확인 — 07-30 런 0건). 아래 §3·§5 의 "kiko-recrawl.timer 가 enabled" 서술은
+> 그 시점의 과거 사실이며 **지금은 해당하지 않는다.**
+>
+> 이 문서를 남겨두는 이유는 설치 중 밟았던 함정(IAM/playwright/deploy key/알람 디멘전)이
+> 재설치 때 여전히 유효하기 때문이다. **리소스 캡·동시성 값은 그대로 가져가면 안 된다** —
+> "4GB 에서 Postgres 와 동거" 전제에서 나온 값이라 배치 서버에서는 근거가 없다.
 
 > 대상: dev-app EC2 (t4g.medium 4GB, ARM, Postgres + PostgREST shim 동거 호스트).
 > 주의: 2026-05-26 마이그레이션 때 t4g.large→medium 다운스케일됨 — 리소스 캡과 swap 은 4GB 전제.
@@ -103,15 +116,18 @@ journalctl -u kiko-refresh-candidates -f
 돌리지 않는다** — 카테고리/색상을 다시 만들어야 할 때만 수동 실행하는 것이 원칙이다.
 두 경로의 차이는 `src/refresh-listing.ts` 헤더 참조.
 
-> **주의 (문서/실제 불일치)**: §5 배포 기록에 있듯 `kiko-recrawl.timer` 는 실제로는
-> `enabled` 상태로 매일 04:00 KST 발화하도록 설치돼 있다 — 위 원칙과 어긋난다.
-> `products` 를 건드리는 작업(예: 2026-06 코호트 재수집 캠페인, 사전 `in_stock`
-> 차단) 전에는 반드시 `systemctl list-timers --all | grep kiko` 로 실제 상태를
-> 확인할 것. 문서만 보고 "타이머 없음"으로 가정하지 않는다.
+> **~~주의 (문서/실제 불일치)~~ — 2026-07-31 해소.** 한동안 `kiko-recrawl.timer` 가
+> 문서와 달리 `enabled` 로 매일 04:00 KST 발화하고 있었다. 지금은 EC2 배치 자체가
+> 정지했으므로(위 머리말) 이 불일치는 사라졌다.
+>
+> 다만 **교훈은 남긴다**: 문서만 보고 "타이머 없음"으로 가정하지 말 것. `products` 를
+> 건드리는 작업 전에는 실제 상태를 확인한다 — `systemctl` 은 "enabled 지만 서비스가
+> 죽어 있는" 경우를 구분 못 하므로, **DB 실행 이력**(`product_refresh_runs` /
+> `product_crawl_runs`)을 함께 보는 쪽이 확실하다.
 
-> **배치 이전 예정**: `kiko-refresh`/`kiko-recrawl` 배치는 향후 전용 배치 서버로
-> 옮긴다. 이전 전까지는 dev-app EC2 가 유일한 실행 위치이므로, `products` 데이터를
-> 직접 조작하는 작업은 이 EC2 의 타이머 상태에 의존한다.
+> **~~배치 이전 예정~~ → 이전 완료 (2026-07-31).** 갱신 배치는 연구실 서버
+> (`kjk@100.70.101.17`, gpusystem)로 옮겨졌다. `products` 를 직접 조작하는 작업은
+> 이제 **그쪽** 타이머 상태에 의존한다.
 >
 > **이사 절차는 [`lab-server-migration.md`](lab-server-migration.md) 를 볼 것.**
 > 이 문서(§1·§4)의 리소스 캡·동시성 값은 **4GB 에서 Postgres 와 동거**한다는 전제에서
@@ -159,7 +175,7 @@ journalctl -u kiko-refresh-candidates -f
 |---|---|
 | 호스트 | `ec2-user@15.165.107.28` (i-01956ed16d12ee792, t4g.medium) |
 | 체크아웃 | `/opt/kiko-crawler` (dev 브랜치, deploy key `dev-app EC2 (recrawl batch, read-only)`) |
-| 타이머 | `kiko-recrawl.timer` **enabled** — 매일 04:00 KST |
+| 타이머 | `kiko-recrawl.timer` enabled — 매일 04:00 KST *(설치 당시. 2026-07-29 정지, 07-31 퇴역)* |
 | 파일럿 제한 | `/etc/systemd/system/kiko-recrawl.service.d/pilot-limit.conf` (`--limit=200`) — 관측 후 이 파일 삭제로 해제 |
 | 알림 | SNS `kiko-devapp-alerts` → 이메일 |
 | 검증 | DB OK · cafe24(rense)/imweb(heretic) probe 통과 · `recrawl --dry-run` 워크리스트 86브랜드 |

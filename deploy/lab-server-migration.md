@@ -145,14 +145,27 @@ Playwright chromium 이 소스마다 뜨므로 **CPU 보다 메모리가 먼저 
 4. **첫 실행 --ignore-backoff** (§2). 타이머 미기동 상태에서 수동 1회
 5. 결과 검토 → REFRESH_EXCLUDE 확정, concurrency/리소스 캡 결정
 6. deploy/systemd/lab/* 설치 → timer enable
-7. EC2 쪽 timer disable (⚠️ 아래)
+7. (EC2 timer disable — **이미 완료됨**, 아래)
 ```
 
-> ⚠️ **EC2 타이머를 반드시 끌 것.** 두 호스트가 동시에 돌면 같은 소스를 중복 크롤하고
-> `product_refresh_runs` 이력이 섞여 서킷브레이커 판정이 오염된다.
-> `deploy/README.md` 에 기록된 대로 `kiko-recrawl.timer` 는 문서상 "타이머로 안 돌림"
-> 인데 실제로는 enabled 로 04:00 KST 발화하도록 설치돼 있다. 컷오버 전
-> `systemctl list-timers --all | grep kiko` 로 **실제 상태를 확인**하고 끈다.
+> ✅ **EC2 배치는 이미 정지했다 (2026-07-29 09:38 KST 이후).** 확인 근거는
+> `systemctl` 이 아니라 **DB 실행 이력**이다 — 타이머가 enabled 여도 서비스가 죽어
+> 있으면 `systemctl` 만으로는 판단이 안 되기 때문이다.
+>
+> ```
+> refresh-listing 런 (KST)
+>   07-27  275건  00:01~23:44   ← 24시간 순환 = EC2 타이머 가동 중
+>   07-28  391건  00:00~23:57
+>   07-29  213건  00:01~09:38   ← 09:38 이후 중단
+>   07-30    0건                 ← 타이머가 살아있다면 200~400건이 찍혀야 한다
+> ```
+>
+> `product_crawl_runs` 의 `recrawl` 스테이지는 기록 자체가 없다.
+>
+> **EC2 는 영구 퇴역한다** (2026-07-31 결정). 갱신 배치의 유일한 실행 위치는 이제
+> 연구실 서버다. 그래도 두 호스트 동시 실행이 위험하다는 사실은 남는다 — 중복
+> 크롤에 `product_refresh_runs` 이력이 섞여 서킷브레이커 판정이 오염된다. EC2 에
+> 다시 손댈 일이 생기면 `systemctl list-timers --all | grep kiko` 로 실제 상태부터 본다.
 
 ## 7. 커버리지 — 전 브랜드가 갱신되게 하는 나머지
 
