@@ -27,7 +27,24 @@ const hybridSubcategory = (r: any): string | null =>
   VARIANT === "hybrid" && typeof r.subcategory === "string" && r.subcategory.trim() ? r.subcategory.trim() : null
 async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}], temperature: 0}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
 async function main() {
-  const rows = fs.readFileSync(`${RUN}/products.jsonl`, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r: any) => r.variant === VARIANT)
+  // 빈 줄을 걸러내고 파싱한다. 크롤이 0건이면 products.jsonl 이 빈 파일이 되는데,
+  // 예전에는 "".split("\n") → [""] → JSON.parse("") 로 터졌다. 브랜드 하나가 상품을
+  // 못 뽑으면 **청크 전체가 죽는** 구조였다 (실측 2026-07-31: tune 이 0건이라 크래시).
+  const jsonlPath = `${RUN}/products.jsonl`
+  const rawText = fs.existsSync(jsonlPath) ? fs.readFileSync(jsonlPath, "utf8") : ""
+  const rows = rawText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => JSON.parse(l))
+    .filter((r: any) => r.variant === VARIANT)
+  if (rows.length === 0) {
+    // 빈 결과도 정상 종료해야 다음 청크로 넘어간다. PASSOUT 은 비워서 쓴다 —
+    // onboard-batch.sh 가 이걸 읽어 import 대상을 정하므로 파일 자체는 있어야 한다.
+    console.log(`crawled 0 rows (variant=${VARIANT}) — 적재할 브랜드 없음`)
+    fs.writeFileSync(PASSOUT, JSON.stringify([]))
+    return
+  }
   const seen = new Set<string>(); const uniq = rows.filter((r: any) => { const k = `${r.brand_key}|${r.product_url || r.name}`; if (seen.has(k)) return false; seen.add(k); return true })
   const byBrand: Record<string, any[]> = {}; for (const r of uniq) (byBrand[r.brand_key] ||= []).push(r)
   let fail = 0, anom = 0; const passBrands: string[] = []
