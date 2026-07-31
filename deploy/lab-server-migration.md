@@ -8,6 +8,24 @@
 
 ---
 
+## 0. 실측한 서버 상태 (2026-07-31)
+
+```
+호스트   gpusystem (kjk@100.70.101.17)   Ubuntu 22.04.1 LTS · x86_64 · 12 core · 62GB
+체크아웃 /home/kjk/kiko-crawler  (dev)   ← /opt 아님. 유닛 경로가 이걸 따라야 한다
+툴체인   node v22.23.1 · corepack · pnpm  (모두 ~/.local/bin — systemd 기본 PATH 에 없음)
+브라우저 playwright chromium-1217 설치됨 + /usr/bin/google-chrome 존재
+env      .env / .env.local 존재. REFRESH_EXCLUDE 에 이미 연구실 전용 값(032c 차단)
+sudo     비밀번호 필요 — 유닛 설치는 사람이 해야 한다
+```
+
+이미 이 서버에서 refresh 를 돌려본 흔적이 있다(`REFRESH_EXCLUDE` 의 032c 주석).
+체크아웃은 #54 시점이었고 `REFRESH_EXCLUDE` 로컬 수정으로 **dirty** 상태였다 —
+그 상태로는 `git pull --ff-only` 가 막힌다(§1 의 바로 그 함정). 해당 수정은 이미
+dev(#55)에 있어 stash 후 pull 했다.
+
+---
+
 ## 1. 왜 그냥 복사하면 안 되나
 
 EC2 유닛의 값 대부분이 **"4GB 호스트에서 Postgres 와 동거"** 라는 전제에서 나왔다.
@@ -48,12 +66,18 @@ sudo systemctl stop kiko-refresh.timer
 EC2 안에서는 사실상 localhost 였기에 문제가 아니었다. 연구실에서 이대로 붙으면
 **인터넷 구간에 서비스 토큰이 평문으로 흐른다.**
 
-배치 서버가 tailnet(`100.70.x.x`)에 있으므로 dev-app 도 tailnet 주소로 붙이는 것이 맞다.
+> ⚠️ **정정 (2026-07-31 실측)**: 처음엔 "tailnet 주소로 붙여라" 라고 적었으나
+> **dev-app 은 tailnet 에 없다.** `tailscale status` 상 노드는 gpusystem 과 macOS
+> 하나뿐이다. 즉 현재로선 실행 불가능한 권고였다. 선택지는 셋이다 —
+> (a) dev-app 을 tailnet 에 넣는다(인프라 작업), (b) shim 에 TLS 를 붙인다,
+> (c) dev 환경이므로 감수한다. 어느 쪽이든 **평문 HTTP + Bearer 토큰이 공인
+> 인터넷을 지난다**는 사실은 그대로다.
 
-성능은 문제없다 — 원격 왕복 실측:
+성능은 문제없다 — 연구실 서버에서 dev-app 까지 실측:
 
 ```
-단건 왕복  min=8ms  p50=13ms  max=77ms
+HTTP 404 (PostgREST 루트 정상 응답) · 8.6ms
+참고: 개발 맥에서 잰 값은 p50 13ms
 ```
 
 | 작업 | 왕복 수 | 추정 |

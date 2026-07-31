@@ -21,9 +21,13 @@ OnSuccess=kiko-refresh-candidates.service
 [Service]
 Type=oneshot
 User=kjk
-WorkingDirectory=/opt/kiko-crawler
-EnvironmentFile=/etc/kiko-crawler.env
-ExecStart=/opt/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=4
+WorkingDirectory=/home/kjk/kiko-crawler
+# corepack/node 가 ~/.local/bin 에 있고 systemd 기본 PATH 에는 없다 — 없으면
+# 래퍼의 `corepack pnpm` 이 command not found 로 죽는다 (실측 2026-07-31).
+Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/home/kjk
+# env 는 .env / .env.local 을 npm 스크립트의 dotenv 가 읽는다 — EnvironmentFile 불필요.
+ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=4
 # 예산 480분 + wrapper 오버헤드 여유
 TimeoutStartSec=32400
 # 동시성 4 + 예산 480분의 근거: 한 패스 총 크롤시간 실측 30.6h(357 소스) →
