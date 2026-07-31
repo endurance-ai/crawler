@@ -302,3 +302,38 @@ test("diffListing: 카테고리별 중복 적재된 같은 상품 행 전부가 
   assert.equal(diff.confirmedUrls.length, 2)
   assert.equal(diff.missingUrls.length, 0)
 })
+
+// ── 소수 가격 처리 (integer 컬럼 보호) ───────────────────────────────────────
+
+test("toPriceFields: KRW 소수 가격은 거부한다 (파싱 오류)", () => {
+  // 실측 2026-07-31: 가격 상세 복구가 "339.3" 을 만들어 UPDATE 전체가
+  // `invalid input syntax for type integer` 로 실패했다. 339,300 의 천 단위
+  // 구분자를 소수점으로 읽은 것으로 보이며, 반올림하면 ₩339 라는 1000배 틀린
+  // 값을 쓰게 된다. 갱신을 건너뛰어 기존 값을 보존하는 쪽이 옳다.
+  assert.equal(toPriceFields({price: 339.3, inStock: true} as never), null)
+})
+
+test("toPriceFields: KRW 정수 가격은 그대로 통과한다", () => {
+  const fields = toPriceFields({price: 339300, inStock: true} as never)
+  assert.deepEqual(fields, {price: 339300, original_price: 339300, sale_price: null})
+})
+
+test("toPriceFields: 통화 변환 후 소수는 반올림한다", () => {
+  // 환율 계산 결과의 소수는 정상이다 — 반올림이 맞다.
+  const fields = toPriceFields({price: 10.5, inStock: true} as never, "USD")
+  assert.ok(fields !== null)
+  assert.ok(Number.isInteger(fields!.price))
+})
+
+test("toPriceFields: 상품이 들고 있는 통화가 config 보다 우선한다", () => {
+  // 상세 페이지에서 통화를 실제로 감지했을 때만 채워지므로 근거가 더 강하다
+  // (applyCafe24DetailFallbacks). config 가 KRW 여도 상품이 USD 면 변환해야 한다.
+  const withProductCurrency = toPriceFields(
+    {price: 10, inStock: true, sourceCurrency: "USD"} as never,
+    "KRW",
+  )
+  const plainKrw = toPriceFields({price: 10, inStock: true} as never, "KRW")
+  assert.ok(withProductCurrency !== null && plainKrw !== null)
+  assert.notEqual(withProductCurrency!.price, plainKrw!.price)
+  assert.ok(withProductCurrency!.price > plainKrw!.price)
+})

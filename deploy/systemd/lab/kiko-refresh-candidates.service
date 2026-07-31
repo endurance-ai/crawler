@@ -1,8 +1,11 @@
 # kiko-refresh 성공 후 실행되는 신규상품 LLM worker — **연구실 배치 서버 프로필**.
 # brand_nodes 를 만들지 않으며 정확히 매칭된 기존 브랜드 상품만 적재한다.
 #
-# --limit/--concurrency 는 EC2 값을 그대로 뒀다. 이 워커의 병목은 호스트 자원이
-# 아니라 LLM 호출이므로, 상향은 큐 적체(discovered 건수)와 비용을 함께 보고 정한다.
+# 코드의 Math.min clamp(limit≤200, concurrency≤4)를 걷어내고 --budget-minutes 를
+# 추가했다. 이 워커의 병목은 호스트 자원이 아니라 LLM 호출이므로, 상향은 큐
+# 적체(discovered 실측 31,901)와 토큰 비용을 함께 보고 정한다.
+# 예산 90분은 refresh(480분) 뒤에 붙어도 하루 안에 끝나도록 잡은 시작값이다 —
+# 첫 런에서 건당 소요/비용을 재고 조정한다.
 [Unit]
 Description=kiko.ai refresh candidate LLM enrichment — lab batch host
 After=network-online.target kiko-refresh.service
@@ -13,7 +16,7 @@ Type=oneshot
 User=kjk
 WorkingDirectory=/opt/kiko-crawler
 EnvironmentFile=/etc/kiko-crawler.env
-ExecStart=/opt/kiko-crawler/scripts/run-refresh-candidates.sh --limit=50 --concurrency=1
+ExecStart=/opt/kiko-crawler/scripts/run-refresh-candidates.sh --budget-minutes=90 --limit=200 --concurrency=4
 TimeoutStartSec=7200
 
 [Install]

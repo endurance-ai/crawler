@@ -95,9 +95,21 @@ export function productIdentityKey(url: string): string | null {
   return null
 }
 
-function sanitizePrice(v: unknown): number | null {
+/**
+ * `products.price` 는 integer 컬럼이라 소수를 그대로 쓰면 UPDATE 가 통째로 실패한다
+ * (실측 2026-07-31: `invalid input syntax for type integer: "339.3"`).
+ *
+ * 소수를 만났을 때 반올림할지 거부할지는 **통화 변환을 거쳤는지**로 갈린다:
+ *   - 변환 후 소수 → 환율 계산의 자연스러운 결과다. 반올림한다.
+ *   - 변환 없음(KRW) 소수 → 파싱 오류다. ₩339.3 은 존재하지 않는다.
+ *     `339,300` 의 천 단위 구분자를 소수점으로 읽은 경우가 대표적이고, 반올림하면
+ *     ₩339 라는 **1000배 틀린 가격**을 쓰게 된다. 잘못된 값을 쓰느니 갱신을 건너뛴다.
+ */
+function sanitizePrice(v: unknown, allowFractional: boolean): number | null {
   const n = typeof v === "number" ? v : null
-  return n !== null && n > 0 && n <= MAX_PRICE ? n : null
+  if (n === null || !(n > 0) || n > MAX_PRICE) return null
+  if (Number.isInteger(n)) return n
+  return allowFractional ? Math.round(n) : null
 }
 
 /**
@@ -109,9 +121,14 @@ export function toPriceFields(product: Product, sourceCurrency = "KRW"): PriceFi
   let originalRaw: number | null | undefined = product.originalPrice
   let saleRaw: number | null | undefined = product.salePrice
 
-  if (sourceCurrency !== "KRW") {
+  // 상품이 자기 통화를 들고 있으면 그쪽이 우선이다. 상세 페이지에서 통화를 실제로
+  // 감지했을 때만 채워지므로(`applyCafe24DetailFallbacks`), config 의 값보다 근거가 강하다.
+  const currency = product.sourceCurrency ?? sourceCurrency
+  const converted = currency !== "KRW"
+
+  if (converted) {
     const conv = (v: number | null | undefined) =>
-      typeof v === "number" ? convertToKrw(v, sourceCurrency) : v
+      typeof v === "number" ? convertToKrw(v, currency) : v
     const convPrice = conv(priceRaw)
     if (typeof priceRaw === "number" && convPrice === null) return null // 미지원 통화
     priceRaw = convPrice
@@ -119,13 +136,13 @@ export function toPriceFields(product: Product, sourceCurrency = "KRW"): PriceFi
     saleRaw = conv(saleRaw)
   }
 
-  const price = sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw)
+  const price = sanitizePrice(saleRaw, converted) ?? sanitizePrice(priceRaw, converted)
   if (price === null) return null // 가격을 못 읽으면 갱신하지 않는다 (기존 값 보존)
 
   return {
     price,
-    original_price: sanitizePrice(originalRaw) ?? sanitizePrice(priceRaw),
-    sale_price: sanitizePrice(saleRaw),
+    original_price: sanitizePrice(originalRaw, converted) ?? sanitizePrice(priceRaw, converted),
+    sale_price: sanitizePrice(saleRaw, converted),
   }
 }
 

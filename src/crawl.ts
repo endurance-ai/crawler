@@ -19,6 +19,7 @@ import * as fs from "fs"
 import * as path from "path"
 import {createClient} from "@supabase/supabase-js"
 import {getActivePlatforms, getPlatformsByType, getSiteConfig, PLATFORMS} from "./configs/platforms"
+import {blockingSignals} from "./lib/crawl-outcome"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlCafe24WithLightpanda} from "./lib/cafe24-lightpanda"
@@ -95,7 +96,11 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
   const brandNodeId = await resolveBrandNodeId(result.platform)
   if (!brandNodeId) return // brand_node 해석 실패 — no-op
 
-  const success = result.errors.length === 0 && result.stats.totalProducts > 0
+  // 온보딩은 품질 실패도 qc_failed 로 본다 — 가격/이름이 대부분 비었으면 적재 가치가
+  // 없다. 갱신 경로는 반대로 품질 경고를 차단 신호로 쓰지 않는다.
+  // 그 비대칭의 근거는 lib/crawl-outcome.ts 헤더 참조.
+  const blocking = blockingSignals(result)
+  const success = blocking.length === 0 && result.stats.totalProducts > 0
   const status = success ? "crawled" : "qc_failed"
 
   // product_crawl_status 에는 crawled_at 컬럼이 없다(크롤 시각은 product_crawl_runs 가
@@ -118,7 +123,7 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
             config_status: crawledConfig.disabled ? "blocked" : "ready",
           }
         : {}),
-      last_error: result.errors[0] ?? null,
+      last_error: blocking[0] ?? null,
     },
     {onConflict: "brand_node_id"},
   )
@@ -134,12 +139,12 @@ async function syncCrawlResultToQueue(result: CrawlResult): Promise<void> {
     actor: "crawl-auto",
     command: `crawl --site=${result.platform}`,
     duration_ms: result.stats.duration,
-    error_message: result.errors[0] ?? null,
+    error_message: blocking[0] ?? null,
     metrics: {
       total_products: result.stats.totalProducts,
       in_stock: result.stats.inStock,
       unique_brands: result.stats.uniqueBrands,
-      errors: result.errors,
+      errors: blocking,
     },
   })
   if (runError) {

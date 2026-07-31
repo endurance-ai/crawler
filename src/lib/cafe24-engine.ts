@@ -155,6 +155,21 @@ export interface CrawlCafe24Options {
    */
   includeOutOfStock?: boolean
   /**
+   * 갱신 전용 — 리스트에서 가격을 못 얻은 상품만 상세를 방문해 가격을 채운다.
+   *
+   * `listingOnly` 와 함께 쓴다. 왜 별도 플래그인가: `listingOnly` 를 끄면 상세 크롤이
+   * 통째로 켜져 `detailParser` 가 필요해지고 material/productCode/리뷰까지 딸려온다.
+   * 여기서 필요한 건 가격 하나뿐이라 `extractCafe24DetailFallbacks` 만 쓰는 좁은
+   * 루프를 돌린다 (Step 3b). `includeOutOfStock` 이 `listingOnly` 의 의미 과적을 푼
+   * 것과 같은 이유다.
+   *
+   * 근거(실측 2026-07-30): 일부 cafe24 상점은 가격을 상세에만 노출한다. 그 42개
+   * 소스가 `price_missing_rate≈100` 으로 갱신 성공 이력을 한 번도 못 쌓았다.
+   */
+  recoverMissingPriceFromDetail?: boolean
+  /** Step 3b 의 소스당 상세 방문 상한. 기본 300 — 한 소스가 배치 예산을 삼키지 않게. */
+  priceRecoveryLimit?: number
+  /**
    * Chromium 전용: deterministic 상세 파싱 직후, 페이지가 리셋/재사용되기 전에
    * 그 살아있는 상세 페이지와 함께 호출된다. product-extraction-poc.ts의 hybrid
    * variant가 두 번째 네비게이션 없이 LLM 보강(category/subcategory/color/
@@ -782,7 +797,9 @@ export async function crawlCafe24(
     : dedupedProducts
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
-  if (config.crawlDetails && detailParser && !options.listingOnly) {
+  // Step 3b(가격 복구)가 같은 상품을 두 번 방문하지 않도록 게이트를 변수로 뽑는다.
+  const ranFullDetail = Boolean(config.crawlDetails && detailParser && !options.listingOnly)
+  if (ranFullDetail && detailParser) {
     console.log(`\n${tag} 🔍 상세 크롤링 시작 — ${uniqueProducts.length}개 상품`)
     const detailStart = Date.now()
     detailNavCount = uniqueProducts.length
@@ -883,6 +900,69 @@ export async function crawlCafe24(
     console.log(`\n${tag} ✅ 상세 크롤링 완료 — ${detailSuccess}/${uniqueProducts.length}개 데이터 수집`)
   }
 
+  // ── Step 3b: 가격 복구 전용 상세 방문 (갱신 경로) ──
+  //
+  // 일부 cafe24 상점은 리스트에 가격을 안 띄우고 상세에만 노출한다. 온보딩 크롤은
+  // crawlDetails=true 라 가격을 얻지만, 갱신은 listingOnly 라 구조적으로 못 얻는다
+  // (실측 2026-07-30: 42개 소스 / 재고 6,182건이 price_missing_rate≈100 으로 갱신 불가).
+  //
+  // 소스 단위로 상세를 켜지 않고 **가격이 빠진 상품만** 방문한다 — 건강한 상점은
+  // 방문 0회다. detailParser 가 필요 없다: extractCafe24DetailFallbacks 는 페이지만
+  // 받아 name/price 를 DOM 에서 뽑고, applyCafe24DetailFallbacks 가 price===null 인
+  // 경우에만 채운다. 그래서 새 파싱 코드가 없다.
+  if (!ranFullDetail && options.recoverMissingPriceFromDetail) {
+    const targets = uniqueProducts.filter((p) => p.price === null)
+    // 한 소스가 배치 예산을 삼키지 않도록 상한을 둔다. price_missing_rate=100 인
+    // 상점은 리스트 전체가 대상이 되기 때문이다.
+    const cap = options.priceRecoveryLimit ?? 300
+    const capped = targets.slice(0, cap)
+    if (capped.length > 0) {
+      const recoveryStart = Date.now()
+      const CONCURRENCY = options.detailConcurrency ?? 3
+      const externalFactory = options.createDetailPage
+      const leases: Cafe24DetailPageLease[] = externalFactory
+        ? []
+        : await Promise.all(
+            Array.from({length: Math.min(CONCURRENCY, capped.length)}, () =>
+              createPlaywrightDetailPageFactory(page)(),
+            ),
+          )
+      let recovered = 0
+      try {
+        for (let i = 0; i < capped.length; i += CONCURRENCY) {
+          const batch = capped.slice(i, i + CONCURRENCY)
+          await Promise.all(
+            batch.map(async (product, slot) => {
+              const lease = externalFactory ? await externalFactory() : leases[slot]!
+              const pg = lease.page
+              try {
+                await pg.goto(product.productUrl, {waitUntil: "domcontentloaded", timeout: 20_000})
+                const fallbacks = await extractCafe24DetailFallbacks(pg)
+                applyCafe24DetailFallbacks(product, fallbacks)
+                if (product.price !== null) recovered += 1
+              } catch {
+                // 한 상품 실패가 나머지를 막지 않는다. 페이지를 재사용하므로 다음
+                // 배치의 goto 가 "interrupted by another navigation" 나지 않도록 리셋한다
+                // (Step 3 의 같은 사고 대응과 동일).
+                await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
+              } finally {
+                if (externalFactory) await lease.close()
+              }
+            }),
+          )
+        }
+      } finally {
+        await Promise.all(leases.map((lease) => lease.close().catch(() => {})))
+      }
+      const skipped = targets.length - capped.length
+      console.log(
+        `${tag} 💰 가격 복구 — ${recovered}/${capped.length}개 회수` +
+          (skipped > 0 ? ` (상한 ${cap} 초과로 ${skipped}개 이번 런 제외)` : "") +
+          ` · ${Math.round((Date.now() - recoveryStart) / 1000)}초`,
+      )
+    }
+  }
+
   if (!options.listingOnly) {
     const priceFiltered = filterCafe24ProductsWithUsablePrice(uniqueProducts)
     if (priceFiltered.dropped.length > 0) {
@@ -930,10 +1010,14 @@ export async function crawlCafe24(
     console.log(`${tag} ✅ 리뷰 크롤링 완료 — ${withReviews}/${uniqueProducts.length}개 상품에 리뷰`)
   }
 
+  // 품질 판정은 errors 가 아니라 qualityWarnings 로 나간다 — 크롤 자체가 실패한 것과
+  // 수집된 내용의 품질이 낮은 것은 다른 문제다. 섞여 있는 동안 갱신 경로에서 가격을
+  // 못 읽는 것이 재고 이탈 감지까지 막았다 (types.ts CrawlResult.qualityWarnings 참조).
+  const qualityWarnings: string[] = []
   const quality = assessCafe24ProductQuality(uniqueProducts, config)
   if (!quality.passed) {
     const msg = `Cafe24 quality failed: ${quality.reasons.join(", ")}`
-    errors.push(msg)
+    qualityWarnings.push(msg)
     console.log(`${tag} ⚠️ ${msg} ${JSON.stringify(quality.metrics)}`)
   }
 
@@ -960,6 +1044,7 @@ export async function crawlCafe24(
       detailNavCount,
     },
     errors,
+    qualityWarnings,
   }
 
   console.log(`\n${tag} ✅ 완료: ${result.stats.totalProducts}개 상품 | 재고 ${result.stats.inStock}개 | ${result.stats.uniqueBrands}개 브랜드 | ${(result.stats.duration / 1000).toFixed(1)}s`)
