@@ -13,7 +13,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=kjk
 WorkingDirectory=/home/kjk/kiko-crawler
 Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/kjk
@@ -24,4 +23,4 @@ ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh-candidates.sh --budget-minu
 TimeoutStartSec=7200
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

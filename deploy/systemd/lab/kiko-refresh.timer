@@ -4,6 +4,8 @@
 Description=Continuous kiko.ai listing refresh — lab batch host
 
 [Timer]
+# user unit 이라 OnBootSec 의 기준은 유저 매니저 기동 시점이다. Linger=yes 이므로
+# 로그인 없이 부팅 직후 뜬다.
 OnBootSec=10min
 OnUnitInactiveSec=15min
 AccuracySec=1min
