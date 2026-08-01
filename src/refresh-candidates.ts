@@ -29,14 +29,27 @@ function intFlag(name: string, fallback: number): number {
   return Number.isInteger(value) && value > 0 ? value : fallback
 }
 
+function stringFlag(name: string): string | null {
+  const prefix = `--${name}=`
+  const raw = process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length)
+  return raw && raw.length > 0 ? raw : null
+}
+
+/**
+ * 후보를 claim 한다. `originCountry` 는 RPC 안에서 걸린다 — 이 함수가 행을
+ * 고르는 그 자리에서 status='enriching' 으로 잠그기 때문에, 받아서 거르면
+ * 이미 claim 된 뒤라 되돌려도 다음 claim 이 같은 행을 또 집는다 (migration 100).
+ */
 async function claimCandidates(
   db: ProductCollectionClient,
   limit: number,
   maxAttempts: number,
+  originCountry: string | null,
 ): Promise<CandidateRow[]> {
   const {data, error} = await db.rpc("claim_product_refresh_candidates", {
     p_limit: limit,
     p_max_attempts: maxAttempts,
+    p_origin_country: originCountry,
   })
   if (error) throw new Error(`candidate claim failed: ${error.message}`)
   return (data ?? []) as CandidateRow[]
@@ -247,6 +260,10 @@ async function main(): Promise<void> {
   // 예산 기반 루프. 0(기본)이면 종전대로 배치 1회만 돌고 끝난다 — 무제한으로 두면
   // 한 런이 끝나지 않아 다음 refresh 를 막는다(같은 이유로 refresh 도 예산제다).
   const budgetMs = Math.max(0, intFlag("budget-minutes", 0)) * 60_000
+  // 브랜드 origin 필터. 큐 75,404건 중 KR 이 58,917건(78%)이고 운영 방침이
+  // 한국 브랜드 우선이라, 대상이 아닌 후보에 LLM 비용을 쓰지 않기 위한 것이다.
+  // 미지정이면 전량 — 방침이 바뀌면 플래그만 빼면 된다.
+  const originCountry = stringFlag("country")
   const startedAt = Date.now()
   const withinBudget = () => budgetMs > 0 && Date.now() - startedAt < budgetMs
 
@@ -258,9 +275,11 @@ async function main(): Promise<void> {
 
   try {
     for (;;) {
-      const candidates = await claimCandidates(db, batchSize, maxAttempts)
+      const candidates = await claimCandidates(db, batchSize, maxAttempts, originCountry)
       if (candidates.length === 0) {
-        if (batches === 0) console.log("신규상품 LLM 후보 없음")
+        if (batches === 0) {
+          console.log(`신규상품 LLM 후보 없음${originCountry ? ` (origin=${originCountry})` : ""}`)
+        }
         break
       }
       // 브라우저는 배치마다 새로 띄우지 않는다 — 예산 루프에서 반복 기동은 비싸다.
@@ -276,7 +295,8 @@ async function main(): Promise<void> {
 
   const elapsed = Math.round((Date.now() - startedAt) / 1000)
   console.log(
-    `신규상품 worker 완료: batches=${batches} claimed=${claimed} imported=${totals.imported}` +
+    `신규상품 worker 완료${originCountry ? ` [origin=${originCountry}]` : ""}:` +
+      ` batches=${batches} claimed=${claimed} imported=${totals.imported}` +
       ` failed=${totals.failed} rejected=${totals.rejected} · ${elapsed}초` +
       (budgetMs > 0 && !withinBudget() && claimed > 0 ? ` (예산 ${budgetMs / 60_000}분 소진)` : ""),
   )

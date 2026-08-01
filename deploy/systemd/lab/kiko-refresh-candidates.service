@@ -17,7 +17,10 @@ User=kjk
 WorkingDirectory=/home/kjk/kiko-crawler
 Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/kjk
-ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh-candidates.sh --budget-minutes=90 --limit=200 --concurrency=4
+# --country=KR: 큐 75,404건 중 KR 이 58,917건(78%)이고 운영 방침이 한국 브랜드
+# 우선이다. 후보 1건 = 상세 크롤 + LLM 1회라 대상 아닌 것을 태우면 그대로 비용이다.
+# 비KR 16,487건은 큐에 남는다 — 방침이 바뀌면 이 플래그만 빼면 전량으로 돌아간다.
+ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh-candidates.sh --budget-minutes=90 --limit=200 --concurrency=4 --country=KR
 TimeoutStartSec=7200
 
 [Install]
