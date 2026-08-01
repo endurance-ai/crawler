@@ -30,10 +30,28 @@ WorkingDirectory=/home/kjk/kiko-crawler
 Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/kjk
 # env 는 .env / .env.local 을 npm 스크립트의 dotenv 가 읽는다 — EnvironmentFile 불필요.
-ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=8
+ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=4
 # 예산 480분 + wrapper 오버헤드 여유
 TimeoutStartSec=32400
-# 동시성 8 + 예산 480분 — **첫 패스 실측 후 조정한 값**(2026-08-01).
+# 동시성 4 + 예산 480분.
+#
+# ⚠️ 8 로 올렸다가 **되돌렸다** (2026-08-01). 병목은 CPU/메모리가 아니라 DNS 다.
+#
+#   concurrency 4 : success 192 / failed 4   → 98%
+#   concurrency 8 : success  70 / failed 17  → 74%
+#
+# 실패 17건 중 **11건이 이전에 잘 되던 소스**다(no categories discovered /
+# fetch failed / robots.txt fetch failed). 어려운 소스를 만난 게 아니라 8이
+# 멀쩡하던 것을 깨고 있었다. 같은 시각 호스트에서:
+#
+#   dig @8.8.8.8 brownsfashion.com  → 1차 timeout, 2차 성공
+#   resolvectl statistics           → 172,243 트랜잭션에 캐시 크기 23
+#
+# 즉 DNS 질의가 통째로 드롭되고 캐시는 사실상 비어 있다. 자원은 여전히 남는다
+# (피크 RSS 4.5GB/62GB · load 1.6/12core). **동시성을 다시 올리려면 CPU 가 아니라
+# 리졸버를 먼저 고쳐야 한다** — 로컬 캐싱 리졸버 또는 resolved 캐시 설정.
+# 실패한 런은 커버리지를 못 올릴 뿐 아니라, 완전성 가드가 걸린 채 applyUpdates 는
+# 계속 돌아 in_stock 이 늘기만 하므로 재고 수치까지 부풀린다.
 #
 # concurrency 4 로 돈 첫 패스: 495분에 237/381 소스, 예산 소진으로 중단.
 # 한 패스 환산 ≈ 13시간이라 480분 예산에 못 들어온다. 원인은 가격 상세 폴백
