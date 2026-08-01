@@ -162,7 +162,13 @@ async function processCandidate(
     platform: candidate.platform_key,
   }
   const enrichment = await enrichProductWithLlm(page, raw, config)
-  const qc = applyProductQcGate([enrichment.product], candidate.platform_key)
+  // trustedCategory: 입력이 LLM 보강 산출물이다. QC 의 이름 기반 category 번복은
+  // DOM 원본을 구제하려고 만든 것이라, 페이지 전체를 본 판단을 정규식으로 뒤집으면
+  // 진다 — "Archive Short Sleeves"(반팔티)를 bottoms 로 바꿔 탈락시킨 게 그 예다.
+  // canonical 계약 강제는 그대로 돈다.
+  const qc = applyProductQcGate([enrichment.product], candidate.platform_key, {
+    trustedCategory: true,
+  })
   if (qc.length !== 1) throw new PermanentCandidateError("product QC rejected LLM enrichment")
   const validated = applyValidationGate(qc, candidate.platform_key)
   if (validated.length !== 1) throw new PermanentCandidateError("product validation rejected LLM enrichment")

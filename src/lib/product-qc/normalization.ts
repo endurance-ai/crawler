@@ -22,6 +22,29 @@ export interface ProductQcInput {
   productCode?: string | null
 }
 
+/**
+ * QC 는 성격이 다른 두 가지를 한다:
+ *
+ *   ① 계약 강제 — 출력을 canonical 어휘(CATEGORIES/SUBCATEGORIES)로 제한한다.
+ *      출처가 무엇이든 필요하다. category 는 NOT NULL 이고 검색 필터가 이 값을 쓴다.
+ *   ② 이름 기반 추론·번복 — 상품명 정규식으로 추론해 입력 category 를 갈아치운다.
+ *      **DOM 스크래핑 원본을 상대하라고 만든 구제 수단이다.** 원본 category 에는
+ *      "SALE"/"NEW"/"하의"/할인율 배너 같은 내비 텍스트가 들어오므로, 그럴 때
+ *      상품명 추론이 명백한 개선이었다.
+ *
+ * QC 게이트(2026-07-07)가 LLM 보강(2026-07-26)보다 3주 먼저 생겼다. 후보 워커가
+ * 그 앞에 LLM 을 붙이면서 ②가 **페이지 전체를 본 판단을 정규식 한 줄로 뒤집는**
+ * 구조가 됐다 — 실측 사고: "Archive Short Sleeves"(반팔티)를 LLM 이 tops 로
+ * 냈는데 ②가 bottoms 로 번복해 후보가 탈락했다.
+ *
+ * `trustedCategory` 는 그 경우 ②만 끈다. ①은 그대로 돈다 — LLM 이 z.enum 으로
+ * 강제돼도 subcategory 는 freeform 이고, canonical 계약은 여전히 지켜야 한다.
+ */
+export interface ProductQcOptions {
+  /** 입력 category 가 신뢰 가능한 출처(LLM 보강)에서 왔는가. 기본 false. */
+  trustedCategory?: boolean
+}
+
 export interface ProductQcResult<T extends ProductQcInput = ProductQcInput> {
   action: ProductQcAction
   product: T
@@ -60,7 +83,12 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "bottoms",
-    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
+    // `shorts?` 의 `s?` 는 의도적이다 — "Logo Biker Short" / "DOUBLE KNEE SHORT"
+    // 처럼 홑단어 Short 를 명사로 쓰는 상품명이 실제로 더 많다(실측: 1,170 vs 304).
+    // 다만 그 때문에 "Short Sleeve"(반팔=tops)가 bottoms 로 잡히는 오탐이 생겼다.
+    // 부정 전방탐색으로 그 한 갈래만 뺀다 — "Short Sleeve Shorts" 는 뒤쪽
+    // "Shorts" 에서 여전히 매치된다.
+    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
     contains: ["\ud558\uc758", "\ud32c\uce20", "\ubc14\uc9c0", "\ub370\ub2d8", "\uc9c4", "\uc1fc\uce20", "\uc2a4\ucee4\ud2b8", "\uce58\ub9c8", "\uc2ac\ub799\uc2a4", "\uc870\uac70"],
   },
   {
@@ -239,7 +267,10 @@ function inferCategoryFromText(text: string): Category | null {
   return unique.length === 1 ? unique[0] : null
 }
 
-function normalizeCategoryField(product: ProductQcInput): {
+function normalizeCategoryField(
+  product: ProductQcInput,
+  trustedCategory: boolean,
+): {
   value: string | null
   reason: string | null
   confidence: number
@@ -259,7 +290,9 @@ function normalizeCategoryField(product: ProductQcInput): {
   // null(NOT NULL 에 걸려 적재 제외)로 떨어뜨린다.
   const current = currentCategoryCompat(raw)
   if (current) {
-    if (inferred && current !== inferred) {
+    // ② 이름 기반 번복. 신뢰 출처에서는 건너뛴다 — 구제할 원본이 아니다.
+    // 아래 두 text_fallback 은 남긴다: 값이 **없을 때** 채우는 것이라 번복이 아니다.
+    if (inferred && current !== inferred && !trustedCategory) {
       return {value: inferred, reason: "category_text_conflict", confidence: 0.5, needsReview: true}
     }
     return {value: current, reason: current === raw ? null : "category_canonicalized", confidence: 0.9, needsReview: false}
@@ -294,14 +327,17 @@ function normalizeSubcategoryField(
   }
 }
 
-export function normalizeProductTextFields<T extends ProductQcInput>(product: T): ProductQcResult<T> {
+export function normalizeProductTextFields<T extends ProductQcInput>(
+  product: T,
+  options: ProductQcOptions = {},
+): ProductQcResult<T> {
   const next = {...product} as T
   const changes: ProductQcFieldChange[] = []
   const reasons: string[] = []
   const confidences: number[] = []
   let needsReview = false
 
-  const category = normalizeCategoryField(product)
+  const category = normalizeCategoryField(product, options.trustedCategory === true)
   confidences.push(category.confidence)
   if (category.needsReview) needsReview = true
   if (category.reason) reasons.push(category.reason)
@@ -344,12 +380,16 @@ export function normalizeProductTextFields<T extends ProductQcInput>(product: T)
   }
 }
 
-export function applyProductQcGate<T extends ProductQcInput>(products: T[], site: string): T[] {
+export function applyProductQcGate<T extends ProductQcInput>(
+  products: T[],
+  site: string,
+  options: ProductQcOptions = {},
+): T[] {
   if (!isQcEnabled()) return products
 
   const accepted: T[] = []
   for (const product of products) {
-    const result = normalizeProductTextFields(product)
+    const result = normalizeProductTextFields(product, options)
     record(site, result)
 
     if (result.action === "review" || result.action === "reject") {
