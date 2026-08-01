@@ -18,6 +18,7 @@ import {crawlFarfetch} from "./lib/farfetch-engine"
 import {crawlImweb} from "./lib/imweb-engine"
 import {diffListing, type RefreshableRow, type RefreshUpdate} from "./lib/listing-refresh"
 import {createProductCollectionClient, type ProductCollectionClient} from "./lib/product-collection"
+import {installRequestBlocking} from "./lib/request-blocking"
 import {
   enqueueRefreshCandidates,
   finishRefreshRun,
@@ -175,7 +176,9 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
           locale: "ko-KR",
         })
-        await context.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
+        // 확장자 글롭에서 교체 — 그 방식은 `.js` 추적 스크립트를 못 막아 페이지당
+        // 고유 호스트명 17개 중 16개가 그대로 조회됐다 (request-blocking.ts 헤더).
+        await installRequestBlocking(context)
         const page = await context.newPage()
         return await crawlCafe24(page, listingConfig, undefined, undefined, {
           listingOnly: true,

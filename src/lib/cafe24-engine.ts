@@ -9,6 +9,7 @@
  * 사이트마다 테마가 달라 셀렉터가 조금씩 다를 수 있음 → 폴백 셀렉터로 대응
  */
 
+import {installRequestBlocking} from "./request-blocking"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
@@ -201,7 +202,14 @@ function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe
     page as unknown as {
       context?: () => {browser?: () => {
         newContext: () => Promise<{
-          route: (pattern: string, handler: (route: {abort: () => unknown}) => unknown) => Promise<unknown>
+          route: (
+            pattern: string,
+            handler: (route: {
+              abort: () => unknown
+              continue: () => unknown
+              request: () => {url: () => string; resourceType: () => string}
+            }) => unknown,
+          ) => Promise<unknown>
           newPage: () => Promise<Cafe24Page>
           close: () => Promise<unknown>
         }>
@@ -215,7 +223,7 @@ function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe
 
   return async () => {
     const ctx = await browser.newContext()
-    await ctx.route("**/*.{png,jpg,jpeg,gif,webp,svg,css,woff,woff2}", (route) => route.abort())
+    await installRequestBlocking(ctx)
     const detailPage = await ctx.newPage()
     ;(detailPage as unknown as {on?: (event: "dialog", handler: (dialog: {dismiss: () => Promise<void>}) => void) => void})
       .on?.("dialog", (dialog) => {
