@@ -30,12 +30,14 @@ WorkingDirectory=/home/kjk/kiko-crawler
 Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/kjk
 # env 는 .env / .env.local 을 npm 스크립트의 dotenv 가 읽는다 — EnvironmentFile 불필요.
-ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=4
+ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=8
 # 예산 480분 + wrapper 오버헤드 여유
 TimeoutStartSec=32400
-# 동시성 4 + 예산 480분.
+# 동시성 8 + 예산 480분 — **서드파티 차단 배포 후 재시도** (2026-08-02).
 #
-# ⚠️ 8 로 올렸다가 **되돌렸다** (2026-08-01). 병목은 CPU/메모리가 아니라 DNS 다.
+# 이력: 8 → 4 되돌림(08-01) → 차단 배포(08-02) → 8 재시도.
+#
+# 되돌렸던 이유는 그대로 유효하다. 병목은 CPU/메모리가 아니라 DNS 다.
 #
 #   concurrency 4 : success 192 / failed 4   → 98%
 #   concurrency 8 : success  70 / failed 17  → 74%
@@ -61,8 +63,25 @@ TimeoutStartSec=32400
 # 8 이면 ≈6.5시간으로 예산 안에 들어온다. 그래도 메모리는 여유가 크다
 # (선형 증가 가정 시 ~9GB).
 #
-# 더 올릴지는 이 설정으로 한 패스 완주한 뒤 판단한다
-# (deploy/lab-server-migration.md §5 의 상향 절차표).
+# 왜 지금 다시 8인가 — 서드파티 차단(#77)이 DNS 질의를 절반으로 줄였다:
+#
+#   newrim   39 → 22   horlisun 190 → 89   saengin 237 → 121
+#
+# 차단은 **동시성 상향을 위해서만** 값어치가 있다. 동시성 4 에서는 성공률이
+# 96% → 95% 로 이득이 없었고, 대신 3개 소스가 깨졌다(아래). 그러니 8 에서
+# 효과가 확인되지 않으면 차단째로 걷어내는 것이 맞다.
+#
+# ⚠️ 차단으로 깨진 소스가 남아 있다 (08-02 실측, 배포 시점에 딱 끊긴다):
+#   hwi          488 → 0    (cov 1.00 → 0.00)
+#   pasion       415 → 0    (cov 1.00 → 0.00)
+#   wknd-project  74 → 12   (cov 1.00 → 0.03)
+# 셋 다 완전성 가드가 걸려 오품절 처리는 없었다. 어느 차단 항목(stylesheet /
+# 추적 호스트 / image 타입)이 원인인지는 미특정 — CRAWLER_REQUEST_BLOCKING=off
+# 로 즉시 되돌릴 수 있다.
+#
+# 판정 기준: 한 패스 후 성공률. 90% 아래면 되돌린다 (8은 74%, 4는 96~98%였다).
+# 실패한 런은 커버리지를 못 올릴 뿐 아니라, 가드가 걸린 채 applyUpdates 는 계속
+# 돌아 사라진 상품을 품절 처리하지 못하므로 재고 정확도까지 나빠진다.
 # ⚠️ 리소스 캡은 의도적으로 비워 뒀다. DB 동거가 없으므로 EC2 값을 그대로
 # 옮기면 근거 없이 처리량만 깎는다. 첫 런 관측 후 필요하면 여기에 추가한다.
 
