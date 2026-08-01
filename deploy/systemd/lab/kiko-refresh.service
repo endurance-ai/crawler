@@ -7,6 +7,10 @@
 #   · DB 가 원격이다 → 왕복 지연이 붙는다 (실측 p50 13ms, 원격 기준).
 #     배치 쓰기가 이미 청킹되어 있어 한 바퀴 last_seen_at 갱신은 ~20초다.
 #   · 사용자/경로/HOME 이 다르다.
+#   · **user unit 이다** (~/.config/systemd/user/). 이 호스트는 sudo 에 비밀번호가
+#     걸려 있고 `loginctl show-user kjk -p Linger` 가 이미 `Linger=yes` 라,
+#     시스템 유닛으로 만들 이유가 없다 — 로그인 없이도 부팅 시 돈다.
+#     그래서 `User=` 가 없고(유저 매니저가 곧 kjk), WantedBy 가 default.target 이다.
 #   · x86 이면 Chrome 채널을 쓸 수 있다 (EC2 는 ARM 이라 chromium 강제였다).
 #
 # 설치 전 반드시 deploy/lab-server-migration.md 의 체크리스트를 볼 것 —
@@ -20,7 +24,6 @@ OnSuccess=kiko-refresh-candidates.service
 
 [Service]
 Type=oneshot
-User=kjk
 WorkingDirectory=/home/kjk/kiko-crawler
 # corepack/node 가 ~/.local/bin 에 있고 systemd 기본 PATH 에는 없다 — 없으면
 # 래퍼의 `corepack pnpm` 이 command not found 로 죽는다 (실측 2026-07-31).
@@ -46,4 +49,4 @@ TimeoutStartSec=32400
 # 옮기면 근거 없이 처리량만 깎는다. 첫 런 관측 후 필요하면 여기에 추가한다.
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

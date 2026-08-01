@@ -16,7 +16,8 @@
 툴체인   node v22.23.1 · corepack · pnpm  (모두 ~/.local/bin — systemd 기본 PATH 에 없음)
 브라우저 playwright chromium-1217 설치됨 + /usr/bin/google-chrome 존재
 env      .env / .env.local 존재. REFRESH_EXCLUDE 에 이미 연구실 전용 값(032c 차단)
-sudo     비밀번호 필요 — 유닛 설치는 사람이 해야 한다
+sudo     비밀번호 필요. **단 유닛 설치에는 sudo 가 필요 없다** — Linger=yes 라
+         user unit 으로 넣으면 로그인 없이 부팅 시 돈다 (§6)
 ```
 
 이미 이 서버에서 refresh 를 돌려본 흔적이 있다(`REFRESH_EXCLUDE` 의 032c 주석).
@@ -167,9 +168,44 @@ Playwright chromium 이 소스마다 뜨므로 **CPU 보다 메모리가 먼저 
                 pnpm refresh -- --dry-run     ← 워크리스트 + 🔌 서킷브레이커 대기 확인
 4. **첫 실행 --ignore-backoff** (§2). 타이머 미기동 상태에서 수동 1회
 5. 결과 검토 → REFRESH_EXCLUDE 확정, concurrency/리소스 캡 결정
-6. deploy/systemd/lab/* 설치 → timer enable
+6. deploy/systemd/lab/* 설치 → timer enable   ← **sudo 불필요, 아래**
 7. (EC2 timer disable — **이미 완료됨**, 아래)
 ```
+
+### 타이머 설치 — 권한 부여도 담당자 대기도 필요 없다
+
+`sudo` 에는 비밀번호가 걸려 있지만(§0), **이 유닛들은 시스템 유닛일 이유가 없다.**
+확인한 사실:
+
+```
+loginctl show-user kjk -p Linger   →  Linger=yes
+systemctl --user is-system-running →  running
+```
+
+`Linger=yes` 면 **로그인 세션이 없어도 유저 매니저가 부팅 시 뜬다.** 시스템 유닛으로
+얻는 것이 없고, user unit 은 `kjk` 가 자기 홈에 파일을 놓는 것이라 sudo 가 개입하지
+않는다. 그래서 `deploy/systemd/lab/*` 는 user unit 으로 작성돼 있다 — `User=` 가 없고
+(유저 매니저가 곧 `kjk`), `WantedBy=default.target` 이다.
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp ~/kiko-crawler/deploy/systemd/lab/* ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now kiko-refresh.timer
+```
+
+확인 · 운용:
+
+```bash
+systemctl --user list-timers --all | grep kiko
+journalctl --user -u kiko-refresh -f
+systemctl --user stop kiko-refresh.timer     # 멈출 때
+```
+
+> 시스템 유닛으로 가야 할 이유가 생긴다면(예: 유저 매니저와 무관한 부팅 순서 의존)
+> 그때는 `sudo cp` → `sudo systemctl daemon-reload` → `sudo systemctl enable --now`
+> 세 줄이고, `kjk` 가 비밀번호를 알면 직접 실행하면 된다. 별도 권한 부여는
+> 그 경우에도 필요 없다.
 
 > ✅ **EC2 배치는 이미 정지했다 (2026-07-29 09:38 KST 이후).** 확인 근거는
 > `systemctl` 이 아니라 **DB 실행 이력**이다 — 타이머가 enabled 여도 서비스가 죽어
