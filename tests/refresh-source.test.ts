@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import {chunkByEncodedLength} from "../src/lib/product-refresh"
+import {chunkByEncodedLength, chunkRowsByJsonSize} from "../src/lib/product-refresh"
 import {
   backoffReason,
   backoffWaitMs,
@@ -350,6 +350,38 @@ test("chunkByEncodedLength: 예산을 혼자 넘기는 값도 버리지 않는�
   const huge = "가".repeat(500)
   const chunks = chunkByEncodedLength([huge, "b"], 10)
   assert.deepEqual(chunks, [[huge], ["b"]])
+})
+
+test("chunkRowsByJsonSize: 본문 크기 예산으로 자르고 순서를 보존한다", () => {
+  // 실측 사고 2026-08-01: browns 는 크롤이 807초 동안 정상이었는데 후보 upsert 를
+  // 통째로 보내다 nginx 413 을 맞아 **후보가 한 건도 적재되지 않았다**(0건).
+  const rows = [{a: 1}, {a: 2}, {a: 3}, {a: 4}]
+  assert.deepEqual(chunkRowsByJsonSize(rows, 10_000), [rows])
+
+  // JSON.stringify({a:1}) = 7B, +1 구분자 = 8B → 예산 16 이면 청크당 2개.
+  const chunks = chunkRowsByJsonSize(rows, 16)
+  assert.deepEqual(chunks, [[{a: 1}, {a: 2}], [{a: 3}, {a: 4}]])
+  assert.deepEqual(chunks.flat(), rows)
+})
+
+test("chunkRowsByJsonSize: 예산을 혼자 넘기는 행도 버리지 않는다", () => {
+  // 조용히 누락시키는 것보다 413 이 나는 편이 낫다 — 행 크기는 raw_product 의
+  // 이미지 배열 길이에 따라 수 배로 벌어진다.
+  const huge = {a: "x".repeat(500)}
+  const chunks = chunkRowsByJsonSize([huge, {a: "b"}], 50)
+  assert.equal(chunks.length, 2)
+  assert.deepEqual(chunks[0], [huge])
+})
+
+test("chunkRowsByJsonSize: 멀티바이트를 바이트 단위로 센다", () => {
+  // 한글 상품명이 raw_product 에 그대로 실린다. 문자 수로 세면 예산을 3배 초과한다.
+  const row = {name: "가".repeat(10)} // 10자 = UTF-8 30B
+  assert.ok(JSON.stringify(row).length < Buffer.byteLength(JSON.stringify(row), "utf8"))
+  assert.equal(chunkRowsByJsonSize([row, row], 45).length, 2)
+})
+
+test("chunkRowsByJsonSize: 빈 입력은 빈 배열", () => {
+  assert.deepEqual(chunkRowsByJsonSize([]), [])
 })
 
 test("chunkByEncodedLength: 빈 입력은 빈 배열", () => {

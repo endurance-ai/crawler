@@ -78,6 +78,48 @@ export function chunkByEncodedLength(
 }
 
 /**
+ * PostgREST 로 보내는 **본문(body)** 예산. 위 `LAST_SEEN_FILTER_BUDGET_BYTES` 는
+ * 쿼리스트링용이라 여기 쓸 수 없다 — 한도가 걸리는 곳이 다르다.
+ *
+ * nginx 기본 `client_max_body_size` 는 1MB 다. 배열 구분자·헤더 여유를 두고 절반으로
+ * 잡았다. 실측(2026-08-01) 후보 1행의 `raw_product` 는 평균 792B · p95 2.3KB 이므로
+ * 청크당 대략 200~600행이 된다.
+ */
+const UPSERT_BODY_BUDGET_BYTES = 512_000
+
+/**
+ * 행 배열을 직렬화 크기 기준으로 자른다.
+ *
+ * 왜 개수가 아니라 크기인가: 후보 행은 `raw_product`(Product 전체 JSON)를 통째로
+ * 싣는다. 이미지 배열 길이에 따라 행 크기가 수 배 차이 나므로 개수로 자르면
+ * 어떤 소스에서는 여전히 한도를 넘는다.
+ *
+ * 한 행이 예산보다 커도 버리지 않는다 — 단독 청크로 보내고 결과는 서버가 정한다.
+ * 조용히 누락시키는 것보다 413 이 나는 편이 낫다.
+ */
+export function chunkRowsByJsonSize<T>(
+  rows: T[],
+  budgetBytes = UPSERT_BODY_BUDGET_BYTES,
+): T[][] {
+  const chunks: T[][] = []
+  let current: T[] = []
+  let size = 0
+  for (const row of rows) {
+    // +1 = 배열 구분자.
+    const cost = Buffer.byteLength(JSON.stringify(row), "utf8") + 1
+    if (current.length > 0 && size + cost > budgetBytes) {
+      chunks.push(current)
+      current = []
+      size = 0
+    }
+    current.push(row)
+    size += cost
+  }
+  if (current.length > 0) chunks.push(current)
+  return chunks
+}
+
+/**
  * 이번 리스트에서 살아있음이 확인된 상품의 `last_seen_at` 을 올린다.
  *
  * 왜 필요한가: `applyUpdates` 는 **변경된 행만** 쓴다(실측 평균 32행/런). 값이
@@ -245,13 +287,20 @@ export async function enqueueRefreshCandidates(
     input.brands,
   )
   if (rows.length === 0) return {discovered: 0, brandUnmatched: 0}
-  const {error} = await db
-    .from("product_refresh_candidates")
-    .upsert(rows, {
-      onConflict: "platform_key,identity_key",
-      ignoreDuplicates: true,
-    })
-  if (error) throw new Error(`refresh candidate enqueue failed: ${error.message}`)
+  // 한 번에 보내면 큰 소스에서 nginx 413 이 난다. 실측 2026-08-01: browns 는
+  // 크롤 자체는 807초 동안 정상이었는데 이 upsert 에서 매번 죽어 **후보가 한 건도
+  // 적재된 적이 없었다**(0건). 런이 failed 로 끝나니 완전성 가드도 성공 이력을
+  // 못 쌓아, 재고 7,426건이 갱신 없이 방치됐다.
+  for (const chunk of chunkRowsByJsonSize(rows)) {
+    const {error} = await db
+      .from("product_refresh_candidates")
+      .upsert(chunk, {
+        onConflict: "platform_key,identity_key",
+        ignoreDuplicates: true,
+      })
+    // upsert 는 ignoreDuplicates 라 멱등하다 — 중간 실패 후 재시도해도 안전하다.
+    if (error) throw new Error(`refresh candidate enqueue failed: ${error.message}`)
+  }
   return {
     discovered: rows.filter((row) => row.status === "discovered").length,
     brandUnmatched: rows.filter((row) => row.status === "brand_unmatched").length,
