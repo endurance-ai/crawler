@@ -290,7 +290,7 @@ async function main() {
   const budgetMs = flags.budgetMinutes * 60_000
 
   if (!flags.dryRun && !process.env.OPENAI_API_KEY) {
-    // onboard-classify.ts 의 LLM 분류(gpt-4.1-nano)에 필요 — 없으면 청크가 전부
+    // onboard-classify.ts 의 LLM 분류(gpt-5.4-nano)에 필요 — 없으면 청크가 전부
     // 분류 실패로 무너지므로 크롤 시작 전에 조기 종료한다.
     console.error("OPENAI_API_KEY 가 필요합니다 (onboard-classify LLM 분류)")
     process.exit(1)

@@ -132,7 +132,7 @@ ZARA류(Akamai 방어)는 항상 real Chrome 경로를 쓴다 — lightpanda 대
 ## 4. 재분류 도구 (`tools/reclassify-categories.ts`)
 
 DB에 이미 적재된 상품의 category/subcategory를 재분류할 때 쓴다. 규칙기반
-(`classifyShopifyCategory`, 비용 없음) 우선 → 매칭 안 되면 LLM(gpt-4.1-nano) 폴백.
+(`classifyShopifyCategory`, 비용 없음) 우선 → 매칭 안 되면 LLM(gpt-5.4-nano) 폴백.
 
 ```bash
 # 전체 DB 재분류 (id 순서로 페이지 처리, 재개 가능)

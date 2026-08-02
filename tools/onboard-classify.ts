@@ -9,6 +9,7 @@ const RUN = process.argv[2], CONFIGS = process.argv[3], PASSOUT = process.argv[4
 // llm-scraper-enhanced rows (category/subcategory already LLM-filled during
 // crawl — see runHybridVariant in product-extraction-poc.ts).
 const VARIANT = process.env.ONBOARD_VARIANT || "existing"
+const OPENAI_MODEL = process.env.LLM_SCRAPER_MODEL || "gpt-5.4-nano"
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 const CANON = ["tops", "knitwear", "bottoms", "dresses", "outerwear", "underwear", "swimwear", "activewear", "shoes", "bags", "accessories", "eyewear", "jewelry", "headwear", "other"], SYM: Record<string, string> = {KRW: "₩", USD: "$", EUR: "€", GBP: "£"}
 const configs: any[] = JSON.parse(fs.readFileSync(CONFIGS, "utf8")); const cfgByKey: Record<string, any> = {}; for (const c of configs) cfgByKey[c.key] = c
@@ -16,16 +17,16 @@ const has = (v: any) => v !== null && v !== undefined && v !== "" && !(Array.isA
 const NOUN = /jacket|coat|pant|trouser|short|tee|shirt|top|knit|sweat|hoodie|cardigan|blouse|dress|skirt|bag|hat|cap|belt|scarf|sock|shoe|sneaker|boot|loafer|sandal|jean|denim|vest|blazer|parka|jersey|셔츠|팬츠|자켓|재킷|코트|니트|맨투맨|후드|원피스|스커트|가방|모자|바지|티셔츠/i
 const isAnomaly = (rows: any[]) => rows.length >= 3 && rows.filter((r) => { const n = (r.name || "").trim(); return n.split(/\s+/).length <= 2 && !NOUN.test(n) }).length / rows.length >= 0.6
 const uCls = {i: 0, o: 0}
-const mk = (s: {i: number; o: number}) => wrapLanguageModel({model: openai("gpt-4.1-nano"), middleware: {specificationVersion: "v3", wrapGenerate: async ({doGenerate}) => { const r = await doGenerate(); const u = r.usage as any; const n = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0); s.i += n(u?.inputTokens); s.o += n(u?.outputTokens); return r }}})
+const mk = (s: {i: number; o: number}) => wrapLanguageModel({model: openai(OPENAI_MODEL), middleware: {specificationVersion: "v3", wrapGenerate: async ({doGenerate}) => { const r = await doGenerate(); const u = r.usage as any; const n = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0); s.i += n(u?.inputTokens); s.o += n(u?.outputTokens); return r }}})
 const clsModel = mk(uCls)
 const ClsSchema = z.object({items: z.array(z.object({i: z.number(), category: z.string().nullable(), subcategory: z.string().nullable()}))})
 // hybrid variant 은 runHybridVariant / createInlineClassifier 가 **상세 페이지를 보고**
 // subcategory 를 뽑아 products.jsonl 에 실어 보낸다. 아래 classify() 는 이름만 보는
-// gpt-4.1-nano 배치 분류라 근거가 훨씬 약하므로, hybrid 일 때는 페이지 기반 값을 우선한다.
+// 이름+힌트만 보는 배치 분류보다 근거가 풍부하므로, hybrid 일 때는 페이지 기반 값을 우선한다.
 // (existing variant 에는 이 필드가 없으므로 기존 경로는 바이트 동일하게 유지된다.)
 const hybridSubcategory = (r: any): string | null =>
   VARIANT === "hybrid" && typeof r.subcategory === "string" && r.subcategory.trim() ? r.subcategory.trim() : null
-async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}], temperature: 0}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
+async function classify(items: {name: string; hint: string | null}[]) { const p: Record<number, any> = {}; for (let s = 0; s < items.length; s += 25) { const chunk = items.slice(s, s + 25).map((it, k) => ({i: s + k, name: it.name, hint: it.hint})); try { const res = await generateText({model: clsModel, output: Output.object({schema: ClsSchema}), system: `Classify each fashion product. category MUST be one of: ${CANON.join(", ")}. Use name+hint. One entry per index.`, messages: [{role: "user", content: JSON.stringify(chunk)}]}); for (const it of (res.output as any).items) p[it.i] = it } catch {} } return p }
 async function main() {
   // 빈 줄을 걸러내고 파싱한다. 크롤이 0건이면 products.jsonl 이 빈 파일이 되는데,
   // 예전에는 "".split("\n") → [""] → JSON.parse("") 로 터졌다. 브랜드 하나가 상품을
@@ -77,6 +78,6 @@ async function main() {
   for (const [key, prods] of Object.entries(perBrand)) { fs.writeFileSync(path.join("data", `${key}-products.json`), JSON.stringify(prods, null, 2)); written.push(key) }
   fs.writeFileSync(PASSOUT, JSON.stringify(written))
   const all = Object.values(perBrand).flat(); const fill = (f: string) => all.length ? Math.round(all.filter((p: any) => has(p[f])).length / all.length * 100) : 0
-  console.log(`=== ${written.length} files · ${all.length} products · fill price=${fill("price")} category=${fill("category")} · LLM $${(uCls.i / 1e6 * 0.1 + uCls.o / 1e6 * 0.4).toFixed(4)}`)
+  console.log(`=== ${written.length} files · ${all.length} products · fill price=${fill("price")} category=${fill("category")} · model=${OPENAI_MODEL} · LLM tokens in=${uCls.i} out=${uCls.o}`)
 }
 main().catch((e) => { console.error(e); process.exitCode = 1 })

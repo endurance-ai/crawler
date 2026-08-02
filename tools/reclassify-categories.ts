@@ -41,9 +41,10 @@ const CONCURRENCY = 8
 const db = createClient(process.env.DB_URL!, process.env.DB_TOKEN!)
 
 const usage = {i: 0, o: 0}
+const OPENAI_MODEL = process.env.LLM_SCRAPER_MODEL || "gpt-5.4-nano"
 const num = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0)
 const model = wrapLanguageModel({
-  model: openai("gpt-4.1-nano"),
+  model: openai(OPENAI_MODEL),
   middleware: {
     specificationVersion: "v3",
     wrapGenerate: async ({doGenerate}) => {
@@ -69,7 +70,6 @@ async function classifyBatch(items: {i: number; name: string; hint: string; bran
       output: Output.object({schema: ClsSchema}),
       system: SYSTEM,
       messages: [{role: "user", content: JSON.stringify(items.map((it) => ({i: it.i, name: it.name, brand: it.brand, hint: it.hint})))}],
-      temperature: 0,
     })
     for (const it of (res.output as any).items) {
       const cat = String(it.category || "").toLowerCase().trim()
@@ -190,8 +190,7 @@ async function main() {
     }
 
     lastId = data[data.length - 1].id
-    const cost = (usage.i / 1e6) * 0.1 + (usage.o / 1e6) * 0.4
-    console.log(`  page done · processed=${processed} changed=${changed} · det=${detCount} llm=${llmRows.length} · lastId=${lastId} · LLM $${cost.toFixed(4)}`)
+    console.log(`  page done · processed=${processed} changed=${changed} · det=${detCount} llm=${llmRows.length} · lastId=${lastId} · model=${OPENAI_MODEL} · LLM tokens in=${usage.i} out=${usage.o}`)
 
     if (LIMIT && processed >= LIMIT) break
     if (data.length < PAGE) break
@@ -199,9 +198,8 @@ async function main() {
     if (ONLY_INVALID && DRY) break
   }
 
-  const cost = (usage.i / 1e6) * 0.1 + (usage.o / 1e6) * 0.4
   console.log(`\n=== DONE ${DRY ? "(DRY-RUN, no writes)" : "(LIVE)"} ===`)
-  console.log(`processed=${processed} changed=${changed} · LLM $${cost.toFixed(4)}`)
+  console.log(`processed=${processed} changed=${changed} · model=${OPENAI_MODEL} · LLM tokens in=${usage.i} out=${usage.o}`)
   console.log("new family distribution:")
   Object.entries(newDist).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${k}: ${v}`))
   console.log("\nsample old→new (changed):")

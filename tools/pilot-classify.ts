@@ -4,7 +4,7 @@
  * 의 category/subcategory를 canonical taxonomy로 채운다.
  *
  * onboard-classify.ts 는 poc-runs/products.jsonl(POC 스키마) 전용이라 직접 크롤
- * 산출물에는 못 쓴다. 이 도구는 같은 배치 분류 접근(gpt-4.1-nano, 25개/청크)을
+ * 산출물에는 못 쓴다. 이 도구는 같은 배치 분류 접근(gpt-5.4-nano, 25개/청크)을
  * data/*.json 에 적용하는 얇은 어댑터다. taxonomy 원천은 product-enums.ts
  * (bulk-onboarding.md §0 핵심 원칙 — 자체 CANON 하드코딩 금지).
  *
@@ -19,8 +19,9 @@ import {z} from "zod"
 import {CATEGORIES, SUBCATEGORIES, type Category} from "../src/lib/enums/product-enums"
 
 const usage = {input: 0, output: 0}
+const OPENAI_MODEL = process.env.LLM_SCRAPER_MODEL || "gpt-5.4-nano"
 const model = wrapLanguageModel({
-  model: openai("gpt-4.1-nano"),
+  model: openai(OPENAI_MODEL),
   middleware: {
     specificationVersion: "v3",
     wrapGenerate: async ({doGenerate}) => {
@@ -74,7 +75,6 @@ async function classifyBatch(
           `subcategory MUST come from the matching category's list below (or null):\n${enumReference}\n` +
           `Use the product name plus the site-category hint. Non-fashion or unclassifiable → "other". One entry per index.`,
         messages: [{role: "user", content: JSON.stringify(chunk)}],
-        temperature: 0,
       })
       for (const item of (res.output as z.infer<typeof Schema>).items) {
         out.set(item.i, {category: item.category, subcategory: item.subcategory})
@@ -129,8 +129,7 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   for (const key of keys) await processSite(key)
-  const cost = (usage.input / 1e6) * 0.1 + (usage.output / 1e6) * 0.4
-  console.log(`LLM tokens in=${usage.input} out=${usage.output} · $${cost.toFixed(4)}`)
+  console.log(`model=${OPENAI_MODEL} · LLM tokens in=${usage.input} out=${usage.output}`)
 }
 
 main().catch((err) => {
