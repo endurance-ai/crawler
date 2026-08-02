@@ -5,6 +5,7 @@ import {chunkByEncodedLength, chunkRowsByJsonSize} from "../src/lib/product-refr
 import {
   backoffReason,
   backoffWaitMs,
+  brandFromNamePrefix,
   buildPlatformRepairPlan,
   buildRefreshCandidateInputs,
   buildRefreshWorklist,
@@ -386,4 +387,43 @@ test("chunkRowsByJsonSize: 빈 입력은 빈 배열", () => {
 
 test("chunkByEncodedLength: 빈 입력은 빈 배열", () => {
   assert.deepEqual(chunkByEncodedLength([], 100), [])
+})
+
+test("brandFromNamePrefix: '[BRAND] 제품명' 프리픽스만 브랜드로 인정한다", () => {
+  assert.equal(brandFromNamePrefix("[HORLISUN] BAKER COZY PANTS (DARK GREEN)"), "HORLISUN")
+  assert.equal(brandFromNamePrefix("  [ROUGH SIDE] Surplus Shirt"), "ROUGH SIDE")
+  // 프리픽스가 없으면 빈 문자열 — 상품명을 브랜드로 오인하지 않는다
+  assert.equal(brandFromNamePrefix("BAKER COZY PANTS"), "")
+  // 프리픽스가 문자열 중간에 있으면 무시
+  assert.equal(brandFromNamePrefix("BAKER [SALE] PANTS"), "")
+  // 닫는 괄호 없음 / 40자 초과는 브랜드로 보지 않는다
+  assert.equal(brandFromNamePrefix("[BAKER COZY PANTS"), "")
+  assert.equal(brandFromNamePrefix(`[${"A".repeat(41)}] X`), "")
+})
+
+test("havati 같은 편집샵은 상품명 프리픽스로 기존 브랜드에 매칭된다", () => {
+  const havati: SiteConfig = {
+    key: "havati",
+    name: "하바티",
+    type: "cafe24",
+    baseUrl: "https://havatishop.com",
+    multiBrand: true,
+    brandFromNamePrefix: true,
+  }
+  const rows = buildRefreshCandidateInputs(
+    [
+      {productUrl: "https://havatishop.com/product/detail.html?product_no=1", brand: "HORLISUN", name: "[HORLISUN] A"},
+      {productUrl: "https://havatishop.com/product/detail.html?product_no=2", brand: "", name: "[NOBRAND] B"},
+    ],
+    havati,
+    [{id: 77, brand_name: "HORLISUN", brand_name_normalized: "horlisun"}],
+  )
+  assert.deepEqual(
+    rows.map((row) => [row.detected_brand, row.status, row.matched_brand_node_id]),
+    [
+      ["HORLISUN", "discovered", 77],
+      // 엔진이 브랜드를 못 뽑은 상품은 종전대로 파킹 — 자동 생성하지 않는다
+      [null, "brand_unmatched", null],
+    ],
+  )
 })

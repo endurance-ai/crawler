@@ -10,6 +10,7 @@
  */
 
 import {installRequestBlocking} from "./request-blocking"
+import {BRAND_NAME_PREFIX_PATTERN} from "./refresh-source"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
@@ -348,6 +349,7 @@ async function collectProductsFromPage(
     baseUrl: config.baseUrl,
     platformKey: config.key,
     pricePatternStr: config.pricePattern?.source || null,
+    brandPrefixPatternStr: config.brandFromNamePrefix ? BRAND_NAME_PREFIX_PATTERN : null,
     sourceCurrency: config.sourceCurrency || "KRW",
   }
 
@@ -532,6 +534,12 @@ async function collectProductsFromPage(
         // 잘못 주워오는 경우가 있다(goyowear: .name의 displaynone 라벨 텍스트가
         // .description 첫 줄로 새어 들어옴, taats에서도 동일 패턴 확인).
         let brand = args.brandNameOverride || ""
+        // "[BRAND] 제품명" 편집샵: 상품명 프리픽스가 DOM 추측보다 훨씬 정확하므로
+        // 폴백 체인 맨 앞에 둔다 (config.brandFromNamePrefix 로 옵트인).
+        if (!brand && args.brandPrefixPatternStr) {
+          var prefixM = name.match(new RegExp(args.brandPrefixPatternStr))
+          if (prefixM) brand = prefixM[1].trim()
+        }
         if (!brand) {
           // 상품 텍스트에서 추출 (Cafe24 편집샵은 보통 브랜드명이 상품명 앞에 있음)
           const brandEl = el.querySelector(".brand, [class*=brand], .manufacturer, .mf_name, p.b, .b")

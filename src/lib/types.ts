@@ -137,6 +137,12 @@ export interface SiteConfig {
    * 직접 크롤(Path A)이 아니라 온보딩 파이프라인(Path B)으로 수집해야 한다.
    */
   multiBrand?: boolean
+  /**
+   * 상품명이 "[BRAND] 제품명" 형식인 편집샵에서 브랜드를 상품명 프리픽스로 추출한다.
+   * `multiBrand` 와 함께 켜는 것이 정상 조합 — DOM 브랜드 추출이 아무것도 못 주워
+   * 후보가 전량 brand_unmatched 로 파킹되는 것을 막는다(havati 실측 1,669건).
+   */
+  brandFromNamePrefix?: boolean
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
   /** 카테고리 탐색 설정 */
