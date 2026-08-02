@@ -38,6 +38,12 @@ test("remote worker에서도 명시적인 fallback 이미지 선택 메타데이
   assert.equal(selected.imageSelection?.kind, "fallback")
   assert.equal(selected.imageSelection?.candidateCount, 1)
 })
+test("fallback 이미지 선택은 10장을 넘는 전체 배열을 보존한다", () => {
+  const images = Array.from({length: 12}, (_, i) => `https://cdn.example/${i}.jpg`)
+  const selected = withFallbackImageSelection({...product, images})
+  assert.equal(selected.images?.length, 13)
+  assert.equal(selected.imageSelection?.candidateCount, 13)
+})
 test("신규상품 DB payload는 기존 brand_node_id와 source platform을 강제한다", () => {
   const row = productToCandidateDbRow(product, config, 11)
   assert.equal(row.brand_node_id, 11)

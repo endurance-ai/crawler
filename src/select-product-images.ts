@@ -2,12 +2,9 @@
 /**
  * 모델컷/제품컷 판별로 `products.image_url` 을 고르는 도구.
  *
- * ⚠️ **휴면 상태다 (2026-07-30).** 어떤 배치·타이머·스케줄에도 배선되어 있지
- * 않고, 크롤/갱신 경로 어디서도 이 모듈을 import 하지 않는다. 로컬에서 만든
- * 실험이며 완성 전이다. dev 에 두는 이유는 브랜치에 방치하면 `Product`/파서가
- * 바뀔 때 조용히 깨지기 때문이다 — 여기 있으면 CI typecheck 가 지켜준다.
- * DB 쪽 절반(`kiko.ai-app` migration 092/093 `product_image_selection`)은 이미
- * 머지되어 있다.
+ * 수동 실행 전용이다. 어떤 배치·타이머·스케줄에도 자동 배선되어 있지 않으며,
+ * macOS 로컬 작업자가 명시적으로 실행한다. DB 적용은 migration 102의 RPC를 통해
+ * 대표 이미지가 바뀐 상품의 기존 embedding/VLM feature를 함께 무효화한다.
  *
  * ## 실행 전제
  * - **macOS 전용.** 이미지 분류를 Apple Vision 으로 한다
@@ -16,16 +13,9 @@
  *   네이티브 테스트는 `{skip: process.platform !== "darwin"}` 로 가드되어 있어
  *   리눅스 CI 에서는 자동 스킵된다.
  *
- * ## ⚠️ 다시 살릴 때 반드시 처리해야 하는 것
- * `image_url` 을 바꾸면 **그 상품의 이미지 파생 산출물이 전부 무효가 된다**:
- *   - `product_embeddings` — 검색 모수. 재임베딩 없으면 옛 이미지로 검색된다
- *   - `product_features`   — VLM 이 뽑은 primary_color/gender 등. 색·성별의
- *                            단일 출처이므로(2026-07-29 이관) 옛 이미지 기준
- *                            값이 남으면 색상 필터가 틀린다
- * 즉 이 도구를 실제로 돌리려면 변경된 product_id 를 재임베딩 + VLM 재생성
- * 큐에 넣는 경로가 먼저 있어야 한다. `product_features_pending`
- * (kiko.ai-app migration 097) 와 같은 패턴이 하나 더 필요하다.
- * 이 경로 없이 돌리면 검색 품질이 조용히 나빠진다.
+ * `image_url` 이 바뀌면 `product_embeddings`와 `product_features`의 해당 행을
+ * 삭제해 기존 pending 조회 경로가 다시 처리하도록 한다. 이미지 배열 자체는
+ * 수집된 전체 후보를 유지하며 대표 이미지 순서로만 재정렬한다.
  */
 
 import * as fs from "node:fs"
@@ -511,7 +501,7 @@ async function runRollback(flags: Flags, manifestPath: string): Promise<void> {
         before_url: row.after_url,
         after_url: row.before_url,
         source_image_url: row.source_image_url,
-        images: [row.before_url, ...row.images.filter((url) => url !== row.before_url)].slice(0, 10),
+        images: [row.before_url, ...row.images.filter((url) => url !== row.before_url)],
         kind: "fallback",
         score: 0,
         version: `${IMAGE_SELECTION_VERSION}-rollback`,
@@ -541,7 +531,7 @@ async function runRollback(flags: Flags, manifestPath: string): Promise<void> {
       ...product,
       imageUrl: row.before_url,
       sourceImageUrl: row.source_image_url,
-      images: [row.before_url, ...row.images.filter((url) => url !== row.before_url)].slice(0, 10),
+      images: [row.before_url, ...row.images.filter((url) => url !== row.before_url)],
       imageSelection: {
         kind: "fallback" as const,
         score: 0,

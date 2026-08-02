@@ -204,7 +204,6 @@ export function parseShopifyProducts(
     const images = sp.images
       .map((img) => img.src)
       .filter((src): src is string => typeof src === "string" && isSafeImageUrl(src, baseHost))
-      .slice(0, 10)
     const imageUrl = images[0] || ""
 
     const tags = sp.tags.length > 0 ? sp.tags.slice(0, 50).map((t) => t.slice(0, 100)) : undefined

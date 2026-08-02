@@ -2,7 +2,6 @@
 import {extractStructuredProduct} from "./parsers/structured-data"
 
 export const IMAGE_SELECTION_VERSION = "mac-vision-v1"
-export const MAX_IMAGE_CANDIDATES = 10
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
 const ASSET_RE =
@@ -117,7 +116,7 @@ export function collectImageCandidatesFromHtml(
   const candidates: string[] = []
   const seen = new Set<string>()
   const add = (raw: string | null | undefined): void => {
-    if (!raw || candidates.length >= MAX_IMAGE_CANDIDATES) return
+    if (!raw) return
     const normalized = safeImageUrl(raw, pageUrl)
     if (!normalized || seen.has(normalized)) return
     seen.add(normalized)

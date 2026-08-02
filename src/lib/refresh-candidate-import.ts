@@ -8,7 +8,7 @@ export function withFallbackImageSelection(product: Product): Product {
   const images = [
     product.imageUrl,
     ...(product.images ?? []),
-  ].filter((url, index, rows) => Boolean(url) && rows.indexOf(url) === index).slice(0, 10)
+  ].filter((url, index, rows) => Boolean(url) && rows.indexOf(url) === index)
   if (images.length === 0) throw new Error("candidate has no image")
   return {
     ...product,
@@ -64,7 +64,7 @@ export function productToCandidateDbRow(
     brand_node_id: brandNodeId,
     crawled_at: selected.crawledAt,
     subcategory: selected.subcategory ?? null,
-    images: selected.images?.slice(0, 10) ?? null,
+    images: selected.images ?? null,
     image_selection_kind: selected.imageSelection!.kind,
     image_selection_score: selected.imageSelection!.score,
     image_selection_version: selected.imageSelection!.version,

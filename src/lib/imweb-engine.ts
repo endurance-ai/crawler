@@ -229,7 +229,7 @@ async function enrichFromDetail(product: Product, delay: number): Promise<void> 
 
   if (structured.inStock !== null) product.inStock = structured.inStock
   if (structured.images.length > 0) {
-    product.images = [...new Set([...(product.images ?? []), ...structured.images])].slice(0, 10)
+    product.images = [...new Set([...(product.images ?? []), ...structured.images])]
     if (!product.imageUrl) product.imageUrl = structured.images[0]
   }
   if (structured.sku && !product.productCode) product.productCode = structured.sku

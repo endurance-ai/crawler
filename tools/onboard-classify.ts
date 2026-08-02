@@ -72,7 +72,7 @@ async function main() {
     // 멀티브랜드 편집샵은 스토어명으로 폴백하지 않는다 — LLM 이 상품에서 뽑은
     // 브랜드를 쓰고, 못 뽑으면 "" 로 남겨 import 의 provenance 가드가 격리한다
     // (`lib/brand-provenance.ts`). 단일브랜드몰은 종전대로 cfg.name 폴백 + 경고.
-    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: hybridSubcategory(r) ?? p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, brand: cfg.brand || (cfg.multiBrand ? ((p as {brand?: string}).brand ?? "") : cfg.name), crawledAt: new Date().toISOString()}) })
+    ;(perBrand[r.brand_key] ||= []).push({name: r.name, category: p.category ?? r.category ?? null, subcategory: hybridSubcategory(r) ?? p.subcategory ?? null, price, originalPrice: price, salePrice: null, priceFormatted: price != null ? `${SYM[cur] || ""}${price.toLocaleString()}` : "", sourceCurrency: cur, imageUrl: r.image_url, images: Array.isArray(r.images) && r.images.length > 0 ? r.images : (r.image_url ? [r.image_url] : null), productUrl: r.product_url, inStock: r.in_stock, platform: r.brand_key, brand: cfg.brand || (cfg.multiBrand ? ((p as {brand?: string}).brand ?? "") : cfg.name), crawledAt: new Date().toISOString()}) })
   fs.mkdirSync("data", {recursive: true}); const written: string[] = []
   for (const [key, prods] of Object.entries(perBrand)) { fs.writeFileSync(path.join("data", `${key}-products.json`), JSON.stringify(prods, null, 2)); written.push(key) }
   fs.writeFileSync(PASSOUT, JSON.stringify(written))

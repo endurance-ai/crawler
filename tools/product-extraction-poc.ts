@@ -76,6 +76,7 @@ interface PocProduct {
   price: number | null
   currency: string | null
   image_url: string | null
+  images?: string[] | null
   product_url: string | null
   in_stock: boolean | null
   raw_category: string | null
@@ -503,12 +504,19 @@ async function runExistingVariant(
 function existingProductToPoc(product: Product, config: SiteConfig, elapsedMs: number): PocProduct {
   const productUrl = absolutizeUrl(product.productUrl, config.baseUrl) ?? product.productUrl
   const currency = product.sourceCurrency ?? config.sourceCurrency ?? "KRW"
+  const imageUrl = absolutizeUrl(product.imageUrl, productUrl || config.baseUrl)
+  const images = [...new Set(
+    (product.images ?? [product.imageUrl])
+      .map((url) => absolutizeUrl(url, productUrl || config.baseUrl))
+      .filter((url): url is string => Boolean(url)),
+  )]
   const row: PocProduct = {
     product_key: stableProductKey(config.key, productUrl || product.productUrl || product.name, config),
     name: cleanString(product.name),
     price: product.price,
     currency,
-    image_url: absolutizeUrl(product.imageUrl, productUrl || config.baseUrl),
+    image_url: imageUrl,
+    images: images.length > 0 ? images : null,
     product_url: productUrl,
     in_stock: product.inStock,
     raw_category: cleanString(product.category),

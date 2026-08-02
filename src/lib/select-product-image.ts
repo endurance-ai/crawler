@@ -6,7 +6,6 @@ import type {Product} from "./types"
 import {
   collectImageCandidatesFromHtml,
   IMAGE_SELECTION_VERSION,
-  MAX_IMAGE_CANDIDATES,
   rankImageCandidates,
   type ImageCandidateAnalysis,
   type ImageSelectionKind,
@@ -137,7 +136,6 @@ export class LocalProductImageSelector {
         }
       }
     }
-    urls = urls.slice(0, MAX_IMAGE_CANDIDATES)
     if (urls.length === 0) {
       // Preserve the empty legacy shape while still producing deterministic
       // selection metadata. Import QC can then report it as a fallback.
@@ -158,7 +156,7 @@ export class LocalProductImageSelector {
       ...product,
       sourceImageUrl,
       imageUrl: ranked.selected.url,
-      images: ranked.ordered.map((item) => item.url).slice(0, MAX_IMAGE_CANDIDATES),
+      images: ranked.ordered.map((item) => item.url),
       imageSelection: {
         kind: ranked.kind,
         score: ranked.score,

@@ -632,7 +632,7 @@ async function main() {
         crawled_at: p.crawledAt as string,
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
         subcategory: p.subcategory || null,
-        images: p.images?.slice(0, 10) || null,
+        images: p.images || null,
         size_info: p.sizeInfo?.slice(0, 2000) || null,
         tags: p.tags?.slice(0, 50) || null,
         product_code: p.productCode?.slice(0, 100) || null,

@@ -64,7 +64,7 @@ test("collectImageCandidatesFromHtml merges structured data, srcset, and gallery
   )
 })
 
-test("collectImageCandidatesFromHtml keeps current image first and caps at ten", () => {
+test("collectImageCandidatesFromHtml keeps current image first without truncating candidates", () => {
   const tags = Array.from(
     {length: 14},
     (_, i) => `<img src="https://cdn.example.com/${i}.jpg">`,
@@ -76,7 +76,7 @@ test("collectImageCandidatesFromHtml keeps current image first and caps at ten",
     ["https://cdn.example.com/current.jpg"],
   )
 
-  assert.equal(result.length, 10)
+  assert.equal(result.length, 15)
   assert.equal(result[0], "https://cdn.example.com/current.jpg")
 })
 

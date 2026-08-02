@@ -101,7 +101,7 @@ function extractImages(value: unknown): string[] {
     const rec = asRecord(value)
     if (rec) push(rec.url ?? rec.contentUrl)
   }
-  return urls.slice(0, 10)
+  return urls
 }
 
 interface OfferFields {

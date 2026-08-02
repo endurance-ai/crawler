@@ -217,6 +217,20 @@ test("characterize: every shopify product carries platform/key + USD shape + whi
   }
 })
 
+test("shopify preserves every safe product image without a ten-image cap", () => {
+  const fixture = loadFixture()
+  const first = fixture.products[0]
+  const expected = Array.from({length: 12}, (_, i) => ({
+    src: `https://cdn.shopify.com/s/files/1/fixture-${i + 1}.jpg`,
+  }))
+  first.images = expected
+
+  const [product] = parseShopifyProducts(fixture, BASE_URL, KEY, PARSE_OPTIONS)
+
+  assert.equal(product.images?.length, 12)
+  assert.deepEqual(product.images, expected.map((image) => image.src))
+})
+
 test("characterize: shopify skip-rules exclude lookbook/gift-card/Rise.ai/unsafe-handle", () => {
   const fixture = loadFixture()
   const products = parseShopifyProducts(fixture, BASE_URL, KEY, PARSE_OPTIONS)

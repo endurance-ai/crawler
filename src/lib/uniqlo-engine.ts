@@ -140,8 +140,7 @@ function mapImages(item: UniqloItem): {primary: string; all: string[]} {
     }
   }
 
-  const limited = collected.slice(0, 10)
-  return {primary: limited[0] ?? "", all: limited}
+  return {primary: collected[0] ?? "", all: collected}
 }
 
 /**
