@@ -23,6 +23,27 @@ export interface BrandSourceTrust {
   multiBrand?: boolean
 }
 
+export interface ProductBrandConfig {
+  brand?: string | null
+  multiBrand?: boolean
+}
+
+/**
+ * 크롤 결과에 저장할 브랜드를 한 곳에서 결정한다.
+ *
+ * 단일브랜드 자사몰은 큐레이션된 `config.brand`가 원본이다. 페이지의 vendor/DOM
+ * 값은 운영사명, 번역명, 스펙 라벨일 수 있으므로 사용하지 않는다. 멀티브랜드몰만
+ * 상품별 추출값을 그대로 사용한다.
+ */
+export function resolveProductBrand(
+  productBrand: unknown,
+  config?: ProductBrandConfig,
+): string {
+  const houseBrand = config?.brand?.trim() ?? ""
+  if (houseBrand && !config?.multiBrand) return houseBrand
+  return typeof productBrand === "string" ? productBrand.trim() : ""
+}
+
 /**
  * `multiBrand` 를 함께 보는 이유: 현재 config 중 `brand` 와 `multiBrand` 를 동시에
  * 가진 것은 0개지만(2026-07-30 실측), 나중에 편집샵에 하우스 브랜드를 적어 넣으면

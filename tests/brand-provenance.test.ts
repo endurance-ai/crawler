@@ -5,8 +5,25 @@ import {
   isTrustedBrandSource,
   partitionUnknownBrands,
   recordUnknownBrand,
+  resolveProductBrand,
   type UnknownBrandEntry,
 } from "../src/lib/brand-provenance"
+
+test("단일브랜드몰은 페이지 추출값 대신 config.brand를 그대로 쓴다", () => {
+  assert.equal(
+    resolveProductBrand("판매가 : 39,000, 상품명 : 니트", {brand: "Marge Sherwood"}),
+    "Marge Sherwood",
+  )
+  assert.equal(resolveProductBrand("translated vendor", {brand: "A.P.C."}), "A.P.C.")
+})
+
+test("멀티브랜드몰은 상품에서 추출한 브랜드명을 그대로 유지한다", () => {
+  assert.equal(
+    resolveProductBrand("Maison Margiela", {brand: "Store Operator", multiBrand: true}),
+    "Maison Margiela",
+  )
+  assert.equal(resolveProductBrand("  KITH  ", {multiBrand: true}), "KITH")
+})
 
 test("단일브랜드 자사몰만 신규 brand_nodes 자동 생성을 신뢰한다", () => {
   assert.equal(isTrustedBrandSource({selfBranded: true}), true)

@@ -22,6 +22,7 @@ import {
   isTrustedBrandSource,
   partitionUnknownBrands,
   recordUnknownBrand,
+  resolveProductBrand,
   type UnknownBrandEntry,
 } from "./lib/brand-provenance"
 
@@ -75,27 +76,6 @@ interface CrawledProduct {
   // 리뷰 데이터
   reviewCount?: number
   reviews?: CrawledReview[]
-}
-
-// 자사몰: brand가 비어있으면 이 이름으로 채움
-const SELF_BRANDED: Record<string, string> = {
-  roughside: "Roughside",
-  bastong: "Bastong",
-  blankroom: "Blankroom",
-  havati: "Havati",
-  mardimercredi: "Mardi Mercredi",
-  sienneboutique: "Sienne",
-  eastlogue: "Eastlogue",
-  anotheroffice: "Another Office",
-  slowsteadyclub: "Slow Steady Club",
-  llud: "LLUD",
-  pottery: "Pottery",
-  beslow: "Beslow",
-  steadyeverywear: "Steady Everywear",
-  chanceclothing: "Chance Clothing",
-  yuse: "YUSE",
-  ojos: "OJOS",
-  goyowear: "GOYOWEAR",
 }
 
 // ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
@@ -429,6 +409,7 @@ async function main() {
 
   for (const file of files) {
     const platform = file.replace("-products.json", "")
+    const config = getSiteConfig(platform)
     const filePath = path.join(dataDir, file)
     let raw: CrawledProduct[]
     try {
@@ -439,17 +420,16 @@ async function main() {
     fileCache.set(file, raw)
 
     for (const p of raw) {
-      const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
+      const brand = resolveProductBrand(p.brand, config)
       if (!brand) continue
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
       if (brandNodeId === null) {
-        const config = getSiteConfig(platform)
         recordUnknownBrand(
           unknownBrands,
           brand,
           platform,
           isTrustedBrandSource({
-            selfBranded: platform in SELF_BRANDED,
+            selfBranded: false,
             configBrand: config?.brand,
             multiBrand: config?.multiBrand,
           }),
@@ -491,6 +471,7 @@ async function main() {
 
   for (const file of files) {
     const platform = file.replace("-products.json", "")
+    const config = getSiteConfig(platform)
 
     const cached = fileCache.get(file)
     if (!cached) {
@@ -536,7 +517,7 @@ async function main() {
     const priceSkipSamples: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
-      const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
+      const brand = resolveProductBrand(p.brand, config)
       const productUrl = (p.productUrl as string) || ""
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
 
@@ -717,9 +698,7 @@ async function main() {
     console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
     // 단일브랜드 자사몰: 파일의 대표 브랜드명으로 brand_node 해석 폴백에 사용
     const dominantBrand =
-      (rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand as string | undefined) ??
-      SELF_BRANDED[platform] ??
-      null
+      resolveProductBrand(rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand, config) || null
     const qcPassRate = rawAll.length > 0 ? raw.length / rawAll.length : 1
     await syncProductCrawlStatus(platform, dominantBrand, {inserted, errors, total: deduped.length, qcPassRate})
     totalInserted += inserted
