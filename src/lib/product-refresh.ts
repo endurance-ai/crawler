@@ -165,13 +165,22 @@ export async function loadRefreshRunOutcomes(
   for (let offset = 0; ; offset += pageSize) {
     const {data, error} = await db
       .from("product_refresh_runs")
-      .select("platform_key,status,started_at")
+      .select("platform_key,status,started_at,metrics")
       .gte("started_at", since)
       .order("started_at", {ascending: false})
       .range(offset, offset + pageSize - 1)
     if (error) throw new Error(`refresh run history load failed: ${error.message}`)
-    const page = (data ?? []) as RefreshRunOutcome[]
-    rows.push(...page)
+    // metrics 는 jsonb 라 그대로 두면 RefreshRunOutcome 과 모양이 다르다 —
+    // 서킷브레이커가 보는 unreachable_only 만 평평하게 끌어올린다.
+    const page = (data ?? []) as Array<RefreshRunOutcome & {metrics?: Record<string, unknown> | null}>
+    rows.push(
+      ...page.map((row) => ({
+        platform_key: row.platform_key,
+        status: row.status,
+        started_at: row.started_at,
+        unreachable_only: Boolean(row.metrics?.unreachable_only),
+      })),
+    )
     if (page.length < pageSize) break
   }
   return rows

@@ -316,14 +316,19 @@ async function main() {
         // 보지 않는다. 섞여 있던 동안 가격을 못 읽는 것이 재고 이탈 감지까지 막았고
         // 런이 failed 로 남아 성공 이력이 영구히 안 쌓였다 (실측 42개 소스).
         const qualityWarnings = crawlResult.qualityWarnings ?? []
+        // 닿지 못한 것(unreachable)은 가드에서는 errors 와 동일하게 본다 — 리스트가
+        // 안 열렸는데 사라진 상품을 품절 처리하면 안 된다. 백오프에서만 다르게 센다.
+        const unreachable = crawlResult.unreachable ?? []
         const guardOk =
           crawlResult.errors.length === 0 &&
+          unreachable.length === 0 &&
           provisional.coverage >= flags.minCoverage
         if (!guardOk && provisional.missingUrls.length > 0) {
           guardTripped += 1
           console.log(
             `   ⚠️ 완전성 가드 — coverage ${(provisional.coverage * 100).toFixed(0)}%` +
-              `, engine errors ${crawlResult.errors.length}; 누락 ${provisional.missingUrls.length}건 품절 처리 안 함`,
+              `, engine errors ${crawlResult.errors.length}, 도달실패 ${unreachable.length}` +
+              `; 누락 ${provisional.missingUrls.length}건 품절 처리 안 함`,
           )
         }
         const diff = guardOk
@@ -354,7 +359,12 @@ async function main() {
         brandUnmatchedTotal += queued.brandUnmatched
         // 런 성패도 품질 경고를 보지 않는다 — 가격을 못 읽어도 재고 갱신은 성공한 것이다.
         // 경고는 아래 메트릭에 남겨 추적 가능하게 둔다.
-        const failed = applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0
+        // unreachable 은 failed 로 친다(성공이 아니므로 last_succeeded_at 을 올리면
+        // 안 된다). 다만 백오프 사다리는 metrics.unreachable_only 를 보고 건너뛴다.
+        const failed =
+          applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
+        const unreachableOnly =
+          unreachable.length > 0 && applied.failed === 0 && seen.failed === 0 && crawlResult.errors.length === 0
         console.log(
           `✓ ${label}: 리스트 ${crawled.length} · DB ${existing.length}` +
             ` · 변경 ${diff.updates.length}(가격 ${priceN}, 재고 ${stockN})` +
@@ -371,6 +381,7 @@ async function main() {
           errorMessage: failed
             ? [
                 ...crawlResult.errors,
+                ...unreachable,
                 applied.failed > 0 ? `update failures=${applied.failed}` : "",
                 seen.failed > 0 ? `last_seen failures=${seen.failed}` : "",
               ]
@@ -390,6 +401,8 @@ async function main() {
             guard_tripped: !guardOk,
             engine_errors: crawlResult.errors,
             quality_warnings: qualityWarnings,
+            unreachable,
+            unreachable_only: unreachableOnly,
           },
         })
         done += 1
