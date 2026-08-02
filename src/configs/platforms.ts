@@ -487,6 +487,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "하바티",
     type: "cafe24",
     baseUrl: "https://havatishop.com",
+    // 편집샵 — 상품 1,823건 전부 "[HORLISUN] ..." 처럼 상품명에 브랜드가 박혀 있다.
+    // 2026-08-02 이전에는 두 플래그가 모두 없어서 (1) 직접 크롤이 brand='Havati'(샵
+    // 이름)를 전 상품에 찍었고 (2) 갱신 경로의 신규 후보 1,669건이 detected_brand
+    // NULL 로 전량 파킹됐다.
+    multiBrand: true,
+    brandFromNamePrefix: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,

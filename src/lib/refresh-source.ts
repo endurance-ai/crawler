@@ -311,6 +311,27 @@ export function normalizeBrandName(value: string): string {
 }
 
 /**
+ * "[BRAND] 상품명" 프리픽스에서 브랜드를 뽑는 패턴 — `SiteConfig.brandFromNamePrefix`
+ * 를 켠 편집샵 전용.
+ *
+ * 2026-08-02: havati 는 상품명이 전부 `[HORLISUN] BAKER COZY PANTS` 형식인 편집샵인데
+ * config 에 `brand` 도 `multiBrand` 도 없어서 DOM 브랜드 추출이 빈 문자열을 내고,
+ * 신규 상품 후보 1,669건이 통째로 brand_unmatched 로 파킹됐다. DB 에 쌓인 1,823행도
+ * 전부 샵 이름인 'Havati' 로 잘못 적재돼 있었다. 상품명에 브랜드가 100% 박혀 있으므로
+ * LLM 없이 결정론적으로 뽑는다.
+ *
+ * 문자열로도 export 하는 이유: cafe24 엔진의 추출은 `page.evaluate` 안(브라우저
+ * 컨텍스트)에서 돌아 바깥 함수를 호출할 수 없다. 패턴 소스를 인자로 넘겨
+ * 규칙이 두 벌로 갈라지지 않게 한다.
+ */
+export const BRAND_NAME_PREFIX_PATTERN = "^\\s*\\[([^\\]]{1,40})\\]"
+
+export function brandFromNamePrefix(name: string): string {
+  const m = name.match(new RegExp(BRAND_NAME_PREFIX_PATTERN))
+  return m ? m[1].trim() : ""
+}
+
+/**
  * 브랜드 대조 키 — 대소문자·공백·구두점을 모두 제거한 형태.
  *
  * 2026-07-29 버그 수정: `brand_nodes.brand_name_normalized` 는 이미 공백·구두점을
