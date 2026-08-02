@@ -66,6 +66,16 @@ const KRW_PARSE_OPTIONS = {
   brandFallback: "Example Store",
 }
 
+test("single-brand override ignores a conflicting Shopify vendor", () => {
+  const fixture = loadFixture()
+  const products = parseShopifyProducts(fixture, BASE_URL, KEY, {
+    sourceCurrency: "USD",
+    brandOverride: "House Brand",
+  })
+  assert.ok(products.length > 0)
+  assert.ok(products.every((product) => product.brand === "House Brand"))
+})
+
 const IMAGE_HOST_WHITELIST = (host: string, baseHost: string): boolean =>
   host === baseHost ||
   host === "cdn.shopify.com" ||
