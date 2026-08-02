@@ -10,6 +10,7 @@
  */
 
 import {installRequestBlocking} from "./request-blocking"
+import {gotoWithRetry, NavFailureError} from "./nav-retry"
 import {BRAND_NAME_PREFIX_PATTERN} from "./refresh-source"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
@@ -255,7 +256,11 @@ async function discoverCategories(
   const discoveryUrl = config.category?.discoveryUrl || config.baseUrl
   const ignorePatterns = config.category?.ignorePatterns || []
 
-  await page.goto(discoveryUrl, {waitUntil: "domcontentloaded", timeout: 60000})
+  const nav = await gotoWithRetry(page, discoveryUrl, {
+    onRetry: (attempt, error) =>
+      console.warn(`[${config.name}] ↻ 카테고리 탐색 재시도 ${attempt}: ${error}`),
+  })
+  if (!nav.ok) throw new Error(`${nav.attempts}회 시도 실패: ${nav.error}`)
   // Cafe24는 JS 렌더링이 필요한 경우가 많음
   await page.waitForTimeout(2000)
 
@@ -652,11 +657,16 @@ async function crawlCategory(
   category: DiscoveredCategory,
   timing?: CrawlTiming,
   listingOnly = false,
+  navAttempts = 3,
 ): Promise<Product[]> {
   const allProducts: Product[] = []
   const maxPages = config.maxPages || 10
   const delay = config.crawlDelay || 2000
   const seenUrls = new Set<string>()
+  const logTag = `[${config.name}]`
+  // 1페이지 내비게이션 실패는 아래 catch 로 흘리지 않고 루프 밖에서 던진다 —
+  // catch 는 파싱 오류용이고, 여기에 섞이면 다시 조용한 break 가 된다.
+  let navFatal: Error | null = null
 
   for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
     const separator = category.url.includes("?") ? "&" : "?"
@@ -665,7 +675,23 @@ async function crawlCategory(
       : `${category.url}${separator}page=${pageNum}`
 
     try {
-      await page.goto(url, {waitUntil: "domcontentloaded", timeout: 60000})
+      const nav = await gotoWithRetry(page, url, {
+        attempts: navAttempts,
+        onRetry: (attempt, error) =>
+          console.warn(`${logTag} ↻ 리스트 내비 재시도 ${attempt} (${category.name} p${pageNum}): ${error}`),
+      })
+      if (!nav.ok) {
+        // 종전에는 goto 실패가 catch 로 흘러 조용히 break 됐다 — 1페이지에서
+        // 걸리면 "상품 0개"가 되어 품질 가드가 no_products 로 보고했고, 원인이
+        // 네트워크였다는 사실이 어디에도 남지 않았다. 실패는 실패로 올린다.
+        if (pageNum === 1) {
+          navFatal = new NavFailureError(
+            `리스트 내비 실패 (${category.name}): ${nav.attempts}회 시도 — ${nav.error}`,
+            nav.attempts,
+          )
+        }
+        break // 2페이지 이후는 종전대로 여기까지 수집한 것으로 끝낸다
+      }
       if (listingOnly) await waitForCafe24ListReady(page)
       else await page.waitForTimeout(3000) // 상세/온보딩 경로의 기존 대기 보존
 
@@ -700,6 +726,7 @@ async function crawlCategory(
     }
   }
 
+  if (navFatal) throw navFatal
   return allProducts
 }
 
@@ -714,6 +741,8 @@ export async function crawlCafe24(
 ): Promise<CrawlResult> {
   const startTime = Date.now()
   const errors: string[] = []
+  /** 재시도까지 소진한 내비게이션 실패 — errors 와 달리 백오프를 태우지 않는다. */
+  const unreachable: string[] = []
   const allProducts: Product[] = []
   const timing: CrawlTiming = {listWaitMs: 0}
   let detailMs = 0
@@ -764,12 +793,14 @@ export async function crawlCafe24(
   }
 
   // Step 2: 카테고리별 상품 수집
+  // 내비게이션 재시도 횟수. 한 번 소진되면 아래 서킷브레이커가 1로 낮춘다.
+  let navAttempts = 3
   for (let i = 0; i < categories.length; i++) {
     const cat = categories[i]
     const delay = config.crawlDelay || 2000
 
     try {
-      const products = await crawlCategory(page, config, cat, timing, options.listingOnly)
+      const products = await crawlCategory(page, config, cat, timing, options.listingOnly, navAttempts)
       allProducts.push(...products)
 
       const inStockCount = products.filter((p) => p.inStock).length
@@ -791,7 +822,21 @@ export async function crawlCafe24(
     } catch (err) {
       const msg = `${cat.name} 수집 실패: ${err}`
       console.error(`${tag} ❌ ${msg}`)
-      errors.push(msg)
+      if (err instanceof NavFailureError) {
+        // 닿지 못한 것은 errors 가 아니라 unreachable 이다 — 우리 쪽 네트워크
+        // 문제일 수 있어 백오프 사다리를 태우면 멀쩡한 소스가 유배된다
+        // (types.ts CrawlResult.unreachable 참조).
+        unreachable.push(msg)
+        // 서킷브레이커: 재시도를 다 쓰고도 안 되면 이 소스는 지금 접속 자체가
+        // 막힌 상태다. 남은 카테고리까지 3회씩 두드리면 카테고리당 3분씩 예산만
+        // 태운다(실측 funfromfun 3×60초 전량 소진). 1회로 낮춘다.
+        if (navAttempts > 1) {
+          navAttempts = 1
+          console.warn(`${tag} ⛔ 내비 실패 — 남은 카테고리는 재시도 없이 1회만 시도한다`)
+        }
+      } else {
+        errors.push(msg)
+      }
     }
 
     await new Promise((r) => setTimeout(r, delay))
@@ -1061,6 +1106,7 @@ export async function crawlCafe24(
     },
     errors,
     qualityWarnings,
+    unreachable,
   }
 
   console.log(`\n${tag} ✅ 완료: ${result.stats.totalProducts}개 상품 | 재고 ${result.stats.inStock}개 | ${result.stats.uniqueBrands}개 브랜드 | ${(result.stats.duration / 1000).toFixed(1)}s`)

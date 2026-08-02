@@ -227,6 +227,27 @@ test("연속 실패는 마지막 성공 이후만 센다", () => {
   assert.deepEqual(streaks.get("a"), {failures: 2, lastFailedAt: "2026-07-29T03:00:00Z"})
 })
 
+test("닿지 못한 런(unreachable_only)은 연쇄로 세지 않는다", () => {
+  // 2026-08-02: 내비 실패 13건이 전부 우리 쪽 호스트 DNS 문제였다(curl 은 1초에
+  // 200). 이걸 연쇄로 세면 멀쩡한 판매처가 최대 14일 워크리스트에서 사라진다.
+  const streaks = computeFailureStreaks([
+    {platform_key: "a", status: "failed", started_at: "2026-08-02T05:00:00Z", unreachable_only: true},
+    {platform_key: "a", status: "failed", started_at: "2026-08-02T04:00:00Z", unreachable_only: true},
+    {platform_key: "a", status: "failed", started_at: "2026-08-02T03:00:00Z", unreachable_only: true},
+  ])
+  assert.equal(streaks.get("a"), undefined)
+})
+
+test("닿지 못한 런은 진짜 실패의 연쇄를 끊지도 않는다", () => {
+  const streaks = computeFailureStreaks([
+    run("a", "failed", "2026-08-02T05:00:00Z"),
+    {platform_key: "a", status: "failed", started_at: "2026-08-02T04:00:00Z", unreachable_only: true},
+    run("a", "failed", "2026-08-02T03:00:00Z"),
+  ])
+  // 사이에 낀 unreachable 은 무시하고 진짜 실패 2건만 센다
+  assert.equal(streaks.get("a")?.failures, 2)
+})
+
 test("성공 기록이 없으면 전체 실패가 연쇄가 된다", () => {
   // 실측 2026-07-29: 연쇄 중인 49개 소스 대부분이 한 번도 성공한 적 없다.
   const streaks = computeFailureStreaks([

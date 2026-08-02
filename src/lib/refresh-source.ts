@@ -19,6 +19,16 @@ export interface RefreshRunOutcome {
   platform_key: string
   status: string
   started_at: string | null
+  /**
+   * 이 실패가 "사이트에 닿지 못한 것"뿐이었는가 (`metrics.unreachable_only`).
+   *
+   * 참이면 연속 실패로 세지 않는다. 근거(실측 2026-08-02): 내비게이션 실패
+   * 13건이 전부 **우리 쪽 호스트의 DNS 문제**였다 — 같은 URL 이 curl 로는
+   * 1초에 200 으로 오고, 호스트 DNS 실패율이 20% 였다. 이걸 연속 실패로 세면
+   * 멀쩡한 판매처가 백오프 사다리를 타고 최대 14일 워크리스트에서 사라진다.
+   * 우리 네트워크가 나쁜 것을 판매처 탓으로 돌리지 않는다.
+   */
+  unreachable_only?: boolean | null
 }
 
 export interface RefreshFailureStreak {
@@ -56,6 +66,8 @@ export function computeFailureStreaks(runs: RefreshRunOutcome[]): Map<string, Re
     for (const run of ordered) {
       if (run.status === "success") break
       if (run.status !== "failed") continue // running/skipped 는 연쇄를 끊지도 늘리지도 않는다
+      // 닿지 못한 런은 판매처의 실패가 아니다 — 끊지도 늘리지도 않는다.
+      if (run.unreachable_only) continue
       failures += 1
       lastFailedAt ??= run.started_at
     }
