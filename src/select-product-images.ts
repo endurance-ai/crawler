@@ -4,7 +4,7 @@
  *
  * 수동 실행 전용이다. 어떤 배치·타이머·스케줄에도 자동 배선되어 있지 않으며,
  * macOS 로컬 작업자가 명시적으로 실행한다. DB 적용은 migration 102의 RPC를 통해
- * 대표 이미지가 바뀐 상품의 기존 embedding만 무효화한다. VLM feature는 보존한다.
+ * 대표 이미지가 바뀐 상품의 기존 embedding/VLM feature를 함께 무효화한다.
  *
  * ## 실행 전제
  * - **macOS 전용.** 이미지 분류를 Apple Vision 으로 한다
@@ -13,9 +13,9 @@
  *   네이티브 테스트는 `{skip: process.platform !== "darwin"}` 로 가드되어 있어
  *   리눅스 CI 에서는 자동 스킵된다.
  *
- * `image_url` 이 바뀌면 `product_embeddings`의 해당 행만 삭제해 기존 pending
- * 조회 경로가 다시 처리하도록 한다. `product_features`는 보존한다. 이미지 배열
- * 자체는 수집된 전체 후보를 유지하며 대표 이미지 순서로만 재정렬한다.
+ * `image_url` 이 바뀌면 `product_embeddings`와 `product_features`의 해당 행을
+ * 삭제해 기존 pending 조회 경로가 다시 처리하도록 한다. 이미지 배열 자체는
+ * 수집된 전체 후보를 유지하며 대표 이미지 순서로만 재정렬한다.
  */
 
 import * as fs from "node:fs"
