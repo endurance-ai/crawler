@@ -30,6 +30,7 @@
     "repair:product-subcategory": "dotenv -e .env -e .env.local -- tsx src/repair-product-subcategory.ts",
     "repair:product-color": "dotenv -e .env -e .env.local -- tsx src/repair-product-color.ts",
     "repair:product-color-llm": "dotenv -e .env -e .env.local -- tsx src/repair-product-color-llm.ts",
+    "select:product-images": "dotenv -e .env -e .env.local -- tsx src/select-product-images.ts",
     "poc:product-extraction": "dotenv -e .env -e .env.local -- tsx tools/product-extraction-poc.ts",
     "scaffold:platform": "tsx tools/scaffold-platform.ts",
     "spike:lightpanda": "dotenv -e .env -e .env.local -- tsx src/spikes/lightpanda-poc.ts",
