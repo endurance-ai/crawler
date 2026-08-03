@@ -1,0 +1,15 @@
+[Unit]
+Description=kiko.ai full product image backfill — lab batch host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kjk/kiko-crawler-image-backfill
+Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/home/kjk
+ExecStart=/home/kjk/kiko-crawler-image-backfill/scripts/run-product-image-backfill.sh
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=default.target

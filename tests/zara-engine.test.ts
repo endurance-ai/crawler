@@ -96,6 +96,37 @@ test("AC-2 parseProductsFromXhr: every product has populated name/price/imageUrl
   }
 })
 
+test("parseProductsFromXhr preserves every safe xmedia image across colors", () => {
+  const raw = {
+    id: 1,
+    name: "Multi image coat",
+    price: 1990000,
+    availability: "in_stock",
+    seo: {keyword: "multi-image-coat", seoProductId: "30688530"},
+    detail: {
+      colors: [
+        {xmedia: [
+          {layers: [{url: "https://static.zara.net/a.jpg?w={width}"}]},
+          {layers: [{url: "https://static.zara.net/b.jpg?w={width}"}]},
+        ]},
+        {xmedia: [
+          {layers: [{url: "https://static.zara.net/c.jpg?w={width}"}]},
+          {layers: [{url: "https://static.zara.net/a.jpg?w={width}"}]},
+        ]},
+      ],
+    },
+  }
+
+  const [product] = parseProductsFromXhr([raw], "https://www.zara.com/kr/ko", "zara-kr")
+  assert.ok(product)
+  assert.deepEqual(product.images, [
+    "https://static.zara.net/a.jpg?w=1024",
+    "https://static.zara.net/b.jpg?w=1024",
+    "https://static.zara.net/c.jpg?w=1024",
+  ])
+  assert.equal(product.imageUrl, product.images[0])
+})
+
 test("AC-2 parseProductsFromXhr: accepts a deeply-nested raw payload via harvest", () => {
   // Wrap the fixture's samples in a fake payload tree.
   const fixture = loadFixture()
@@ -382,4 +413,3 @@ test("AC-3 parseProductsFromXhr (US): every product has populated name/price/ima
     assert.ok(/\.\d{2}$/.test(p.priceFormatted), `US priceFormatted should end in .NN: ${p.priceFormatted}`)
   }
 })
-

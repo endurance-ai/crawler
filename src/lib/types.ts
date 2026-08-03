@@ -41,6 +41,8 @@ export interface Product {
   material?: string
   subcategory?: string
   images?: string[]
+  /** Version of the detail-image collector that produced `images`. */
+  imageCollectionVersion?: string
   /** Local Apple Vision representative-image selection metadata. */
   imageSelection?: {
     kind: "model" | "product" | "fallback"

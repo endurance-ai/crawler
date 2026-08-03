@@ -333,6 +333,20 @@ export function deriveGenderFromUrl(url: string): string {
   return "kids"
 }
 
+function buildImageUrls(product: RawZaraProduct): string[] {
+  const images: string[] = []
+  const seen = new Set<string>()
+  for (const color of product.detail?.colors ?? []) {
+    for (const media of color.xmedia ?? []) {
+      const url = buildImageUrl(media)
+      if (!url || !isSafeZaraImageUrl(url) || seen.has(url)) continue
+      seen.add(url)
+      images.push(url)
+    }
+  }
+  return images
+}
+
 function buildProductUrl(baseUrl: string, seo: RawZaraProduct["seo"]): string {
   if (!seo?.keyword || !seo?.seoProductId) return ""
   const trimmed = baseUrl.replace(/\/+$/, "")
@@ -400,8 +414,8 @@ export function parseProductsFromXhr(
     if (!raw.id || !raw.name || typeof raw.price !== "number" || raw.price <= 0) continue
     const productUrl = buildProductUrl(baseUrl, raw.seo)
     if (!productUrlPattern.test(productUrl)) continue
-    const xm = raw.detail?.colors?.[0]?.xmedia?.[0]
-    const imageUrl = buildImageUrl(xm)
+    const images = buildImageUrls(raw)
+    const imageUrl = images[0] ?? ""
     if (!imageUrl || !isSafeZaraImageUrl(imageUrl)) continue
     const inStock = (raw.availability ?? "").toLowerCase() === "in_stock"
     const normalizedPrice = normalizeZaraPrice(raw.price, region)
@@ -414,6 +428,7 @@ export function parseProductsFromXhr(
       salePrice: null,
       priceFormatted: formatZaraPrice(normalizedPrice, region),
       imageUrl,
+      images,
       productUrl,
       inStock,
       gender: mapGender(raw),

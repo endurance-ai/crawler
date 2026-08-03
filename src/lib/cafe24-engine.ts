@@ -18,6 +18,10 @@ import type {IDetailParser} from "./parsers/detail"
 import type {DetailData} from "./parsers/detail/types"
 import type {IReviewParser} from "./parsers/review"
 import {
+  collectProductImagesFromPage,
+  PRODUCT_IMAGE_COLLECTION_VERSION,
+} from "./product-images"
+import {
   applyCafe24DetailFallbacks,
   assessCafe24ProductQuality,
   cleanCafe24ProductName,
@@ -639,7 +643,9 @@ async function collectProductsFromPage(
           originalPrice, salePrice,
           priceFormatted,
           imageUrl, productUrl, inStock,
-          gender: args.gender, genderSource: args.genderSource, platform: args.platformKey,
+          gender: args.gender, genderSource: args.genderSource,
+          images: imageUrl ? [imageUrl] : undefined,
+          platform: args.platformKey,
           sourceCurrency: args.sourceCurrency,
           sourcePrice: salePrice || price || undefined,
           crawledAt: new Date().toISOString(),
@@ -916,7 +922,12 @@ export async function crawlCafe24(
             // (2026-07-29 이전에는 color 유무로 판정 → color 가 VLM 으로 이관되며 교체).
             const known = options.existingDetails?.get(product.productUrl)
             if (known && product.detailFetchedAt) {
-              return {product, detail: known, detailFallbacks: null}
+              return {
+                product,
+                detail: known,
+                detailFallbacks: null,
+                images: product.images ?? (product.imageUrl ? [product.imageUrl] : []),
+              }
             }
             const lease = externalDetailFactory ? await externalDetailFactory() : workerLeases[slot]!
             const pg = lease.page
@@ -927,11 +938,15 @@ export async function crawlCafe24(
                 `detail:${product.productUrl.slice(-50)}`
               )
               const detailFallbacks = await extractCafe24DetailFallbacks(pg)
+              const images = await collectProductImagesFromPage(pg, [
+                product.imageUrl,
+                ...(product.images ?? []),
+              ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
               if (options.enrichDetailPage) {
                 await options.enrichDetailPage(pg, product).catch(() => {})
               }
               product.detailFetchedAt = new Date().toISOString()
-              return {product, detail, detailFallbacks}
+              return {product, detail, detailFallbacks, images}
             } catch {
               // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서
               // 계속 진행 중일 수 있다 — 페이지를 재사용하므로, 다음 배치가 같은
@@ -939,16 +954,24 @@ export async function crawlCafe24(
               // 에러가 나는 걸 막기 위해 about:blank로 강제 리셋해 정리한다
               // (2026-07-06, 페이지 재사용 도입 후 A.R.U 등에서 확인된 회귀).
               const detailFallbacks = await extractCafe24DetailFallbacks(pg).catch(() => null)
+              const images = await collectProductImagesFromPage(pg, [
+                product.imageUrl,
+                ...(product.images ?? []),
+              ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
               await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
-              return {product, detail: null, detailFallbacks}
+              return {product, detail: null, detailFallbacks, images}
             } finally {
               if (externalDetailFactory) await lease.close()
             }
           })
         )
 
-        for (const {product, detail, detailFallbacks} of results) {
-          if (!detail && !detailFallbacks) continue
+        for (const {product, detail, detailFallbacks, images} of results) {
+          if (!detail && !detailFallbacks && images.length === 0) continue
+          if (images.length > 0) {
+            product.images = images
+            product.imageCollectionVersion = PRODUCT_IMAGE_COLLECTION_VERSION
+          }
           if (detailFallbacks) {
             applyCafe24DetailFallbacks(product, detailFallbacks)
           }

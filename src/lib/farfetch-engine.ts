@@ -343,6 +343,7 @@ export function parseProductsFromCards(
       salePrice: null,
       priceFormatted: formatFarfetchPrice(price, region),
       imageUrl: raw.imageUrl,
+      images: [raw.imageUrl],
       productUrl: raw.href,
       inStock: true,
       gender,

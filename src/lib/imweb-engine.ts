@@ -20,6 +20,10 @@ import {chromium, type Browser, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {extractStructuredProduct} from "./parsers/structured-data"
 import {CURRENCY_SYMBOL} from "./fx"
+import {
+  collectProductImagesFromHtml,
+  PRODUCT_IMAGE_COLLECTION_VERSION,
+} from "./product-images"
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -230,13 +234,18 @@ async function enrichFromDetail(product: Product, delay: number): Promise<void> 
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const html = await res.text()
   const structured = extractStructuredProduct(html)
+  const images = collectProductImagesFromHtml(html, product.productUrl, [
+    product.imageUrl,
+    ...(product.images ?? []),
+  ])
+  if (images.length > 0) {
+    product.images = images
+    product.imageCollectionVersion = PRODUCT_IMAGE_COLLECTION_VERSION
+    if (!product.imageUrl) product.imageUrl = images[0]!
+  }
   if (!structured) return
 
   if (structured.inStock !== null) product.inStock = structured.inStock
-  if (structured.images.length > 0) {
-    product.images = [...new Set([...(product.images ?? []), ...structured.images])]
-    if (!product.imageUrl) product.imageUrl = structured.images[0]
-  }
   if (structured.sku && !product.productCode) product.productCode = structured.sku
 }
 

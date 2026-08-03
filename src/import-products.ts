@@ -18,6 +18,7 @@ import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 import {getSiteConfig} from "./configs/platforms"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
+import {mergeProductImages} from "./lib/product-images"
 import {
   isTrustedBrandSource,
   partitionUnknownBrands,
@@ -706,7 +707,10 @@ async function main() {
         crawled_at: p.crawledAt as string,
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
         subcategory: p.subcategory || null,
-        images: p.images || null,
+        // Kept out of the products upsert below and merged atomically through
+        // merge_product_images. A listing-only crawl must never erase richer
+        // detail images collected by an earlier run.
+        images: mergeProductImages(p.imageUrl, productUrl, p.images),
         size_info: p.sizeInfo?.slice(0, 2000) || null,
         tags: p.tags?.slice(0, 50) || null,
         product_code: p.productCode?.slice(0, 100) || null,
@@ -809,7 +813,11 @@ async function main() {
 
     for (let i = 0; i < deduped.length; i += BATCH) {
       const batch = deduped.slice(i, i + BATCH)
-      const {error} = await db.from("products").upsert(batch, {
+      const productRows = batch.map(({images: _images, ...row}) => row)
+      const imageUpdates = batch
+        .filter((row) => row.images.length > 0)
+        .map((row) => ({product_url: row.product_url, images: row.images}))
+      const {error} = await db.from("products").upsert(productRows, {
         onConflict: "product_url",
         ignoreDuplicates: false,
       })
@@ -818,8 +826,16 @@ async function main() {
         console.error(`   ❌ 배치 ${i}-${i + batch.length} 실패:`, error.message)
         errors++
       } else {
-        inserted += batch.length
-        process.stdout.write(`\r   💾 ${inserted}/${deduped.length}`)
+        const {error: imageError} = imageUpdates.length > 0
+          ? await db.rpc("merge_product_images", {updates: imageUpdates})
+          : {error: null}
+        if (imageError) {
+          console.error(`   ❌ 이미지 병합 ${i}-${i + batch.length} 실패:`, imageError.message)
+          errors++
+        } else {
+          inserted += batch.length
+          process.stdout.write(`\r   💾 ${inserted}/${deduped.length}`)
+        }
       }
     }
 
