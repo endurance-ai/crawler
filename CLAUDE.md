@@ -498,7 +498,7 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   QC(`normalizeGenderField` → needsReview)와 두 INSERT 경로의 가드.
 - **INSERT 경로는 둘뿐이고 둘 다 gender 를 실어야 한다**:
   `src/import-products.ts`(배치)와 `src/refresh-candidates.ts`(연구실 서버
-  신규상품 워커, 15분 주기). 후자에 gender 를 빼먹으면 migration 099 가 기록한
+  신규상품 워커). 후자에 gender 를 빼먹으면 migration 099 가 기록한
   color 사고(210회 연속 INSERT 실패)가 그대로 재현된다 — 가격·재고 UPDATE 는
   계속 성공해서 대시보드는 초록색인 채 신규 유입만 0 이 된다.
 - 사이트 전역 기본값은 두 곳: `SiteConfig.defaultGender`(platforms.ts, 손으로

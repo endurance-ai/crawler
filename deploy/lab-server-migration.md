@@ -295,9 +295,19 @@ pnpm exec dotenv -e .env.local -- tsx tools/repair-product-platforms.ts --apply=
 ```
 
 3 을 건너뛰고 4 를 적용하면 `chk_products_gender_required` 가 걸린 상태에서 옛
-코드가 돌아 신규상품 INSERT 가 **15분마다 전량 실패**한다. 가격·재고 UPDATE 는
-계속 성공하므로 대시보드는 초록색인 채 유입만 멈춘다 — migration 099 가 기록한
-color 사고와 같은 모양이다.
+코드가 돌아 **신규상품 워커가 한 런치(예산 90분) 를 통째로 실패**한다. 가격·재고
+UPDATE 는 계속 성공하므로 대시보드는 초록색인 채 유입만 멈춘다 — migration 099 가
+기록한 color 사고와 같은 모양이다.
+
+⚠️ 사이클을 오해하지 말 것. `OnUnitInactiveSec=15min` 은 **주기가 아니라 런이
+끝난 뒤의 휴식**이다. `kiko-refresh.service` 가 `--budget-minutes=480`
+(TimeoutStartSec=32400) 이고 실측 한 패스가 6.5~8시간이므로 실제 사이클은
+**약 8~9시간 + 15분**이다. 신규상품 워커는 그 뒤에 `OnSuccess` 로 붙는다.
+
+빈도가 낮다는 것이 위험을 줄이지 않는다 — 오히려 **발견이 늦다.** 하루 한두 번만
+도니까 실패가 다음 날에야 드러난다. 같은 이유로 이 서버가 새 코드를 받는 데도
+최대 9시간이 걸린다(진행 중인 런이 끝나야 `batch_prep()` 의 git pull 이 돈다).
+급하면 `systemctl --user start kiko-refresh.service` 로 한 사이클을 앞당길 수 있다.
 
 검증:
 
