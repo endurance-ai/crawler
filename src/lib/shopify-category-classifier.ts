@@ -42,6 +42,9 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   [/\b(sweater|sweaters|cardigan|cardigans|knitwear|knits|knit|pullover|turtleneck)\b/, "knitwear"],
   // Tops
   [/\b(shirt|shirts|top|tops|tee|tees|t-shirt|t-shirts|hoodie|hoodies|sweatshirt|sweatshirts|blouse|blouses|polo|polos|tank|longsleeve|jersey|henley|camisole|rugby|crop-top)\b/, "tops"],
+  // Swimwear before bottoms/underwear: "bikini bottoms" and "swim trunks"
+  // are swimwear products, not generic trousers or underwear.
+  [/\b(swimsuit|swimwear|bikini|trunks|rashguard|rash\s+guard)\b/, "swimwear"],
   // Bottoms
   [/\b(pant|pants|jean|jeans|trouser|trousers|short|shorts|skirt|skirts|bottom|bottoms|chino|chinos|jogger|joggers|cargo|legging|leggings|culotte|culottes|sweatpant|sweatpants)\b/, "bottoms"],
   // Shoes
@@ -58,8 +61,6 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|accessories|accessory|muffler)\b/, "accessories"],
   // Underwear
   [/\b(underwear|briefs|boxer|boxers|bra|bras|lingerie|panties|panty)\b/, "underwear"],
-  // Swimwear
-  [/\b(swimsuit|swimwear|bikini|trunks|rashguard|rash\s+guard)\b/, "swimwear"],
   // Activewear
   [/\b(activewear|tracksuit|sportswear|sports\s*bra|athletic|yoga)\b/, "activewear"],
 ]

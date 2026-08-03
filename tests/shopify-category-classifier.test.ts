@@ -50,6 +50,12 @@ test("classify_shopify_specific_type_pants_to_bottoms", () => {
   assert.equal(category, "bottoms")
 })
 
+test("classify_shopify_bikini_bottoms_as_swimwear_before_generic_bottoms", () => {
+  const {category, subcategory} = classifyShopifyCategory("", "Printed Bikini Bottoms", [])
+  assert.equal(category, "swimwear")
+  assert.equal(subcategory, "bikini")
+})
+
 test("classify_shopify_specific_type_footwear_to_shoes", () => {
   const {category, subcategory} = classifyShopifyCategory("Footwear", "Trail Running Shoe", [])
   assert.equal(category, "shoes")
