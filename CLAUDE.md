@@ -507,9 +507,13 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   "성별 카테고리가 없다"는 unisex 의 근거가 아니라 "모름"이다.
   후보 뽑기: `pnpm propose:site-gender` (gender_source 화이트리스트로 091 의
   brand_scope 백필 오염을 걸러낸다 — 안 거르면 근거 행이 7배 부풀려진다).
-- DB: `chk_products_gender_required` 는 migration 104 에서 재도입 + VALIDATE.
-  읽기 경로는 `products.gender` → VLM → fail-open 3단이며, 백필 완료 후
-  1단으로 축약한다 (`search_products_v6.sql` 헤더의 🧹 항목).
+- DB: `chk_products_gender_required` 가 migration 104 에서 재도입 + **VALIDATE**
+  됐다 (2026-08-03). `products.gender` 는 non-NULL · non-empty · canonical 이
+  DB 차원에서 보장된다. 그래서 읽기 경로의 3단 다리(VLM 폴백 + fail-open)는
+  걷어냈고 `p.gender && ARRAY[p_gender,'unisex']` 단일 출처다 —
+  `search_products_v6.sql`(5곳), `search_products_hybrid_v1.sql`(2곳),
+  `curation_refresh.py`, `products.py`.
+  `LEFT JOIN product_features` 는 유지한다 — color 필터가 쓴다.
 - **상품 단위 근거가 브랜드 단위 backfill 을 이긴다** (2026-08-03 확정). 별도로
   `brand_nodes.gender_scope` 기반 일괄 backfill 이 돌아 `gender_source =
   'repair_brand_scope'` 행이 8,098건 있다. 브랜드가 실제로 단일 성별이면 그 값이
