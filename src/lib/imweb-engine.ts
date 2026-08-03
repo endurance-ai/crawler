@@ -110,6 +110,7 @@ export function parseImwebListItem(
     productUrl: item.link,
     inStock: !item.soldOutBadge,
     gender: [...(config.defaultGender ?? [])],
+    genderSource: "config_default",
     platform: config.key,
     crawledAt: new Date().toISOString(),
     color: colorFromName ?? undefined,

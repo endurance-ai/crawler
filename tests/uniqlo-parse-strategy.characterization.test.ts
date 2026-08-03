@@ -63,7 +63,12 @@ function loadGolden(): Product[] {
 }
 
 function normalize(products: Product[]): Product[] {
-  return products.map((p) => ({...p, crawledAt: "<<NORMALIZED>>"}))
+  return products.map((p) => {
+    // genderSource is a new persistence-provenance field and is tested
+    // separately; omit it from the pre-existing parser golden master.
+    const {genderSource: _genderSource, ...legacyShape} = p
+    return {...legacyShape, crawledAt: "<<NORMALIZED>>"}
+  })
 }
 
 // ─── Golden-master: full Product[] output is byte-identical ─────

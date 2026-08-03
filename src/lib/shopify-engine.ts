@@ -224,10 +224,12 @@ export function parseShopifyProducts(
     // gender 추론 (태그에서)
     const gender: string[] = [...(options.defaultGender || [])]
     const tagsLower = sp.tags.map((t) => t.toLowerCase())
-    if (tagsLower.some((t) => t.includes("women") || t.includes("female"))) {
+    const hasWomenTag = tagsLower.some((t) => t.includes("women") || t.includes("female"))
+    const hasMenTag = tagsLower.some((t) => t.includes("men") || t.includes("male"))
+    if (hasWomenTag) {
       if (!gender.includes("women")) gender.push("women")
     }
-    if (tagsLower.some((t) => t.includes("men") || t.includes("male"))) {
+    if (hasMenTag) {
       if (!gender.includes("men")) gender.push("men")
     }
 
@@ -301,6 +303,7 @@ export function parseShopifyProducts(
       productUrl: `${baseUrl}/products/${sp.handle}`,
       inStock,
       gender,
+      genderSource: hasWomenTag || hasMenTag ? "text" : (gender.length > 0 ? "config_default" : undefined),
       platform: platformKey,
       crawledAt: new Date().toISOString(),
       description,

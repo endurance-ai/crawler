@@ -102,7 +102,12 @@ function loadKrwGolden(): Product[] {
  */
 function normalize(products: Product[]): Product[] {
   return JSON.parse(
-    JSON.stringify(products.map((p) => ({...p, crawledAt: "<<NORMALIZED>>"}))),
+    JSON.stringify(products.map((p) => {
+      // genderSource is a new persistence-provenance field and is tested
+      // separately below; omit it from the pre-existing parser golden.
+      const {genderSource: _genderSource, ...legacyShape} = p
+      return {...legacyShape, crawledAt: "<<NORMALIZED>>"}
+    })),
   ) as Product[]
 }
 
@@ -162,6 +167,13 @@ test("characterize: shopify crawledAt is a valid ISO-8601 value per product", ()
       `crawledAt is not a round-trip-stable ISO-8601 string: ${p.crawledAt}`,
     )
   }
+})
+
+test("shopify gender provenance distinguishes tag extraction from no signal", () => {
+  const products = parseShopifyProducts(loadFixture(), BASE_URL, KEY, PARSE_OPTIONS)
+  assert.equal(products[0]?.genderSource, "text")
+  assert.equal(products[1]?.genderSource, undefined)
+  assert.equal(products[2]?.genderSource, "text")
 })
 
 // ─── Output contract invariants (characterized, not corrected) ──

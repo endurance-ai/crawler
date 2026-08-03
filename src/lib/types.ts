@@ -16,6 +16,8 @@ export interface Product {
   productUrl: string
   inStock: boolean
   gender: string[]
+  /** Provenance for gender; persisted to products.gender_source. */
+  genderSource?: "engine" | "config_default" | "brand_scope" | "text" | "url" | "unverified_legacy"
   platform: string
   crawledAt: string
   // ── 상세 페이지 데이터 (Phase 2) ──

@@ -23,7 +23,7 @@ import {fileURLToPath} from "node:url"
 
 import {validateProduct, ProductSchema} from "../src/lib/core/product-validator"
 import {applyValidationGate, isValidationEnabled} from "../src/lib/core/validation-gate"
-import {cleanGenderScope, resolveProductGender} from "../src/lib/product-gender"
+import {cleanGenderScope, resolveProductGender, resolveProductGenderWithSource} from "../src/lib/product-gender"
 import {
   normalizeColor,
   normalizeCafe24DetailColorList,
@@ -161,6 +161,21 @@ test("resolveProductGender prefers product value and falls back to brand gender_
   assert.deepEqual(resolveProductGender(undefined, ["unisex"]), ["unisex"])
   assert.deepEqual(resolveProductGender([], []), [])
   assert.deepEqual(cleanGenderScope(["Women", "MEN", "kids", "women"]), ["women", "men"])
+})
+
+test("resolveProductGenderWithSource records extraction versus brand fallback", () => {
+  assert.deepEqual(
+    resolveProductGenderWithSource(["women"], ["men"], "text"),
+    {gender: ["women"], source: "text"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource([], ["men"], "engine"),
+    {gender: ["men"], source: "brand_scope"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource(undefined, []),
+    {gender: [], source: null},
+  )
 })
 
 test("gate excludes invalid + emits a structured reject event", () => {
