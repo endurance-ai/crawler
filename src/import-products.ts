@@ -16,7 +16,11 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGender} from "./lib/product-gender"
+import {
+  cleanGenderScope,
+  resolveProductGenderWithSource,
+  type ProductGenderSource,
+} from "./lib/product-gender"
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -54,6 +58,7 @@ interface CrawledProduct {
   productUrl: string
   inStock: boolean
   gender: string[]
+  genderSource?: ProductGenderSource
   platform: string
   crawledAt: string
   // 상세 페이지 데이터
@@ -465,11 +470,14 @@ async function main() {
     const rawWithGenderFallback: CrawledProduct[] = rawAll.map((p) => {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      const gender = resolveProductGender(
+      const resolvedGender = resolveProductGenderWithSource(
         p.gender,
         brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
+        p.genderSource ?? "unverified_legacy",
       )
-      return gender.length > 0 ? {...p, gender} : p
+      return resolvedGender.gender.length > 0
+        ? {...p, gender: resolvedGender.gender, genderSource: resolvedGender.source ?? undefined}
+        : p
     })
     // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
     // product before the DB upsert. Valid products pass through
@@ -510,10 +518,12 @@ async function main() {
       const brand = (p.brand as string) || SELF_BRANDED[platform] || ""
       const productUrl = (p.productUrl as string) || ""
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      const gender = resolveProductGender(
+      const resolvedGender = resolveProductGenderWithSource(
         p.gender,
         brandNodeId !== null ? brandGenderById.get(brandNodeId) : undefined,
+        p.genderSource ?? "unverified_legacy",
       )
+      const gender = resolvedGender.gender
 
       // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
       // 누출 가드(cafe24-engine.ts)가 오염된 값을 걸러내고 brand=""로 넘기는
@@ -606,6 +616,7 @@ async function main() {
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
         gender,
+        gender_source: resolvedGender.source,
         brand_node_id: brandNodeId,
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,

@@ -397,6 +397,7 @@ export function parseProductsFromXhr(
       productUrl,
       inStock,
       gender: mapGender(raw),
+      genderSource: "engine",
       platform: platformKey,
       crawledAt,
       productCode: raw.seo?.seoProductId ?? String(raw.id),

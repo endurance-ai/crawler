@@ -58,7 +58,7 @@ import type {DetailData} from "./lib/parsers/detail/types"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {getValidationReport} from "./lib/core/observability"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {cleanGenderScope, resolveProductGender} from "./lib/product-gender"
+import {cleanGenderScope, resolveProductGenderWithSource} from "./lib/product-gender"
 
 // 크롤 결과를 product_crawl_status(091, brand_node_id 기준)에 자동 반영한다(수기 mark 불필요).
 // 배포 admin 페이지(product_crawl_brands 뷰)가 읽는 소스가 이 테이블이다. DB_URL/DB_TOKEN
@@ -896,8 +896,14 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
 
   const brandGenderScope = await getBrandGenderScopeForPlatform(platform)
   const productsWithGenderFallback = rawProducts.map((product) => {
-    const gender = resolveProductGender(product.gender, brandGenderScope)
-    return gender.length > 0 ? {...product, gender} : product
+    const resolved = resolveProductGenderWithSource(
+      product.gender,
+      brandGenderScope,
+      product.genderSource ?? "engine",
+    )
+    return resolved.gender.length > 0
+      ? {...product, gender: resolved.gender, genderSource: resolved.source ?? undefined}
+      : product
   })
 
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed

@@ -346,6 +346,7 @@ export function parseProductsFromCards(
       productUrl: raw.href,
       inStock: true,
       gender,
+      genderSource: gender.length > 0 ? "url" : undefined,
       platform: platformKey,
       crawledAt,
       productCode,

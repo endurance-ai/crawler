@@ -214,6 +214,7 @@ export function parseProducts(
       productUrl: `${baseUrl}/products/${item.productId}`,
       inStock: item.representative?.sales ?? true,
       gender: mapGender(item.genderName),
+      genderSource: "engine",
       platform: platformKey,
       crawledAt,
       productCode: item.productId,
