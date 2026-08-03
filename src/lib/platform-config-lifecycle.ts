@@ -4,6 +4,7 @@ export interface PlatformConfigLifecycleRow {
   status: string
   config_status: string
   origin_country: string | null
+  kr_eligibility_status: string
   platform_type: string
   detection: Record<string, unknown> | null
 }
@@ -14,7 +15,8 @@ const ONBOARDING_STATUSES = new Set(["tech_detected", "qc_failed"])
 /**
  * Config inventory and brand onboarding state are different lifecycles.
  *
- * New automatic configs remain KR-scoped, but a config that already produced
+ * New automatic configs require either KR origin or verified KR storefront
+ * eligibility, but a config that already produced
  * data must survive later workflow transitions and origin metadata changes.
  * Blocked rows are retained so the generator can emit them as disabled instead
  * of silently deleting the source from the inventory.
@@ -22,7 +24,12 @@ const ONBOARDING_STATUSES = new Set(["tech_detected", "qc_failed"])
 export function shouldGeneratePlatformConfig(row: PlatformConfigLifecycleRow): boolean {
   if (COLLECTED_STATUSES.has(row.status)) return true
   if (row.status === "blocked") return true
-  return ONBOARDING_STATUSES.has(row.status) && row.origin_country === "KR"
+  return (
+    ONBOARDING_STATUSES.has(row.status) &&
+    (row.origin_country === "KR" ||
+      row.kr_eligibility_status === "eligible_origin" ||
+      row.kr_eligibility_status === "eligible_storefront")
+  )
 }
 
 /** Map the DB's coarse platform enum to an executable crawler engine. */

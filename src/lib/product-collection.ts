@@ -33,6 +33,14 @@ export interface ProductCrawlBrand {
   category_discovery: string
   categories: unknown[]
   detection: Record<string, unknown>
+  kr_eligibility_status: string
+  kr_localization_status: string
+  kr_shipping_status: string
+  kr_price_currency: string | null
+  kr_storefront_url: string | null
+  kr_eligibility_evidence: Record<string, unknown>
+  kr_eligibility_checked_at: string | null
+  kr_eligibility_next_check_at: string | null
   latest_artifact_path: string | null
   latest_artifact_sha256: string | null
   qc_summary: Record<string, unknown>

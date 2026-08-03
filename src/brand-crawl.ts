@@ -26,6 +26,13 @@ import {
 } from "./lib/product-collection"
 import {getSiteConfig} from "./configs/platforms"
 import {assessCafe24ProductQuality} from "./lib/cafe24-chain"
+import {
+  isRetryableEligibilityError,
+  krEligibilityPatch,
+  probeKrMarketEligibility,
+  retryableKrEligibilityAssessment,
+  type KrEligibilityAssessment,
+} from "./lib/kr-market-eligibility"
 import type {Product} from "./lib/types"
 
 type Flags = Record<string, string | boolean>
@@ -36,6 +43,7 @@ export interface DetectResult {
   platform_key: string
   categories: Array<Record<string, unknown>>
   detection: Record<string, unknown>
+  krEligibility?: KrEligibilityAssessment
 }
 
 interface CrawledProduct {
@@ -276,11 +284,20 @@ async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
   const categories = uniqueCateNos.map((cateNo) => ({cateNo}))
 
   const categoryDiscovery = platformType === "cafe24" && categories.length > 0 ? "manual" : "auto"
+  const originCountry =
+    typeof brand.wiki?.origin_country === "string" ? brand.wiki.origin_country : null
+  const krEligibility = await probeKrMarketEligibility({
+    homepageUrl: homepage,
+    homepageHtml: html,
+    platformType,
+    originCountry,
+  })
   return {
     platform_type: platformType,
     category_discovery: categoryDiscovery,
     platform_key: brand.platform_key ?? keyFromUrl(homepage),
     categories,
+    krEligibility,
     detection: {
       detected_at: new Date().toISOString(),
       brand_node_id: brand.brand_node_id,
@@ -371,10 +388,25 @@ async function selectBrands(db: ProductCollectionClient, flags: Flags): Promise<
   // Optional onboarding scope. Durable configs from already-collected sources
   // are no longer country-scoped by generate-platform-configs.ts.
   const country = stringFlag(flags, "country")
+  const eligibilityStatus = stringFlag(flags, "eligibility-status")
+  const eligibilityStaleDays = numberFlag(flags, "eligibility-stale-days")
   const q = cleanSearch(stringFlag(flags, "q") ?? "")
-  if (status) query = query.eq("status", status)
+  if (status) {
+    const statuses = status.split(",").map((value) => value.trim()).filter(Boolean)
+    if (statuses.length === 1) query = query.eq("status", statuses[0]!)
+    else if (statuses.length > 1) query = query.in("status", statuses)
+  }
   if (platformType) query = query.eq("platform_type", platformType)
   if (country) query = query.eq("wiki->>origin_country", country.toUpperCase())
+  if (eligibilityStatus) {
+    const statuses = eligibilityStatus.split(",").map((value) => value.trim()).filter(Boolean)
+    if (statuses.length === 1) query = query.eq("kr_eligibility_status", statuses[0]!)
+    else if (statuses.length > 1) query = query.in("kr_eligibility_status", statuses)
+  }
+  if (eligibilityStaleDays) {
+    const cutoff = new Date(Date.now() - eligibilityStaleDays * 86_400_000).toISOString()
+    query = query.lt("kr_eligibility_checked_at", cutoff)
+  }
   if (urlFilter === "missing") query = query.is("homepage_url", null)
   else if (urlFilter === "present") query = query.not("homepage_url", "is", null)
   if (q) {
@@ -447,6 +479,7 @@ export function detectStatusPatch(args: {
     // detection 은 실패 근거(status/bot_protected)를 담으므로 항상 기록한다.
     detection: args.result.detection,
     detected_at: args.detectedAt,
+    ...(args.result.krEligibility ? krEligibilityPatch(args.result.krEligibility) : {}),
     ...(inconclusive
       ? {last_error: "detection inconclusive: homepage bot-protected or rate-limited"}
       : {last_error: null, blocked_reason: null}),
@@ -506,6 +539,8 @@ async function detectOneBrand(
         bot_protected: result.detection.bot_protected ?? false,
         category_discovery: result.category_discovery,
         cate_no_count: result.categories.length,
+        kr_eligibility_status: result.krEligibility?.status ?? "unchecked",
+        kr_price_currency: result.krEligibility?.priceCurrency ?? null,
       },
       startedAt,
     })
@@ -516,13 +551,24 @@ async function detectOneBrand(
     const verdict = isInconclusiveDetection(result)
       ? `inconclusive(http=${result.detection.homepage_status ?? "?"}) — platform_type 유지`
       : `${result.platform_type}${familyNote}`
-    console.log(`#${brand.brand_node_id} ${brand.brand_name}: ${verdict} (${result.platform_key})`)
+    console.log(
+      `#${brand.brand_node_id} ${brand.brand_name}: ${verdict} (${result.platform_key}) eligibility=${result.krEligibility?.status ?? "unchecked"}`,
+    )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    const retryable = isRetryableEligibilityError(err)
     await upsertProductCrawlStatus(db, brand.brand_node_id, {
       last_error: message,
-      blocked_reason: message,
-      ...(preserveStatus ? {} : {status: "blocked", config_status: "blocked"}),
+      ...(retryable
+        ? {
+            ...krEligibilityPatch(retryableKrEligibilityAssessment(err)),
+            // A transient transport failure is not proof that Korea is unsupported.
+            blocked_reason: null,
+          }
+        : {
+            blocked_reason: message,
+            ...(preserveStatus ? {} : {status: "blocked", config_status: "blocked"}),
+          }),
     })
     await finishProductRun(db, runId, {status: "failed", errorMessage: message, startedAt})
     console.error(`#${brand.brand_node_id} ${brand.brand_name}: ${message}`)

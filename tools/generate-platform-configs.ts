@@ -2,7 +2,7 @@
 /**
  * DB → SiteConfig codegen (read-only, never writes to DB).
  *
- * Adds new KR-origin storefronts after detection and retains every generated
+ * Adds new KR-origin or verified KR-market storefronts after detection and retains every generated
  * storefront that has already collected data. This keeps refresh inventory
  * independent from later brand onboarding status transitions. Supported
  * generated engines are Shopify, Cafe24, and Imweb.
@@ -77,6 +77,9 @@ interface CandidateRow {
   status: string
   config_status: string
   detection: Record<string, unknown>
+  kr_eligibility_status: string
+  kr_price_currency: string | null
+  kr_storefront_url: string | null
   wiki: Record<string, unknown> | null
 }
 
@@ -142,14 +145,14 @@ async function fetchCandidates(): Promise<GeneratedCandidate[]> {
   const {data, error} = await db
     .from("product_crawl_brands")
     .select(
-      "brand_node_id,brand_name,homepage_url,platform_key,platform_type,category_discovery,categories,status,config_status,detection,wiki",
+      "brand_node_id,brand_name,homepage_url,platform_key,platform_type,category_discovery,categories,status,config_status,detection,kr_eligibility_status,kr_price_currency,kr_storefront_url,wiki",
     )
     .not("homepage_url", "is", null)
     .not("platform_key", "is", null)
     // qc_failed 포함: select-onboard-batch.ts는 tech_detected뿐 아니라
     // qc_failed(재시도 대상, MAX_IMPORT_RETRIES 캡 안)도 선정 후보로 삼는다.
-    // tech_detected/qc_failed는 shouldGeneratePlatformConfig()에서 KR-origin으로
-    // 스코프되고, crawled~active/blocked는 recrawl-by-source(#47) 인벤토리
+    // tech_detected/qc_failed는 shouldGeneratePlatformConfig()에서 KR-origin 또는
+    // 검증된 KR storefront로 스코프되고, crawled~active/blocked는 recrawl-by-source(#47) 인벤토리
     // 유지를 위해 포함된다. status를 좁히면 qc_failed 브랜드의 config가
     // 재생성마다 빠져 "missing" 스킵으로 재발하던 버그가 되살아난다
     // (2026-07-23 실측: dadakarada/noscouleurs/temporahaus).
@@ -171,6 +174,7 @@ async function fetchCandidates(): Promise<GeneratedCandidate[]> {
       config_status: raw.config_status,
       origin_country:
         typeof raw.wiki?.origin_country === "string" ? raw.wiki.origin_country : null,
+      kr_eligibility_status: raw.kr_eligibility_status,
       platform_type: raw.platform_type,
       detection: raw.detection,
     }
@@ -192,7 +196,11 @@ function buildEntrySource(
   shopifyCurrencyResult?: {currency: SiteConfig["sourceCurrency"]; ok: boolean; raw?: string},
 ): string {
   const host = normalizeHost(row.homepage_url)
-  const baseUrl = `https://${host}`
+  const verifiedKrStorefront =
+    row.kr_eligibility_status === "eligible_storefront" && row.kr_storefront_url
+      ? row.kr_storefront_url.replace(/\/$/, "")
+      : null
+  const baseUrl = verifiedKrStorefront ?? `https://${host}`
   const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
   const disabled =
     DISABLED_KEYS.has(row.platform_key) ||
@@ -201,6 +209,7 @@ function buildEntrySource(
       status: row.status,
       config_status: row.config_status,
       origin_country: typeof row.wiki?.origin_country === "string" ? row.wiki.origin_country : null,
+      kr_eligibility_status: row.kr_eligibility_status,
       platform_type: row.platform_type,
       detection: row.detection,
     })
@@ -240,7 +249,7 @@ function buildEntrySource(
       lines.push('    category: {discovery: "auto"},')
     }
   } else if (row.platform_type === "shopify") {
-    lines.push(`    sourceCurrency: ${JSON.stringify(shopifyCurrencyResult?.currency ?? "KRW")},`)
+    lines.push(`    sourceCurrency: ${JSON.stringify(row.kr_price_currency === "KRW" ? "KRW" : (shopifyCurrencyResult?.currency ?? "KRW"))},`)
     lines.push("    maxPages: 300,")
     lines.push("    crawlDelay: 1500,")
   }
@@ -310,7 +319,9 @@ async function main() {
   async function currencyWorker() {
     while (cursor < shopifyRows.length) {
       const row = shopifyRows[cursor++]!
-      let result = await detectShopifyCurrency(`https://${normalizeHost(row.homepage_url)}`)
+      let result = row.kr_eligibility_status === "eligible_storefront" && row.kr_price_currency === "KRW"
+        ? {currency: "KRW" as const, ok: true}
+        : await detectShopifyCurrency(`https://${normalizeHost(row.homepage_url)}`)
       const previousCurrency = previousByKey.get(row.platform_key)?.sourceCurrency
       if (!result.ok && previousCurrency) {
         result = {currency: previousCurrency, ok: true}
@@ -335,7 +346,7 @@ async function main() {
  * Regenerate: npx dotenv -e .env.local -- tsx tools/generate-platform-configs.ts
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
- * New onboarding remains KR-scoped; collected sources survive workflow status
+ * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
  * transitions. Generated ${new Date().toISOString()}.
  * Total: ${kept.length} (active ${activeCount} / disabled ${disabledCount})
  */

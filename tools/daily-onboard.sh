@@ -19,10 +19,9 @@
 #      않는다(오판 위험) — 이상 발견 시 그 리포트를 다음 Claude 세션에 붙여넣어
 #      조사를 요청하는 흐름을 상정한다 (2026-07-22 확정).
 #
-# 범위 제약: generate-platform-configs.ts가 wiki->>origin_country='KR' 브랜드만
-# 다뤄서, 해외 브랜드는 tech_detected여도 config가 안 생겨 select 단계에서 계속
-# 스킵된다. KR 후보가 소진되면 select-onboard-batch.ts가 "선정 브랜드 없음"을
-# 경고한다 — 그때는 스코프를 넓힐지 사용자에게 먼저 확인할 것.
+# 범위: KR-origin은 기존처럼 통과하고, 해외 브랜드는 detect 단계가 한국 locale/
+# Shopify Market에서 실제 variant KRW 가격을 검증한 경우에만 config 후보가 된다.
+# price_only/unsupported/inconclusive는 자동 온보딩하지 않는다.
 #
 # Usage:
 #   tools/daily-onboard.sh [--limit N] [--detect-limit N] [--out-root DIR]
@@ -59,12 +58,34 @@ if [ -z "$OUT_ROOT" ]; then OUT_ROOT="poc-runs/daily-$(date +%Y-%m-%d-%H%M%S)"; 
 PNPM="corepack pnpm@10.33.2 exec dotenv -e .env.local --"
 mkdir -p "$OUT_ROOT"
 
-echo "===== 1/5 detect: 미탐지 KR 브랜드(homepage_url 있음) 최대 ${DETECT_LIMIT}개 ====="
-# --country=KR: generate-platform-configs.ts가 origin_country='KR'만 config로
-# 만들 수 있으므로, 애초에 KR 아닌 브랜드는 detect도 안 한다 — detect 낭비 방지 +
-# "config 없음"으로 매번 스킵 리포트에 잡히는 노이즈 방지 (2026-07-23).
-$PNPM tsx src/brand-crawl.ts detect --status=not_started --url=present --country=KR --limit="$DETECT_LIMIT" \
+echo "===== 1/5 detect: 미탐지 브랜드 KR-market eligibility 확인 최대 ${DETECT_LIMIT}개 ====="
+$PNPM tsx src/brand-crawl.ts detect --status=not_started --url=present \
+  --eligibility-status=unchecked --limit="$DETECT_LIMIT" \
   || echo "  (detect 단계 실패/0건 — 계속 진행)"
+
+# migration 103 이전부터 tech_detected/qc_failed였던 비KR 브랜드는 eligibility만
+# unchecked로 남는다. 이 풀도 하루 DETECT_LIMIT개씩 순차 판정해야 기존 해외 후보가
+# 새 모델에 실제로 유입된다. 위 not_started 실행에서 막 처리된 행은 더 이상
+# unchecked가 아니므로 같은 실행에서 중복 probe되지 않는다.
+$PNPM tsx src/brand-crawl.ts detect --url=present \
+  --status=tech_detected,qc_failed --eligibility-status=unchecked \
+  --limit="$DETECT_LIMIT" --preserve-status \
+  || echo "  (기존 unchecked eligibility 확인 실패/0건 — 계속 진행)"
+
+# DNS/timeout/bot 등은 미지원으로 확정하지 않는다. 하루가 지난 retryable/inconclusive
+# 건만 별도 재확인해 같은 brand_node를 매 실행마다 반복하지 않는다. not_started는
+# 성공 시 tech_detected로 승격해야 하므로 preserve 없이, 진행 중/완료 상태는 preserve로
+# 재확인한다.
+$PNPM tsx src/brand-crawl.ts detect --url=present \
+  --status=not_started --eligibility-status=retryable_error,inconclusive \
+  --eligibility-stale-days=1 --limit="$DETECT_LIMIT" \
+  || echo "  (신규 eligibility 재확인 실패/0건 — 계속 진행)"
+
+$PNPM tsx src/brand-crawl.ts detect --url=present \
+  --status=tech_detected,qc_failed,crawled,imported,embedded,active,blocked \
+  --eligibility-status=retryable_error,inconclusive --eligibility-stale-days=1 \
+  --limit="$DETECT_LIMIT" --preserve-status \
+  || echo "  (기존 상태 eligibility 재확인 실패/0건 — 계속 진행)"
 
 echo "===== 2/5 generate-platform-configs: tech_detected 후보를 platforms.generated.ts에 반영 ====="
 $PNPM tsx tools/generate-platform-configs.ts

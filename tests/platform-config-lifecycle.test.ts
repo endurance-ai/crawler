@@ -13,16 +13,27 @@ function row(patch: Partial<PlatformConfigLifecycleRow> = {}): PlatformConfigLif
     status: "tech_detected",
     config_status: "needed",
     origin_country: "KR",
+    kr_eligibility_status: "eligible_origin",
     platform_type: "cafe24",
     detection: {},
     ...patch,
   }
 }
 
-test("신규 온보딩 후보는 KR tech_detected/qc_failed만 생성한다", () => {
+test("신규 온보딩 후보는 KR origin 또는 검증된 KR storefront만 생성한다", () => {
   assert.equal(shouldGeneratePlatformConfig(row()), true)
   assert.equal(shouldGeneratePlatformConfig(row({status: "qc_failed"})), true)
-  assert.equal(shouldGeneratePlatformConfig(row({origin_country: "US"})), false)
+  assert.equal(
+    shouldGeneratePlatformConfig(row({origin_country: "US", kr_eligibility_status: "eligible_storefront"})),
+    true,
+  )
+  for (const kr_eligibility_status of ["unchecked", "price_only", "unsupported", "inconclusive", "retryable_error"]) {
+    assert.equal(
+      shouldGeneratePlatformConfig(row({origin_country: "US", kr_eligibility_status})),
+      false,
+      kr_eligibility_status,
+    )
+  }
 })
 
 test("이미 수집된 설정은 상태와 국가가 바뀌어도 보존한다", () => {
