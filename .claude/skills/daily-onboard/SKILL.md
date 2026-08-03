@@ -5,20 +5,20 @@ description: >
   recently status-updated tech_detected/qc_failed candidates (not yet
   crawled/imported, or previously low-yield and eligible for retry) from
   brand_nodes/product_crawl_status, then runs them through the hybrid
-  onboarding pipeline (crawl + LLM category/color/description enrichment +
-  import + category guardrail + price/brand/color/gender anomaly report).
-  Live DB reads/writes and external site crawling — confirm scope with the
-  user before running.
+  onboarding pipeline (crawl incl. crawler-resolved gender + LLM
+  category/subcategory classification + import + category guardrail +
+  price/brand anomaly report). Live DB reads/writes and external site
+  crawling — confirm scope with the user before running.
 license: Apache-2.0
 compatibility: Designed for Claude Code
 allowed-tools: Bash, Read
 user-invocable: true
 disable-model-invocation: true
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   category: "workflow"
   status: "active"
-  updated: "2026-07-22"
+  updated: "2026-08-03"
   tags: "onboarding, crawl, hybrid, brand-nodes, daily"
   argument-hint: "[limit]"
 ---
@@ -85,10 +85,15 @@ metadata:
 4. **onboard-batch --variants hybrid** — 크롤(existing) + LLM 카테고리/subcategory
    분류(hybrid) + import(`--no-new-brands` 아님, 신규 브랜드 자동 등록) +
    `reclassify-categories.ts --only-invalid` guardrail까지 한 번에 실행.
-   **색상/설명/성별은 hybrid LLM 분류 대상이 아니다** (2026-07-29 제거, §18 참조) —
+   **색상/설명/성별은 hybrid LLM 분류 대상이 아니다** —
    `tools/product-extraction-poc.ts`의 `ClassificationSchema`는 category/subcategory
-   두 필드만 남아있다. color/gender는 VLM(`product_features`)이 단일 출처이고
-   description은 소비처가 없어 폐기됐다.
+   두 필드만 남아있다. **color**는 VLM(`product_features`)이 단일 출처(2026-07-29
+   이관, §18)이고 description은 소비처가 없어 폐기됐다. **gender는 2026-08-03
+   크롤러로 회귀**했다 — LLM 분류가 아니라 크롤 단계의
+   `resolveProductGenderWithSource`(engine→url→text→config_default, §18)가
+   만들고 import가 그대로 `products.gender`에 싣는다. gender를 확정하지 못한
+   상품은 QC가 needsReview로 걸러 적재하지 않는다(`unisex`는 근거가 있을 때만
+   쓰고 "모름"에는 쓰지 않는다).
    **QC 통과율이 낮으면 자동으로 재시도 대상이 된다**: `import-products.ts`가
    크롤 원본 대비 QC 게이트 통과 비율(`raw.length / rawAll.length`)을 계산해서
    50% 미만이면 상품이 일부 들어갔어도(`inserted>0`) `status='imported'`로 확정하지
@@ -97,9 +102,15 @@ metadata:
    찍혀서 영구히 재시도 후보에서 빠지는 문제가 있었다.)
 5. **anomaly check** (`tools/check-onboard-anomalies.ts`) — 오늘 처리한 브랜드만 대상으로
    가격(KRW인데 1000원 미만/null 10%+), 브랜드(빈 문자열/name과 동일/spec 라벨 누출)
-   이상 패턴을 검사해 `<out-root>/anomaly-report.log`에 남긴다. 색상/성별 체크는
-   §18 색상·성별 VLM 이관(2026-07-29) 이후 이 스크립트에서 제거됐다 — products
-   테이블에 해당 컬럼이 없다. **원인 조사와 코드 수정은 자동화하지 않는다** — 오판으로 멀쩡한 데이터를
+   이상 패턴을 검사해 `<out-root>/anomaly-report.log`에 남긴다. 색상 체크는 §18
+   색상 VLM 이관(2026-07-29) 이후 이 스크립트에서 제거됐다 — products 테이블에
+   해당 컬럼이 없다. **gender는 2026-08-03 크롤러로 회귀했지만 이 스크립트에는
+   아직 gender 이상치 체크가 복원되지 않았다** — `chk_products_gender_required`
+   (migration 104)와 QC의 needsReview 게이트가 write 시점에 빈 gender는 이미
+   막지만, "값은 있는데 틀린" 케이스(예: 특정 브랜드에서 unisex로 쏠림)는 여기서
+   잡히지 않는다. 온보딩 직후 성별 분포가 의심스러우면 해당 브랜드의
+   `products.gender` 분포를 수동으로 확인할 것.
+   **원인 조사와 코드 수정은 자동화하지 않는다** — 오판으로 멀쩡한 데이터를
    망가뜨릴 위험이 있어, 이상 발견 시 그 리포트를 다음 Claude 세션에 붙여넣어 조사를
    요청하는 흐름을 상정한다. 스킬 실행 자체는 이상치가 있어도 실패로 끝나지 않는다
    (경고만 출력).
