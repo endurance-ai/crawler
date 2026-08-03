@@ -6,6 +6,7 @@
  */
 
 import type {SiteConfig} from "../lib/types"
+import {SITE_GENDER_DEFAULTS} from "./gender-defaults"
 import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
@@ -25,23 +26,23 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Women
-        {name: "Outer", cateNo: 450},
-        {name: "Top", cateNo: 451},
-        {name: "Knitwear", cateNo: 689},
-        {name: "Bottom", cateNo: 460},
-        {name: "Dress", cateNo: 465},
-        {name: "Shoes", cateNo: 466},
-        {name: "Bag", cateNo: 467},
-        {name: "Accessories", cateNo: 469},
+        {name: "Outer", cateNo: 450, gender: ["women"]},
+        {name: "Top", cateNo: 451, gender: ["women"]},
+        {name: "Knitwear", cateNo: 689, gender: ["women"]},
+        {name: "Bottom", cateNo: 460, gender: ["women"]},
+        {name: "Dress", cateNo: 465, gender: ["women"]},
+        {name: "Shoes", cateNo: 466, gender: ["women"]},
+        {name: "Bag", cateNo: 467, gender: ["women"]},
+        {name: "Accessories", cateNo: 469, gender: ["women"]},
         // Men
-        {name: "Outer", cateNo: 490},
-        {name: "Top", cateNo: 491},
-        {name: "Shirts", cateNo: 493},
-        {name: "Knitwear", cateNo: 693},
-        {name: "Bottom", cateNo: 501},
-        {name: "Shoes", cateNo: 505},
-        {name: "Bag", cateNo: 544},
-        {name: "Accessories", cateNo: 507},
+        {name: "Outer", cateNo: 490, gender: ["men"]},
+        {name: "Top", cateNo: 491, gender: ["men"]},
+        {name: "Shirts", cateNo: 493, gender: ["men"]},
+        {name: "Knitwear", cateNo: 693, gender: ["men"]},
+        {name: "Bottom", cateNo: 501, gender: ["men"]},
+        {name: "Shoes", cateNo: 505, gender: ["men"]},
+        {name: "Bag", cateNo: 544, gender: ["men"]},
+        {name: "Accessories", cateNo: 507, gender: ["men"]},
       ],
     },
     notes: "Women 8 + Men 8 = 16개 카테고리",
@@ -57,13 +58,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 683},
-        {name: "Top", cateNo: 742},
-        {name: "Knitwear", cateNo: 1020},
-        {name: "Bottom", cateNo: 755},
-        {name: "Shoes", cateNo: 783},
-        {name: "Bag", cateNo: 1341},
-        {name: "Accessories", cateNo: 798},
+        {name: "Outer", cateNo: 683, gender: ["unisex"]},
+        {name: "Top", cateNo: 742, gender: ["unisex"]},
+        {name: "Knitwear", cateNo: 1020, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 755, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 783, gender: ["unisex"]},
+        {name: "Bag", cateNo: 1341, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 798, gender: ["unisex"]},
       ],
     },
     notes: "unisex 편집샵. 7개 카테고리",
@@ -80,20 +81,20 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Women
-        {name: "Outer", cateNo: 121},
-        {name: "Top", cateNo: 119},
-        {name: "Bottom", cateNo: 118},
-        {name: "Dress", cateNo: 123},
-        {name: "Bag", cateNo: 117},
-        {name: "Shoes", cateNo: 120},
-        {name: "Accessories", cateNo: 116},
+        {name: "Outer", cateNo: 121, gender: ["women"]},
+        {name: "Top", cateNo: 119, gender: ["women"]},
+        {name: "Bottom", cateNo: 118, gender: ["women"]},
+        {name: "Dress", cateNo: 123, gender: ["women"]},
+        {name: "Bag", cateNo: 117, gender: ["women"]},
+        {name: "Shoes", cateNo: 120, gender: ["women"]},
+        {name: "Accessories", cateNo: 116, gender: ["women"]},
         // Men
-        {name: "Outer", cateNo: 115},
-        {name: "Top", cateNo: 113},
-        {name: "Bottom", cateNo: 112},
-        {name: "Bag", cateNo: 111},
-        {name: "Shoes", cateNo: 114},
-        {name: "Accessories", cateNo: 110},
+        {name: "Outer", cateNo: 115, gender: ["men"]},
+        {name: "Top", cateNo: 113, gender: ["men"]},
+        {name: "Bottom", cateNo: 112, gender: ["men"]},
+        {name: "Bag", cateNo: 111, gender: ["men"]},
+        {name: "Shoes", cateNo: 114, gender: ["men"]},
+        {name: "Accessories", cateNo: 110, gender: ["men"]},
       ],
     },
     notes: "도산공원 편집샵. Women 7 + Men 6 = 13개 카테고리",
@@ -109,16 +110,16 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 446},
-        {name: "Outer", cateNo: 170}, // Jacket
-        {name: "Knitwear", cateNo: 450},
-        {name: "Shirts", cateNo: 169},
-        {name: "Top", cateNo: 171}, // T-Shirts
-        {name: "Bottom", cateNo: 103},
-        {name: "Bottom", cateNo: 1368}, // Shorts
-        {name: "Shoes", cateNo: 137},
-        {name: "Accessories", cateNo: 26}, // Headwear
-        {name: "Accessories", cateNo: 27},
+        {name: "Outer", cateNo: 446, gender: ["unisex"]},
+        {name: "Outer", cateNo: 170, gender: ["unisex"]}, // Jacket
+        {name: "Knitwear", cateNo: 450, gender: ["unisex"]},
+        {name: "Shirts", cateNo: 169, gender: ["unisex"]},
+        {name: "Top", cateNo: 171, gender: ["unisex"]}, // T-Shirts
+        {name: "Bottom", cateNo: 103, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 1368, gender: ["unisex"]}, // Shorts
+        {name: "Shoes", cateNo: 137, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 26, gender: ["unisex"]}, // Headwear
+        {name: "Accessories", cateNo: 27, gender: ["unisex"]},
       ],
     },
     notes: "unisex. Coat/Jacket 분리, 10개 카테고리",
@@ -128,21 +129,21 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "VISUAL AID",
     type: "cafe24",
     baseUrl: "https://visualaid.kr",
-    multiBrand: true, // 상품이 "[BRAND] 제품명" 형식 — 브랜드가 상품명에 있어 name 파싱/LLM 추출 대상(8division과 달리 DOM에 없음). 단 아직 미검증.
-    disabled: true, // 비활성 유지. 재활성 전 name-기반 브랜드 추출을 실제로 검증할 것(LLM-from-name 신뢰도 낮으면 name-prefix 파서 필요).
+    disabled: true, // 보류: 멀티브랜드 편집샵, 상품이 "[BRAND] 제품명" 형식 — [브랜드] 추출 미구현, OLD엔진 크롤 시 brand 오염
     paginate: true,
     maxPages: 300,
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 25},
-        {name: "Top", cateNo: 26},
-        {name: "Bottom", cateNo: 27},
-        {name: "Dress", cateNo: 306},
-        {name: "Bag", cateNo: 54},
-        {name: "Shoes", cateNo: 42},
-        {name: "Accessories", cateNo: 28},
-        {name: "Accessories", cateNo: 351}, // Headwear
+        {name: "Outer", cateNo: 25, gender: ["women"]},
+        {name: "Top", cateNo: 26, gender: ["women"]},
+        {name: "Bottom", cateNo: 27, gender: ["women"]},
+        {name: "Dress", cateNo: 306, gender: ["women"]},
+        {name: "Bag", cateNo: 54, gender: ["women"]},
+        {name: "Shoes", cateNo: 42, gender: ["women"]},
+        {name: "Accessories", cateNo: 28, gender: ["women"]},
+        {name: "Accessories", cateNo: 351, gender: ["women"]}, // Headwear
       ],
     },
     notes: "여성 전용. 8개 카테고리",
@@ -154,11 +155,6 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "8디비전",
     type: "cafe24",
     baseUrl: "https://www.8division.com",
-    // 멀티브랜드 편집샵이지만 브랜드가 상품명이 아니라 cafe24 DOM(.brand/manufacturer)에
-    // 있다 — 직접 크롤(cafe24-engine DOM 추출)이 실제 브랜드를 뽑는다. 따라서
-    // multiBrand(온보딩 LLM-from-name) 경로가 아니라 직접 크롤 + import provenance
-    // 가드로 처리한다: DOM 추출 성공분은 기존 brand_node 매칭 시 적재, 실패분은
-    // 격리(플랫폼명 폴백 없음 → platform-as-brand 재오염 불가).
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -166,15 +162,15 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // 온라인샵 (unisex 편집샵 — 성별 구분 없음)
-        {name: "Top", cateNo: 218}, // 상의
-        {name: "Outer", cateNo: 220}, // 아우터
-        {name: "Bottom", cateNo: 219}, // 하의
-        {name: "Shoes", cateNo: 223}, // 신발
-        {name: "Bag", cateNo: 222}, // 가방
-        {name: "Accessories", cateNo: 229}, // 악세사리
-        {name: "Accessories", cateNo: 224}, // 모자
-        {name: "Accessories", cateNo: 221}, // 벨트
-        {name: "Accessories", cateNo: 1078}, // 주얼리
+        {name: "Top", cateNo: 218, gender: ["unisex"]}, // 상의
+        {name: "Outer", cateNo: 220, gender: ["unisex"]}, // 아우터
+        {name: "Bottom", cateNo: 219, gender: ["unisex"]}, // 하의
+        {name: "Shoes", cateNo: 223, gender: ["unisex"]}, // 신발
+        {name: "Bag", cateNo: 222, gender: ["unisex"]}, // 가방
+        {name: "Accessories", cateNo: 229, gender: ["unisex"]}, // 악세사리
+        {name: "Accessories", cateNo: 224, gender: ["unisex"]}, // 모자
+        {name: "Accessories", cateNo: 221, gender: ["unisex"]}, // 벨트
+        {name: "Accessories", cateNo: 1078, gender: ["unisex"]}, // 주얼리
       ],
     },
     notes: "unisex 편집샵. 700+ cate_no 중 의류 카테고리 9개만 사용. 브랜드(Needles, EG 등) 카테고리 제외",
@@ -192,23 +188,23 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // 카테고리 (unisex — 성별 구분 없음)
-        {name: "Top", cateNo: 77}, // 티셔츠
-        {name: "Shirts", cateNo: 74}, // 셔츠
-        {name: "Top", cateNo: 76}, // 스웻
-        {name: "Knitwear", cateNo: 71}, // 니트
-        {name: "Top", cateNo: 78}, // 베스트
-        {name: "Outer", cateNo: 70}, // 자켓
-        {name: "Outer", cateNo: 64}, // 코트
-        {name: "Outer", cateNo: 66}, // 다운파카
-        {name: "Bottom", cateNo: 72}, // 긴바지
-        {name: "Bottom", cateNo: 73}, // 반바지
-        {name: "Bottom", cateNo: 65}, // 데님
-        {name: "Bottom", cateNo: 75}, // 스커트
-        {name: "Shoes", cateNo: 68}, // 신발
-        {name: "Shoes", cateNo: 390}, // 샌들
-        {name: "Accessories", cateNo: 69}, // 모자
-        {name: "Bag", cateNo: 52}, // 가방 & 지갑
-        {name: "Accessories", cateNo: 51}, // 액세서리
+        {name: "Top", cateNo: 77, gender: ["unisex"]}, // 티셔츠
+        {name: "Shirts", cateNo: 74, gender: ["unisex"]}, // 셔츠
+        {name: "Top", cateNo: 76, gender: ["unisex"]}, // 스웻
+        {name: "Knitwear", cateNo: 71, gender: ["unisex"]}, // 니트
+        {name: "Top", cateNo: 78, gender: ["unisex"]}, // 베스트
+        {name: "Outer", cateNo: 70, gender: ["unisex"]}, // 자켓
+        {name: "Outer", cateNo: 64, gender: ["unisex"]}, // 코트
+        {name: "Outer", cateNo: 66, gender: ["unisex"]}, // 다운파카
+        {name: "Bottom", cateNo: 72, gender: ["unisex"]}, // 긴바지
+        {name: "Bottom", cateNo: 73, gender: ["unisex"]}, // 반바지
+        {name: "Bottom", cateNo: 65, gender: ["unisex"]}, // 데님
+        {name: "Bottom", cateNo: 75, gender: ["unisex"]}, // 스커트
+        {name: "Shoes", cateNo: 68, gender: ["unisex"]}, // 신발
+        {name: "Shoes", cateNo: 390, gender: ["unisex"]}, // 샌들
+        {name: "Accessories", cateNo: 69, gender: ["unisex"]}, // 모자
+        {name: "Bag", cateNo: 52, gender: ["unisex"]}, // 가방 & 지갑
+        {name: "Accessories", cateNo: 51, gender: ["unisex"]}, // 액세서리
       ],
     },
     notes: "unisex 편집샵 (Eastlogue, EG, Kapital 등). 브랜드 카테고리 제외, 의류 17개 카테고리",
@@ -225,20 +221,20 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // 일반 카테고리 (unisex)
-        {name: "Top", cateNo: 47}, // t-shirts
-        {name: "Top", cateNo: 522}, // sweats
-        {name: "Shirts", cateNo: 48}, // shirts
-        {name: "Top", cateNo: 49}, // vests
-        {name: "Knitwear", cateNo: 50}, // knitwear
-        {name: "Outer", cateNo: 393}, // jackets
-        {name: "Outer", cateNo: 525}, // leather
-        {name: "Outer", cateNo: 394}, // coats
-        {name: "Bottom", cateNo: 52}, // pants
-        {name: "Bottom", cateNo: 1574}, // skirt
-        {name: "Bottom", cateNo: 53}, // shorts
-        {name: "Shoes", cateNo: 55}, // shoes
-        {name: "Accessories", cateNo: 523}, // headwear
-        {name: "Accessories", cateNo: 54}, // accessories
+        {name: "Top", cateNo: 47, gender: ["unisex"]}, // t-shirts
+        {name: "Top", cateNo: 522, gender: ["unisex"]}, // sweats
+        {name: "Shirts", cateNo: 48, gender: ["unisex"]}, // shirts
+        {name: "Top", cateNo: 49, gender: ["unisex"]}, // vests
+        {name: "Knitwear", cateNo: 50, gender: ["unisex"]}, // knitwear
+        {name: "Outer", cateNo: 393, gender: ["unisex"]}, // jackets
+        {name: "Outer", cateNo: 525, gender: ["unisex"]}, // leather
+        {name: "Outer", cateNo: 394, gender: ["unisex"]}, // coats
+        {name: "Bottom", cateNo: 52, gender: ["unisex"]}, // pants
+        {name: "Bottom", cateNo: 1574, gender: ["unisex"]}, // skirt
+        {name: "Bottom", cateNo: 53, gender: ["unisex"]}, // shorts
+        {name: "Shoes", cateNo: 55, gender: ["unisex"]}, // shoes
+        {name: "Accessories", cateNo: 523, gender: ["unisex"]}, // headwear
+        {name: "Accessories", cateNo: 54, gender: ["unisex"]}, // accessories
       ],
     },
     notes: "Eastlogue/Unaffected 자사 브랜드 + 편집샵. 브랜드 페이지(list_b) 제외, 카테고리 14개",
@@ -278,24 +274,24 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Men
-        {name: "Top", cateNo: 226},       // t-shirts
-        {name: "Top", cateNo: 227},       // sweats
-        {name: "Shirts", cateNo: 228},
-        {name: "Top", cateNo: 229},       // vests
-        {name: "Knitwear", cateNo: 230},
-        {name: "Outer", cateNo: 231},     // jackets
-        {name: "Outer", cateNo: 232},     // leather
-        {name: "Outer", cateNo: 233},     // coats
-        {name: "Outer", cateNo: 234},     // down jackets
-        {name: "Bottom", cateNo: 235},    // pants
-        {name: "Bottom", cateNo: 236},    // shorts
-        {name: "Shoes", cateNo: 241},
-        {name: "Accessories", cateNo: 237}, // headwear
-        {name: "Accessories", cateNo: 238},
+        {name: "Top", cateNo: 226, gender: ["men"]},       // t-shirts
+        {name: "Top", cateNo: 227, gender: ["men"]},       // sweats
+        {name: "Shirts", cateNo: 228, gender: ["men"]},
+        {name: "Top", cateNo: 229, gender: ["men"]},       // vests
+        {name: "Knitwear", cateNo: 230, gender: ["men"]},
+        {name: "Outer", cateNo: 231, gender: ["men"]},     // jackets
+        {name: "Outer", cateNo: 232, gender: ["men"]},     // leather
+        {name: "Outer", cateNo: 233, gender: ["men"]},     // coats
+        {name: "Outer", cateNo: 234, gender: ["men"]},     // down jackets
+        {name: "Bottom", cateNo: 235, gender: ["men"]},    // pants
+        {name: "Bottom", cateNo: 236, gender: ["men"]},    // shorts
+        {name: "Shoes", cateNo: 241, gender: ["men"]},
+        {name: "Accessories", cateNo: 237, gender: ["men"]}, // headwear
+        {name: "Accessories", cateNo: 238, gender: ["men"]},
         // Women
-        {name: "Top", cateNo: 207},     // t-shirts
-        {name: "Top", cateNo: 208},     // sweats
-        {name: "Shirts", cateNo: 209},
+        {name: "Top", cateNo: 207, gender: ["women"]},     // t-shirts
+        {name: "Top", cateNo: 208, gender: ["women"]},     // sweats
+        {name: "Shirts", cateNo: 209, gender: ["women"]},
       ],
     },
     notes: "밀리터리/아웃도어 자사 브랜드. Men 14 + Women 3 = 17개 카테고리. 10~40만원대",
@@ -309,16 +305,17 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 54},
-        {name: "Top", cateNo: 44},
-        {name: "Knitwear", cateNo: 78},
-        {name: "Bottom", cateNo: 49},
-        {name: "Dress", cateNo: 55},
-        {name: "Bag", cateNo: 183},
-        {name: "Accessories", cateNo: 56},
+        {name: "Outer", cateNo: 54, gender: ["women"]},
+        {name: "Top", cateNo: 44, gender: ["women"]},
+        {name: "Knitwear", cateNo: 78, gender: ["women"]},
+        {name: "Bottom", cateNo: 49, gender: ["women"]},
+        {name: "Dress", cateNo: 55, gender: ["women"]},
+        {name: "Bag", cateNo: 183, gender: ["women"]},
+        {name: "Accessories", cateNo: 56, gender: ["women"]},
       ],
     },
     notes: "리파인드 빈티지 컨템포러리 여성복. 7개 카테고리. 10~50만원대",
@@ -332,20 +329,21 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Top", cateNo: 519},      // TSHIRT
-        {name: "Top", cateNo: 520},      // TOPS
-        {name: "Shirts", cateNo: 522},
-        {name: "Top", cateNo: 521},      // SWEATSHIRT
-        {name: "Bottom", cateNo: 525},
-        {name: "Dress", cateNo: 526},
-        {name: "Knitwear", cateNo: 523},
-        {name: "Outer", cateNo: 524},
-        {name: "Accessories", cateNo: 527},
-        {name: "Bag", cateNo: 528},
-        {name: "Shoes", cateNo: 553},
+        {name: "Top", cateNo: 519, gender: ["women"]},      // TSHIRT
+        {name: "Top", cateNo: 520, gender: ["women"]},      // TOPS
+        {name: "Shirts", cateNo: 522, gender: ["women"]},
+        {name: "Top", cateNo: 521, gender: ["women"]},      // SWEATSHIRT
+        {name: "Bottom", cateNo: 525, gender: ["women"]},
+        {name: "Dress", cateNo: 526, gender: ["women"]},
+        {name: "Knitwear", cateNo: 523, gender: ["women"]},
+        {name: "Outer", cateNo: 524, gender: ["women"]},
+        {name: "Accessories", cateNo: 527, gender: ["women"]},
+        {name: "Bag", cateNo: 528, gender: ["women"]},
+        {name: "Shoes", cateNo: 553, gender: ["women"]},
       ],
     },
     notes: "프렌치 데일리 캐주얼 여성복. WOMEN 11개 카테고리 (KIDS/PET 제외). 5~25만원대",
@@ -362,13 +360,14 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     crawlDetails: true,
     pricePattern: /KRW\s*([\d,]+)/,
     priceCurrency: "₩",
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Top",         cateNo: 43},
-        {name: "Accessories", cateNo: 44},
-        {name: "Bottom",      cateNo: 46},
-        {name: "Dress",       cateNo: 47},
+        {name: "Top",         cateNo: 43, gender: ["women"]},
+        {name: "Accessories", cateNo: 44, gender: ["women"]},
+        {name: "Bottom",      cateNo: 46, gender: ["women"]},
+        {name: "Dress",       cateNo: 47, gender: ["women"]},
       ],
     },
     notes: "여성 자사 브랜드몰. Top/Acc/Bottom/Dress 4개 카테고리. 4~6만원대",
@@ -388,26 +387,26 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Men
-        {name: "Outer", cateNo: 1500},
-        {name: "Knitwear", cateNo: 1546},
-        {name: "Top", cateNo: 1547},       // Sweatshirt
-        {name: "Shirts", cateNo: 1556},
-        {name: "Top", cateNo: 1574},       // T-Shirt
-        {name: "Bottom", cateNo: 1499},
-        {name: "Bottom", cateNo: 1577},    // Shorts
-        {name: "Bag", cateNo: 1548},
-        {name: "Shoes", cateNo: 1776},
-        {name: "Accessories", cateNo: 1501}, // Headgear
+        {name: "Outer", cateNo: 1500, gender: ["men"]},
+        {name: "Knitwear", cateNo: 1546, gender: ["men"]},
+        {name: "Top", cateNo: 1547, gender: ["men"]},       // Sweatshirt
+        {name: "Shirts", cateNo: 1556, gender: ["men"]},
+        {name: "Top", cateNo: 1574, gender: ["men"]},       // T-Shirt
+        {name: "Bottom", cateNo: 1499, gender: ["men"]},
+        {name: "Bottom", cateNo: 1577, gender: ["men"]},    // Shorts
+        {name: "Bag", cateNo: 1548, gender: ["men"]},
+        {name: "Shoes", cateNo: 1776, gender: ["men"]},
+        {name: "Accessories", cateNo: 1501, gender: ["men"]}, // Headgear
         // Women
-        {name: "Outer", cateNo: 1508},
-        {name: "Knitwear", cateNo: 1568},
-        {name: "Top", cateNo: 1569},     // Sweatshirt
-        {name: "Top", cateNo: 1593},
-        {name: "Dress", cateNo: 1725},
-        {name: "Bottom", cateNo: 1507},
-        {name: "Bag", cateNo: 1558},
-        {name: "Shoes", cateNo: 1778},
-        {name: "Accessories", cateNo: 1505}, // Headgear
+        {name: "Outer", cateNo: 1508, gender: ["women"]},
+        {name: "Knitwear", cateNo: 1568, gender: ["women"]},
+        {name: "Top", cateNo: 1569, gender: ["women"]},     // Sweatshirt
+        {name: "Top", cateNo: 1593, gender: ["women"]},
+        {name: "Dress", cateNo: 1725, gender: ["women"]},
+        {name: "Bottom", cateNo: 1507, gender: ["women"]},
+        {name: "Bag", cateNo: 1558, gender: ["women"]},
+        {name: "Shoes", cateNo: 1778, gender: ["women"]},
+        {name: "Accessories", cateNo: 1505, gender: ["women"]}, // Headgear
       ],
     },
     notes: "제주 기반 편집샵. Men 10 + Women 9 = 19개 카테고리. 5~40만원대",
@@ -420,6 +419,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     category: { discovery: "auto" },
+    defaultGender: ["unisex"],
     disabled: true,
     notes: "부산 기반 편집샵. 브랜드 기반 구조라 의류 카테고리 없음. 수동 설정 필요",
   },
@@ -434,8 +434,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     // "모두 보기"(1152)에 전 브랜드 상품이 포함됨. 브랜드별 서브카테고리(1153+)는 중복이므로 제외.
     category: {
       discovery: "manual",
-      categories: [{ name: "모두 보기", cateNo: 1152 }],
+      categories: [{ name: "모두 보기", cateNo: 1152, gender: ["unisex"] }],
     },
+    defaultGender: ["unisex"],
     notes: "성수동 편집샵. Crepuscule, Toga, Blurhms, Aton 등 50+ 브랜드. 10~50만원대",
   },
   {
@@ -449,13 +450,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 137},
-        {name: "Top", cateNo: 135},
-        {name: "Bottom", cateNo: 136},
-        {name: "Bag", cateNo: 138},
-        {name: "Accessories", cateNo: 139}, // 모자
-        {name: "Accessories", cateNo: 141},
-        {name: "Shoes", cateNo: 1111},
+        {name: "Outer", cateNo: 137, gender: ["unisex"]},
+        {name: "Top", cateNo: 135, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 136, gender: ["unisex"]},
+        {name: "Bag", cateNo: 138, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 139, gender: ["unisex"]}, // 모자
+        {name: "Accessories", cateNo: 141, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 1111, gender: ["unisex"]},
       ],
     },
     notes: "합정 편집샵. 7개 카테고리. 3~20만원대",
@@ -471,13 +472,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 29},
-        {name: "Top", cateNo: 30},
-        {name: "Bottom", cateNo: 31},
-        {name: "Shoes", cateNo: 42},
-        {name: "Bag", cateNo: 43},
-        {name: "Accessories", cateNo: 44}, // Hats
-        {name: "Accessories", cateNo: 45},
+        {name: "Outer", cateNo: 29, gender: ["unisex"]},
+        {name: "Top", cateNo: 30, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 31, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 42, gender: ["unisex"]},
+        {name: "Bag", cateNo: 43, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 44, gender: ["unisex"]}, // Hats
+        {name: "Accessories", cateNo: 45, gender: ["unisex"]},
       ],
     },
     notes: "국내외 브랜드 편집샵. 7개 카테고리. 5~30만원대",
@@ -500,30 +501,30 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Outer 하위
-        {name: "Outer", cateNo: 131},  // Jacket/Blouson
-        {name: "Outer", cateNo: 132},  // Jumper/Parka
-        {name: "Outer", cateNo: 323},  // Leather
-        {name: "Outer", cateNo: 133},  // Coat
-        {name: "Outer", cateNo: 135},  // Vest
-        {name: "Outer", cateNo: 136},  // Padding
-        {name: "Knitwear", cateNo: 137}, // Cardigan
+        {name: "Outer", cateNo: 131, gender: ["unisex"]},  // Jacket/Blouson
+        {name: "Outer", cateNo: 132, gender: ["unisex"]},  // Jumper/Parka
+        {name: "Outer", cateNo: 323, gender: ["unisex"]},  // Leather
+        {name: "Outer", cateNo: 133, gender: ["unisex"]},  // Coat
+        {name: "Outer", cateNo: 135, gender: ["unisex"]},  // Vest
+        {name: "Outer", cateNo: 136, gender: ["unisex"]},  // Padding
+        {name: "Knitwear", cateNo: 137, gender: ["unisex"]}, // Cardigan
         // Tops 하위
-        {name: "Top", cateNo: 32},     // Tee
-        {name: "Shirts", cateNo: 33},   // Shirt
-        {name: "Top", cateNo: 125},    // Sweatshirt
-        {name: "Knitwear", cateNo: 126}, // Knitwear
+        {name: "Top", cateNo: 32, gender: ["unisex"]},     // Tee
+        {name: "Shirts", cateNo: 33, gender: ["unisex"]},   // Shirt
+        {name: "Top", cateNo: 125, gender: ["unisex"]},    // Sweatshirt
+        {name: "Knitwear", cateNo: 126, gender: ["unisex"]}, // Knitwear
         // Bottoms 하위
-        {name: "Bottom", cateNo: 138},  // Denim
-        {name: "Bottom", cateNo: 280},  // Chino
-        {name: "Bottom", cateNo: 281},  // Trousers
-        {name: "Bottom", cateNo: 282},  // Easy Pants
-        {name: "Bottom", cateNo: 283},  // Work Pants
-        {name: "Bottom", cateNo: 284},  // Shorts
+        {name: "Bottom", cateNo: 138, gender: ["unisex"]},  // Denim
+        {name: "Bottom", cateNo: 280, gender: ["unisex"]},  // Chino
+        {name: "Bottom", cateNo: 281, gender: ["unisex"]},  // Trousers
+        {name: "Bottom", cateNo: 282, gender: ["unisex"]},  // Easy Pants
+        {name: "Bottom", cateNo: 283, gender: ["unisex"]},  // Work Pants
+        {name: "Bottom", cateNo: 284, gender: ["unisex"]},  // Shorts
         // 나머지
-        {name: "Shoes", cateNo: 28},
-        {name: "Bag", cateNo: 80},
-        {name: "Accessories", cateNo: 79}, // Hats
-        {name: "Accessories", cateNo: 42},
+        {name: "Shoes", cateNo: 28, gender: ["unisex"]},
+        {name: "Bag", cateNo: 80, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 79, gender: ["unisex"]}, // Hats
+        {name: "Accessories", cateNo: 42, gender: ["unisex"]},
       ],
     },
     notes: "캐주얼 편집샵. 하위 카테고리 21개",
@@ -539,6 +540,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     category: { discovery: "auto" },
+    defaultGender: ["unisex"],
     disabled: true,
     notes: "컨템포러리 캐주얼. 커스텀 셀렉터 필요 (기본 셀렉터로 상품 못 찾음). 5~30만원대",
   },
@@ -553,10 +555,10 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Beslow", cateNo: 126},          // 자사 메인 (6p)
-        {name: "Beslow Purple", cateNo: 76},    // 퍼플 라인 (2p)
-        {name: "Slowboy", cateNo: 133},         // 슬로우보이 (1p)
-        {name: "Selected Brands", cateNo: 127}, // 셀렉 브랜드 (16p)
+        {name: "Beslow", cateNo: 126, gender: ["men"]},          // 자사 메인 (6p)
+        {name: "Beslow Purple", cateNo: 76, gender: ["men"]},    // 퍼플 라인 (2p)
+        {name: "Slowboy", cateNo: 133, gender: ["men"]},         // 슬로우보이 (1p)
+        {name: "Selected Brands", cateNo: 127, gender: ["men"]}, // 셀렉 브랜드 (16p)
       ],
     },
     disabled: true,
@@ -575,15 +577,15 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Men
-        {name: "Outer", cateNo: 44},
-        {name: "Top", cateNo: 45},
-        {name: "Bottom", cateNo: 46},
-        {name: "Accessories", cateNo: 47},
+        {name: "Outer", cateNo: 44, gender: ["men"]},
+        {name: "Top", cateNo: 45, gender: ["men"]},
+        {name: "Bottom", cateNo: 46, gender: ["men"]},
+        {name: "Accessories", cateNo: 47, gender: ["men"]},
         // Women
-        {name: "Top", cateNo: 80},
-        {name: "Bottom", cateNo: 81},
-        {name: "Dress", cateNo: 95},
-        {name: "Accessories", cateNo: 82},
+        {name: "Top", cateNo: 80, gender: ["women"]},
+        {name: "Bottom", cateNo: 81, gender: ["women"]},
+        {name: "Dress", cateNo: 95, gender: ["women"]},
+        {name: "Accessories", cateNo: 82, gender: ["women"]},
       ],
     },
     notes: "컨템포러리 캐주얼, 테일러드 베이직. Men 4 + Women 4 = 8개 카테고리. 7~38만원대",
@@ -600,7 +602,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "All", cateNo: 64}, // SHOPNOW (전체 상품 — 단일 카테고리)
+        {name: "All", cateNo: 64, gender: ["men"]}, // SHOPNOW (전체 상품 — 단일 카테고리)
       ],
     },
     notes: "클래식 남성복. 단일 카테고리 (379개). 7~50만원대",
@@ -618,20 +620,20 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         // Men
-        {name: "Outer", cateNo: 62},
-        {name: "Outer", cateNo: 63},       // 재킷
-        {name: "Bottom", cateNo: 27},
-        {name: "Shirts", cateNo: 64},
-        {name: "Knitwear", cateNo: 65},
-        {name: "Top", cateNo: 66},         // 컷앤소운
-        {name: "Accessories", cateNo: 53},
+        {name: "Outer", cateNo: 62, gender: ["men"]},
+        {name: "Outer", cateNo: 63, gender: ["men"]},       // 재킷
+        {name: "Bottom", cateNo: 27, gender: ["men"]},
+        {name: "Shirts", cateNo: 64, gender: ["men"]},
+        {name: "Knitwear", cateNo: 65, gender: ["men"]},
+        {name: "Top", cateNo: 66, gender: ["men"]},         // 컷앤소운
+        {name: "Accessories", cateNo: 53, gender: ["men"]},
         // Women
-        {name: "Outer", cateNo: 81},
-        {name: "Top", cateNo: 86},
-        {name: "Bottom", cateNo: 83},
-        {name: "Knitwear", cateNo: 85},
-        {name: "Dress", cateNo: 84},
-        {name: "Accessories", cateNo: 87},
+        {name: "Outer", cateNo: 81, gender: ["women"]},
+        {name: "Top", cateNo: 86, gender: ["women"]},
+        {name: "Bottom", cateNo: 83, gender: ["women"]},
+        {name: "Knitwear", cateNo: 85, gender: ["women"]},
+        {name: "Dress", cateNo: 84, gender: ["women"]},
+        {name: "Accessories", cateNo: 87, gender: ["women"]},
       ],
     },
     notes: "컨템포러리 캐주얼. Men 7 + Women 6 = 13개 카테고리. 5~25만원대",
@@ -648,12 +650,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 87},
-        {name: "Knitwear", cateNo: 51},
-        {name: "Shirts", cateNo: 80},
-        {name: "Top", cateNo: 30},
-        {name: "Bottom", cateNo: 31},
-        {name: "Bottom", cateNo: 188}, // Denim
+        {name: "Outer", cateNo: 87, gender: ["unisex"]},
+        {name: "Knitwear", cateNo: 51, gender: ["unisex"]},
+        {name: "Shirts", cateNo: 80, gender: ["unisex"]},
+        {name: "Top", cateNo: 30, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 31, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 188, gender: ["unisex"]}, // Denim
       ],
     },
     notes: "미니멀 라이프스타일. 6개 카테고리 (Home 제외)",
@@ -667,6 +669,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     category: { discovery: "auto" },
+    defaultGender: ["unisex"],
     notes: "데일리 캐주얼. JS 렌더링 심해서 카테고리 구조 파악 불가",
   },
 
@@ -777,6 +780,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     // 차단). 기존 DB 634행 실측: men=634, women=3(예외적 오분류로 보임),
     // 상품명 women 계열 키워드 0건 — 사실상 남성 전용 헤리티지 멘즈웨어
     // 브랜드(sack jacket/sport jacket 등 클래식 테일러링 어휘)라 men 으로 명시.
+    defaultGender: ["men"],
   },
   {
     key: "brain-dead",
@@ -801,6 +805,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     // gender_missing 으로 QC 게이트에 전량 걸려 writeProductsFile 이 파일을
     // 아예 안 썼다 (크롤 "0개"로 보였던 원인). 스트리트웨어 브랜드로 사이트에
     // 남녀 구분이 없어 unisex 로 명시.
+    defaultGender: ["unisex"],
   },
   {
     key: "drakes",
@@ -814,7 +819,10 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     // 2026-07-28 재수집 배치 2에서 발견: gender_missing 으로 1816개 중
     // 1639개 드랍(46→942행 게이트 실패). 기존 DB 942행 전량 men, women 0건
     // — Drake's 는 영국 헤리티지 멘즈웨어 전문 브랜드라 men 으로 명시.
-    // (참고: 같은 배치의 stussy/aime-leon-dore 는 반대로 실제 혼성 브랜드다.)
+    // (참고: 같은 배치의 stussy/aime-leon-dore 는 반대로 실제 혼성 브랜드라
+    // defaultGender 를 넣지 않았다 — men/women 이 둘 다 실측되는 곳에 일괄
+    // 기본값을 넣으면 그 다양성 자체를 세탁하게 된다.)
+    defaultGender: ["men"],
   },
   {
     key: "bodega",
@@ -1152,45 +1160,6 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     notes: "ZARA US Playwright engine. Shares src/lib/zara-engine.ts with KR via region:'US' (SPEC-005 §9 DDD). Run-phase gates verified 2026-05-06: REQ-007 Akamai bypass 5/5 (100%) with channel:'chrome' against woman-new-in-l1180. REQ-008 ToS captured from canonical PDF terms-and-conditions-en_US-20250829.pdf via SPA homepage footer; verdict AMBIGUOUS-ACCEPTED-BY-OWNER (no automation keyword present; §17 IP rights structurally parallel to KR §15) — verbatim English clauses embedded at top of zara-engine.ts. REQ-009 live URL verification 17/18 (man-outerwear-l715 removed: page does not fire AJAX endpoint). XHR-interception: /us/en/category/{id}/products?ajax=true (region-agnostic regex). USD-native cache, USD→KRW import-time conversion via SPEC-002 fx.ts hook (FX_TO_KRW.USD = 1430). 2 sec/page pacing, 5-UA rotation, robots-check enforced. portal.ai-internal-use only; halt-on-cease-and-desist; re-verify > 90 days OR Inditex USA, Inc. communication OR ToS PDF version change.",
   },
 
-  // ─── 29CM (KR) — second Playwright engine, Cloudflare-passive ───────
-  // SPEC: SPEC-PLATFORM-EXPANSION-004
-  // Engine: pure Playwright with vanilla `headless: true` (Cloudflare on
-  //   29CM is passive — verified 2026-05-06: 5/5 attempts, no challenge,
-  //   100% reliability). XHR interception of display-bff-api.29cm.co.kr/
-  //   api/v1/listing/items carries full product JSON.
-  // Pacing: 2 sec/category (Cloudflare-friendly + browser overhead).
-  // ToS: captured live 2026-05-06 by hansangho via Playwright at
-  //   /home/agreement. 제11조 제2항 9호 names "크롤러(Crawler)" verbatim
-  //   (FORBIDS literal reading). OWNER OVERRIDE: hansangho 2026-05-06,
-  //   conditioned on portal.ai-internal-use only + halt-on-cease-and-
-  //   desist + 90-day re-verification. Verbatim clauses embedded at top
-  //   of src/lib/29cm-engine.ts per REQ-008.
-  // apiCategoryCodes: 10 Women + Men L1 fashion codes (research.md §1.6),
-  //   live-verified 2026-05-06 via display-bff-api response sample.
-  {
-    key: "29cm-kr",
-    name: "29CM (KR)",
-    type: "29cm",
-    baseUrl: "https://www.29cm.co.kr",
-    sourceCurrency: "KRW",
-    crawlDelay: 2000,
-    apiCategoryCodes: [
-      // Women fashion L1 codes
-      268100100, // 여성의류
-      269100100, // 여성가방
-      270100100, // 여성슈즈
-      271100100, // 여성액세서리
-      305100100, // 여성주얼리
-      // Men fashion L1 codes
-      272100100, // 남성의류
-      273100100, // 남성가방
-      274100100, // 남성슈즈
-      275100100, // 남성액세서리
-      306100100, // 남성주얼리
-    ],
-    notes: "29CM KR Playwright + XHR-interception engine. Cloudflare passive (no JS challenge); vanilla headless:true sufficient — channel:'chrome' is documented escalation path. KRW-native, 2 sec/category, 5-UA rotation (one UA per browser context), robots-check enforced. ToS captured 2026-05-06: 제11조 제2항 9호 verbatim names '크롤러' (FORBIDS literal); OWNER OVERRIDE by hansangho 2026-05-06 conditioned on portal.ai-internal-use only + halt-on-cease-and-desist + 90-day re-verification. Lifestyle/design/books/kitchen/beauty/electronics categories out of scope.",
-  },
-
   // ─── Farfetch (KR) — luxury multi-brand DOM-scrape engine ───────────
   // SPEC: SPEC-PLATFORM-EXPANSION-006
   // Engine: src/lib/farfetch-engine.ts is region-parameterized
@@ -1308,15 +1277,16 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    defaultGender: ["unisex"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Top", cateNo: 290},
-        {name: "Knitwear", cateNo: 59},
-        {name: "Outer", cateNo: 47},
-        {name: "Bottom", cateNo: 291},
-        {name: "Dress", cateNo: 28},
-        {name: "Accessories", cateNo: 43},
+        {name: "Top", cateNo: 290, gender: ["unisex"]},
+        {name: "Knitwear", cateNo: 59, gender: ["unisex"]},
+        {name: "Outer", cateNo: 47, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 291, gender: ["unisex"]},
+        {name: "Dress", cateNo: 28, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 43, gender: ["unisex"]},
       ],
     },
     notes: "brand_nodes id=258, gender_scope=unisex. 홈 nav 확인: NEW/BEST/REFURB/SAMPLE SALE 등 컬렉션성 cate_no는 타입 카테고리와 중복이라 제외.",
@@ -1330,14 +1300,15 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 260},
-        {name: "Top", cateNo: 261},
-        {name: "Dress", cateNo: 262},
-        {name: "Bottom", cateNo: 263},
-        {name: "Shoes", cateNo: 264},
+        {name: "Outer", cateNo: 260, gender: ["women"]},
+        {name: "Top", cateNo: 261, gender: ["women"]},
+        {name: "Dress", cateNo: 262, gender: ["women"]},
+        {name: "Bottom", cateNo: 263, gender: ["women"]},
+        {name: "Shoes", cateNo: 264, gender: ["women"]},
       ],
     },
     notes: "brand_nodes id=844 gender_scope 태그는 unisex였지만 wiki.category=['womenswear','streetwear']와 실제 카테고리(Dress/Skirt 포함, 남성 카테고리 없음)가 women을 가리켜 여기서는 women으로 설정.",
@@ -1351,16 +1322,17 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    defaultGender: ["unisex"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Top", cateNo: 36},
-        {name: "Outer", cateNo: 28},
-        {name: "Bottom", cateNo: 38},
-        {name: "Shoes", cateNo: 43},
-        {name: "Bag", cateNo: 42},
-        {name: "Accessories", cateNo: 44},
-        {name: "Accessories", cateNo: 39}, // HEAD GEAR
+        {name: "Top", cateNo: 36, gender: ["unisex"]},
+        {name: "Outer", cateNo: 28, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 38, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 43, gender: ["unisex"]},
+        {name: "Bag", cateNo: 42, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 44, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 39, gender: ["unisex"]}, // HEAD GEAR
       ],
     },
     notes: "brand_nodes id=3841, gender_scope 비어있음, wiki.category=['menswear','womenswear','outerwear'] → unisex. 홈 nav 자체엔 타입 카테고리가 없고 /product/list.html?cate_no=29(ALL) 페이지 내부 서브필터에서 발견.",
@@ -1377,8 +1349,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Washed Pajama", cateNo: 48},
-        {name: "Loungewear", cateNo: 56},
+        {name: "Washed Pajama", cateNo: 48, gender: ["unisex"]},
+        {name: "Loungewear", cateNo: 56, gender: ["unisex"]},
       ],
     },
     notes: "dry-run으로 확인된 실제 카테고리 2개(New Arrivals/Sale/Archives는 상품 목록이 아니라 제외)",
@@ -1402,10 +1374,10 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outwear", cateNo: 30},
-        {name: "Top", cateNo: 31},
-        {name: "Bottom", cateNo: 34},
-        {name: "Acc", cateNo: 35},
+        {name: "Outwear", cateNo: 30, gender: ["unisex"]},
+        {name: "Top", cateNo: 31, gender: ["unisex"]},
+        {name: "Bottom", cateNo: 34, gender: ["unisex"]},
+        {name: "Acc", cateNo: 35, gender: ["unisex"]},
       ],
     },
     notes: "SHOP(24) 하위 서브카테고리 4개. ALL(29)은 중복 방지를 위해 제외",
@@ -1419,7 +1391,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     category: {
       discovery: "manual",
-      categories: [{name: "Shop", cateNo: 49}],
+      categories: [{name: "Shop", cateNo: 49, gender: ["unisex"]}],
     },
     notes: "서브카테고리 없음 확인 — 단일 SHOP 피드",
   },
@@ -1432,7 +1404,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     category: {
       discovery: "manual",
-      categories: [{name: "Shop", cateNo: 24}],
+      categories: [{name: "Shop", cateNo: 24, gender: ["women"]}],
     },
     notes: "서브카테고리 없음 확인 — 단일 Shop 피드. Only at Layer(50)은 Shop과 중복 가능성 높아 제외",
   },
@@ -1445,7 +1417,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     category: {
       discovery: "manual",
-      categories: [{name: "All", cateNo: 42}],
+      categories: [{name: "All", cateNo: 42, gender: ["women"]}],
     },
     notes: "ALL(42) 단일 피드. NEW(210)/BEST(74)/X GEUNGHEE(215)는 ALL과 중복되는 컬렉션 뷰라 제외",
   },
@@ -1468,15 +1440,15 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 46},
-        {name: "Top", cateNo: 48},
-        {name: "Dress", cateNo: 50},
-        {name: "Bag", cateNo: 51},
-        {name: "Shoes", cateNo: 52},
-        {name: "Inner", cateNo: 53},
-        {name: "Acc", cateNo: 54},
-        {name: "Pants", cateNo: 63},
-        {name: "Skirt", cateNo: 64},
+        {name: "Outer", cateNo: 46, gender: ["women"]},
+        {name: "Top", cateNo: 48, gender: ["women"]},
+        {name: "Dress", cateNo: 50, gender: ["women"]},
+        {name: "Bag", cateNo: 51, gender: ["women"]},
+        {name: "Shoes", cateNo: 52, gender: ["women"]},
+        {name: "Inner", cateNo: 53, gender: ["women"]},
+        {name: "Acc", cateNo: 54, gender: ["women"]},
+        {name: "Pants", cateNo: 63, gender: ["women"]},
+        {name: "Skirt", cateNo: 64, gender: ["women"]},
       ],
     },
     notes: "정적 HTML 파싱으로 확인된 실제 카테고리 9개(Best/New arrivals/당일발송은 상품 목록이 아니라 제외)",
@@ -1502,11 +1474,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Coats, Jackets", cateNo: 30},
-        {name: "Trousers", cateNo: 31},
-        {name: "Tops, Shirts", cateNo: 43},
-        {name: "Skirts", cateNo: 44},
-        {name: "Accessories", cateNo: 46},
+        {name: "Coats, Jackets", cateNo: 30, gender: ["unisex"]},
+        {name: "Trousers", cateNo: 31, gender: ["unisex"]},
+        {name: "Tops, Shirts", cateNo: 43, gender: ["unisex"]},
+        {name: "Skirts", cateNo: 44, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 46, gender: ["unisex"]},
       ],
     },
     notes: "dry-run으로 확인된 실제 카테고리 5개(SHOP=24는 상위 all, ARCHIVES는 lookbook이라 제외)",
@@ -1565,8 +1537,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Poster", cateNo: 52},
-        {name: "DNA", cateNo: 54},
+        {name: "Poster", cateNo: 52, gender: ["unisex"]},
+        {name: "DNA", cateNo: 54, gender: ["unisex"]},
       ],
     },
     notes: "dry-run으로 확인된 실제 카테고리 2개",
@@ -1577,9 +1549,10 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://ccqstore.com",
     brand: "CCQ",
+    defaultGender: ["unisex"],
     notes: "Shopify, /products.json 가격이 이미 KRW(예: 38000) — sourceCurrency 생략(기본값 KRW). 2026-07-06: gender_scope/wiki 미완료라 상품군(반다나/캡 등 액세서리) 기준 unisex로 시드.",
   },
-  // BLOCKED — 아래 3개는 PlatformType(cafe24/shopify/uniqlo/zara/29cm/farfetch)에 없는
+  // BLOCKED — 아래 3개는 PlatformType(cafe24/shopify/uniqlo/zara/farfetch)에 없는
   // 미지원 플랫폼이라 SiteConfig 자체를 만들 수 없음(엔진 부재). 신규 파서 구현 필요:
   //   - MOROA (https://www.moroa.kr) — Sixshop(식스샵)
   //   - OUR NATION (https://our-nation.com) — Imweb
@@ -1594,6 +1567,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://hamsaseyo.com",
     brand: "HAM",
     paginate: true,
+    defaultGender: ["men"],
     category: {discovery: "auto"},
     notes: "3차 배치 draft — dry-run 필요. 2026-07-06: menswear(chino/shirts 등) 확인되어 defaultGender=men 시드.",
   },
@@ -1819,8 +1793,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {discovery: "auto"},
     // 메인 라인이 남성복이고 여성은 "Years Ago Women"/"우먼즈 캡슐 컬렉션" 으로
     // 붙은 별도 라인이다 (사이트에 MEN 카테고리 자체가 없다). 카테고리가 교차
-    // 구조라 여성 라인 상품은 "상의"/"아우터" 에도 함께 걸린다.
-    notes: "3차 배치 draft — dry-run 필요.",
+    // 구조라 여성 라인 상품은 "상의"/"아우터" 에도 함께 걸리는데, 카테고리 유래
+    // gender(engine)가 이 전역 기본값(config_default)보다 상위라 dedup merge 에서
+    // women 이 이긴다 — 확인: tests/product-gender.test.ts 의 config_default 케이스.
+    defaultGender: ["men"],
+    notes: "3차 배치 draft — dry-run 필요. defaultGender=men (여성 라인은 카테고리로 분리됨)",
   },
   {
     key: "ceyesseoul",
@@ -2080,6 +2057,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://autumnshop.kr",
     brand: "AUTUMN",
     paginate: true,
+    defaultGender: ["women"],
     category: {discovery: "auto"},
     notes: "3차 배치 draft — dry-run 필요",
   },
@@ -2252,6 +2230,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://ballew.nyc",
     brand: "Ballew",
+    defaultGender: ["unisex"],
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
@@ -2263,6 +2242,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://becay.store",
     brand: "Becay",
+    defaultGender: ["unisex"],
     sourceCurrency: "EUR",
     maxPages: 300,
     crawlDelay: 1500,
@@ -2274,11 +2254,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://anotte.kr",
     brand: "ÄNOTTE",
+    defaultGender: ["women"],
     paginate: true,
     crawlDetails: true,
     category: {
       discovery: "manual",
-      categories: [{name: "SHOP", cateNo: 23}],
+      categories: [{name: "SHOP", cateNo: 23, gender: ["women"]}],
     },
     notes: "brand_node id=5723. dry-run 확인: SHOP(23) 단일 상품 피드(li[id^=anchorBoxId] 셀렉터 정상). COLLECTION(43)/EDITORIAL(45)은 lookbook이라 제외.",
   },
@@ -2288,13 +2269,14 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://blank03.com",
     brand: "BLANK03",
+    defaultGender: ["men"],
     paginate: true,
     crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
-        {name: "Category A", cateNo: 50},
-        {name: "Category B", cateNo: 51},
+        {name: "Category A", cateNo: 50, gender: ["men"]},
+        {name: "Category B", cateNo: 51, gender: ["men"]},
       ],
     },
     notes: "brand_node id=5726. dry-run 확인: cate_no=50/51 상품 피드(각 14개, 셀렉터 정상). cate_no=29는 프로모션 배너라 제외. 엔진이 productUrl로 dedup하므로 겹쳐도 안전.",
@@ -2305,6 +2287,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://nocle.co.kr",
     brand: "NOCLE",
+    defaultGender: ["men"],
     paginate: true,
     category: {discovery: "auto"},
     disabled: true,
@@ -2318,6 +2301,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://birthofroyalchild.com",
     brand: "BIRTH OF ROYAL CHILD (BORC)",
+    defaultGender: ["unisex"],
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
@@ -2329,6 +2313,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://nofaithstudios.com",
     brand: "NO/FAITH STUDIOS",
+    defaultGender: ["unisex"],
     sourceCurrency: "EUR",
     maxPages: 300,
     crawlDelay: 1500,
@@ -2357,11 +2342,44 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     notes: "brand_node id=5757. /en-kr/products.json returns KRW prices. detect=shopify.",
   },
   {
+    key: "sportyandrich",
+    name: "Sporty & Rich",
+    type: "shopify",
+    baseUrl: "https://www.sportyandrich.com",
+    brand: "Sporty & Rich",
+    sourceCurrency: "KRW",
+    maxPages: 300,
+    crawlDelay: 1500,
+    // 2026-08-03 추가: 성별 롤백 백필 대상이었으나 SiteConfig 가 없어 재크롤이
+    // 불가능했다(DB 1,433행이 refresh-candidates 경로로만 들어와 있었다).
+    // robots.txt 통과 확인. /products.json 은 KRW 가격을 그대로 반환한다.
+    // 남녀 모두 판매하는 혼성 브랜드라 defaultGender 를 두지 않는다 — 사이트
+    // 기본값을 박으면 상품 절반이 반대 성별로 적재된다. 태그에 "Unisex" 가
+    // 실려 오므로 evidence 텍스트 추론이 처리한다.
+    notes: "재크롤 대상(성별 백필). robots allowed 2026-08-03. 혼성 브랜드 — defaultGender 금지.",
+  },
+  {
+    key: "a-cold-wall-2808",
+    name: "A-COLD-WALL*",
+    type: "shopify",
+    baseUrl: "https://www.a-cold-wall.com",
+    brand: "A-COLD-WALL*",
+    sourceCurrency: "KRW",
+    maxPages: 300,
+    crawlDelay: 1500,
+    // 2026-08-03 추가: sportyandrich 와 같은 사유(DB 95행, config 부재).
+    // robots.txt 통과 확인. 태그에 성별 신호가 없어 카테고리 URL 근거에 의존한다 —
+    // 크롤 후 수율을 측정하고, 근거가 안 나오면 defaultGender 를 넣지 말고
+    // 드랍시킨다 (근거 없는 기본값 금지, gender-defaults.ts 헤더 참조).
+    notes: "재크롤 대상(성별 백필). robots allowed 2026-08-03.",
+  },
+  {
     key: "cayl",
     name: "Cayl",
     type: "cafe24",
     baseUrl: "https://cayl.co.kr",
     brand: "Cayl",
+    defaultGender: ["unisex"],
     paginate: true,
     crawlDetails: true,
     category: {discovery: "auto"},
@@ -2373,6 +2391,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://nastyfancyclub.com",
     brand: "FANCY CLUB",
+    defaultGender: ["women"],
     paginate: true,
     crawlDetails: true,
     category: {discovery: "auto"},
@@ -2384,6 +2403,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://www.setup-exe.com",
     brand: "SETUPEXE",
+    defaultGender: ["unisex"],
     paginate: true,
     crawlDetails: true,
     category: {discovery: "auto"},
@@ -2396,6 +2416,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://plasticproduct.co.kr",
     brand: "PLASTICPRODUCT",
+    defaultGender: ["unisex"],
     paginate: true,
     crawlDetails: true,
     category: {discovery: "auto"},
@@ -2407,6 +2428,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://blackpurple.kr",
     brand: "BLACKPURPLE",
+    defaultGender: ["unisex"],
     sourceCurrency: "USD",
     paginate: true,
     crawlDetails: true,
@@ -2419,6 +2441,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://nothingeverything.kr",
     brand: "NOTHINGEVERYTHING",
+    defaultGender: ["women"],
     paginate: true,
     crawlDetails: true,
     category: {discovery: "auto"},
@@ -2468,6 +2491,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://sheelly.co.kr",
     brand: "SHEELLY",
+    defaultGender: ["women"],
     notes: "7월 미착수 브랜드 온보딩 — brand_node_id=5764, detect platform_family=imweb",
   },
   {
@@ -2492,6 +2516,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "AUBOUR",
     type: "imweb",
     baseUrl: "https://www.aubour.com",
+    defaultGender: ["women"],
     brand: "AUBOUR",
     notes: "imweb 파일럿 — brand_node_id=5575, detect platform_family=imweb",
   },
@@ -2500,6 +2525,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "HERETIC",
     type: "imweb",
     baseUrl: "https://heretic.kr",
+    defaultGender: ["unisex"],
     brand: "HERETIC",
     notes: "imweb 파일럿 — brand_node_id=5608, detect platform_family=imweb",
   },
@@ -2508,6 +2534,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "QG",
     type: "imweb",
     baseUrl: "https://questandguest.com",
+    defaultGender: ["unisex"],
     brand: "QG",
     notes: "imweb 파일럿 — brand_node_id=2459, detect platform_family=imweb",
   },
@@ -2516,6 +2543,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "DIFFERENTIS",
     type: "imweb",
     baseUrl: "https://www.differentis.kr",
+    defaultGender: ["unisex"],
     brand: "DIFFERENTIS",
     notes: "imweb 파일럿 — brand_node_id=5285, detect platform_family=imweb",
   },
@@ -2524,6 +2552,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "604service",
     type: "imweb",
     baseUrl: "http://604service-en.com",
+    defaultGender: ["unisex"],
     brand: "604service",
     sourceCurrency: "USD",
     notes: "imweb 파일럿 — brand_node_id=823, detect platform_family=imweb. 2026-07-21: 사이트 실측 currency=USD 확인 (기존엔 미설정으로 KRW 오판정 → id 605827 등 가격 오적재, crawler SPEC 수정과 함께 반영).",
@@ -2533,6 +2562,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "YOUCHE PRETAPORTER",
     type: "imweb",
     baseUrl: "https://youche-pa.kr",
+    defaultGender: ["unisex"],
     brand: "YOUCHE PRETAPORTER",
     notes: "imweb 파일럿 — brand_node_id=5229, detect platform_family=imweb",
   },
@@ -2541,6 +2571,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "사크레드티",
     type: "imweb",
     baseUrl: "https://sacredt.kr",
+    defaultGender: ["unisex"],
     brand: "사크레드티",
     notes: "imweb 파일럿 — brand_node_id=5233, detect platform_family=imweb",
   },
@@ -2549,6 +2580,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Noobstore",
     type: "imweb",
     baseUrl: "https://www.noobstore.co.kr",
+    defaultGender: ["unisex"],
     brand: "Noobstore",
     notes: "imweb 파일럿 — brand_node_id=5506, detect platform_family=imweb",
   },
@@ -2557,6 +2589,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Eonts",
     type: "imweb",
     baseUrl: "https://www.eonts.kr",
+    defaultGender: ["unisex"],
     brand: "Eonts",
     notes: "imweb 파일럿 — brand_node_id=5290, detect platform_family=imweb",
   },
@@ -2565,6 +2598,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "bluesf",
     type: "imweb",
     baseUrl: "https://bluesf.kr",
+    defaultGender: ["unisex"],
     brand: "bluesf",
     notes: "imweb 파일럿 — brand_node_id=5295, detect platform_family=imweb",
   },
@@ -2573,6 +2607,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "durt",
     type: "imweb",
     baseUrl: "https://durt.co.kr",
+    defaultGender: ["unisex"],
     brand: "durt",
     notes: "imweb 파일럿 — brand_node_id=5365, detect platform_family=imweb",
   },
@@ -2581,6 +2616,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "COREBRASS",
     type: "imweb",
     baseUrl: "https://corebrass.com",
+    defaultGender: ["unisex"],
     brand: "COREBRASS",
     notes: "imweb 파일럿 — brand_node_id=2557, detect platform_family=imweb",
   },
@@ -2589,6 +2625,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Lost Town Supply",
     type: "imweb",
     baseUrl: "https://www.lost-town-supply.com",
+    defaultGender: ["unisex"],
     brand: "Lost Town Supply",
     notes: "imweb 파일럿 — brand_node_id=2474, detect platform_family=imweb",
   },
@@ -2597,6 +2634,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Homly",
     type: "imweb",
     baseUrl: "https://homly.kr",
+    defaultGender: ["unisex"],
     brand: "Homly",
     notes: "imweb 파일럿 — brand_node_id=2170, detect platform_family=imweb",
   },
@@ -2605,6 +2643,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Monja Gal",
     type: "imweb",
     baseUrl: "https://monjagal.com",
+    defaultGender: ["women"],
     brand: "Monja Gal",
     notes: "imweb 파일럿 — brand_node_id=5512, detect platform_family=imweb",
   },
@@ -2613,6 +2652,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "RAR",
     type: "imweb",
     baseUrl: "https://rarseoul.com",
+    defaultGender: ["unisex"],
     brand: "RAR",
     notes: "imweb 파일럿 — brand_node_id=5341, detect platform_family=imweb",
   },
@@ -2621,6 +2661,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Taille",
     type: "imweb",
     baseUrl: "https://taille.kr",
+    defaultGender: ["women"],
     brand: "Taille",
     notes: "imweb 파일럿 — brand_node_id=2205, detect platform_family=imweb",
   },
@@ -2629,6 +2670,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "DOGMA EHKS",
     type: "imweb",
     baseUrl: "https://dogmaehks.com",
+    defaultGender: ["women"],
     brand: "DOGMA EHKS",
     notes: "imweb 파일럿 — brand_node_id=5284, detect platform_family=imweb",
   },
@@ -2637,6 +2679,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "jimilii",
     type: "imweb",
     baseUrl: "https://jimilii.com",
+    defaultGender: ["women"],
     brand: "jimilii",
     notes: "imweb 파일럿 — brand_node_id=5316, detect platform_family=imweb",
   },
@@ -2645,6 +2688,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "AMABE",
     type: "imweb",
     baseUrl: "http://amabe.kr",
+    defaultGender: ["women"],
     brand: "AMABE",
     notes: "imweb 파일럿 — brand_node_id=5227, detect platform_family=imweb",
   },
@@ -2653,6 +2697,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "singulari",
     type: "imweb",
     baseUrl: "https://singularisca.com",
+    defaultGender: ["women"],
     brand: "singulari",
     notes: "imweb 파일럿 — brand_node_id=5317, detect platform_family=imweb",
   },
@@ -2661,6 +2706,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "PULA",
     type: "imweb",
     baseUrl: "https://pulajournal.com",
+    defaultGender: ["women"],
     brand: "PULA",
     notes: "imweb 파일럿 — brand_node_id=5445, detect platform_family=imweb",
   },
@@ -2669,6 +2715,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "HOKUSPOKUS (호쿠스포쿠스)",
     type: "imweb",
     baseUrl: "https://www.hokuspokus.co.kr",
+    defaultGender: ["women"],
     brand: "HOKUSPOKUS (호쿠스포쿠스)",
     notes: "imweb 파일럿 — brand_node_id=5511, detect platform_family=imweb",
   },
@@ -2677,6 +2724,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Mini Horses",
     type: "imweb",
     baseUrl: "https://minihorses.co.kr",
+    defaultGender: ["women"],
     brand: "Mini Horses",
     notes: "imweb 파일럿 — brand_node_id=5528, detect platform_family=imweb",
   },
@@ -2685,6 +2733,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "HAUSOU",
     type: "imweb",
     baseUrl: "https://www.hausou.com",
+    defaultGender: ["women"],
     brand: "HAUSOU",
     notes: "imweb 파일럿 — brand_node_id=5484, detect platform_family=imweb",
   },
@@ -2694,7 +2743,15 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
-  return PLATFORMS.find((p) => p.key === key)
+  const config = PLATFORMS.find((p) => p.key === key)
+  if (!config) return undefined
+  // 사이트가 자체 defaultGender 를 갖고 있으면 그대로 둔다. 없을 때만
+  // 사람이 검증한 보강 맵에서 채운다 — platforms.generated.ts 는
+  // AUTO-GENERATED 라 여기에 값을 넣을 수 없기 때문이다.
+  // 근거 규칙은 src/configs/gender-defaults.ts 헤더 참조.
+  if (config.defaultGender && config.defaultGender.length > 0) return config
+  const fallback = SITE_GENDER_DEFAULTS[key]
+  return fallback ? {...config, defaultGender: fallback} : config
 }
 
 /** 활성화된 사이트만 반환 */

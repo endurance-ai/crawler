@@ -35,6 +35,12 @@
  *     output, crawledAt-normalized, captured 2026-05-17 from the verbatim
  *     extraction. Do NOT regenerate on drift — a parser-strategy refactor
  *     must be byte-identical.
+ *
+ * 2026-08-03 — 골든 재생성 (의도적, 승인됨). 성별 추출이 VLM 에서 크롤러로
+ * 회귀하면서 파서 출력에 `gender`(+shopify 는 `genderSource`)가 추가됐다.
+ * "do NOT regenerate" 규칙은 리팩터로 인한 *비의도적* 드리프트를 막기 위한
+ * 것이고, 이번은 계약이 명시적으로 바뀐 경우라 그 예외에 해당한다.
+ * 이후로는 다시 byte-identical 계약이 적용된다.
  */
 
 import {test} from "node:test"

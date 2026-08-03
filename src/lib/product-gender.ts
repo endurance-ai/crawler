@@ -1,0 +1,264 @@
+/**
+ * 상품 성별 추출 / 결의.
+ *
+ * 2026-08-03 크롤러 회귀. 2026-07-29 에 gender 를 VLM(product_features)으로
+ * 이관했으나 성능이 나오지 않아 되돌린다. color 는 VLM 에 그대로 둔다.
+ *
+ * 회귀하면서 **브랜드 스코프 폴백은 복원하지 않았다** — 삭제 전에도 최하위
+ * 근거였고 `['unisex']`·다중값은 이미 거부됐지만, 단일값이면서 틀린
+ * brand_nodes.gender_scope(예: id=844 womenswear 인데 unisex) 가 상품으로
+ * 조용히 전파되는 유일한 경로였다. 감사 도구도 수정 UI 도 없어 신뢰할 근거가
+ * 못 된다. 근거 순위는 engine → url → text → config_default 4단이다.
+ */
+import {matchesAny, normalizeForMatch} from "./text-match"
+
+export const PRODUCT_GENDER_VALUES = ["men", "women", "unisex"] as const
+
+const PRODUCT_GENDER_SET = new Set<string>(PRODUCT_GENDER_VALUES)
+
+export type ProductGender = (typeof PRODUCT_GENDER_VALUES)[number]
+
+export function cleanGenderScope(value: unknown): ProductGender[] {
+  if (!Array.isArray(value)) return []
+
+  const out: ProductGender[] = []
+  for (const item of value) {
+    if (typeof item !== "string") continue
+    const gender = item.trim().toLowerCase()
+    if (!PRODUCT_GENDER_SET.has(gender)) continue
+    if (!out.includes(gender as ProductGender)) out.push(gender as ProductGender)
+  }
+  return out
+}
+
+// ─── provenance ──────────────────────────────────────────────────────────
+//
+// `unisex` 는 "남녀 공용임이 확인됨" 이어야 하고 "모르겠음" 이어서는 안 된다.
+// 검색 RPC(search_products_v6)가 `p.gender && ARRAY[p_gender,'unisex']` 로
+// unisex 상품을 남성·여성 양쪽 결과에 항상 노출시키기 때문에, 미확인을 unisex
+// 로 적재하면 여성 상품이 남성 검색 결과로 새어 나간다. gender 가 어디서
+// 왔는지를 products.gender_source 에 남겨 이 구분을 사후에도 검증 가능하게 한다.
+//
+// `brand_scope` 는 write-path 에서 더 이상 생산하지 않지만(위 헤더 참조) 값은
+// 남겨둔다 — 2026-07 이전 행들이 이 출처를 들고 있어 읽기 측이 파싱해야 한다.
+// migration 095(products_gender_source_chk)의 allow-list 와 일치해야 한다.
+
+export const GENDER_SOURCE_VALUES = [
+  // write-path
+  "engine",
+  "url",
+  "text",
+  "config_default",
+  // 읽기 전용 (과거 행)
+  "brand_scope",
+  "llm",
+  // 093 이전 행 / 교정 스크립트
+  "legacy_backfill",
+  "repair_url",
+  "repair_text",
+  "repair_brand_scope",
+  "unverified_legacy",
+] as const
+
+export type GenderSource = (typeof GENDER_SOURCE_VALUES)[number]
+
+export interface GenderEvidence {
+  name?: string | null
+  category?: string | null
+  subcategory?: string | null
+  description?: string | null
+  tags?: string[] | null
+  productUrl?: string | null
+  /**
+   * description 을 텍스트 추론에 포함할지. write-path 는 description 자체를
+   * 더 이상 수집하지 않으므로 무의미하고, 교정 스크립트는 false 로 둬야 한다 —
+   * products.description 은 마케팅/사이즈표 2000자 slice 라 "여성 사이즈 참고"
+   * 같은 문구가 일회성 mass UPDATE 를 대량 오판시킨다.
+   */
+  useDescription?: boolean
+}
+
+export interface GenderResolution {
+  /** 빈 배열 = 미확인. 호출자는 적재에서 제외한다. */
+  gender: ProductGender[]
+  /** 미확인이면 null. */
+  source: GenderSource | null
+  /** URL 신호와 텍스트 신호가 어긋난 경우 — 추측하지 않고 미확인으로 떨어뜨린다. */
+  conflict?: {url: ProductGender; text: ProductGender}
+}
+
+// ─── 규칙 ────────────────────────────────────────────────────────────────
+//
+// 한글 대안은 반드시 `\b()` 그룹 **밖**에 둔다 — \b 는 한글에 적용되지 않아
+// /\b(men|남성)\b/ 는 "남성코트" 를 놓친다. matchesAny 가 raw 문자열에도
+// contains 를 시도하므로 조합형 한글이 NFKD 로 자모 분해되는 문제도 함께 피한다.
+
+export const GENDER_RULES: Array<{gender: ProductGender; patterns: RegExp[]; contains?: string[]}> = [
+  {
+    gender: "men",
+    patterns: [/\b(men|mens|men's|man|male|hombre|homme|uomo|herren)\b/i],
+    contains: ["남성", "남자", "남자용", "멘즈"],
+  },
+  {
+    gender: "women",
+    patterns: [/\b(women|womens|women's|woman|female|mujer|femme|donna|damen|ladies)\b/i],
+    contains: ["여성", "여자", "여자용", "우먼", "레이디스"],
+  },
+  {
+    gender: "unisex",
+    patterns: [/\b(unisex|genderless|gender[-\s]?free)\b/i],
+    contains: ["남녀공용", "공용", "유니섹스"],
+  },
+]
+
+// kids 는 PRODUCT_GENDER_VALUES 에 없어서 cleanGenderScope 가 조용히 버린다
+// (zara-engine 은 ["kids"] 를 반환한다). 그대로 두면 빈 배열 → 사이트 기본값으로
+// 흘러 아동복이 성인 성별을 얻는 세탁 경로가 되므로, 성인 추론보다 먼저
+// 걸러 미확인으로 떨어뜨린다.
+const KIDS_RULE = {
+  patterns: [
+    /\b(kids?|kid's|child|children|childrens|boys?|boy's|girls?|girl's|baby|infant|toddler|junior|nino|nina|enfant|bambino)\b/i,
+  ],
+  contains: ["키즈", "아동", "유아", "주니어", "베이비", "어린이"],
+}
+
+export function normalizeGenderToken(raw: string): ProductGender | null {
+  for (const rule of GENDER_RULES) {
+    if (matchesAny(raw, rule.patterns, rule.contains)) return rule.gender
+  }
+  return null
+}
+
+/**
+ * 텍스트에서 성별을 읽는다.
+ *
+ * 구체 성별(men/women)이 unisex 와 함께 잡히면 **구체 성별이 이긴다**.
+ * unisex 는 "둘 다 해당"이라는 약한 주장이고 men/women 은 적극적 단언이라,
+ * 둘이 같이 나오면 후자가 상품을 더 잘 설명한다. 실측 근거: sportyandrich 는
+ * 전 상품에 사이트 공용 머천다이징 태그 "Unisex" 를 달아 두는데, 이걸
+ * 우선하면 상품명이 "... Oxford Shirt Men" 이고 URL 도 `-men` 인 남성 상품이
+ * unisex 로 접힌다. unisex 는 검색 RPC 에서 남녀 양쪽에 노출되므로 그 방향의
+ * 오판이 정확히 이 프로젝트가 막으려는 세탁이다.
+ *
+ * men 과 women 이 **둘 다** 잡히면:
+ *   - unisex 도 함께 있으면 unisex — "unisex, MALE, Female" 같은 태그는 상충이
+ *     아니라 남녀공용을 명시한 것이다. 이건 추측이 아니라 근거다.
+ *   - unisex 가 없으면 null(모호) — 근거 없이 양쪽 노출을 만들지 않는다.
+ */
+export function inferGenderFromText(text: string): ProductGender | null {
+  const matches = GENDER_RULES.filter((rule) => matchesAny(text, rule.patterns, rule.contains)).map((rule) => rule.gender)
+  const unique = [...new Set(matches)]
+  const specific = unique.filter((g) => g !== "unisex")
+  const hasUnisex = unique.includes("unisex")
+  if (specific.length === 1) return specific[0]
+  if (specific.length > 1) return hasUnisex ? "unisex" : null
+  return hasUnisex ? "unisex" : null
+}
+
+export function isKidsText(text: string): boolean {
+  return matchesAny(text, KIDS_RULE.patterns, KIDS_RULE.contains)
+}
+
+/**
+ * URL 경로에서 성별을 읽는다. 크롤러가 실제로 진입한 카테고리 랜딩이 남긴
+ * 구조적 신호라 상품명(마케팅 카피)보다 신뢰도가 높다.
+ *
+ * hostname 은 절대 보지 않는다 — `hommes.kr` 같은 도메인이 전 상품을 남성으로
+ * 만들어 버린다. 서로 다른 성별이 2개 이상 잡히면 null (inferGenderFromText 의
+ * `unique.length === 1` 규율과 동일).
+ */
+export function inferGenderFromUrl(url: unknown): ProductGender | null {
+  if (typeof url !== "string" || !url.trim()) return null
+
+  let target = url
+  try {
+    const parsed = new URL(url)
+    target = `${parsed.pathname}${parsed.search}`
+  } catch {
+    // 상대 경로 등 URL 파싱 불가 — raw 문자열을 그대로 쓴다. 이 경우에도
+    // 스킴/호스트가 없으므로 hostname 오염 위험은 없다.
+  }
+
+  try {
+    target = decodeURIComponent(target)
+  } catch {
+    // malformed percent-encoding (URIError) — 디코딩 전 문자열로 진행.
+  }
+
+  const normalized = normalizeForMatch(target)
+  const matches = GENDER_RULES.filter((rule) => matchesAny(normalized, rule.patterns, rule.contains)).map((r) => r.gender)
+  const unique = [...new Set(matches)]
+  return unique.length === 1 ? unique[0] : null
+}
+
+function evidenceText(evidence: GenderEvidence): string {
+  const parts = [evidence.name, evidence.category, evidence.subcategory, ...(evidence.tags ?? [])]
+  if (evidence.useDescription) parts.push(evidence.description)
+  return parts.filter((p): p is string => typeof p === "string" && p.length > 0).join(" ")
+}
+
+/**
+ * 상품 성별 결의. 우선순위:
+ *
+ *   1. 엔진이 뽑은 상품 성별 (카테고리 유래 등 상품 단위 근거)
+ *   2. kids 가드 (성인 토큰 없이 아동 신호만 있으면 미확인)
+ *   3. URL 경로
+ *   4. 상품명/카테고리/태그 텍스트
+ *   5. 3·4 가 서로 다르면 미확인 (추측하지 않음)
+ *   6. 사이트 전역 defaultGender (productGenderSource === "config_default")
+ *   7. 미확인 — 호출자가 적재에서 제외한다
+ */
+export function resolveProductGenderWithSource(
+  productGender: unknown,
+  evidence: GenderEvidence = {},
+  productGenderSource: GenderSource = "engine",
+): GenderResolution {
+  const fromProduct = cleanGenderScope(productGender)
+
+  // 사이트 전역 defaultGender 는 상품 단위 근거가 아니라 설정상의 기본값이다.
+  // 카테고리가 교차하는 사이트(예: yearsago — 여성 라인 상품이 "상의"에도 함께
+  // 걸린다)에서는 같은 상품의 다른 행이 카테고리 유래 성별을 들고 오므로,
+  // 전역 기본값은 URL/텍스트 추론보다 **아래**에서만 쓰여야 한다. 그러지 않으면
+  // dedup merge 에서 동순위 충돌이 나 ['men','women'] union 이 만들어진다.
+  const isConfigDefault = productGenderSource === "config_default"
+  if (fromProduct.length > 0 && !isConfigDefault) {
+    return {gender: fromProduct, source: productGenderSource}
+  }
+
+  const text = evidenceText(evidence)
+  const url = typeof evidence.productUrl === "string" ? evidence.productUrl : ""
+
+  const fromText = text ? inferGenderFromText(text) : null
+  const fromUrl = inferGenderFromUrl(url)
+
+  if (fromText === null && fromUrl === null && (isKidsText(text) || isKidsText(url))) {
+    return {gender: [], source: null}
+  }
+
+  // URL 과 텍스트가 어긋나는 경우.
+  //
+  // 한쪽이 unisex 이면 상충이 아니다 — unisex 는 "둘 다"라는 약한 주장이고
+  // men/women 은 적극적 단언이므로 구체 쪽을 택한다 (inferGenderFromText 의
+  // 규율과 동일). 실측(jadedldn): URL 이 `.../top-women` 인데 사이트가 전 상품에
+  // 붙이는 blanket "unisex" 태그 때문에 텍스트가 unisex 로 나와 충돌 처리됐고,
+  // 그 결과 명백한 여성 상품이 미확인으로 떨어졌다.
+  //
+  // men vs women 만 진짜 상충이다 — 추측하지 않고 미확인으로 남긴다.
+  if (fromUrl !== null && fromText !== null && fromUrl !== fromText) {
+    if (fromUrl === "unisex") return {gender: [fromText], source: "text"}
+    if (fromText === "unisex") return {gender: [fromUrl], source: "url"}
+    return {gender: [], source: null, conflict: {url: fromUrl, text: fromText}}
+  }
+  if (fromUrl !== null) return {gender: [fromUrl], source: "url"}
+  if (fromText !== null) return {gender: [fromText], source: "text"}
+
+  // 상품 단위 근거가 없을 때만 사이트 전역 기본값을 쓴다.
+  if (fromProduct.length > 0 && isConfigDefault) return {gender: fromProduct, source: "config_default"}
+
+  return {gender: [], source: null}
+}
+
+/** 기존 호출부 호환 wrapper — 성별 배열만 필요한 경우. */
+export function resolveProductGender(productGender: unknown, evidence: GenderEvidence = {}): ProductGender[] {
+  return resolveProductGenderWithSource(productGender, evidence).gender
+}

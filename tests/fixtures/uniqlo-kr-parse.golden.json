@@ -2,6 +2,9 @@
   {
     "brand": "Uniqlo",
     "name": "미니T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -24,7 +27,9 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465760/item/krgoods_00_465760_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465760/item/krgoods_03_465760_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465760/item/krgoods_09_465760_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465760/sub/goods_465760_sub1_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465760/sub/goods_465760_sub1_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465760/sub/krgoods_465760_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465760/sub/goods_465760_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 14900
@@ -32,6 +37,9 @@
   {
     "brand": "Uniqlo",
     "name": "포인텔라운드넥미니T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -60,6 +68,9 @@
   {
     "brand": "Uniqlo",
     "name": "립미니T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -86,6 +97,9 @@
   {
     "brand": "Uniqlo",
     "name": "미니T(스트라이프)A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -111,6 +125,9 @@
   {
     "brand": "Uniqlo",
     "name": "미니T(스트라이프)B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -136,6 +153,9 @@
   {
     "brand": "Uniqlo",
     "name": "미니T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -162,6 +182,9 @@
   {
     "brand": "Uniqlo",
     "name": "미니T(스트라이프)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -187,6 +210,9 @@
   {
     "brand": "Uniqlo",
     "name": "미니T(스트라이프)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -210,6 +236,9 @@
   {
     "brand": "Uniqlo",
     "name": "피케미니폴로셔츠",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 39900,
     "originalPrice": 39900,
@@ -236,6 +265,9 @@
   {
     "brand": "Uniqlo",
     "name": "피케미니폴로셔츠(스트라이프)B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 39900,
     "originalPrice": 39900,
@@ -260,6 +292,9 @@
   {
     "brand": "Uniqlo",
     "name": "피케미니폴로셔츠(스트라이프)A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 39900,
     "originalPrice": 39900,
@@ -283,6 +318,9 @@
   {
     "brand": "Uniqlo",
     "name": "워시코튼박시T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -307,6 +345,9 @@
   {
     "brand": "Uniqlo",
     "name": "리넨크루넥T(반팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 39900,
     "originalPrice": 39900,
@@ -329,7 +370,10 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/item/krgoods_68_465761_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/item/krgoods_01_465761_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/item/krgoods_09_465761_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/sub/krgoods_465761_sub3_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/sub/krgoods_465761_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465761/sub/goods_465761_sub11_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465761/sub/goods_465761_sub12_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/sub/krgoods_465761_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 39900
@@ -337,6 +381,9 @@
   {
     "brand": "Uniqlo",
     "name": "와플풀오픈미니T(패턴)딥넥",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -361,6 +408,9 @@
   {
     "brand": "Uniqlo",
     "name": "캡슬리브T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -384,6 +434,9 @@
   {
     "brand": "Uniqlo",
     "name": "크루넥T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -406,7 +459,10 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/item/krgoods_69_424873_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/item/krgoods_70_424873_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/item/krgoods_00_424873_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/item/krgoods_09_424873_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/item/krgoods_09_424873_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/sub/krgoods_424873_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/sub/goods_424873_sub11_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/sub/goods_424873_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -414,6 +470,9 @@
   {
     "brand": "Uniqlo",
     "name": "SUPIMA COTTON T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -444,6 +503,9 @@
   {
     "brand": "Uniqlo",
     "name": "슬러브저지V넥T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -466,7 +528,10 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483576/item/krgoods_03_483576_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483576/item/krgoods_09_483576_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483576/sub/krgoods_483576_sub3_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483576/sub/krgoods_483576_sub4_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483576/sub/krgoods_483576_sub4_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483576/sub/goods_483576_sub11_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483576/sub/goods_483576_sub12_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483576/sub/goods_483576_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -474,6 +539,9 @@
   {
     "brand": "Uniqlo",
     "name": "크루넥T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -500,6 +568,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism코튼T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -522,7 +593,8 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/item/krgoods_02_465755_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/item/krgoods_09_465755_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/sub/krgoods_465755_sub3_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/sub/krgoods_465755_sub11_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/sub/krgoods_465755_sub11_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465755/sub/goods_465755_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -530,6 +602,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism코튼T(스트라이프)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -555,6 +630,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism릴랙스크루넥T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -581,6 +659,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism릴랙스V넥T(2WAY)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -603,7 +684,9 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485300/sub/krgoods_485300_sub4_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485300/sub/krgoods_485300_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub11_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub12_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub12_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub14_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub15_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -611,6 +694,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism코튼T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -634,6 +720,9 @@
   {
     "brand": "Uniqlo",
     "name": "프런트오픈셸탑T(슬리브리스)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -663,6 +752,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립탱크탑",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -690,6 +782,9 @@
   {
     "brand": "Uniqlo",
     "name": "포인텔탱크탑(프린트)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -717,6 +812,9 @@
   {
     "brand": "Uniqlo",
     "name": "포인텔탱크탑",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -746,6 +844,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트모달탱크탑(레이스포인텔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -772,6 +873,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립탱크탑(스트라이프)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -799,6 +903,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트모달캐미솔(플라워)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -824,6 +931,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트모달캐미솔(스트라이프)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -849,6 +959,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트모달캐미솔(하트)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -874,6 +987,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립탱크탑(링거)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 14900,
     "originalPrice": 14900,
@@ -899,6 +1015,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -929,6 +1048,9 @@
   {
     "brand": "Uniqlo",
     "name": "립헨리넥T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -958,6 +1080,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립T(긴팔)스트라이프",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -982,6 +1107,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1004,6 +1132,9 @@
   {
     "brand": "Uniqlo",
     "name": "소프트립T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 7900,
     "originalPrice": 7900,
@@ -1028,6 +1159,9 @@
   {
     "brand": "Uniqlo",
     "name": "립헨리넥T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1052,6 +1186,9 @@
   {
     "brand": "Uniqlo",
     "name": "시어T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1081,6 +1218,9 @@
   {
     "brand": "Uniqlo",
     "name": "시어메쉬크루넥T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -1105,6 +1245,9 @@
   {
     "brand": "Uniqlo",
     "name": "SUPIMA COTTON T(긴팔)",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1130,6 +1273,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism바디수트",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1157,6 +1303,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism코튼오버사이즈크루넥T(5부)",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1179,7 +1328,12 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_69_465185_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_00_465185_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_02_465185_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_07_465185_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_07_465185_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_09_465185_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465185/sub/goods_465185_sub1_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/sub/krgoods_465185_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/sub/krgoods_465185_sub6_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465185/sub/goods_465185_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -1187,6 +1341,9 @@
   {
     "brand": "Uniqlo",
     "name": "크루넥T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1209,7 +1366,11 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/item/krgoods_73_422992_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/item/krgoods_00_422992_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/item/krgoods_07_422992_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/item/krgoods_09_422992_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/item/krgoods_09_422992_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/422992/sub/goods_422992_sub1_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/sub/krgoods_422992_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/sub/krgoods_422992_sub6_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/422992/sub/goods_422992_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -1217,6 +1378,9 @@
   {
     "brand": "Uniqlo",
     "name": "SUPIMA COTTON T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1239,7 +1403,10 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/item/krgoods_00_455365_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/item/krgoods_07_455365_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/item/krgoods_09_455365_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/455365/sub/goods_455365_sub1_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/455365/sub/goods_455365_sub1_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/sub/krgoods_455365_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/sub/krgoods_455365_sub5_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/455365/sub/goods_455365_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -1247,6 +1414,9 @@
   {
     "brand": "Uniqlo",
     "name": "드라이컬러크루넥T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 7900,
     "originalPrice": 7900,
@@ -1269,7 +1439,12 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/item/krgoods_00_465187_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/item/krgoods_03_465187_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/item/krgoods_06_465187_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/item/krgoods_09_465187_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/item/krgoods_09_465187_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465187/sub/goods_465187_sub1_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465187/sub/goods_465187_sub2_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/sub/krgoods_465187_sub3_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/sub/krgoods_465187_sub6_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465187/sub/goods_465187_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 7900
@@ -1277,6 +1452,9 @@
   {
     "brand": "Uniqlo",
     "name": "박시크롭T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1307,6 +1485,9 @@
   {
     "brand": "Uniqlo",
     "name": "AIRism코튼오버사이즈스트라이프T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1336,6 +1517,9 @@
   {
     "brand": "Uniqlo",
     "name": "바이컬러T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -1363,6 +1547,9 @@
   {
     "brand": "Uniqlo",
     "name": "래글런T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -1390,6 +1577,9 @@
   {
     "brand": "Uniqlo",
     "name": "V넥T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1412,7 +1602,8 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/482301/item/krgoods_09_482301_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/482301/sub/krgoods_482301_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/482301/sub/krgoods_482301_sub6_3x4.jpg",
-      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482301/sub/goods_482301_sub11_3x4.jpg"
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482301/sub/goods_482301_sub11_3x4.jpg",
+      "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482301/sub/goods_482301_sub14_3x4.jpg"
     ],
     "sourceCurrency": "KRW",
     "sourcePrice": 19900
@@ -1420,6 +1611,9 @@
   {
     "brand": "Uniqlo",
     "name": "드라이V넥T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 7900,
     "originalPrice": 7900,
@@ -1450,6 +1644,9 @@
   {
     "brand": "Uniqlo",
     "name": "UNIQLO로고크루넥T",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 19900,
     "originalPrice": 19900,
@@ -1477,6 +1674,9 @@
   {
     "brand": "Uniqlo",
     "name": "GU루프얀2WAY T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1506,6 +1706,9 @@
   {
     "brand": "Uniqlo",
     "name": "GU돌먼슬리브T",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -1533,6 +1736,9 @@
   {
     "brand": "Uniqlo",
     "name": "MARIO Movie UT(그래픽T)A",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -1562,6 +1768,9 @@
   {
     "brand": "Uniqlo",
     "name": "MARIO Movie UT(그래픽T)B",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -1590,6 +1799,9 @@
   {
     "brand": "Uniqlo",
     "name": "MARIO Movie UT(그래픽T)D",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -1617,6 +1829,9 @@
   {
     "brand": "Uniqlo",
     "name": "MARIO Movie UT(그래픽T)C",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -1642,6 +1857,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)1C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1665,6 +1883,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)1E",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1691,6 +1912,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)1D",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1714,6 +1938,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)2G",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1738,6 +1965,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1762,6 +1992,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)2H",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1786,6 +2019,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)1F",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1809,6 +2045,9 @@
   {
     "brand": "Uniqlo",
     "name": "PEANUTS UT(그래픽T)B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1835,6 +2074,9 @@
   {
     "brand": "Uniqlo",
     "name": "miffy in bloom UT(그래픽T)1C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1862,6 +2104,9 @@
   {
     "brand": "Uniqlo",
     "name": "miffy in bloom UT(그래픽T)1E",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1887,6 +2132,9 @@
   {
     "brand": "Uniqlo",
     "name": "miffy in bloom UT(그래픽T)1D",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1912,6 +2160,9 @@
   {
     "brand": "Uniqlo",
     "name": "miffy in bloom UT(그래픽T)1A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1939,6 +2190,9 @@
   {
     "brand": "Uniqlo",
     "name": "miffy in bloom UT(그래픽T)1B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1966,6 +2220,9 @@
   {
     "brand": "Uniqlo",
     "name": "POP MART UT(그래픽T)1C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -1992,6 +2249,9 @@
   {
     "brand": "Uniqlo",
     "name": "POP MART UT(그래픽T)1D",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2019,6 +2279,9 @@
   {
     "brand": "Uniqlo",
     "name": "POP MART UT(그래픽T)1A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2044,6 +2307,9 @@
   {
     "brand": "Uniqlo",
     "name": "POP MART UT(그래픽T)1B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2072,6 +2338,9 @@
   {
     "brand": "Uniqlo",
     "name": "Sanrio characters UT(그래픽T)1D",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2097,6 +2366,9 @@
   {
     "brand": "Uniqlo",
     "name": "Sanrio characters UT(그래픽T)1C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2123,6 +2395,9 @@
   {
     "brand": "Uniqlo",
     "name": "Sanrio characters UT(그래픽T)1B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2148,6 +2423,9 @@
   {
     "brand": "Uniqlo",
     "name": "Disney UT(그래픽T)1A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2172,6 +2450,9 @@
   {
     "brand": "Uniqlo",
     "name": "Disney UT(그래픽T)1D",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2197,6 +2478,9 @@
   {
     "brand": "Uniqlo",
     "name": "Disney UT(그래픽T)1C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2222,6 +2506,9 @@
   {
     "brand": "Uniqlo",
     "name": "Disney UT(그래픽T)1B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 29900,
     "originalPrice": 29900,
@@ -2248,6 +2535,9 @@
   {
     "brand": "Uniqlo",
     "name": "Pokémon UT(그래픽T)1B",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -2275,6 +2565,9 @@
   {
     "brand": "Uniqlo",
     "name": "Pokémon UT(그래픽T)1E",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -2303,6 +2596,9 @@
   {
     "brand": "Uniqlo",
     "name": "Pokémon UT(그래픽T)1C",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -2332,6 +2628,9 @@
   {
     "brand": "Uniqlo",
     "name": "Pokémon UT(그래픽T)1A",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -2358,6 +2657,9 @@
   {
     "brand": "Uniqlo",
     "name": "Pokémon UT(그래픽T)1D",
+    "gender": [
+      "unisex"
+    ],
     "category": "UNISEX",
     "price": 29900,
     "originalPrice": 29900,
@@ -2384,6 +2686,9 @@
   {
     "brand": "Uniqlo",
     "name": "Cheerful characters UT(그래픽T)1D",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -2409,6 +2714,9 @@
   {
     "brand": "Uniqlo",
     "name": "Cheerful characters UT(그래픽T)2E",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -2433,6 +2741,9 @@
   {
     "brand": "Uniqlo",
     "name": "Cheerful characters UT(그래픽T)1C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -2456,6 +2767,9 @@
   {
     "brand": "Uniqlo",
     "name": "Cheerful characters UT(그래픽T)1B",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -2482,6 +2796,9 @@
   {
     "brand": "Uniqlo",
     "name": "Cheerful characters UT(그래픽T)1A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -2505,6 +2822,9 @@
   {
     "brand": "Uniqlo",
     "name": "Cheerful characters UT(그래픽T)2F",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 12900,
     "originalPrice": 12900,
@@ -2530,6 +2850,9 @@
   {
     "brand": "Uniqlo",
     "name": "BABYMONSTER UT(그래픽T)F",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -2554,6 +2877,9 @@
   {
     "brand": "Uniqlo",
     "name": "BABYMONSTER UT(그래픽T)C",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -2578,6 +2904,9 @@
   {
     "brand": "Uniqlo",
     "name": "BABYMONSTER UT(그래픽T)E",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,
@@ -2604,6 +2933,9 @@
   {
     "brand": "Uniqlo",
     "name": "BABYMONSTER UT(그래픽T)A",
+    "gender": [
+      "women"
+    ],
     "category": "WOMEN",
     "price": 19900,
     "originalPrice": 19900,

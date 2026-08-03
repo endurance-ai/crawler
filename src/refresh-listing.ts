@@ -12,7 +12,6 @@ import {chromium} from "playwright"
 
 import {PLATFORMS, getSiteConfig} from "./configs/platforms"
 import {runAsyncPool} from "./lib/async-pool"
-import {crawl29cm} from "./lib/29cm-engine"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlFarfetch} from "./lib/farfetch-engine"
 import {crawlImweb} from "./lib/imweb-engine"
@@ -46,7 +45,6 @@ const ALL_TYPES: PlatformType[] = [
   "imweb",
   "uniqlo",
   "zara",
-  "29cm",
   "farfetch",
 ]
 
@@ -164,8 +162,6 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
       return crawlUniqlo(listingConfig)
     case "zara":
       return crawlZara(listingConfig)
-    case "29cm":
-      return crawl29cm(listingConfig)
     case "farfetch":
       return crawlFarfetch(listingConfig)
     case "cafe24": {

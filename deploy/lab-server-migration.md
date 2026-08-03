@@ -270,3 +270,59 @@ pnpm exec dotenv -e .env.local -- tsx tools/repair-product-platforms.ts --apply=
   `discovered` 31,901 이 줄기 시작해야 한다. 첫 런에서 건당 소요·토큰 비용을 재고
   예산(현재 90분)을 조정한다. `brand_unmatched` 44,466 은
   `tools/rematch-brand-unmatched.ts --apply` 로 41,423 건 회수 가능(실측).
+
+## 9. 성별 롤백 배포 (2026-08-03)
+
+`products.gender` 출처가 VLM 에서 크롤러로 되돌아왔다. 연구실 배치에 영향이 있다.
+
+### 코드는 자동으로 반영된다
+
+`scripts/lib-batch-prep.sh` 의 `batch_prep()` 이 매 런 `git pull --ff-only` +
+`pnpm install` + config codegen 을 돌리고, `kiko-refresh.service` 가
+`OnSuccess=kiko-refresh-candidates.service` 로 연쇄한다. 즉 refresh 가 한 번 돌면
+신규상품 워커도 새 코드로 갱신된다. **수동 배포 단계는 없다.**
+
+단 `run-refresh-candidates.sh` 는 `batch_prep` 을 부르지 않는다. 워커만 단독
+실행할 일이 있으면 그 전에 pull 을 직접 해야 한다.
+
+### [HARD] 배포 순서 — 이걸 어기면 신규상품 유입이 조용히 0 이 된다
+
+```
+1. sql/runbooks/2026-08-03-delete-gender-null.sql   (성별 미확인 행 삭제)
+2. kiko.ai-app migration 103                        (canonical 밖 값 정리)
+3. **크롤러 코드가 이 서버에 올라온 것을 확인**       ← 아래 검증
+4. kiko.ai-app migration 104                        (CHECK + VALIDATE)
+```
+
+3 을 건너뛰고 4 를 적용하면 `chk_products_gender_required` 가 걸린 상태에서 옛
+코드가 돌아 신규상품 INSERT 가 **15분마다 전량 실패**한다. 가격·재고 UPDATE 는
+계속 성공하므로 대시보드는 초록색인 채 유입만 멈춘다 — migration 099 가 기록한
+color 사고와 같은 모양이다.
+
+검증:
+
+```bash
+ssh kjk@100.70.101.17
+git -C /home/kjk/kiko-crawler log --oneline -1     # 성별 롤백 커밋이 보여야 한다
+grep -c . /home/kjk/kiko-crawler/src/lib/product-gender.ts   # 파일이 있어야 한다
+systemctl --user status kiko-refresh-candidates
+```
+
+배포 후 한 사이클 지나면 신규 행에 gender 가 실리는지 확인:
+
+```sql
+SELECT gender_source, count(*) FROM products
+WHERE created_at > now() - interval '1 hour' GROUP BY 1;
+```
+
+### 예상되는 부작용: 신규 온보딩 브랜드의 수율 하락
+
+성별을 확정하지 못한 상품은 **적재하지 않는다**. codegen 이 만드는
+`platforms.generated.ts` 항목은 카테고리명이 `CatN` 플레이스홀더이고
+`defaultGender` 도 없으므로, 상품명·URL 에 성별 신호가 없는 신규 브랜드는
+상품이 전량 드랍될 수 있다.
+
+대응: `pnpm propose:site-gender --allow-null-source` 로 후보를 뽑고, **사이트를
+직접 확인한 뒤** `src/configs/gender-defaults.ts` 에 추가한다. 근거 없이 값을
+넣지 말 것 — 특히 "성별 카테고리가 없다"는 unisex 의 근거가 아니라 "모름"이고,
+unisex 는 검색에서 남녀 양쪽에 노출된다. 판단 기준은 그 파일 헤더에 있다.

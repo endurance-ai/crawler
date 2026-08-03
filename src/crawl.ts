@@ -34,13 +34,6 @@ import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
 import {
-  crawl29cm,
-  harvestRawItems as harvest29cmItems,
-  is29cmCloudflareChallenge,
-  parseProductsFromXhr as parse29cmXhr,
-  pick29cmUserAgent,
-} from "./lib/29cm-engine"
-import {
   crawlFarfetch,
   detectChallengeIntercept as detectFarfetchChallenge,
   extractCardsFromDom as extractFarfetchCards,
@@ -289,81 +282,6 @@ async function probeSite(config: SiteConfig) {
     } catch (err) {
       console.log(`   ❌ probe failed: ${err}`)
     } finally {
-      await browser.close().catch(() => {})
-    }
-    return
-  }
-
-  if (config.type === "29cm") {
-    const codes = config.apiCategoryCodes ?? []
-    const firstCode = codes[0]
-    if (typeof firstCode !== "number") {
-      console.log(`   ❌ 29cm-kr: apiCategoryCodes is empty — cannot probe`)
-      return
-    }
-    const probeUrl = `https://www.29cm.co.kr/store/category/list?categoryLargeCode=${firstCode}&sort=RECOMMENDED`
-    let browser
-    try {
-      browser = await chromium.launch({headless: true})
-    } catch (err) {
-      console.log(`   ❌ Chromium launch failed: ${err}`)
-      console.log(`      Install with: npx playwright install chromium`)
-      return
-    }
-    const ctx = await browser.newContext({
-      userAgent: pick29cmUserAgent(0),
-      locale: "ko-KR",
-      timezoneId: "Asia/Seoul",
-      viewport: {width: 1440, height: 900},
-    })
-    try {
-      const page = await ctx.newPage()
-      let xhrPayload: unknown = null
-      const onResponse = async (res: import("playwright").Response) => {
-        if (xhrPayload) return
-        if (/display-bff-api\.29cm\.co\.kr\/api\/v1\/listing\/items(?:\?|$)/.test(res.url())) {
-          try {
-            const buf = await res.body()
-            xhrPayload = JSON.parse(buf.toString("utf-8"))
-          } catch {}
-        }
-      }
-      page.on("response", onResponse)
-      try {
-        const response = await page.goto(probeUrl, {waitUntil: "domcontentloaded", timeout: 30000})
-        console.log(`   HTTP: ${response?.status()}`)
-        const body = await page.content()
-        const intercept = is29cmCloudflareChallenge(body)
-        if (intercept.isIntercept) {
-          console.log(`   ❌ Cloudflare intercept (${intercept.reason}); body=${body.length} bytes`)
-          return
-        }
-        // Mild scroll to trigger React Query fetch
-        for (let i = 0; i < 8 && !xhrPayload; i++) {
-          await page.evaluate((y) => window.scrollTo(0, y), (i + 1) * 800)
-          await page.waitForTimeout(500)
-        }
-        await page.waitForTimeout(1500)
-        if (!xhrPayload) {
-          console.log(`   ⚠️  no display-bff-api/listing/items XHR captured`)
-          return
-        }
-        const harvested = harvest29cmItems(xhrPayload)
-        for (const it of harvested) {
-          it._categoryCode = firstCode
-        }
-        const products = parse29cmXhr(harvested.slice(0, 3), config.baseUrl, config.key)
-        console.log(`   ✅ 29CM XHR OK: harvested ${harvested.length} raw items; sample 3:`)
-        for (const p of products) {
-          console.log(`      ${p.priceFormatted} — ${p.name.slice(0, 40)} → ${p.productUrl.slice(0, 80)}`)
-        }
-      } finally {
-        page.off("response", onResponse)
-      }
-    } catch (err) {
-      console.log(`   ❌ probe failed: ${err}`)
-    } finally {
-      await ctx.close().catch(() => {})
       await browser.close().catch(() => {})
     }
     return
@@ -650,7 +568,6 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
   const shopifySites = configs.filter((c) => c.type === "shopify")
   const uniqloSites = configs.filter((c) => c.type === "uniqlo")
   const zaraSites = configs.filter((c) => c.type === "zara")
-  const twentyninecmSites = configs.filter((c) => c.type === "29cm")
   const farfetchSites = configs.filter((c) => c.type === "farfetch")
   const imwebSites = configs.filter((c) => c.type === "imweb")
 
@@ -709,33 +626,6 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
           continue
         }
         const result = await crawlZara(config)
-        results.push(await saveResultAndTrim(outDir, result))
-      } catch (err) {
-        console.error(`❌ ${config.name} 크롤 실패:`, err)
-      }
-    }
-  }
-
-  // 29CM — sequential (each crawl launches its own Chromium browser
-  // internally; mirrors ZARA's per-engine browser-launch pattern).
-  if (twentyninecmSites.length > 0) {
-    for (const config of twentyninecmSites) {
-      const robots = await checkRobots(config.baseUrl)
-      if (!robots.allowed) {
-        console.error(
-          `❌ robots-block: ${config.key} blocked by robots.txt (${robots.blockingLine ?? "unknown"}). ` +
-            `Project HARD rule #1: sites that explicitly forbid crawling MUST be deferred.`,
-        )
-        process.exit(1)
-      }
-    }
-    for (const config of twentyninecmSites) {
-      try {
-        if (dryRun) {
-          await probeSite(config)
-          continue
-        }
-        const result = await crawl29cm(config)
         results.push(await saveResultAndTrim(outDir, result))
       } catch (err) {
         console.error(`❌ ${config.name} 크롤 실패:`, err)
@@ -1145,7 +1035,7 @@ async function main() {
     targets = getActivePlatforms()
   } else if (typeof flags.type === "string") {
     // SPEC-PLATFORM-AUTOMATION-009 (2026-05-07): support comma-separated
-    // types so cron can run e.g. `--type=shopify,uniqlo,zara,29cm,farfetch`
+    // types so cron can run e.g. `--type=shopify,uniqlo,zara,farfetch`
     // (Cafe24 KR self-brands excluded from daily cron by user direction).
     const types = flags.type.split(",").map((t) => t.trim()).filter(Boolean)
     const seen = new Set<string>()
@@ -1206,7 +1096,7 @@ async function main() {
   npx tsx scripts/crawl.ts --site=obscura,llud                   복수 사이트
   npx tsx scripts/crawl.ts --all                                 전체 크롤링
   npx tsx scripts/crawl.ts --type=cafe24                         단일 타입
-  npx tsx scripts/crawl.ts --type=shopify,uniqlo,zara,29cm,farfetch   복수 타입
+  npx tsx scripts/crawl.ts --type=shopify,uniqlo,zara,farfetch   복수 타입
   npx tsx scripts/crawl.ts --all --exclude-type=cafe24           Cafe24 제외 전체
   npx tsx scripts/crawl.ts --all --exclude-site=heights-store    특정 사이트 제외
   npx tsx scripts/crawl.ts --probe=obscura                       사이트 구조 프로빙
@@ -1216,7 +1106,7 @@ async function main() {
   --list                  등록된 플랫폼 목록
   --site=KEY[,KEY,...]    크롤링 대상 (콤마 구분)
   --all                   전체 활성 플랫폼
-  --type=TYPE[,TYPE,...]  타입별: cafe24, shopify, uniqlo, zara, 29cm, farfetch (콤마 구분)
+  --type=TYPE[,TYPE,...]  타입별: cafe24, shopify, uniqlo, zara, farfetch (콤마 구분)
   --exclude-type=TYPE     선택된 타겟에서 타입 제외 (--all과 조합)
   --exclude-site=KEY      선택된 타겟에서 사이트 제외
   --probe=KEY             사이트 구조 확인

@@ -9,9 +9,14 @@
  * 방침 A 예외 — category:
  * products.category 는 검색 필터 신뢰성 때문에 빈 문자열·null 을 거부한다.
  *
- * 2026-07-29: color 와 gender 는 이 게이트에서 빠졌다. 두 필드 모두 출처가
- * 크롤러 → product_features(VLM) 로 이관됐고, 크롤러는 더 이상 만들지 않는다.
- * DB 쪽 `chk_products_gender_required` 도 migration 096 에서 해제됐다.
+ * 2026-07-29: color 와 gender 가 이 게이트에서 빠졌다 (출처를 크롤러 →
+ * product_features(VLM) 로 이관).
+ *
+ * 2026-08-03: gender 만 되돌렸다 — VLM gender 성능이 나오지 않아 크롤러가 다시
+ * products.gender 의 단일 출처가 된다. 성별 미확인 상품은 적재하지 않으므로
+ * 여기서 `.min(1)` 로 막는다 (미확인을 unisex 로 세탁하면 검색 RPC 가 남녀
+ * 양쪽에 노출시킨다 — src/lib/product-gender.ts 헤더 참조).
+ * **color 는 계속 VLM 소관이다 — 이 게이트에 다시 넣지 말 것.**
  *
  * 방침 A 예외 (category canonical-strict): category 는 QC 정규화
  * (product-qc/normalization.ts normalizeCategoryField)에서 CATEGORIES(enums)
@@ -33,6 +38,7 @@
 
 import {z} from "zod"
 import type {Product} from "../types.js"
+import {GENDER_SOURCE_VALUES, PRODUCT_GENDER_VALUES} from "../product-gender.js"
 
 // @MX:ANCHOR: [AUTO] validateProduct() is the crawler write-boundary contract —
 //   every product crossing into JSON output or DB upsert passes through here.
@@ -60,6 +66,8 @@ export const ProductSchema = z
     brand: z.string(),
     name: z.string(),
     category: z.string().min(1),
+    gender: z.array(z.enum(PRODUCT_GENDER_VALUES)).min(1),
+    genderSource: z.enum(GENDER_SOURCE_VALUES).optional(),
     price: z.number().nullable(),
     originalPrice: z.number().nullable(),
     salePrice: z.number().nullable(),

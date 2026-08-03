@@ -270,6 +270,8 @@ export interface RawZaraProduct {
   availability?: string
   availableColors?: Array<{colorName?: string; hexColor?: string}>
   /** Engine-attached annotation; not part of the canonical ZARA payload. */
+  /** Engine-attached annotation; not part of the canonical ZARA payload. */
+  _gender?: string
   _category?: string
 }
 
@@ -296,6 +298,39 @@ function buildImageUrl(xm?: RawZaraXmedia): string {
     return `https://static.zara.net${xm.path}/${xm.name}.jpg${ts}`
   }
   return ""
+}
+
+function mapGender(p: RawZaraProduct): string[] {
+  // Prefer engine-attached _gender (derived from URL section). Fall back
+  // to sectionName which is "WOMAN" / "MAN" in the live payload.
+  //
+  // "kids" is deliberately returned as-is even though it is not a canonical
+  // products.gender value: cleanGenderScope drops it to [], and the isKidsText
+  // guard in resolveProductGenderWithSource then keeps the product unresolved
+  // instead of letting it fall through to an adult site default.
+  if (p._gender) return [p._gender]
+  const sn = (p.sectionName || "").toUpperCase()
+  if (sn === "WOMAN") return ["women"]
+  if (sn === "MAN") return ["men"]
+  if (sn === "KID" || sn === "KIDS") return ["kids"]
+  return []
+}
+
+/**
+ * Region-agnostic gender derivation. Matches any 2-letter country/2-letter
+ * language locale prefix (e.g. `/kr/ko/`, `/us/en/`) followed by the gender
+ * slug.
+ *
+ * SPEC: SPEC-PLATFORM-EXPANSION-005 REQ-002
+ */
+export function deriveGenderFromUrl(url: string): string {
+  if (typeof url !== "string") return ""
+  const m = url.match(/\/(?:[a-z]{2})\/(?:[a-z]{2})\/(woman|women|man|men|kids|kid)/)
+  if (!m) return ""
+  const slug = m[1]
+  if (slug === "woman" || slug === "women") return "women"
+  if (slug === "man" || slug === "men") return "men"
+  return "kids"
 }
 
 function buildProductUrl(baseUrl: string, seo: RawZaraProduct["seo"]): string {
@@ -381,6 +416,7 @@ export function parseProductsFromXhr(
       imageUrl,
       productUrl,
       inStock,
+      gender: mapGender(raw),
       platform: platformKey,
       crawledAt,
       productCode: raw.seo?.seoProductId ?? String(raw.id),
@@ -421,6 +457,7 @@ async function crawlOneCategory(
   categoryUrl: string,
   baseUrl: string,
   platformKey: string,
+  gender: string,
   region: ZaraRegion,
   sourceCurrency: "KRW" | "USD",
 ): Promise<CategoryScrapeResult> {
@@ -489,6 +526,7 @@ async function crawlOneCategory(
     }
     // Parse — annotate each raw with _gender so the parser maps it correctly.
     const harvested = harvestRawProducts(xhrPayload)
+    for (const r of harvested) r._gender = gender
     const products = parseProductsFromXhr(harvested, baseUrl, platformKey, region, sourceCurrency)
     result.products = products
     return result
@@ -598,6 +636,7 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
           categoryUrl,
           config.baseUrl,
           config.key,
+          deriveGenderFromUrl(categoryUrl),
           region,
           sourceCurrency,
         )

@@ -7,6 +7,7 @@
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
+import {inferGenderFromText} from "./product-gender"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
@@ -123,6 +124,8 @@ export interface ShopifyParseOptions {
    * (single-brand mall). Multi-brand editshops leave this undefined so the
    * brand stays "" rather than leaking the platform name. */
   brandFallback?: string
+  /** Site-wide default gender seed (`config.defaultGender`). */
+  defaultGender?: string[]
   /**
    * 품절 상품을 결과에 남긴다 (갱신 전용). 기본 false — 일반 크롤 출력은 종전과
    * 바이트 동일하다(골든 마스터 불변식). 갱신 경로만 true 로 켜서 "재고→품절"
@@ -225,8 +228,33 @@ export function parseShopifyProducts(
       : ""
     if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
 
+    // gender 추론 (태그에서). 태그가 실제로 성별을 말해주면 engine 근거이고,
+    // 아무 말도 안 해서 사이트 기본값만 남으면 config_default 다.
+    //
+    // 삭제 전 코드는 골든 마스터(tests/shopify-parse.characterization.test.ts,
+    // "do NOT regenerate")를 깨지 않으려고 genderSource 를 아예 stamp 하지
+    // 않았고, 그 결과 defaultGender 로만 정해진 shopify 상품이 engine 으로
+    // 기록돼 실제보다 신뢰도가 높게 표시됐다. import-products 의 dedup rank 가
+    // 이 구분에 의존하므로 여기서는 제대로 stamp 하고 골든을 갱신한다.
+    // 태그 성별 추론은 공용 규칙(GENDER_RULES)에 위임한다.
+    //
+    // 삭제 전 코드는 `t.includes("men")` 으로 직접 판정했는데 **"womens" 가
+    // "men" 을 포함한다** — w-o-[m-e-n]-s. 그래서 여성 태그 상품이 전부
+    // ["women","men"] 이 됐고, 검색 RPC 의 `p.gender && ARRAY[p_gender,'unisex']`
+    // 에서 남녀 양쪽에 노출됐다. 실측: 적재 예정분의 41.7% 가 다중값이었고
+    // `(WOMEN) DENIM PRINTED BRA-TOP` 이 남성 검색에 뜨는 상태였다.
+    //
+    // inferGenderFromText 는 `\b(men|mens|...)\b` 워드 바운더리를 쓰므로
+    // "womens" 를 men 으로 읽지 않고, 남녀가 진짜로 함께 잡히면 null(모호)을
+    // 돌려준다 — 추측 대신 미확인이 이 프로젝트의 규율이다.
+    const inferredFromTags = inferGenderFromText(sp.tags.join(" "))
+    const genderFromTags = inferredFromTags !== null
+    const gender: string[] = genderFromTags ? [inferredFromTags] : [...(options.defaultGender || [])]
+
     allProducts.push({
       brand: options.brandOverride || sp.vendor || options.brandFallback || "",
+      gender,
+      genderSource: genderFromTags ? ("engine" as const) : ("config_default" as const),
       name: sp.title,
       ...classifyShopifyCategory(sp.product_type || "", sp.title, sp.tags),
       price: srcPrice,
@@ -331,6 +359,7 @@ export async function crawlShopify(
           // config.brand를 그대로 쓴다. 멀티브랜드몰은 vendor를 그대로
           // 유지하며, 빈 vendor를 플랫폼명으로 채우지 않는다.
           brandOverride: config.multiBrand ? undefined : config.brand,
+          defaultGender: config.defaultGender,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )

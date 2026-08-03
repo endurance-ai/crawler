@@ -477,13 +477,60 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   안에서만 계산된다 (`DetailData` 에는 노출되지 않음).
 - 상세 크롤 재시작 스킵 마커는 `Product.detailFetchedAt` 이다. 예전에는 `color`
   가 비어있지 않은지로 판정했는데 그 필드가 사라져 명시 필드로 교체했다.
-- `gender` 도 2026-07-29 함께 제거됐다. `products.gender` 의
-  `chk_products_gender_required` CHECK 은 migration 096 에서 해제됐고,
-  `search_products_v6` 는 VLM → `products.gender` → fail-open 3단 다리로 읽는다.
-  크롤러는 gender 를 만들지 않는다 — `defaultGender`/`category.gender` 설정,
-  엔진별 추론(`inferGender`/`deriveGenderFromUrl`/`mapGender`/
-  `genderFromCategoryCode`), QC `GENDER_RULES` 전부 삭제됨.
-  `brand_nodes.gender_scope` 는 브랜드 레벨 신호로 유지한다(상품에 안 씀).
+
+### 성별 출처: 크롤러 (2026-08-03 VLM 에서 회귀)
+
+`gender` 는 2026-07-29 에 color 와 함께 VLM 으로 이관됐다가 **2026-08-03 크롤러로
+되돌아왔다** — VLM gender 성능이 기준에 못 미쳤다. **color 와 달리 gender 의 단일
+출처는 다시 `products.gender` 이고 크롤러가 만든다.**
+
+- 결의는 `src/lib/product-gender.ts` `resolveProductGenderWithSource` 하나뿐이다.
+  우선순위 4단: **engine → url → text → config_default**. 여기가 write-path 와
+  교정 스크립트의 공통 출처다 (정규식 중복 없음).
+- **`brand_nodes.gender_scope` 폴백은 복원하지 않았다.** 삭제 전에도 최하위
+  근거였고 `['unisex']`·다중값은 거부됐지만, 단일값이면서 틀린 행이 상품으로
+  조용히 전파되는 유일한 경로였다. 감사 도구도 수정 UI 도 없다.
+  `gender_scope` 는 브랜드 레벨 신호로만 유지한다(상품에 안 씀).
+- **미확인 상품은 적재하지 않는다.** `unisex` 는 "확인된 남녀공용"일 때만 쓰고
+  "모름"에는 절대 쓰지 않는다 — `search_products_v6` 가
+  `p.gender && ARRAY[p_gender,'unisex']` 로 unisex 를 남녀 양쪽에 노출시키므로
+  세탁하면 여성 상품이 남성 검색으로 샌다. 게이트는 이중이다:
+  QC(`normalizeGenderField` → needsReview)와 두 INSERT 경로의 가드.
+- **INSERT 경로는 둘뿐이고 둘 다 gender 를 실어야 한다**:
+  `src/import-products.ts`(배치)와 `src/refresh-candidates.ts`(연구실 서버
+  신규상품 워커, 15분 주기). 후자에 gender 를 빼먹으면 migration 099 가 기록한
+  color 사고(210회 연속 INSERT 실패)가 그대로 재현된다 — 가격·재고 UPDATE 는
+  계속 성공해서 대시보드는 초록색인 채 신규 유입만 0 이 된다.
+- 사이트 전역 기본값은 두 곳: `SiteConfig.defaultGender`(platforms.ts, 손으로
+  큐레이션)와 `src/configs/gender-defaults.ts`(생성 config 사이트 보강용).
+  후자는 `getSiteConfig()` 가 병합한다. **근거 없이 값을 넣지 말 것** —
+  "성별 카테고리가 없다"는 unisex 의 근거가 아니라 "모름"이다.
+  후보 뽑기: `pnpm propose:site-gender` (gender_source 화이트리스트로 091 의
+  brand_scope 백필 오염을 걸러낸다 — 안 거르면 근거 행이 7배 부풀려진다).
+- DB: `chk_products_gender_required` 는 migration 104 에서 재도입 + VALIDATE.
+  읽기 경로는 `products.gender` → VLM → fail-open 3단이며, 백필 완료 후
+  1단으로 축약한다 (`search_products_v6.sql` 헤더의 🧹 항목).
+- **상품 단위 근거가 브랜드 단위 backfill 을 이긴다** (2026-08-03 확정). 별도로
+  `brand_nodes.gender_scope` 기반 일괄 backfill 이 돌아 `gender_source =
+  'repair_brand_scope'` 행이 8,098건 있다. 브랜드가 실제로 단일 성별이면 그 값이
+  맞지만(birrot 470행 전부 일치), 남녀 모두 파는 브랜드에서는 상품 단위로 틀린다 —
+  jadedldn 1,275행이 브랜드 레벨 `['unisex']` 인데 URL 에 `-menswear`/`-womenswear`
+  가 박혀 있었다. 브랜드 스코프는 카탈로그 경계이지 상품 속성이 아니므로,
+  engine/url/text 근거가 있으면 그쪽으로 덮어쓴다.
+- **shopify 태그 성별 추론은 반드시 `inferGenderFromText` 에 위임한다.**
+  `t.includes("men")` 같은 부분 문자열 판정을 쓰지 말 것 — **`"womens"` 가 `"men"`
+  을 포함한다**(`wo[men]s`). 이 버그로 여성 태그 상품이 전부 `['women','men']` 이
+  돼 남성 검색에 노출됐다(실측 41.7%; 수정 후 0%).
+- 기존 행 교정은 `pnpm repair:product-gender` (`--plan` → 검토 → `--apply`).
+  `--use-description` 은 켜지 말 것 — `products.description` 은 2000자 마케팅
+  slice 라 "여성 사이즈 참고" 같은 문구가 대량 오판을 만든다.
+
+### 크롤 금지 사이트
+
+- **29cm** — 2026-08-03 전면 제거. ToS 제11조 제2항 9호가 '크롤러'를 명시적으로
+  금지하며, 2026-05-06 자 OWNER OVERRIDE 는 철회됐다. 엔진·설정·`PlatformType`·
+  분기 전부 삭제됐다. **다시 추가하지 말 것.**
+- **무신사** — 29CM 모회사. 크롤 대상으로 추가하지 않는다.
 
 ### Product Crawl Status Sync (admin 동기화)
 

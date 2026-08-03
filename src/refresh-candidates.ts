@@ -7,6 +7,7 @@ import {applyValidationGate} from "./lib/core/validation-gate"
 import {enrichProductWithLlm} from "./lib/llm-product-enrichment"
 import {createProductCollectionClient, type ProductCollectionClient} from "./lib/product-collection"
 import {applyProductQcGate} from "./lib/product-qc/normalization"
+import {resolveProductGenderWithSource} from "./lib/product-gender"
 import {productToCandidateDbRow} from "./lib/refresh-candidate-import"
 import type {Product} from "./lib/types"
 
@@ -162,6 +163,34 @@ async function processCandidate(
     platform: candidate.platform_key,
   }
   const enrichment = await enrichProductWithLlm(page, raw, config)
+  // enrichProductWithLlm 은 category/subcategory 만 만든다 — gender 는 만들지 않는다.
+  // 리스팅 크롤이 실은 엔진 gender 가 있으면 그걸 쓰고, 없으면 URL/상품명/사이트
+  // 기본값으로 결의한다. 여기서 결의하지 않으면 아래 productToCandidateDbRow 가
+  // 전건 throw 해 워커가 15분마다 헛돈다.
+  const resolvedGender = resolveProductGenderWithSource(
+    enrichment.product.gender,
+    {
+      name: enrichment.product.name,
+      category: enrichment.product.category,
+      subcategory: enrichment.product.subcategory,
+      tags: enrichment.product.tags,
+      productUrl: enrichment.product.productUrl,
+    },
+    enrichment.product.genderSource ?? "engine",
+  )
+  const withGender =
+    resolvedGender.gender.length > 0
+      ? resolvedGender
+      : config.defaultGender && config.defaultGender.length > 0
+        ? resolveProductGenderWithSource(config.defaultGender, {}, "config_default")
+        : resolvedGender
+  if (withGender.gender.length === 0) {
+    // PermanentCandidateError 여야 한다 — 일반 Error 면 maxAttempts 까지 같은
+    // 후보를 계속 재시도한다. 성별 근거가 없는 건 재시도로 해결되지 않는다.
+    throw new PermanentCandidateError("gender unresolved")
+  }
+  enrichment.product.gender = withGender.gender
+  enrichment.product.genderSource = withGender.source ?? undefined
   // trustedCategory: 입력이 LLM 보강 산출물이다. QC 의 이름 기반 category 번복은
   // DOM 원본을 구제하려고 만든 것이라, 페이지 전체를 본 판단을 정규식으로 뒤집으면
   // 진다 — "Archive Short Sleeves"(반팔티)를 bottoms 로 바꿔 탈락시킨 게 그 예다.

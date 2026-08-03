@@ -20,6 +20,8 @@ const product: Product = {
   brand: "KITH",
   name: "New jacket",
   category: "outerwear",
+  gender: ["men"],
+  genderSource: "engine",
   price: 100,
   originalPrice: 120,
   salePrice: 100,
@@ -51,4 +53,20 @@ test("신규상품 DB payload는 기존 brand_node_id와 source platform을 강�
   assert.equal(row.product_url, product.productUrl)
   assert.equal(row.image_selection_version, REFRESH_FALLBACK_IMAGE_VERSION)
   assert.equal(typeof row.price, "number")
+})
+
+test("성별이 비어 있으면 신규상품 payload를 만들지 않는다", () => {
+  // migration 099 가 기록한 color 사고(210회 연속 INSERT 실패)의 gender 판.
+  // 이 경로는 연구실 서버에서 15분마다 돌기 때문에, DB 제약에 도달하기 전
+  // 여기서 막아야 한다.
+  assert.throws(
+    () => productToCandidateDbRow({...product, gender: []}, config, 11),
+    /candidate gender is missing/,
+  )
+})
+
+test("신규상품 payload는 gender와 gender_source를 함께 싣는다", () => {
+  const row = productToCandidateDbRow(product, config, 11)
+  assert.deepEqual(row.gender, ["men"])
+  assert.equal(row.gender_source, "engine")
 })

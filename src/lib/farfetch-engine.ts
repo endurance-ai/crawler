@@ -280,6 +280,21 @@ export interface RawFarfetchCard {
   imageUrl: string
 }
 
+// ─── Region-agnostic gender derivation ──────────────────
+
+/**
+ * Match `/kr/shopping/(men|women|kids)/...` (KR) or `/shopping/(men|women|kids)/...` (US).
+ * Returns canonical `"men"` / `"women"` / `"kids"` or empty string.
+ *
+ * SPEC: SPEC-006 REQ-002
+ */
+export function deriveGenderFromUrl(url: string): string {
+  if (typeof url !== "string") return ""
+  const m = url.match(/\/(?:kr\/)?shopping\/(men|women|kids)\b/i)
+  if (!m) return ""
+  return m[1]!.toLowerCase()
+}
+
 // ─── Pure parse function (fixture-testable) ─────────────
 
 /**
@@ -291,6 +306,8 @@ export interface RawFarfetchCard {
  * @param platformKey   SiteConfig.key (e.g. "farfetch-kr")
  * @param region        "KR" | "US"
  * @param sourceCurrency "KRW" | "USD"
+ * @param genderHint    Optional gender inferred from category URL (cards from
+ *                      a /men/ category landing inherit "men" by default).
  *
  * @MX:NOTE: Defensive null-handling on every nested field; a card that
  * fails any guardrail is dropped silently rather than aborting the page.
@@ -301,6 +318,7 @@ export function parseProductsFromCards(
   platformKey: string,
   region: FarfetchRegion = "KR",
   sourceCurrency: "KRW" | "USD" = "KRW",
+  genderHint = "",
 ): Product[] {
   const out: Product[] = []
   const crawledAt = new Date().toISOString()
@@ -315,6 +333,7 @@ export function parseProductsFromCards(
     if (!isPriceInSaneRange(price, region)) continue
     const idMatch = raw.href.match(/-item-(\d+)\.aspx$/)
     const productCode = idMatch ? idMatch[1]! : ""
+    const gender = genderHint ? [genderHint] : (deriveGenderFromUrl(raw.href) ? [deriveGenderFromUrl(raw.href)] : [])
     out.push({
       brand: raw.brand,
       name: raw.name,
@@ -326,6 +345,7 @@ export function parseProductsFromCards(
       imageUrl: raw.imageUrl,
       productUrl: raw.href,
       inStock: true,
+      gender,
       platform: platformKey,
       crawledAt,
       productCode,
@@ -407,6 +427,7 @@ async function crawlOneCategory(
   categoryUrl: string,
   baseUrl: string,
   platformKey: string,
+  gender: string,
   region: FarfetchRegion,
   sourceCurrency: "KRW" | "USD",
 ): Promise<CategoryScrapeResult> {
@@ -479,6 +500,7 @@ async function crawlOneCategory(
       platformKey,
       region,
       sourceCurrency,
+      gender,
     )
     result.products = products.slice(0, PER_CATEGORY_PRODUCT_CAP)
     return result
@@ -561,6 +583,7 @@ export async function crawlFarfetch(config: SiteConfig): Promise<CrawlResult> {
     for (let i = 0; i < categoryUrls.length; i++) {
       const categoryUrl = categoryUrls[i]!
       const ua = pickFarfetchUserAgent(i)
+      const gender = deriveGenderFromUrl(categoryUrl)
 
       // 3 sec/page pacing between consecutive page navigations
       // (REQ-003). First request runs immediately.
@@ -587,6 +610,7 @@ export async function crawlFarfetch(config: SiteConfig): Promise<CrawlResult> {
           categoryUrl,
           config.baseUrl,
           config.key,
+          gender,
           region,
           sourceCurrency,
         )
