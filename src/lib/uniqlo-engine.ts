@@ -119,6 +119,25 @@ interface UniqloApiResponse {
 
 // ─── Field mapping ─────────────────────────────────────
 
+/**
+ * Uniqlo `genderName` -> products.gender tokens.
+ *
+ * "KIDS"/"BABY" are returned verbatim even though they are not canonical
+ * products.gender values. cleanGenderScope drops them to [], and the
+ * isKidsText guard in resolveProductGenderWithSource then leaves the product
+ * unresolved rather than letting it inherit an adult site default.
+ */
+function mapGender(genderName?: string): string[] {
+  if (!genderName) return []
+  const g = genderName.toUpperCase()
+  if (g === "WOMEN") return ["women"]
+  if (g === "MEN") return ["men"]
+  if (g === "KIDS") return ["kids"]
+  if (g === "BABY") return ["baby"]
+  if (g === "UNISEX") return ["unisex"]
+  return [g.toLowerCase()]
+}
+
 function mapImages(item: UniqloItem): {primary: string; all: string[]} {
   const collected: string[] = []
   const main = item.images?.main
@@ -190,6 +209,7 @@ export function parseProducts(
     products.push({
       brand: "Uniqlo",
       name: item.name ?? "",
+      gender: mapGender(item.genderName),
       category: item.genderCategory ?? "",
       price,
       originalPrice: price,

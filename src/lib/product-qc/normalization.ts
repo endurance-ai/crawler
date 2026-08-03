@@ -2,11 +2,12 @@ import {CATEGORIES, isValidCategory, type Category} from "../enums/product-enums
 import {emit} from "../core/observability"
 import {resolveSubcategory} from "../subcategory-classifier"
 import {matchesAny, normalizeForMatch} from "../text-match"
+import {normalizeGenderToken, resolveProductGenderWithSource, type GenderSource} from "../product-gender"
 
 export type ProductQcAction = "keep" | "auto_fix" | "review" | "reject"
 
 export interface ProductQcFieldChange {
-  field: "category" | "subcategory"
+  field: "category" | "subcategory" | "gender"
   before: unknown
   after: unknown
   reason: string
@@ -17,6 +18,13 @@ export interface ProductQcInput {
   name: string
   category?: string | null
   subcategory?: string | null
+  gender?: string[] | null
+  /**
+   * gender 의 출처. QC 가 gender 를 바꾸면 이 값도 함께 갱신해야 한다 —
+   * 갱신하지 않으면 provenance 가 거짓이 되고, import 결의가 그 라벨을 보고
+   * 다른 분기를 타 실제와 어긋난 판정을 낸다 (실측: jadedldn 18건).
+   */
+  genderSource?: string | null
   tags?: string[] | null
   productUrl?: string | null
   productCode?: string | null
@@ -327,6 +335,79 @@ function normalizeSubcategoryField(
   }
 }
 
+/**
+ * 성별 정규화 — 크롤러 write-path 게이트의 백스톱.
+ *
+ * 추론 규칙 자체는 ../product-gender.ts 에 산다: 그쪽이 write-path(engine/url/
+ * text/config_default 순위 결의)와 교정 스크립트의 공통 출처이고, QC 는 그 결과가
+ * canonical 어휘를 벗어나지 않는지 확인하는 마지막 관문이다.
+ *
+ * gender 를 못 뽑으면 needsReview → applyProductQcGate 가 상품을 드랍한다.
+ * 미확인을 unisex 로 채우지 않는 것이 핵심 — 검색 RPC 가 unisex 를 남녀 양쪽에
+ * 노출시키므로 그건 여성 상품이 남성 검색으로 새는 경로다.
+ *
+ * [HARD] 추론은 반드시 resolveProductGenderWithSource 를 통한다 — 자체
+ * inferGenderFromText 호출로 대체하지 말 것. 예전에는 QC 가 name+category 만
+ * 보고 따로 추론했는데, write-path 는 tags+URL 까지 보므로 **두 곳의 판정이
+ * 갈렸다**. 실측(sportyandrich): URL `-men` 과 태그 "Unisex" 가 충돌해
+ * write-path 는 미확인으로 떨어뜨렸는데, 태그를 안 보는 QC 가 name 의 "Men"
+ * 만으로 되살려 충돌 가드를 무력화했다. 같은 결의를 쓰면 갈릴 수 없다.
+ *
+ * description 은 입력에서 뺐다. 크롤러가 더 이상 수집하지 않고, products.description
+ * 은 2000자 마케팅/사이즈표 slice 라 "여성 사이즈 참고" 같은 문구가 오판을 만든다.
+ */
+function normalizeGenderField(product: ProductQcInput): {
+  value: string[] | null
+  /** value 를 새로 추론했을 때의 출처. 기존 값을 그대로 쓰면 null. */
+  source: string | null
+  reason: string | null
+  confidence: number
+  needsReview: boolean
+} {
+  const raw = Array.isArray(product.gender) ? product.gender : []
+
+  // write-path(import-products.ts)와 **완전히 같은** 호출이어야 한다 —
+  // 상품값·근거·출처를 모두 넘긴다. 예전에는 raw 가 canonical 이면 그대로
+  // 통과시켰는데, 그러면 엔진이 미리 찍은 config_default 값이 kids 가드를
+  // 건너뛰어 아동복이 사이트 기본 성별을 얻었다 (실측: birthdayeve 9건).
+  const resolved = resolveProductGenderWithSource(
+    raw,
+    {
+      name: product.name,
+      category: product.category,
+      subcategory: product.subcategory,
+      tags: product.tags,
+      productUrl: product.productUrl,
+    },
+    (product.genderSource as GenderSource | undefined) ?? "engine",
+  )
+
+  const normalized = [...new Set(raw.map((g) => normalizeGenderToken(String(g)) ?? normalizeForMatch(String(g))).filter(Boolean))]
+    .filter((g): g is "men" | "women" | "unisex" => g === "men" || g === "women" || g === "unisex")
+
+  // 결의 결과가 상품값과 같으면 canonical 정리만 보고한다 (출처 불변).
+  if (resolved.gender.length > 0 && JSON.stringify(resolved.gender) === JSON.stringify(normalized)) {
+    return {
+      value: normalized,
+      source: null,
+      reason: JSON.stringify(raw) === JSON.stringify(normalized) ? null : "gender_canonicalized",
+      confidence: 0.95,
+      needsReview: false,
+    }
+  }
+  if (resolved.gender.length > 0) {
+    return {
+      value: resolved.gender,
+      source: resolved.source,
+      reason: "gender_missing_text_fallback",
+      confidence: 0.82,
+      needsReview: false,
+    }
+  }
+  // conflict(men vs women)도 여기로 온다 — 추측하지 않고 드랍한다.
+  return {value: null, source: null, reason: "gender_missing", confidence: 0.2, needsReview: true}
+}
+
 export function normalizeProductTextFields<T extends ProductQcInput>(
   product: T,
   options: ProductQcOptions = {},
@@ -366,6 +447,24 @@ export function normalizeProductTextFields<T extends ProductQcInput>(
       confidence: subcategory.confidence,
     })
     next.subcategory = subcategory.value
+  }
+
+  const gender = normalizeGenderField(product)
+  confidences.push(gender.confidence)
+  if (gender.needsReview) needsReview = true
+  if (gender.reason) reasons.push(gender.reason)
+  if (gender.value && JSON.stringify(gender.value) !== JSON.stringify(product.gender ?? null)) {
+    changes.push({
+      field: "gender",
+      before: product.gender,
+      after: gender.value,
+      reason: gender.reason ?? "gender_normalized",
+      confidence: gender.confidence,
+    })
+    next.gender = gender.value
+    // provenance 를 값과 함께 갱신한다. 이걸 빠뜨리면 import 결의가 stale 한
+    // config_default 라벨을 보고 isConfigDefault 분기를 타 오판한다.
+    if (gender.source !== null) next.genderSource = gender.source
   }
 
   const confidence = confidences.length > 0 ? Math.min(...confidences) : 1

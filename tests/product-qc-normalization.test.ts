@@ -13,6 +13,9 @@ function product(overrides: Partial<Product> = {}): Product {
     brand: "Brand",
     name: "Black Wide Pants",
     category: "bottoms",
+    // 2026-08 성별 크롤러 회귀: gender 는 필수다. 비어 있으면 QC 가
+    // gender_missing 으로 needsReview 를 세워 상품을 드랍한다.
+    gender: ["women"],
     price: 1000,
     originalPrice: 1000,
     salePrice: null,
@@ -156,3 +159,77 @@ test("QC resolves subcategory against the canonicalized category, not the raw al
   assert.equal(result.product.subcategory, "turtleneck")
 })
 
+
+// ─── 성별 (2026-08 크롤러 회귀) ────────────────────────────────
+
+test("QC canonicalizes gender tokens", () => {
+  const result = normalizeProductTextFields(product({gender: ["WOMEN"]}))
+  assert.deepEqual(result.product.gender, ["women"])
+  assert.ok(result.reasons.includes("gender_canonicalized"))
+})
+
+test("QC infers gender from the product name when the field is empty", () => {
+  const result = normalizeProductTextFields(product({name: "여성 와이드 팬츠", gender: []}))
+  assert.deepEqual(result.product.gender, ["women"])
+  assert.ok(result.reasons.includes("gender_missing_text_fallback"))
+})
+
+test("QC reviews (drops) a product with no gender and no text signal", () => {
+  // 미확인을 unisex 로 채우면 검색 RPC 가 남녀 양쪽에 노출시킨다 — 드랍이 맞다.
+  const result = normalizeProductTextFields(product({name: "Archive Piece 001", gender: []}))
+  // 해결 못 하면 입력값을 그대로 두고 needsReview 만 세운다 — 게이트가 드랍한다.
+  assert.deepEqual(result.product.gender, [])
+  assert.ok(result.reasons.includes("gender_missing"))
+  assert.equal(result.action, "review")
+})
+
+test("QC gate excludes gender-less products from the batch", () => {
+  resetProductQcReport()
+  const kept = applyProductQcGate(
+    [product({gender: ["women"]}), product({name: "Archive Piece 002", gender: [], productUrl: "https://example.com/product/2"})],
+    "test-shop",
+  )
+  assert.equal(kept.length, 1)
+  assert.deepEqual(kept[0].gender, ["women"])
+})
+
+test("QC does not launder an unresolvable gender into unisex", () => {
+  const result = normalizeProductTextFields(product({name: "Object No. 7", gender: []}))
+  assert.notDeepEqual(result.product.gender, ["unisex"])
+})
+
+test("QC 는 write-path 와 같은 결의를 쓴다 — tags/URL 까지 본다", () => {
+  // 회귀: 예전 QC 는 name+category 만 봐서, write-path 가 URL↔태그 충돌로
+  // 미확인 처리한 상품을 name 만으로 되살려 충돌 가드를 무력화했다.
+  const result = normalizeProductTextFields(
+    product({
+      name: "Archive Piece 001",
+      gender: [],
+      tags: ["여성"],
+      productUrl: "https://example.com/product/1",
+    }),
+  )
+  assert.deepEqual(result.product.gender, ["women"])
+})
+
+test("QC 는 URL 과 텍스트가 충돌하면 되살리지 않는다", () => {
+  const result = normalizeProductTextFields(
+    product({
+      name: "여성 코트",
+      gender: [],
+      productUrl: "https://example.com/men/coat-1",
+    }),
+  )
+  assert.ok(result.reasons.includes("gender_missing"))
+  assert.equal(result.action, "review")
+})
+
+test("QC 가 gender 를 채우면 genderSource 도 함께 갱신한다", () => {
+  // 회귀: 예전에는 gender 만 바꾸고 source 를 stale 하게 뒀다. import 결의가
+  // 그 라벨(config_default)을 보고 isConfigDefault 분기를 타 오판했다.
+  const result = normalizeProductTextFields(
+    product({name: "Archive Piece 001", gender: [], genderSource: "config_default", productUrl: "https://example.com/women/1"}),
+  )
+  assert.deepEqual(result.product.gender, ["women"])
+  assert.equal(result.product.genderSource, "url")
+})

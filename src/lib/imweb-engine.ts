@@ -81,7 +81,7 @@ function toNumber(value: number | string | undefined): number | null {
  */
 export function parseImwebListItem(
   item: ImwebListItem,
-  config: Pick<SiteConfig, "key" | "name" | "brand" | "sourceCurrency">,
+  config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender" | "sourceCurrency">,
   category: string,
 ): Product | null {
   const props = item.properties
@@ -109,6 +109,11 @@ export function parseImwebListItem(
     // imweb 자사몰은 반드시 config.brand 를 설정해야 하며(미설정 시 import 단계에서
     // 격리), 멀티브랜드 편집샵은 온보딩 LLM 브랜드 추출로 처리한다.
     brand: config.brand || "",
+    // imweb 위젯 JSON 에는 성별 필드가 없다. 사이트 전역 기본값만 실을 수 있고,
+    // config_default 는 dedup rank 최하위라 import 단계에서 상품명/URL 추론이
+    // 이기면 그쪽으로 교체된다.
+    gender: [...(config.defaultGender ?? [])],
+    genderSource: "config_default" as const,
     name,
     category,
     price,

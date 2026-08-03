@@ -2,12 +2,22 @@
  * 크롤러 공통 타입
  */
 
+import type {GenderSource} from "./product-gender"
+
 // ─── 상품 ─────────────────────────────────────────────
 
 export interface Product {
   brand: string
   name: string
   category: string
+  /**
+   * 성별 태그 (men/women/unisex). 비어 있으면 **적재하지 않는다** —
+   * 검색 RPC 가 unisex 를 남녀 양쪽에 노출시키므로 미확인을 unisex 로
+   * 세탁하면 여성 상품이 남성 검색에 샌다. src/lib/product-gender.ts 참조.
+   */
+  gender: string[]
+  /** 이 gender 가 어느 근거에서 왔는지 (products.gender_source). */
+  genderSource?: GenderSource
   price: number | null
   originalPrice: number | null
   salePrice: number | null
@@ -77,7 +87,7 @@ export interface Product {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "29cm" | "farfetch" | "imweb"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "farfetch" | "imweb"
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
@@ -108,7 +118,7 @@ export interface CategoryConfig {
    * manual일 때: 고정 카테고리 번호 목록
    * auto일 때: 카테고리 링크를 찾을 CSS 셀렉터 (기본: a[href*="cate_no="])
    */
-  categories?: { name: string; cateNo: number }[]
+  categories?: { name: string; cateNo: number; gender?: string[] }[]
   /** auto 탐색 시 시작 URL (기본: baseUrl) */
   discoveryUrl?: string
   /** auto 탐색 시 카테고리 링크 셀렉터 */
@@ -143,6 +153,13 @@ export interface SiteConfig {
    * 후보가 전량 brand_unmatched 로 파킹되는 것을 막는다(havati 실측 1,669건).
    */
   brandFromNamePrefix?: boolean
+  /**
+   * 사이트 전역 기본 성별. 상품 단위 근거(engine/url/text)가 전혀 없을 때만
+   * 쓰이는 최후 폴백이며 `genderSource: "config_default"` 로 기록된다.
+   * 하우스브랜드 자사몰(멘즈웨어 전문 등)에서 URL·상품명에 성별 신호가 없어
+   * 상품이 전량 드랍되는 것을 막는 장치다.
+   */
+  defaultGender?: string[]
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
   /** 카테고리 탐색 설정 */
@@ -191,17 +208,6 @@ export interface SiteConfig {
    * that render `.shop-item` widgets.
    */
   categoryUrls?: string[]
-  /**
-   * 29CM-specific: numeric L1 category codes (`categoryLargeCode`)
-   * consumed by `crawl29cm`. The engine constructs landing-page URLs
-   * `https://www.29cm.co.kr/store/category/list?categoryLargeCode={CODE}
-   * &sort=RECOMMENDED` at runtime and intercepts the
-   * `display-bff-api.29cm.co.kr/api/v1/listing/items` JSON XHR. Only
-   * consumed when `type === "29cm"`. Distinct from `apiCategoryPaths`
-   * (Uniqlo string tuples) and `categoryUrls` (ZARA full URLs).
-   * SPEC: SPEC-PLATFORM-EXPANSION-004 REQ-001
-   */
-  apiCategoryCodes?: number[]
   /** 비활성화 */
   disabled?: boolean
   /** 메모 */

@@ -1,6 +1,10 @@
 [
   {
     "brand": "Acme Apparel",
+    "gender": [
+      "women"
+    ],
+    "genderSource": "engine",
     "name": "Oxford Cotton Shirt",
     "category": "tops",
     "subcategory": "shirt",
@@ -28,6 +32,8 @@
   },
   {
     "brand": "Example Store",
+    "gender": [],
+    "genderSource": "config_default",
     "name": "Plain Basic Tee",
     "category": "tops",
     "subcategory": "t-shirt",
@@ -45,6 +51,10 @@
   },
   {
     "brand": "Summit Gear",
+    "gender": [
+      "unisex"
+    ],
+    "genderSource": "engine",
     "name": "Trail Running Shoe",
     "category": "shoes",
     "subcategory": "running-shoes",

@@ -160,6 +160,9 @@ function productFromDb(row: DbProductRow): Product {
     brand: row.brand,
     name: row.name,
     category: row.category,
+    // 이 스크립트는 이미지 선별만 하고 gender 를 읽지도 쓰지도 않는다.
+    // Product 타입을 만족시키기 위한 자리끼움 — DB 행의 gender 는 건드리지 않는다.
+    gender: [],
     price: row.price,
     originalPrice: row.original_price,
     salePrice: row.sale_price,

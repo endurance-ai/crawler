@@ -25,6 +25,28 @@ import {
   resolveProductBrand,
   type UnknownBrandEntry,
 } from "./lib/brand-provenance"
+import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
+import {emit} from "./lib/core/observability"
+
+/**
+ * 성별 출처 신뢰도 순위 (dedup merge 용).
+ *
+ * config_default 가 url/text 아래인 것이 핵심 — 카테고리가 교차하는 사이트
+ * (yearsago 등)에서 여성 라인 상품은 "상의" 행에서 사이트 기본값(men)을,
+ * "Women" 행에서 카테고리 유래 women 을 받는다. 동순위였다면 union 이 되어
+ * ['men','women'] 로 남녀 양쪽에 노출된다.
+ *
+ * brand_scope 는 없다 — 2026-08 회귀에서 브랜드 스코프 폴백을 복원하지 않았다
+ * (src/lib/product-gender.ts 헤더). 과거 행이 그 값을 들고 있으면 rank 0 이 되어
+ * 다른 모든 출처에 진다.
+ */
+const GENDER_SOURCE_RANK: Record<string, number> = {
+  engine: 5,
+  url: 4,
+  text: 3,
+  llm: 2,
+  config_default: 1,
+}
 
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -54,6 +76,10 @@ interface CrawledReview {
 interface CrawledProduct {
   brand: string
   name: string
+  category?: string
+  /** men/women/unisex. 비어 있으면 적재하지 않는다 (src/lib/product-gender.ts). */
+  gender?: string[]
+  genderSource?: string
   price: number | null
   originalPrice?: number | null
   salePrice?: number | null
@@ -468,6 +494,8 @@ async function main() {
   let totalInserted = 0
   let totalErrors = 0
   let totalReviews = 0
+  /** P0 계측: 플랫폼별 성별 해결 수율. 하단 요약에서 저수율 사이트를 뽑는다. */
+  const genderYield: Array<{platform: string; resolved: number; total: number}> = []
 
   for (const file of files) {
     const platform = file.replace("-products.json", "")
@@ -481,15 +509,69 @@ async function main() {
       continue
     }
     const rawAll: CrawledProduct[] = cached
+
+    // ── 성별 결의 (2026-08 크롤러 회귀) ────────────────────────────
+    //
+    // 여기 한 번만 수행하고 아래 row mapper 는 결과를 읽기만 한다.
+    // 브랜드 스코프 폴백은 복원하지 않았다 — 근거는 engine/url/text/
+    // config_default 4단뿐이다 (src/lib/product-gender.ts 헤더 참조).
+    const genderSourceCounts: Record<string, number> = {}
+    const siteDefaultGender = config?.defaultGender ?? []
+    const rawWithGender: CrawledProduct[] = rawAll.map((p) => {
+      const evidence = {
+        name: p.name,
+        category: p.category,
+        subcategory: p.subcategory,
+        tags: p.tags,
+        productUrl: p.productUrl,
+      }
+      let resolved = resolveProductGenderWithSource(
+        p.gender,
+        evidence,
+        (p.genderSource as GenderSource | undefined) ?? "engine",
+      )
+      // 엔진이 사이트 기본값을 찍지 않은 캐시(구 크롤 JSON, 또는 기본값을
+      // 소비하지 않는 엔진)를 위해 import 시점에도 같은 폴백을 적용한다.
+      // config_default 는 어차피 최하위 rank 라 url/text 를 이기지 못하므로
+      // 엔진이 찍었든 여기서 찍었든 결과 순위는 동일하다.
+      if (resolved.gender.length === 0 && !resolved.conflict && siteDefaultGender.length > 0) {
+        resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default")
+      }
+      genderSourceCounts[resolved.source ?? "unresolved"] = (genderSourceCounts[resolved.source ?? "unresolved"] ?? 0) + 1
+      if (resolved.conflict) {
+        emit({
+          kind: "gender_source_conflict",
+          site: platform,
+          sku: p.productUrl,
+          urlGender: resolved.conflict.url,
+          textGender: resolved.conflict.text,
+        })
+      }
+      return resolved.gender.length > 0
+        ? {...p, gender: resolved.gender, genderSource: resolved.source ?? undefined}
+        : p
+    })
+
     // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
     // product before the DB upsert. Valid products pass through
     // byte-identical into the existing .map(); invalid ones are excluded
     // + a structured reject event is emitted (does not crash the import
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
-    const qcRaw = applyProductQcGate(rawAll, platform)
+    const qcRaw = applyProductQcGate(rawWithGender, platform)
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
+
+    {
+      const resolvedCount = rawAll.length - (genderSourceCounts["unresolved"] ?? 0)
+      const pct = rawAll.length > 0 ? ((resolvedCount / rawAll.length) * 100).toFixed(1) : "0.0"
+      const hist = Object.entries(genderSourceCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([s, n]) => `${s}=${n}`)
+        .join(" ")
+      console.log(`   🚻 gender 해결: ${resolvedCount}/${rawAll.length} (${pct}%) — ${hist}`)
+      genderYield.push({platform, resolved: resolvedCount, total: rawAll.length})
+    }
 
     // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
     // were generated BEFORE the engine native-currency unification.
@@ -514,6 +596,7 @@ async function main() {
 
     let fxSkipped = 0
     let priceSkipped = 0
+    let genderSkipped = 0
     const priceSkipSamples: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
@@ -526,6 +609,14 @@ async function main() {
       // 경우 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
       // 잘못 적재되는 것보다 재크롤 때까지 보류하는 편이 안전하다.
       if (!brand) return null
+      // 성별 미확인 상품은 적재하지 않는다. 미확인을 unisex 로 채우면 검색 RPC
+      // (p.gender && ARRAY[p_gender,'unisex'])가 남녀 양쪽에 노출시켜 여성 상품이
+      // 남성 검색으로 샌다 — src/lib/product-gender.ts 헤더 참조.
+      const gender = cleanGenderScope(p.gender)
+      if (gender.length === 0) {
+        genderSkipped++
+        return null
+      }
       // --no-new-brands: 미등록 brand 상품 적재 제외
       if (noNewBrands && brandNodeId === null) return null
       // --in-stock-only: 품절 상품 적재 제외
@@ -609,6 +700,8 @@ async function main() {
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
         brand_node_id: brandNodeId,
+        gender,
+        gender_source: (p.genderSource as string | undefined) ?? null,
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
@@ -628,6 +721,9 @@ async function main() {
       console.log(
         `   ⚠️  ${priceSkipped} product(s) skipped due to missing/invalid price: ${priceSkipSamples.join(", ")}`,
       )
+    }
+    if (genderSkipped > 0) {
+      console.log(`   ⚠️  ${genderSkipped} product(s) skipped — gender unresolved`)
     }
 
     // Dedup by product_url — Postgres rejects ON CONFLICT batches that
@@ -649,12 +745,44 @@ async function main() {
         if (av === null || av === undefined || av === "") return bv
         return bv  // both non-null: take the later occurrence
       }
+      // 성별은 pickRicher(나중 것 우선)로 병합하면 안 된다. 같은 상품이 여러
+      // 카테고리 랜딩에 걸릴 때 한쪽은 카테고리 유래 women, 다른 쪽은 사이트
+      // 기본값 men 을 들고 오는데, 그대로 두면 union 이 되어 ['men','women'] 이
+      // 되고 검색 RPC 에서 남녀 양쪽에 노출된다 — 브랜드 폴백과 똑같은 세탁이다.
+      // 대신 출처 신뢰도가 높은 쪽을 채택하고, 동순위인데 값이 다르면 판정 불가로
+      // 보고 이벤트만 남긴다. resolveProductGenderWithSource 와 같은 순서.
+      const genderWinner = (() => {
+        const ga = Array.isArray(a.gender) ? a.gender : []
+        const gb = Array.isArray(b.gender) ? b.gender : []
+        if (ga.length === 0) return {gender: gb, gender_source: b.gender_source}
+        if (gb.length === 0) return {gender: ga, gender_source: a.gender_source}
+
+        const ra = GENDER_SOURCE_RANK[a.gender_source ?? ""] ?? 0
+        const rb = GENDER_SOURCE_RANK[b.gender_source ?? ""] ?? 0
+        if (ra !== rb) {
+          return ra > rb
+            ? {gender: ga, gender_source: a.gender_source}
+            : {gender: gb, gender_source: b.gender_source}
+        }
+        if (ga.join() === gb.join()) return {gender: ga, gender_source: a.gender_source}
+
+        emit({
+          kind: "gender_merge_conflict",
+          site: platform,
+          sku: b.product_url,
+          genders: [ga.join("+"), gb.join("+")],
+        })
+        return {gender: ga, gender_source: a.gender_source}
+      })()
+
       return {
         ...b,
         sale_price: a.sale_price ?? b.sale_price,
         original_price: pickRicher("original_price"),
         category: pickRicher("category"),
         subcategory: pickRicher("subcategory"),
+        gender: genderWinner.gender,
+        gender_source: genderWinner.gender_source,
       }
     }
     const dedupedByUrl = new Map<string, Row>()
@@ -804,6 +932,25 @@ async function main() {
 
   console.log("\n" + "═".repeat(50))
   console.log(`🏁 전체 적재 완료: ${totalInserted}개 성공, ${totalErrors}건 에러`)
+
+  // ── P0 계측: 성별 해결 수율 요약 ────────────────────────────────
+  if (genderYield.length > 0) {
+    const grandTotal = genderYield.reduce((s, g) => s + g.total, 0)
+    const grandResolved = genderYield.reduce((s, g) => s + g.resolved, 0)
+    const grandPct = grandTotal > 0 ? ((grandResolved / grandTotal) * 100).toFixed(1) : "0.0"
+    console.log(`\n🚻 gender 수율 전체: ${grandResolved}/${grandTotal} (${grandPct}%)`)
+
+    const low = genderYield
+      .filter((g) => g.total > 0 && g.resolved / g.total < 0.5)
+      .sort((a, b) => a.resolved / a.total - b.resolved / b.total)
+    if (low.length > 0) {
+      console.log(`⚠️ 수율 50% 미만 플랫폼 ${low.length}개 (defaultGender 필요):`)
+      for (const g of low) {
+        const pct = ((g.resolved / g.total) * 100).toFixed(1)
+        console.log(`   ${g.platform}: ${g.resolved}/${g.total} (${pct}%)`)
+      }
+    }
+  }
   printProductQcReport()
   if (totalReviews > 0) {
     console.log(`📝 리뷰 적재: ${totalReviews}건`)

@@ -28,6 +28,7 @@ import {
   runFirstUsefulCafe24Step,
   type Cafe24CategoryCandidate,
 } from "./cafe24-chain"
+import {inferGenderFromText} from "./product-gender"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
 // with this to prevent indefinite hangs when page JS is stuck or network stalls.
@@ -122,6 +123,8 @@ export async function waitForCafe24ListReady(page: Cafe24Page, timeoutMs = 3000)
 interface DiscoveredCategory {
   name: string
   cateNo: number
+  /** 카테고리 단위 성별 근거. manual config 값 또는 auto 탐색 링크 텍스트 추론. */
+  gender: string[]
   url: string
 }
 
@@ -303,7 +306,18 @@ async function discoverCategories(
     console.log(`[${config.name}]    category-chain ${result.strategy} (${attempted})`)
   }
 
-  return result.value
+  // auto 탐색 카테고리의 성별 근거는 링크 텍스트 자체다 — "WOMEN",
+  // "여성 아우터", "MEN'S SHIRTS" 같은 내비게이션 라벨은 크롤러가 실제로
+  // 진입한 카테고리가 남긴 상품 단위 근거이므로 `genderSource: "engine"` 으로
+  // 취급한다. discovery: "auto" 사이트는 config 에 카테고리 gender 를 적을
+  // 수단이 없어(카테고리를 런타임에 발견한다) 이 경로가 유일한 근거다.
+  //
+  // 추론 실패 시 빈 배열 → collectProductsFromPage 가 config.defaultGender 로
+  // 폴백하고 config_default 로 기록한다.
+  return result.value.map((c) => {
+    const inferred = inferGenderFromText(c.name)
+    return {...c, gender: inferred ? [inferred] : []}
+  })
 }
 
 // ─── 상품 수집 (단일 페이지) ──────────────────────────
@@ -312,6 +326,7 @@ async function collectProductsFromPage(
   page: Cafe24Page,
   config: SiteConfig,
   categoryName: string,
+  categoryGender: string[],
   brandOverride?: string,
   timing?: CrawlTiming
 ): Promise<Product[]> {
@@ -351,6 +366,10 @@ async function collectProductsFromPage(
       : DEFAULT_SELECTORS.productLink,
     categoryName,
     brandNameOverride: brandOverride || "",
+    gender: categoryGender.length > 0 ? categoryGender : config.defaultGender || [],
+    // 카테고리 유래(상품 단위 근거)와 사이트 전역 기본값을 구분한다 — 후자는
+    // 카테고리가 교차하는 사이트에서 URL/텍스트 추론보다 낮은 순위로 쓰인다.
+    genderSource: categoryGender.length > 0 ? "engine" : "config_default",
     baseUrl: config.baseUrl,
     platformKey: config.key,
     pricePatternStr: config.pricePattern?.source || null,
@@ -620,7 +639,7 @@ async function collectProductsFromPage(
           originalPrice, salePrice,
           priceFormatted,
           imageUrl, productUrl, inStock,
-          platform: args.platformKey,
+          gender: args.gender, genderSource: args.genderSource, platform: args.platformKey,
           sourceCurrency: args.sourceCurrency,
           sourcePrice: salePrice || price || undefined,
           crawledAt: new Date().toISOString(),
@@ -699,6 +718,7 @@ async function crawlCategory(
         page,
         config,
         category.name,
+        category.gender,
         config.brand,
         timing
       )
@@ -761,6 +781,7 @@ export async function crawlCafe24(
     categories = config.category.categories.map((c) => ({
       name: c.name,
       cateNo: c.cateNo,
+      gender: c.gender || [],
       url: `${config.baseUrl}/product/list.html?cate_no=${c.cateNo}`,
     }))
     console.log(`${tag} 📋 수동 카테고리 ${categories.length}개`)
@@ -784,7 +805,7 @@ export async function crawlCafe24(
         timeout: 30000,
       })
       await page.waitForTimeout(1500)
-      const products = await collectProductsFromPage(page, config, config.name, config.brand, timing)
+      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [], config.brand, timing)
       allProducts.push(...products)
       console.log(`${tag} 📦 메인: ${products.length}개 상품`)
     } catch (err) {
@@ -805,7 +826,7 @@ export async function crawlCafe24(
 
       const inStockCount = products.filter((p) => p.inStock).length
       console.log(
-        `${tag} [${i + 1}/${categories.length}] ${cat.name} — ${products.length}개 (재고 ${inStockCount})`
+        `${tag} [${i + 1}/${categories.length}] ${cat.gender.length > 0 ? cat.gender.join("/") : "all"} > ${cat.name} — ${products.length}개 (재고 ${inStockCount})`
       )
 
       for (const p of products) {
