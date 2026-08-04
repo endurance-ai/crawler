@@ -25,22 +25,37 @@ while (( idle_checks < 4 )); do
   sleep 15
 done
 
+# One process for the whole catalogue, not one per platform key.
+#
+# The per-key loop paid its startup cost 398 times: a chromium launch, a robots
+# fetch, and a full re-parse of the checkpoint file — which grows to one line
+# per product (~158k at completion), so the last keys re-read the entire file to
+# learn they have nothing to skip. Keys of a handful of products spent more time
+# starting than visiting (measured 2026-08-04: `htav`, 3 products, 0.3 min).
+# `--all` keeps the identical per-platform grouping and robots check inside the
+# tool; only the process boundary disappears.
+#
+# concurrency 8 (was 3). The host is nowhere near its limit — peak RSS 4.5GB of
+# 62GB, load 1.6 of 12 cores, swap 0, measured 2026-08-02 while listing refresh
+# ran at concurrency 8, which is the heavier job. refresh had to fall back to 4
+# because DNS queries were being dropped, but that verdict does not transfer:
+# there a failed visit leaves the completeness guard on while applyUpdates keeps
+# running, so stock accuracy degrades. Here a failed row is simply not written to
+# the checkpoint and gets retried by the attempt loop, and writes go through the
+# `merge_product_images` union RPC, which never removes an existing image.
+#
+# Throughput is engine-bound, so watch cafe24: shopify reads product JSON over
+# fetch (10,244 rows/h measured) while cafe24 opens the page in Playwright
+# (2,481 rows/h) and is the bulk of the remaining work.
 status=1
 for attempt in 1 2 3; do
   echo "product image backfill attempt ${attempt}/3"
-  status=0
-  mapfile -t platforms < <(corepack pnpm exec tsx src/repair-product-images.ts --list-sites)
-  for platform in "${platforms[@]}"; do
-    corepack pnpm repair:product-images -- \
-      --apply \
-      --site="$platform" \
-      --concurrency=3 \
-      --checkpoint=data/product-image-backfill/full.jsonl
-    platform_status=$?
-    if (( platform_status != 0 )); then
-      status=$platform_status
-    fi
-  done
+  corepack pnpm repair:product-images -- \
+    --apply \
+    --all \
+    --concurrency=8 \
+    --checkpoint=data/product-image-backfill/full.jsonl
+  status=$?
   if (( status == 0 )); then
     break
   fi
