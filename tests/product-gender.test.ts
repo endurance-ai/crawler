@@ -94,6 +94,18 @@ test("config_default 는 상품 단위 근거가 전혀 없을 때 쓰인다", (
   assert.equal(r.source, "config_default")
 })
 
+test("config_default unisex 는 미확정을 공용으로 세탁하지 않는다", () => {
+  const r = resolveProductGenderWithSource(["unisex"], {name: "Signature Wool Coat"}, "config_default")
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
+test("명시적인 unisex 상품 신호는 config_default 와 무관하게 유지한다", () => {
+  const r = resolveProductGenderWithSource(["unisex"], {name: "Unisex Crewneck"}, "config_default")
+  assert.deepEqual(r.gender, ["unisex"])
+  assert.equal(r.source, "text")
+})
+
 test("config_default 라도 kids 는 성인 성별을 받지 않는다", () => {
   const r = resolveProductGenderWithSource(["men"], {name: "Kids Puffer Jacket"}, "config_default")
   assert.deepEqual(r.gender, [])

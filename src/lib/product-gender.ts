@@ -252,8 +252,15 @@ export function resolveProductGenderWithSource(
   if (fromUrl !== null) return {gender: [fromUrl], source: "url"}
   if (fromText !== null) return {gender: [fromText], source: "text"}
 
-  // 상품 단위 근거가 없을 때만 사이트 전역 기본값을 쓴다.
-  if (fromProduct.length > 0 && isConfigDefault) return {gender: fromProduct, source: "config_default"}
+  // 상품 단위 근거가 없을 때만 사이트 전역 기본값을 쓴다. 단, unisex 는
+  // "성별을 모름"의 대체값이 아니다. 혼성 브랜드/편집샵의 전역 unisex 기본값을
+  // 상품 근거 없이 저장하면 검색에서 남녀 양쪽에 노출되는 세탁 버그가 재발한다.
+  // 단일 성별로 검증된 men/women 기본값만 최후 fallback 으로 허용한다.
+  if (fromProduct.length > 0 && isConfigDefault) {
+    return fromProduct.length === 1 && fromProduct[0] !== "unisex"
+      ? {gender: fromProduct, source: "config_default"}
+      : {gender: [], source: null}
+  }
 
   return {gender: [], source: null}
 }
