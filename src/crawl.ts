@@ -980,6 +980,7 @@ function printProductQcReport() {
 async function main() {
   const flags = parseArgs()
   const detailFlag = !!flags.detail
+  const noDetailFlag = !!flags["no-detail"]
   const reviewFlag = !!flags.reviews
   // 품절 상품은 평소 shopify/cafe24 엔진에서 걸러진다. 재수집(옛 추출 로직으로
   // 만들어진 행을 현재 로직으로 갈아엎는 작업)에서는 품절 행도 갱신 대상이므로
@@ -1112,6 +1113,7 @@ async function main() {
   --probe=KEY             사이트 구조 확인
   --dry-run               카테고리 탐색만 (상품 안 긁음)
   --detail      상세 페이지 크롤링 (material, productCode 수집)
+  --no-detail   사이트 기본 설정과 무관하게 목록 페이지만 수집
   --reviews     리뷰 크롤링 (--detail 없이도 가능, 리뷰 보드 페이지 기반)
   --include-out-of-stock  품절 상품도 수집 (재수집 전용 — shopify/cafe24 엔진의
                           기본 품절 필터를 끈다. zara/uniqlo 는 원래 품절도 남긴다)
@@ -1124,7 +1126,16 @@ async function main() {
     return
   }
 
-  if (detailFlag) {
+  if (detailFlag && noDetailFlag) {
+    throw new Error("--detail and --no-detail cannot be used together")
+  }
+
+  if (noDetailFlag) {
+    for (const config of targets) {
+      config.crawlDetails = false
+    }
+    console.log("📋 목록 페이지만 크롤링 (--no-detail)")
+  } else if (detailFlag) {
     for (const config of targets) {
       config.crawlDetails = true
     }
