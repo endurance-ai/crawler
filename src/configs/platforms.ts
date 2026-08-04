@@ -2269,17 +2269,17 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://blank03.com",
     brand: "BLANK03",
-    defaultGender: ["men"],
+    defaultGender: ["women"],
     paginate: true,
     crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
-        {name: "Category A", cateNo: 50, gender: ["men"]},
-        {name: "Category B", cateNo: 51, gender: ["men"]},
+        {name: "Category A", cateNo: 50, gender: ["women"]},
+        {name: "Category B", cateNo: 51, gender: ["women"]},
       ],
     },
-    notes: "brand_node id=5726. dry-run 확인: cate_no=50/51 상품 피드(각 14개, 셀렉터 정상). cate_no=29는 프로모션 배너라 제외. 엔진이 productUrl로 dedup하므로 겹쳐도 안전.",
+    notes: "brand_node id=5726. 공식 Brand Story/상품 카탈로그로 여성복 브랜드 확인(2026-08-03). cate_no=50/51 상품 피드(각 14개, 셀렉터 정상). cate_no=29는 프로모션 배너라 제외. 엔진이 productUrl로 dedup하므로 겹쳐도 안전.",
   },
   {
     key: "nocle",
@@ -2525,9 +2525,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "HERETIC",
     type: "imweb",
     baseUrl: "https://heretic.kr",
-    defaultGender: ["unisex"],
+    defaultGender: ["women"],
     brand: "HERETIC",
-    notes: "imweb 파일럿 — brand_node_id=5608, detect platform_family=imweb",
+    notes: "imweb 파일럿 — brand_node_id=5608. 공식 스토어의 Dresses/Skirts/Blouses 카테고리로 여성복 확인(2026-08-03).",
   },
   {
     key: "questandguest",
