@@ -79,6 +79,23 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   aetoa: ["women"], // 여성 17 / 남성 0 (n=97)
   asymmetry: ["women"], // 여성 6 / 남성 0 (n=30)
 
+  // ── 3차: CatN 생성 config 사이트 (2026-08-04) ─────────────────
+  //
+  // 배경: 이 사이트들은 crawl→import 경로에서 상품이 전량 드랍된다. 진단해 보니
+  // 원인은 카테고리가 아니라 **성별**이었다 — 상품명·URL·태그 어디에도 성별
+  // 신호가 없어 미해결률이 84~100% 다 (204개 사이트 / 37,022건).
+  //
+  // 자동 판정은 포기했다. 상품 코퍼스의 여성 어휘로 후보를 뽑아 사이트를 하나씩
+  // 확인했더니 **14개 중 8개가 혼성(MEN/WOMEN 내비 분리)** 이었다. 혼성 브랜드도
+  // 여성 라인에 DRESS/SKIRT 카테고리가 있으니 어휘가 잡힌다 — 어휘는 "여성 상품이
+  // 있다"는 신호이지 "여성 전용"의 신호가 아니다.
+  //
+  // 아래는 사이트를 열어 여성 전용임을 확인한 것만 넣는다.
+  bittercells: ["women"], // OUTER/TOP/BOTTOM(PANTS,SKIRT,DRESS)/ACC — 남성 섹션 없음
+  kindersalmon: ["women"], // DRESSES / SHIRTS & BLOUSE / KNITWEAR — 남성 섹션 없음
+  magnetarchive: ["women"], // Outer/Top/Bottom/Dress/Swimwear/Jewelry (+Magnet Kids)
+  "brand-4cb9": ["women"], // 더핑크 — "여성의류 쇼핑몰" 명시, OPS&SKIRT 카테고리
+
   // ── 의도적으로 비워둔 사이트 (근거 불충분) ────────────────────
   //
   // 아래는 defaultGender 를 넣지 않는다. 이 사이트 상품은 engine/url/text
@@ -108,4 +125,21 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //   sportyandrich   혼성 브랜드. 태그·URL 근거로 재크롤 시 100% 해결되므로
   //                   기본값이 필요 없다 (platforms.ts 주석 참조).
   //   jadedldn        혼성 브랜드. 재크롤 시 engine 근거로 100% 해결.
+  //
+  //   ── 2026-08-04 사이트 확인 결과 혼성(MEN/WOMEN 내비 분리) ──
+  //   기본값을 넣으면 상품 절반이 반대 성별로 적재된다. 상품 단위 근거도 없어
+  //   (미해결 84~100%) 재크롤 + 카테고리 URL 기반 성별이 선행돼야 한다.
+  //   어휘 집계로는 전부 "여성"으로 잘못 나왔던 것들이라 특히 주의.
+  //     matin-kim      Outerwears/Tops/Bottoms/Dresses + KIMMATIN 서브브랜드
+  //     wooyoungmi     여성/남성 분리 내비, "남녀 통합 컬렉션" 명시
+  //     uniformbridge  MEN / WOMEN 쇼핑 구획 분리
+  //     humanity       MEN(OUTER,TOP..) / WOMEN(..SKIRTS)
+  //     erer           WOMEN / MEN 섹션 분리
+  //     en-1111 (coor) MEN'S / WOMEN'S 캠페인 분리
+  //     glowny         WOMEN + GLOWNY CLASSIC(유니섹스) + GIRLS(아동)
+  //     millowomen     MEN(Pokémon..) / WOMEN(miffy..) — 이름과 달리 혼성
+  //
+  //   ── 판정 불가 (카테고리는 여성형이나 명시 없음) ──
+  //     oheshio        OUTERWEAR/TOP/BOTTOMS/DRESS/BAG/ACC
+  //     nuuanu         Shop/Lookbook/About 뿐
 }
