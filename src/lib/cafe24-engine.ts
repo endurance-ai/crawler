@@ -25,6 +25,7 @@ import {
   applyCafe24DetailFallbacks,
   assessCafe24ProductQuality,
   cleanCafe24ProductName,
+  cafe24CategoryGenderSource,
   dedupeAndFilterCafe24Categories,
   extractCafe24DetailFallbacks,
   filterCafe24ProductsWithUsablePrice,
@@ -373,7 +374,7 @@ async function collectProductsFromPage(
     gender: categoryGender.length > 0 ? categoryGender : config.defaultGender || [],
     // 카테고리 유래(상품 단위 근거)와 사이트 전역 기본값을 구분한다 — 후자는
     // 카테고리가 교차하는 사이트에서 URL/텍스트 추론보다 낮은 순위로 쓰인다.
-    genderSource: categoryGender.length > 0 ? "engine" : "config_default",
+    genderSource: cafe24CategoryGenderSource(categoryGender),
     baseUrl: config.baseUrl,
     platformKey: config.key,
     pricePatternStr: config.pricePattern?.source || null,

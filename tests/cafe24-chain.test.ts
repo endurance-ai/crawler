@@ -3,6 +3,7 @@ import * as assert from "node:assert/strict"
 
 import {
   assessCafe24ProductQuality,
+  cafe24CategoryGenderSource,
   cleanCafe24ProductName,
   filterCafe24ProductsWithUsablePrice,
   inferCafe24Currency,
@@ -13,6 +14,13 @@ import {
   runFirstUsefulCafe24Step,
 } from "../src/lib/cafe24-chain"
 import type {Product} from "../src/lib/types"
+
+test("Cafe24 generic unisex category remains a fallback below product URL/text evidence", () => {
+  assert.equal(cafe24CategoryGenderSource(["unisex"]), "config_default")
+  assert.equal(cafe24CategoryGenderSource([]), "config_default")
+  assert.equal(cafe24CategoryGenderSource(["men"]), "engine")
+  assert.equal(cafe24CategoryGenderSource(["women"]), "engine")
+})
 
 test("Cafe24 category chain parses pretty category URLs and rejects product detail URLs", () => {
   assert.deepEqual(

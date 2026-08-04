@@ -1,6 +1,18 @@
 import type {Cafe24Page} from "./cafe24-page"
 import type {Product, SiteConfig} from "./types"
 
+/**
+ * A generic unisex bucket is a site-wide fallback, not product evidence.
+ * Keeping it below URL/text inference prevents edit-shop categories from
+ * forcing every product (including verified men- or women-only brands) to
+ * unisex. Explicit men/women categories remain trusted engine evidence.
+ */
+export function cafe24CategoryGenderSource(gender: readonly string[]): "engine" | "config_default" {
+  return gender.length === 1 && (gender[0] === "men" || gender[0] === "women")
+    ? "engine"
+    : "config_default"
+}
+
 export interface Cafe24ChainStep<TContext, TValue> {
   name: string
   run: (context: TContext) => Promise<TValue[]> | TValue[]
