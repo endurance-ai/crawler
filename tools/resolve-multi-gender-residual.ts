@@ -37,15 +37,14 @@ import * as fs from "node:fs"
 
 import {createClient} from "@supabase/supabase-js"
 
+import {hasGenderToken} from "../src/lib/product-gender"
+
 const db = createClient(process.env.DB_URL!, process.env.DB_TOKEN!)
 const APPLY = process.argv.includes("--apply")
 const MANIFEST = "data/repair/gender-multi-residual-2026-08-05.json"
 
 /** 다중값 조합 3가지 = 정규값이 3개뿐이라 이게 전부다 (repair-product-gender.ts 와 동일). */
 const MULTI = "gender.cs.{men,women},gender.cs.{men,unisex},gender.cs.{women,unisex}"
-
-const MEN = /\b(men|mens|men's|man|male|homme|uomo|herren)\b/i
-const WOM = /\b(women|womens|women's|woman|female|femme|donna|damen|ladies)\b/i
 
 const COLS =
   "id,name,category,subcategory,tags,product_url,platform,brand,brand_node_id,gender,gender_source,in_stock,last_seen_at,image_url"
@@ -67,7 +66,10 @@ async function main(): Promise<void> {
   for (const r of rows) {
     const parts = [r.name, r.category, r.subcategory, ...((r.tags as string[]) ?? [])]
     const blob = `${parts.filter(Boolean).join(" ")} ${r.product_url ?? ""}`
-    if (MEN.test(blob) && WOM.test(blob)) dual.push(r)
+    // 어휘는 GENDER_RULES 가 유일한 출처다 — 여기서 정규식을 새로 쓰면
+    // resolver 와 판정이 어긋난다 (2026-08-05 실측 시점에는 자체 정규식이었고,
+    // 그 버전은 hombre/mujer 와 한글 토큰을 빠뜨려 원본보다 좁았다).
+    if (hasGenderToken(blob, "men") && hasGenderToken(blob, "women")) dual.push(r)
     else drop.push(r)
   }
   console.log(`  A 양쪽 부서 등록 → unisex: ${dual.length}`)

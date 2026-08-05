@@ -491,6 +491,14 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   근거였고 `['unisex']`·다중값은 거부됐지만, 단일값이면서 틀린 행이 상품으로
   조용히 전파되는 유일한 경로였다. 감사 도구도 수정 UI 도 없다.
   `gender_scope` 는 브랜드 레벨 신호로만 유지한다(상품에 안 씀).
+- **태그가 Men·Women 두 부서에 걸려 있으면 확인된 unisex 다** (2026-08-05).
+  편집샵은 같은 상품을 두 부서에 함께 올린다(browns 스노부츠
+  `["Boots","Men","Rain Boots","Shoes","Women"]`). 이건 "모르겠음"이 아니라
+  양쪽에서 판다는 근거다. `inferDualDepartmentFromTags` 가 **태그만** 본다 —
+  상품명까지 합치면 마케팅 카피가 부서 분류로 둔갑한다(실측: Tibi
+  "Thomas Menswear Check Shirt" 는 태그가 여성 전용인 여성복이다).
+  kids 가드가 이 규칙보다 **먼저** 돈다 — `["Kids","Men","Women"]` 이 아동복에
+  성인 unisex 를 주면 안 된다. A/B: 획득 1,029(전부 unisex) / 상실 0 / 뒤집힘 0.
 - **값은 항상 단일값이다** (2026-08-05 확정, migration 105). `['men','women']` 은
   검색 RPC 에서 unisex 와 **똑같이** 남녀 양쪽에 노출되는데 의미는 "남녀공용
   확인됨"이 아니라 "판정 실패"다. 두 상태가 검색에서 구별되지 않는 것이 문제다.
@@ -533,6 +541,27 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   jadedldn 1,275행이 브랜드 레벨 `['unisex']` 인데 URL 에 `-menswear`/`-womenswear`
   가 박혀 있었다. 브랜드 스코프는 카탈로그 경계이지 상품 속성이 아니므로,
   engine/url/text 근거가 있으면 그쪽으로 덮어쓴다.
+- **어휘(`GENDER_RULES`)는 유일 출처다. 교정 스크립트가 정규식을 새로 쓰지 말 것** —
+  필요하면 `hasGenderToken(text, gender)` 을 쓴다. 어휘를 늘릴 때는 반드시
+  `tools/ab-gender-rules.ts` 로 전 코퍼스 A/B 를 돌려 **획득/상실/뒤집힘**을 먼저
+  측정하고, **수치가 0 이면 넣지 않는다** (코퍼스 0행 토큰을 "위험 없으니 미래
+  대비" 로 넣는 것은 아래 항목들을 실측으로 기각한 것과 같은 기준이 아니다).
+  2026-08-05 에 61개 후보를 돌려 **하나도 채택하지 않았다** — 미탐 어휘가 사실상
+  없다. 특히 기각 근거를 남긴 것:
+  - `menswear`/`womenswear` — 코퍼스 최다(600/1,006행)였지만 **거부**. Shopify
+    `/products/<slug>` 는 상품명 그 자체라 URL 단도 구조적 신호가 아니고,
+    "menswear-inspired" 는 여성복 관용어다. Tibi "Thomas Menswear Check Shirt"
+    (태그 woman/Women/Womens)가 `["women"]`→`["men"]` 으로 뒤집혔다.
+  - `lady` — 9행 전부 고유명사(`Lady Lunetta` 가방, Kith **Kids** `Lady Liberty`).
+  - `masculine`/`feminine` — 스타일 묘사어지 대상 성별이 아니다.
+- **적재 경로 둘은 같은 함수를 써야 한다.** 행을 만드는 곳은
+  `import-products.ts`(신규·재수집·온보딩)와 `refresh-candidate-import.ts`(연구실
+  워커) 둘뿐이고, 둘 다 `resolveProductGenderWithSource` + `resolveProductBrand` +
+  `applyProductQcGate` + `applyValidationGate` + `sanitizePrice` 를 탄다.
+  `refresh-listing.ts` 는 `in_stock`/`price`/`original_price`/`sale_price` 만
+  UPDATE 하므로 성별·브랜드를 오염시킬 수 없다.
+  **`tags` 는 반드시 함께 적재한다** — 성별 결의의 입력이라, 저장하지 않으면
+  나중에 `repair:product-gender` 가 그 근거를 다시 볼 수 없다.
 - **shopify 태그 성별 추론은 반드시 `inferGenderFromText` 에 위임한다.**
   `t.includes("men")` 같은 부분 문자열 판정을 쓰지 말 것 — **`"womens"` 가 `"men"`
   을 포함한다**(`wo[men]s`). 이 버그로 여성 태그 상품이 전부 `['women','men']` 이

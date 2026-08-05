@@ -3,6 +3,8 @@ import assert from "node:assert/strict"
 
 import {
   cleanGenderScope,
+  hasGenderToken,
+  inferDualDepartmentFromTags,
   inferGenderFromText,
   inferGenderFromUrl,
   isKidsText,
@@ -171,6 +173,124 @@ test("women 은 men 으로 오인되지 않는다", () => {
 
 test("남성·여성이 함께 잡히면 모호 → null", () => {
   assert.equal(inferGenderFromText("men and women coat"), null)
+})
+
+// ─── 어휘 확장 (2026-08-05) ──────────────────────────────────────────────
+
+test("menswear/womenswear 는 성별 토큰이 아니다", () => {
+  // 코퍼스 최다 후보였지만(600 / 1,006행) 실측에서 탈락했다. Shopify 의
+  // `/products/<slug>` 는 상품명 그 자체라 URL 단에서도 구조적 신호가 아니고,
+  // "menswear-inspired" 는 여성복 관용어다. 실측: Tibi "Thomas Menswear Check
+  // Detached Shirt"(태그 woman/Women/Womens)가 men 으로 뒤집혔다.
+  assert.equal(inferGenderFromText("Thomas Menswear Check Detached Shirt"), null)
+  assert.equal(inferGenderFromUrl("https://x.com/products/tibi-thomas-menswear-shirt-tan"), null)
+  assert.equal(hasGenderToken("menswear", "men"), false)
+})
+
+test("'womens' 안의 'men' 을 남성으로 읽지 않는다", () => {
+  // wo[men]s — contains 로 넣었으면 여성 상품이 전부 다중값이 된다.
+  // `"womens".includes("men")` 사고(실측 41.7%)와 같은 계열이라 회귀로 고정한다.
+  assert.equal(inferGenderFromText("womens jacket"), "women")
+  assert.equal(inferGenderFromText("WOMENS JACKET"), "women")
+  assert.equal(hasGenderToken("womens jacket", "men"), false)
+  assert.equal(hasGenderToken("womens jacket", "women"), true)
+})
+
+test("고유명사·스타일 묘사어는 성별로 읽지 않는다", () => {
+  // 실측으로 거부한 토큰들. lady 9행은 전부 고유명사였고, 그중 하나는 아동복이다.
+  assert.equal(inferGenderFromText("Lady Liberty Vintage Graphic Tee"), null)
+  assert.equal(inferGenderFromText("Lady Lunetta Small Shoulder Bag"), null)
+  assert.equal(inferGenderFromText("Relaxed Lady Luck Tee"), null)
+  assert.equal(inferGenderFromText("Feminine Silhouette Blazer"), null)
+  assert.equal(inferGenderFromText("Masculine Cut Trousers"), null)
+})
+
+// ─── 태그 부서 분류 → unisex ─────────────────────────────────────────────
+//
+// 편집샵이 같은 상품을 Men·Women 두 부서에 올린 것은 "판정 실패"가 아니라
+// "확인된 남녀공용"이다. 2026-08-05 에 이 근거로 1,063행을 unisex 로 확정했고,
+// 그 규칙을 write-path 에도 통일한다 (그러지 않으면 같은 성격의 신규 상품이
+// 계속 import 에서 드랍된다 — browns 는 live 6,416행짜리 활성 소스다).
+
+test("태그가 Men·Women 두 부서에 걸려 있으면 확인된 unisex", () => {
+  // browns 실측 행.
+  const r = resolveProductGenderWithSource([], {
+    name: "Icon Low Glance snow boots",
+    category: "shoes",
+    subcategory: "boots",
+    tags: ["Boots", "Men", "Rain Boots", "Shoes", "Women"],
+  })
+  assert.deepEqual(r.gender, ["unisex"])
+  assert.equal(r.source, "text")
+})
+
+test("상품명의 성별 어휘는 부서 분류로 승격되지 않는다", () => {
+  // 상품명이 남성, 태그가 여성이면 **모호**다 — unisex 가 아니다. 부서 분류
+  // 규칙이 태그만 보는 이유가 이것이다. 상품명까지 합쳐서 "둘 다 나왔으니
+  // 남녀공용" 으로 읽으면 마케팅 카피가 부서 분류로 둔갑한다.
+  const r = resolveProductGenderWithSource([], {
+    name: "Mens Style Check Detached Shirt",
+    tags: ["Tops", "woman", "Women", "Womens"],
+  })
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
+test("mohawk-general Tibi 회귀: 여성 태그 + 남성풍 상품명은 women 을 유지한다", () => {
+  // 실측 행. "Menswear" 는 성별 토큰이 아니므로(위 기각 항목) 남성 신호가 되지
+  // 않고, 태그가 여성 전용이라 women 으로 확정된다. 이 행이 men 이나 unisex 로
+  // 새면 여성복이 남성 검색에 뜬다.
+  const r = resolveProductGenderWithSource([], {
+    name: "Thomas Menswear Check Detached Shirt in Tan Multi",
+    category: "tops",
+    subcategory: "shirt",
+    tags: ["AW24", "Girl", "Girls", "Tops", "woman", "Women", "Womens"],
+    productUrl: "https://www.mohawkgeneralstore.com/products/tibi-thomas-menswear-shirt-tan-multi",
+  })
+  assert.deepEqual(r.gender, ["women"])
+})
+
+test("태그가 한쪽 성별만이면 부서 규칙이 개입하지 않는다", () => {
+  const r = resolveProductGenderWithSource([], {name: "Wool Coat", tags: ["Clothing", "Women"]})
+  assert.deepEqual(r.gender, ["women"])
+  assert.equal(r.source, "text")
+})
+
+test("kids 가드가 태그 부서 분류보다 먼저다", () => {
+  // `["Kids","Men","Women"]` 이 아동복에 성인 unisex 를 주면 안 된다 —
+  // unisex 는 검색에서 남녀 양쪽에 노출되므로 정확히 이 모듈이 막으려는 세탁이다.
+  const r = resolveProductGenderWithSource([], {
+    name: "Puffer Jacket",
+    tags: ["Kids", "Men", "Women"],
+  })
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
+test("URL 이 구체 성별이면 태그 부서 분류를 이긴다", () => {
+  // unisex 는 "둘 다"라는 약한 주장이고 men/women 은 적극적 단언이다 — 기존 규율 그대로.
+  const r = resolveProductGenderWithSource([], {
+    name: "Wool Coat",
+    tags: ["Men", "Women"],
+    productUrl: "https://x.com/collections/women/coat-1",
+  })
+  assert.deepEqual(r.gender, ["women"])
+  assert.equal(r.source, "url")
+})
+
+test("inferDualDepartmentFromTags 는 태그가 없거나 한쪽뿐이면 null", () => {
+  assert.equal(inferDualDepartmentFromTags(null), null)
+  assert.equal(inferDualDepartmentFromTags([]), null)
+  assert.equal(inferDualDepartmentFromTags(["Women"]), null)
+  assert.equal(inferDualDepartmentFromTags(["Men", "Women"]), "unisex")
+  assert.equal(inferDualDepartmentFromTags(["accessories", "men", "mykita", "women"]), "unisex")
+})
+
+test("hasGenderToken 은 GENDER_RULES 를 단일 출처로 노출한다", () => {
+  // 교정 스크립트가 자체 정규식을 새로 쓰지 않게 하려는 것이 이 함수의 목적이다.
+  assert.equal(hasGenderToken("MEN'S COAT", "men"), true)
+  assert.equal(hasGenderToken("MEN'S COAT", "women"), false)
+  assert.equal(hasGenderToken("남녀공용 후디", "unisex"), true)
 })
 
 // ─── URL 추론 ────────────────────────────────────────────────────────────
