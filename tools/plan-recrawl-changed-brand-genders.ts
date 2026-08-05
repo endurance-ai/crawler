@@ -28,12 +28,14 @@ if (statusError) throw statusError
 if (productError) throw productError
 
 const statusById = new Map((statuses ?? []).map((row) => [row.brand_node_id as number, row]))
-const productStats = new Map<number, {total: number; brandFallback: number; configDefault: number; unverifiedLegacy: number; platforms: Record<string, number>}>()
+// `brand_fallback` 은 세지 않는다 — GENDER_SOURCE_VALUES 에 없는 값이고 DB 에도
+// 0행이다 (2026-08-05 확인). 브랜드 스코프 폴백은 2026-08 회귀에서 복원되지
+// 않았으므로 앞으로도 생기지 않는다 (src/lib/product-gender.ts 헤더).
+const productStats = new Map<number, {total: number; configDefault: number; unverifiedLegacy: number; platforms: Record<string, number>}>()
 for (const product of products ?? []) {
   const id = product.brand_node_id as number
-  const stats = productStats.get(id) ?? {total: 0, brandFallback: 0, configDefault: 0, unverifiedLegacy: 0, platforms: {}}
+  const stats = productStats.get(id) ?? {total: 0, configDefault: 0, unverifiedLegacy: 0, platforms: {}}
   stats.total++
-  if (product.gender_source === "brand_fallback") stats.brandFallback++
   if (product.gender_source === "config_default") stats.configDefault++
   if (product.gender_source === "unverified_legacy") stats.unverifiedLegacy++
   if (typeof product.platform === "string") stats.platforms[product.platform] = (stats.platforms[product.platform] ?? 0) + 1
@@ -57,7 +59,7 @@ const rows = (brands ?? []).map((brand) => {
     configType: config?.type ?? null,
     configDisabled: config?.disabled ?? null,
     eligible,
-    products: productStats.get(brand.id as number) ?? {total: 0, brandFallback: 0, configDefault: 0, unverifiedLegacy: 0, platforms: {}},
+    products: productStats.get(brand.id as number) ?? {total: 0, configDefault: 0, unverifiedLegacy: 0, platforms: {}},
   }
 })
 
@@ -65,7 +67,7 @@ const totals = {
   changedBrands: rows.length,
   withProducts: rows.filter((row) => row.products.total > 0).length,
   products: rows.reduce((sum, row) => sum + row.products.total, 0),
-  fallbackProducts: rows.reduce((sum, row) => sum + row.products.brandFallback + row.products.configDefault + row.products.unverifiedLegacy, 0),
+  fallbackProducts: rows.reduce((sum, row) => sum + row.products.configDefault + row.products.unverifiedLegacy, 0),
   withStatus: rows.filter((row) => row.platformKey).length,
   configFound: rows.filter((row) => row.configFound).length,
   eligible: rows.filter((row) => row.eligible).length,
@@ -91,7 +93,7 @@ for (const product of products ?? []) {
     const source = typeof product.gender_source === "string" ? product.gender_source : "(null)"
     item.sources[source] = (item.sources[source] ?? 0) + 1
   }
-  if (!["brand_fallback", "config_default", "unverified_legacy"].includes(product.gender_source as string)) continue
+  if (!["config_default", "unverified_legacy"].includes(product.gender_source as string)) continue
   if (item) item.affected++
 }
 console.log("source-platforms:")

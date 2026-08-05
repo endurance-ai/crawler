@@ -491,6 +491,12 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   근거였고 `['unisex']`·다중값은 거부됐지만, 단일값이면서 틀린 행이 상품으로
   조용히 전파되는 유일한 경로였다. 감사 도구도 수정 UI 도 없다.
   `gender_scope` 는 브랜드 레벨 신호로만 유지한다(상품에 안 씀).
+- **값은 항상 단일값이다** (2026-08-05 확정, migration 105). `['men','women']` 은
+  검색 RPC 에서 unisex 와 **똑같이** 남녀 양쪽에 노출되는데 의미는 "남녀공용
+  확인됨"이 아니라 "판정 실패"다. 두 상태가 검색에서 구별되지 않는 것이 문제다.
+  가드는 세 곳: `resolveProductGenderWithSource`(다중값 근거를 버리고 URL→텍스트→
+  사이트 기본값으로 계속 내려간다) + 두 INSERT 경로(`length !== 1` 이면 스킵).
+  실측: 회귀 이전 재고 16,468행이 다중값이었고 browns 한 사이트가 8,757행이었다.
 - **미확인 상품은 적재하지 않는다.** `unisex` 는 "확인된 남녀공용"일 때만 쓰고
   "모름"에는 절대 쓰지 않는다 — `search_products_v6` 가
   `p.gender && ARRAY[p_gender,'unisex']` 로 unisex 를 남녀 양쪽에 노출시키므로
@@ -507,12 +513,16 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   "성별 카테고리가 없다"는 unisex 의 근거가 아니라 "모름"이다.
   후보 뽑기: `pnpm propose:site-gender` (gender_source 화이트리스트로 091 의
   brand_scope 백필 오염을 걸러낸다 — 안 거르면 근거 행이 7배 부풀려진다).
-- DB: `chk_products_gender_required` 는 migration 104 에서 재도입 + VALIDATE.
-  읽기 경로는 `products.gender` → VLM → fail-open 3단이며, 백필 완료 후
-  1단으로 축약한다 (`search_products_v6.sql` 헤더의 🧹 항목).
+- DB: `chk_products_gender_required` 는 migration 104 에서 재도입 + VALIDATE,
+  **105 에서 `cardinality(gender) = 1` 로 좁혔다.** 읽기 경로는 ai-server
+  `3ea5a29` 로 이미 `products.gender` 1단이다 — fail-open 단이 없으므로 이
+  컬럼의 오염이 검색 결과로 직결된다.
+  ⚠️ 105 를 적용하기 전에 **다중값 거부 가드가 배포돼 있어야 한다** (연구실 서버
+  워커 포함). 옛 코드가 도는 상태에서 걸면 099 color 사고가 재현된다.
 - **상품 단위 근거가 브랜드 단위 backfill 을 이긴다** (2026-08-03 확정). 별도로
   `brand_nodes.gender_scope` 기반 일괄 backfill 이 돌아 `gender_source =
-  'repair_brand_scope'` 행이 8,098건 있다. 브랜드가 실제로 단일 성별이면 그 값이
+  'repair_brand_scope'` 행이 6,310건 있다 (2026-08-05 실측. 최초 8,098건에서
+  교정으로 감소). 브랜드가 실제로 단일 성별이면 그 값이
   맞지만(birrot 470행 전부 일치), 남녀 모두 파는 브랜드에서는 상품 단위로 틀린다 —
   jadedldn 1,275행이 브랜드 레벨 `['unisex']` 인데 URL 에 `-menswear`/`-womenswear`
   가 박혀 있었다. 브랜드 스코프는 카탈로그 경계이지 상품 속성이 아니므로,
@@ -522,8 +532,18 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   을 포함한다**(`wo[men]s`). 이 버그로 여성 태그 상품이 전부 `['women','men']` 이
   돼 남성 검색에 노출됐다(실측 41.7%; 수정 후 0%).
 - 기존 행 교정은 `pnpm repair:product-gender` (`--plan` → 검토 → `--apply`).
+  `--scope=` 는 `null-gender`(기본) | `multi-gender` | `unisex` | `source-null` |
+  `all`. **기본값 `null-gender` 는 2026-08-05 기준 0행이다** — 스코프를 지정하지
+  않으면 스크립트가 에러로 멈춘다(빈 계획을 조용히 만들지 않게 바꿨다).
+  다중값 정리는 `--scope=multi-gender` (16,468행 중 12,672행이 재판정만으로 해결).
   `--use-description` 은 켜지 말 것 — `products.description` 은 2000자 마케팅
   slice 라 "여성 사이즈 참고" 같은 문구가 대량 오판을 만든다.
+- **재크롤로 못 고치는 행이 있다.** `gender_source='unverified_legacy'` 25,031행은
+  전부 `['unisex']` 인데, DB 텍스트로 재판정하면 22,134행이 여전히 미해결이다
+  (그중 22,117행은 사이트 기본값도 없다). 재크롤이 값을 만들 수 있는 경로는
+  엔진 카테고리 성별 / shopify 태그 / `gender-defaults.ts` 보강 셋뿐이므로,
+  전량 재크롤 전에 소수 사이트로 수율을 먼저 재라. 끝내 미확인인 행은
+  `sql/runbooks/2026-08-05-delete-gender-unresolved.sql` 로 삭제한다.
 
 ### 크롤 금지 사이트
 
