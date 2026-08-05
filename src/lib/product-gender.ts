@@ -198,9 +198,26 @@ function evidenceText(evidence: GenderEvidence): string {
 }
 
 /**
+ * 상품 단위 근거는 **단일값이어야 한다**. 2개 이상이면 근거로 쓰지 않고 버린다.
+ *
+ * products.gender 는 men/women/unisex 중 **하나**다 (migration 105 의
+ * chk_products_gender_required, `cardinality(gender) = 1`). 검색 RPC 가
+ * `p.gender && ARRAY[p_gender,'unisex']` 로 매칭하므로 `['men','women']` 은
+ * unisex 와 똑같이 남녀 양쪽에 노출된다 — 실제로는 "남녀공용 확인됨"이 아니라
+ * "판정 실패"인데 검색 결과에서는 구별되지 않는다. 실측(2026-08-05): 16,468행이
+ * 이 상태였고 그중 8,757행이 browns 한 사이트였다.
+ *
+ * 버린 뒤에 미확인으로 끝내지 않고 URL → 텍스트 → 사이트 기본값으로 계속
+ * 내려간다. 엔진이 모호했다는 사실이 URL 경로 근거까지 무효로 만들지는 않는다.
+ */
+function singleEvidence(gender: ProductGender[]): ProductGender[] {
+  return gender.length === 1 ? gender : []
+}
+
+/**
  * 상품 성별 결의. 우선순위:
  *
- *   1. 엔진이 뽑은 상품 성별 (카테고리 유래 등 상품 단위 근거)
+ *   1. 엔진이 뽑은 상품 성별 (카테고리 유래 등 상품 단위 근거, 단일값만)
  *   2. kids 가드 (성인 토큰 없이 아동 신호만 있으면 미확인)
  *   3. URL 경로
  *   4. 상품명/카테고리/태그 텍스트
@@ -213,7 +230,7 @@ export function resolveProductGenderWithSource(
   evidence: GenderEvidence = {},
   productGenderSource: GenderSource = "engine",
 ): GenderResolution {
-  const fromProduct = cleanGenderScope(productGender)
+  const fromProduct = singleEvidence(cleanGenderScope(productGender))
 
   // 사이트 전역 defaultGender 는 상품 단위 근거가 아니라 설정상의 기본값이다.
   // 카테고리가 교차하는 사이트(예: yearsago — 여성 라인 상품이 "상의"에도 함께

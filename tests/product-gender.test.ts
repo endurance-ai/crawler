@@ -78,6 +78,50 @@ test("엔진 값이 이미 있으면 재호출해도 source 는 engine 으로 �
   assert.deepEqual(second, {gender: ["women"], source: "text"})
 })
 
+// ─── 다중값 거부 ─────────────────────────────────────────────────────────
+//
+// products.gender 는 men/women/unisex 중 하나다 (migration 105,
+// cardinality(gender) = 1). 검색 RPC 가 `p.gender && ARRAY[p_gender,'unisex']`
+// 로 매칭하므로 ['men','women'] 은 unisex 와 똑같이 남녀 양쪽에 노출된다 —
+// "남녀공용 확인됨"이 아니라 "판정 실패"인데도 구별되지 않는다.
+
+test("엔진이 다중값을 넘기면 근거로 쓰지 않는다", () => {
+  // 구 shopify 태그 union 잔재: ["men","women","unisex"]. 실측 16,468행.
+  const r = resolveProductGenderWithSource(["men", "women", "unisex"], {name: "Ribbed Knit Cap"})
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
+test("다중값을 버려도 URL·텍스트 근거는 살아남는다", () => {
+  // 엔진이 모호했다는 사실이 URL 경로 근거까지 무효로 만들지는 않는다.
+  assert.deepEqual(
+    resolveProductGenderWithSource(["men", "women"], {name: "Wool Coat", productUrl: "https://x.com/women/coat-1"}),
+    {gender: ["women"], source: "url"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource(["men", "women"], {name: "WOMEN'S WOOL BLEND COAT"}),
+    {gender: ["women"], source: "text"},
+  )
+})
+
+test("사이트 기본값이 다중값이어도 부여되지 않는다", () => {
+  const r = resolveProductGenderWithSource(["men", "women"], {name: "Signature Wool Coat"}, "config_default")
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
+test("결의 결과는 항상 0개 또는 1개다", () => {
+  const cases: Array<[unknown, string]> = [
+    [["men", "women"], "Ribbed Knit Cap"],
+    [["women", "unisex"], "남녀공용 후디"],
+    [[], "WOMEN'S COAT"],
+    [["unisex"], "Signature Wool Coat"],
+  ]
+  for (const [engine, name] of cases) {
+    assert.ok(resolveProductGenderWithSource(engine, {name}).gender.length <= 1, name)
+  }
+})
+
 // ─── config_default ──────────────────────────────────────────────────────
 
 test("config_default 는 상품 단위 근거(URL/텍스트)보다 아래다", () => {

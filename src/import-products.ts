@@ -610,11 +610,14 @@ async function main() {
       // 경우 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
       // 잘못 적재되는 것보다 재크롤 때까지 보류하는 편이 안전하다.
       if (!brand) return null
-      // 성별 미확인 상품은 적재하지 않는다. 미확인을 unisex 로 채우면 검색 RPC
-      // (p.gender && ARRAY[p_gender,'unisex'])가 남녀 양쪽에 노출시켜 여성 상품이
-      // 남성 검색으로 샌다 — src/lib/product-gender.ts 헤더 참조.
+      // 성별이 **정확히 하나**가 아니면 적재하지 않는다. 미확인을 unisex 로
+      // 채우면 검색 RPC (p.gender && ARRAY[p_gender,'unisex'])가 남녀 양쪽에
+      // 노출시켜 여성 상품이 남성 검색으로 샌다 — src/lib/product-gender.ts 참조.
+      // 다중값도 같은 결과를 내므로 함께 막는다: migration 105 의
+      // chk_products_gender_required 가 cardinality(gender)=1 을 요구하고,
+      // 이 가드가 없으면 그 CHECK 이 INSERT 를 전량 거부한다 (099 color 사고 패턴).
       const gender = cleanGenderScope(p.gender)
-      if (gender.length === 0) {
+      if (gender.length !== 1) {
         genderSkipped++
         return null
       }

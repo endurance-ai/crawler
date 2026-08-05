@@ -45,12 +45,14 @@ export function productToCandidateDbRow(
   const sourceCurrency = selected.sourceCurrency ?? config.sourceCurrency ?? "KRW"
   const prices = toPriceFields(selected, sourceCurrency)
   if (!prices) throw new Error("candidate price is missing or invalid")
-  // 성별 미확인 상품은 적재하지 않는다. products.gender 는 NOT NULL 계약이고,
-  // 미확인을 unisex 로 채우면 검색 RPC 가 남녀 양쪽에 노출시킨다.
-  // 이 가드가 없으면 migration 099 가 기록한 color 사고(210회 연속 INSERT 실패)가
-  // gender 로 그대로 재현된다 — 이 경로는 연구실 서버에서 15분마다 돈다.
-  if (!Array.isArray(selected.gender) || selected.gender.length === 0) {
-    throw new Error("candidate gender is missing")
+  // 성별이 **정확히 하나**가 아니면 적재하지 않는다. products.gender 는 NOT NULL
+  // 계약이고, 미확인을 unisex 로 채우면 검색 RPC 가 남녀 양쪽에 노출시킨다.
+  // 다중값도 `p.gender && ARRAY[p_gender,'unisex']` 에서 같은 결과를 내고,
+  // migration 105 의 chk_products_gender_required 가 cardinality(gender)=1 을
+  // 요구한다. 이 가드가 없으면 migration 099 가 기록한 color 사고(210회 연속
+  // INSERT 실패)가 gender 로 그대로 재현된다 — 이 경로는 연구실 서버 워커다.
+  if (!Array.isArray(selected.gender) || selected.gender.length !== 1) {
+    throw new Error("candidate gender is missing or not a single value")
   }
   const now = new Date().toISOString()
   return {
