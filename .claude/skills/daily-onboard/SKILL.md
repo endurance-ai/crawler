@@ -103,12 +103,14 @@ eligibility가 확인된**(`eligible_origin`/`eligible_storefront`) 것을 `stat
    건너뛴다(`MAX_IMPORT_RETRIES`) — 영구히 깨진 사이트에 LLM 비용을 무한정
    태우지 않기 위함. 누적 실패가 아니라 연속 실패라 한 번 성공하면 카운터가
    리셋된다.
-   **알려진 갭: imweb은 여기서 선정되지 않는다.** 2번 단계는 imweb config를
-   만들지만(`generatedPlatformType`이 `platform_type='custom'` +
+   **imweb은 여기서 선정되지 않는다 — 의도된 제약이니 넓히지 말 것.** 2번 단계는
+   imweb config를 만들지만(`generatedPlatformType`이 `platform_type='custom'` +
    `detection.platform_family='imweb'`을 imweb으로 매핑), 이 select는
-   `platform_type in ('cafe24','shopify')`로 조회하고 뷰에는 imweb이 `custom`으로
-   저장돼 있어 매칭되지 않는다. imweb 브랜드를 태우려면 `onboard-batch.sh
-   --configs`에 수동으로 넘겨야 한다.
+   `platform_type in ('cafe24','shopify')`만 조회한다. 이유는 4번 단계의 크롤러인
+   `tools/product-extraction-poc.ts:491`이 `Existing POC only supports
+   cafe24/shopify` 로 **throw** 하기 때문이다 — 필터를 넓히면 imweb 브랜드가
+   배치에서 전량 실패한다. imweb 온보딩을 열려면 poc에 엔진을 배선하는 별도
+   작업이 필요하다 (`src/crawl.ts`의 `crawlImweb`은 이미 있다).
 4. **onboard-batch --variants hybrid** — 크롤(existing) + LLM 카테고리/subcategory
    분류(hybrid) + import(`--no-new-brands` 아님, 신규 브랜드 자동 등록) +
    `reclassify-categories.ts --only-invalid` guardrail까지 한 번에 실행.
@@ -130,13 +132,11 @@ eligibility가 확인된**(`eligible_origin`/`eligible_storefront`) 것을 `stat
      'unisex']`로 unisex를 남녀 양쪽에 노출시키므로 세탁하면 여성 상품이 남성
      검색으로 샌다. 게이트는 이중이다(QC `normalizeGenderField` → needsReview,
      그리고 위 INSERT 가드).
-   - **태그가 Men·Women 두 부서에 걸려 있으면 확인된 unisex다** — ⚠️ **아직 dev에
-     없다.** `inferDualDepartmentFromTags`는 `fix/gender-rules-unify`
-     (a6dd55a, 2026-08-05)에 있고 머지 전이다. shopify 편집샵이 같은 상품을 두
-     부서에 올리는 경우를 근거로 잡으며, **태그만** 보고 상품명은 보지 않고
-     (마케팅 카피가 부서 분류로 둔갑하는 것 방지), kids 가드가 이 규칙보다 먼저
-     돈다. 머지 전까지 dev로 돌리는 온보딩은 이 상품들을 unisex로 확정하지 못해
-     성별 미확정으로 스킵한다. 머지되면 이 경고 문구를 지울 것.
+   - **태그가 Men·Women 두 부서에 걸려 있으면 확인된 unisex다** (2026-08-05,
+     `inferDualDepartmentFromTags`, `src/lib/product-gender.ts:223`). shopify
+     편집샵이 같은 상품을 두 부서에 올리는 경우를 근거로 잡는다. **태그만**
+     보고 상품명은 보지 않으며(마케팅 카피가 부서 분류로 둔갑하는 것 방지),
+     kids 가드가 이 규칙보다 먼저 돈다.
 
    import 로그의 `genderSourceCounts`와 성별 스킵 건수로 그날 판정 분포를 볼 수 있다.
    **QC 통과율이 낮으면 자동으로 재시도 대상이 된다**: `import-products.ts`가
@@ -149,15 +149,23 @@ eligibility가 확인된**(`eligible_origin`/`eligible_storefront`) 것을 `stat
    가격(KRW인데 1000원 미만/null 10%+), 브랜드(빈 문자열/name과 동일/spec 라벨 누출)
    이상 패턴을 검사해 `<out-root>/anomaly-report.log`에 남긴다. 색상 체크는 §18
    색상 VLM 이관(2026-07-29) 이후 이 스크립트에서 제거됐다 — products 테이블에
-   해당 컬럼이 없다. **gender 이상치 체크는 여전히 이 스크립트에 없다**
-   (2026-08-05 확인: 스크립트에 gender 참조 0건). `chk_products_gender_required`
-   (migration 104 도입 → **105에서 `cardinality(gender)=1`로 축소**), QC의
-   needsReview 게이트, `import-products.ts`의 단일값 가드가 write 시점에 빈/다중
-   gender를 이미 막지만, "값은 있는데 틀린" 케이스(예: 특정 브랜드에서 unisex로
-   쏠림)는 여기서 잡히지 않는다. **단계 5의 콘솔 출력이 "가격/브랜드/색상/성별
-   이상 검사"라고 찍히지만 실제로 도는 것은 가격·브랜드뿐이다** —
-   `tools/daily-onboard.sh`의 echo 문구가 갱신되지 않았다. 온보딩 직후 성별 분포가
-   의심스러우면 해당 브랜드의 `products.gender` 분포를 수동으로 확인할 것.
+   해당 컬럼이 없다. **gender 체크는 2026-08-05에 복원됐다** (2026-07-29 VLM
+   이관 때 빠져 있었다). write 시점 게이트(`chk_products_gender_required` —
+   migration 104 도입 → **105에서 `cardinality(gender)=1`로 축소**, QC의
+   needsReview, `import-products.ts`의 단일값 가드)가 빈/다중 gender를 이미
+   막으므로, 여기서 잡는 것은 **값은 있는데 근거가 약한** 패턴이다:
+   - `gender` 단일값 계약 위반 (0이어야 정상 — 아니면 105 미적용이거나 가드
+     없는 적재 경로가 생겼다는 뜻)
+   - `gender_source` 미기록 (write-path는 항상 채운다)
+   - **unisex 쏠림** — 단일값 행의 60% 이상이 unisex면 근거(`gender_source`)
+     분포와 함께 경고. "확인된 unisex"(engine/text 태그 근거)와 "사이트 기본값
+     일괄"을 사람이 구분하라는 뜻이다
+   - **근거가 사이트 기본값 일변도** — `config_default`가 80% 이상이면 상품 단위
+     근거 없이 전량이 찍힌 것. 단일 성별 브랜드가 맞는지 확인 필요 (§18
+     jadedldn 1,275행 사례)
+
+   비율 판정은 표본 20건 이상일 때만 돈다. 임계값은 스크립트 상단 상수
+   (`GENDER_MIN_ROWS`/`UNISEX_SHARE_WARN`/`CONFIG_DEFAULT_SHARE_WARN`)에 있다.
    **원인 조사와 코드 수정은 자동화하지 않는다** — 오판으로 멀쩡한 데이터를
    망가뜨릴 위험이 있어, 이상 발견 시 그 리포트를 다음 Claude 세션에 붙여넣어 조사를
    요청하는 흐름을 상정한다. 스킬 실행 자체는 이상치가 있어도 실패로 끝나지 않는다

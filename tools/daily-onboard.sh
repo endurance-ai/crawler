@@ -12,12 +12,13 @@
 #   3. select-onboard-batch.ts — status_updated_at 최신순으로 N개를 골라
 #      onboard-batch.sh용 --configs JSON을 만든다 (반드시 getSiteConfig()의 완전한
 #      config를 그대로 씀 — stub 절대 금지, 2026-07-21 사고 참조).
-#   4. onboard-batch.sh --variants hybrid — 크롤 + LLM 카테고리/색상/설명 보강 +
-#      import + guardrail까지 한 번에.
-#   5. check-onboard-anomalies.ts — 오늘 처리한 브랜드들만 대상으로 가격/브랜드/색상/
-#      성별 이상 패턴을 검사해 리포트. 원인 조사·코드 수정은 여기서 자동으로 하지
-#      않는다(오판 위험) — 이상 발견 시 그 리포트를 다음 Claude 세션에 붙여넣어
-#      조사를 요청하는 흐름을 상정한다 (2026-07-22 확정).
+#   4. onboard-batch.sh --variants hybrid — 크롤 + LLM 카테고리/subcategory 분류 +
+#      import + guardrail까지 한 번에. 색상·설명은 2026-07-29 에 빠졌고(색상은 VLM
+#      단일 출처), 성별은 LLM 이 아니라 크롤 단계가 결의한다.
+#   5. check-onboard-anomalies.ts — 오늘 처리한 브랜드들만 대상으로 가격/브랜드/성별
+#      이상 패턴을 검사해 리포트. 색상 체크는 VLM 이관으로 제거됐다. 원인 조사·코드
+#      수정은 여기서 자동으로 하지 않는다(오판 위험) — 이상 발견 시 그 리포트를
+#      다음 Claude 세션에 붙여넣어 조사를 요청하는 흐름을 상정한다 (2026-07-22 확정).
 #
 # 범위: KR-origin은 기존처럼 통과하고, 해외 브랜드는 detect 단계가 한국 locale/
 # Shopify Market에서 실제 variant KRW 가격을 검증한 경우에만 config 후보가 된다.
@@ -103,7 +104,7 @@ fi
 echo "===== 4/5 onboard-batch (hybrid): ${COUNT}개 브랜드 크롤+LLM분류+import+guardrail ====="
 bash tools/onboard-batch.sh --configs "$SELECTED_JSON" --chunk-size "$LIMIT" --variants hybrid --out-root "$OUT_ROOT"
 
-echo "===== 5/5 anomaly check: 오늘 처리한 ${COUNT}개 브랜드 가격/브랜드/색상/성별 이상 검사 ====="
+echo "===== 5/5 anomaly check: 오늘 처리한 ${COUNT}개 브랜드 가격/브랜드/성별 이상 검사 ====="
 SELECTED_KEYS=$(node -e 'console.log(require(require("path").resolve(process.argv[1])).map(c => c.key).join(","))' "$SELECTED_JSON")
 $PNPM tsx tools/check-onboard-anomalies.ts --platforms="$SELECTED_KEYS" | tee "$OUT_ROOT/anomaly-report.log" \
   || echo "  ⚠️  이상치 발견 — $OUT_ROOT/anomaly-report.log 참고, 다음 세션에서 원인 조사 요청할 것"

@@ -50,6 +50,14 @@ async function main() {
     .from("product_crawl_brands")
     .select("brand_node_id,brand_name,platform_key,platform_type,homepage_url,status,status_updated_at,kr_eligibility_status")
     .in("status", ["tech_detected", "qc_failed"])
+    // cafe24/shopify 만 뽑는 것은 의도된 제약이다 — 넓히지 말 것.
+    // generate-platform-configs 는 imweb config 도 만들지만(뷰에는 platform_type=
+    // 'custom' + detection.platform_family='imweb' 로 저장된다), daily-onboard 가
+    // 쓰는 hybrid 크롤러 tools/product-extraction-poc.ts:491 이
+    // "Existing POC only supports cafe24/shopify" 로 **throw** 한다. 여기서
+    // 'custom' 을 통과시키면 그 브랜드가 배치에서 전량 실패한다.
+    // imweb 온보딩은 poc 에 엔진을 붙이는 별도 작업이다 (src/crawl.ts 의
+    // crawlImweb 은 이미 있으므로 배선만 하면 되지만 이 스크립트의 일이 아니다).
     .in("platform_type", ["cafe24", "shopify"])
     .not("homepage_url", "is", null)
     .in("kr_eligibility_status", ["eligible_origin", "eligible_storefront"])
