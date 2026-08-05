@@ -406,16 +406,31 @@ async function applyPlan(planPath: string): Promise<void> {
   for (const [key, rows] of groups) {
     const [afterRaw, source] = key.split("\u0000")
     const after = JSON.parse(afterRaw) as string[] | null
-    for (let i = 0; i < rows.length; i += WRITE_BATCH) {
-      const batch = rows.slice(i, i + WRITE_BATCH)
+    // multi-gender 는 batch 를 before 값으로 한 번 더 쪼갠다. stale 가드가 before
+    // 를 술어로 쓰는데 다중값 조합이 3가지라, 한 배치에 섞여 있으면 술어를 하나로
+    // 정할 수 없다. 나머지 스코프는 before 를 술어로 쓰지 않으므로 단일 그룹이다.
+    const partitions =
+      plan.scope === "multi-gender"
+        ? [...rows.reduce((m, r) => m.set(JSON.stringify(r.before), [...(m.get(JSON.stringify(r.before)) ?? []), r]), new Map<string, GenderRepairDecision[]>())]
+        : [["", rows] as [string, GenderRepairDecision[]]]
+
+    for (const [beforeRaw, partition] of partitions) {
+    for (let i = 0; i < partition.length; i += WRITE_BATCH) {
+      const batch = partition.slice(i, i + WRITE_BATCH)
       const payload: Record<string, unknown> = {gender_source: source, updated_at: new Date().toISOString()}
       if (after !== null) payload.gender = after
 
-      // .contains 가드: 이미 올바른 값으로 갱신된 행(재임포트 등)은 매치되지
-      // 않는다 → 재실행 멱등 + 동시 import 와의 경쟁에서 안전.
+      // stale 가드: 이미 다른 경로(재임포트 등)로 갱신된 행은 술어에 매치되지
+      // 않아 건너뛴다 → 재실행 멱등 + 동시 import 와의 경쟁에서 안전.
+      //
+      // multi-gender 는 `.contains("gender", before)` 를 쓴다. PostgREST 는
+      // UPDATE 에 `or=()` 를 받지 않는다 ("column products.gender does not
+      // exist") — SELECT 에서는 통하므로 plan 단계에서는 문제가 없다. before 를
+      // 술어로 쓰는 편이 어차피 더 정확하다: 그 행이 **여전히 그 다중값 그대로**
+      // 일 때만 쓴다.
       let q = db.from("products").update(payload).in("id", batch.map((r) => r.id))
       if (plan.scope === "unisex") q = q.contains("gender", ["unisex"])
-      if (plan.scope === "multi-gender") q = q.or(MULTI_GENDER_FILTER)
+      if (plan.scope === "multi-gender") q = q.contains("gender", JSON.parse(beforeRaw) as string[])
       const {data, error} = await q.select("id")
       if (error) throw new Error(`apply failed (${afterRaw}/${source}): ${error.message}`)
 
@@ -426,6 +441,7 @@ async function applyPlan(planPath: string): Promise<void> {
       saveProgress(absolute, applied)
       process.stdout.write(`\r   💾 updated=${updated} stale=${stale}`)
       if (sleepMs > 0) await new Promise((r) => setTimeout(r, sleepMs))
+    }
     }
   }
   console.log(`\n✅ applied=${updated} stale_or_already_changed=${stale} plan=${absolute}`)
