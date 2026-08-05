@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 
 import {
   cleanGenderScope,
+  hasGenderToken,
   inferGenderFromText,
   inferGenderFromUrl,
   isKidsText,
@@ -171,6 +172,43 @@ test("women 은 men 으로 오인되지 않는다", () => {
 
 test("남성·여성이 함께 잡히면 모호 → null", () => {
   assert.equal(inferGenderFromText("men and women coat"), null)
+})
+
+// ─── 어휘 확장 (2026-08-05) ──────────────────────────────────────────────
+
+test("menswear/womenswear 는 성별 토큰이 아니다", () => {
+  // 코퍼스 최다 후보였지만(600 / 1,006행) 실측에서 탈락했다. Shopify 의
+  // `/products/<slug>` 는 상품명 그 자체라 URL 단에서도 구조적 신호가 아니고,
+  // "menswear-inspired" 는 여성복 관용어다. 실측: Tibi "Thomas Menswear Check
+  // Detached Shirt"(태그 woman/Women/Womens)가 men 으로 뒤집혔다.
+  assert.equal(inferGenderFromText("Thomas Menswear Check Detached Shirt"), null)
+  assert.equal(inferGenderFromUrl("https://x.com/products/tibi-thomas-menswear-shirt-tan"), null)
+  assert.equal(hasGenderToken("menswear", "men"), false)
+})
+
+test("'womens' 안의 'men' 을 남성으로 읽지 않는다", () => {
+  // wo[men]s — contains 로 넣었으면 여성 상품이 전부 다중값이 된다.
+  // `"womens".includes("men")` 사고(실측 41.7%)와 같은 계열이라 회귀로 고정한다.
+  assert.equal(inferGenderFromText("womens jacket"), "women")
+  assert.equal(inferGenderFromText("WOMENS JACKET"), "women")
+  assert.equal(hasGenderToken("womens jacket", "men"), false)
+  assert.equal(hasGenderToken("womens jacket", "women"), true)
+})
+
+test("고유명사·스타일 묘사어는 성별로 읽지 않는다", () => {
+  // 실측으로 거부한 토큰들. lady 9행은 전부 고유명사였고, 그중 하나는 아동복이다.
+  assert.equal(inferGenderFromText("Lady Liberty Vintage Graphic Tee"), null)
+  assert.equal(inferGenderFromText("Lady Lunetta Small Shoulder Bag"), null)
+  assert.equal(inferGenderFromText("Relaxed Lady Luck Tee"), null)
+  assert.equal(inferGenderFromText("Feminine Silhouette Blazer"), null)
+  assert.equal(inferGenderFromText("Masculine Cut Trousers"), null)
+})
+
+test("hasGenderToken 은 GENDER_RULES 를 단일 출처로 노출한다", () => {
+  // 교정 스크립트가 자체 정규식을 새로 쓰지 않게 하려는 것이 이 함수의 목적이다.
+  assert.equal(hasGenderToken("MEN'S COAT", "men"), true)
+  assert.equal(hasGenderToken("MEN'S COAT", "women"), false)
+  assert.equal(hasGenderToken("남녀공용 후디", "unisex"), true)
 })
 
 // ─── URL 추론 ────────────────────────────────────────────────────────────

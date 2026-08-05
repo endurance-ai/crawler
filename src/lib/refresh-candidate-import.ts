@@ -1,3 +1,4 @@
+import {resolveProductBrand} from "./brand-provenance"
 import {toPriceFields} from "./listing-refresh"
 import type {Product, SiteConfig} from "./types"
 
@@ -54,9 +55,18 @@ export function productToCandidateDbRow(
   if (!Array.isArray(selected.gender) || selected.gender.length !== 1) {
     throw new Error("candidate gender is missing or not a single value")
   }
+  // 브랜드 확정은 import-products 와 **같은 함수**를 쓴다. 단일브랜드 자사몰은
+  // 큐레이션된 config.brand 가 원본이고 DOM 추출값은 멀티브랜드 편집샵 전용
+  // 폴백이다 (CLAUDE.md §18 "Brand Name Fixing"). 예전에는 selected.brand 를
+  // 그대로 써서 두 적재 경로의 판정이 어긋나 있었다 — brand-provenance.ts 헤더가
+  // "두 경로의 판정을 어긋나게 두지 않는다" 고 적어 둔 계약을 이 경로만 깨고 있었다.
+  const brand = resolveProductBrand(selected.brand, config)
+  // 빈 브랜드도 import-products 와 같이 적재하지 않는다. products.brand 는 NOT NULL
+  // 이지만 빈 문자열은 제약을 통과해 버려서, "브랜드 없음" 으로 조용히 적재된다.
+  if (!brand) throw new Error("candidate brand is missing")
   const now = new Date().toISOString()
   return {
-    brand: selected.brand,
+    brand,
     name: selected.name,
     category: selected.category,
     price: prices.price,
@@ -76,6 +86,15 @@ export function productToCandidateDbRow(
     crawled_at: selected.crawledAt,
     subcategory: selected.subcategory ?? null,
     images: selected.images ?? null,
+    // tags/size_info/product_code 는 import-products 와 같은 절단 규칙으로 함께
+    // 싣는다. 특히 **tags 는 성별 근거다** — resolveProductGenderWithSource 가
+    // evidenceText 로 tags 를 읽는데(refresh-candidates.ts 가 결의에 넘긴다),
+    // 저장하지 않으면 나중에 repair:product-gender 가 그 근거를 다시 볼 수 없다.
+    // 실측 2026-08-05: 이 경로로 들어온 1,673행 중 product_code 는 100%,
+    // tags 는 84.3% 가 NULL 이었다.
+    tags: selected.tags?.slice(0, 50) ?? null,
+    size_info: selected.sizeInfo?.slice(0, 2000) ?? null,
+    product_code: selected.productCode?.slice(0, 100) ?? null,
     image_selection_kind: selected.imageSelection!.kind,
     image_selection_score: selected.imageSelection!.score,
     image_selection_version: selected.imageSelection!.version,

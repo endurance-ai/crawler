@@ -93,6 +93,40 @@ export interface GenderResolution {
 // /\b(men|남성)\b/ 는 "남성코트" 를 놓친다. matchesAny 가 raw 문자열에도
 // contains 를 시도하므로 조합형 한글이 NFKD 로 자모 분해되는 문제도 함께 피한다.
 
+// ─── 어휘를 늘릴 때의 규율 (2026-08-05) ──────────────────────────────────
+//
+// 토큰은 **대상 성별을 단정하는 것만** 넣는다. 스타일 묘사어와 고유명사는
+// 넣지 않는다 — 확실한 것만 뽑고 모호하면 버리는 것이 이 모듈의 계약이다.
+// 아래는 후보를 전 코퍼스(155,827행)에 돌려 실측한 결과다:
+//
+//   · `menswear`/`womenswear` — **거부.** 코퍼스에 600 / 1,006행으로 가장 많이
+//     나오는 후보였지만 실측에서 탈락했다. 넣으면 jadedldn 6행을 되찾는 대신
+//     mohawk-general 의 Tibi "Thomas Menswear Check Detached Shirt" 가
+//     `["women"]` → `["men"]` 으로 **뒤집힌다**. 그 상품 태그는
+//     `["woman","Women","Womens",…]` 로 명백한 여성복이고 "Thomas Menswear" 는
+//     Tibi 의 스타일명이다 — "menswear-inspired" 는 여성복 관용어다.
+//     URL 단에서만 쓰는 것도 안 된다: Shopify 의 `/products/<slug>` 는 상품명
+//     그 자체라 `inferGenderFromUrl` 의 전제("카테고리 랜딩이 남긴 구조적
+//     신호")가 성립하지 않는다. jadedldn 의 `-womenswear` 도 같은 slug 안에
+//     있어 부서인지 스타일명인지 구분할 방법이 없다.
+//     → 되찾을 6행은 어휘가 아니라 **사이트별 교정**으로 다뤄야 한다
+//       (jadedldn 은 URL 규약이 확인된 단일 사이트다).
+//   · `lady` 9행 — **거부.** 전부 고유명사였다: "Lady Lunetta" 가방,
+//     "Kith **Kids** Lady Liberty Tee", "Lady Luck Tee". 아동복을 여성으로
+//     만드는 경로까지 열린다.
+//   · `masculine`/`feminine` — **거부.** 스타일 묘사어라 대상 성별이 아니다.
+//   · `gentleman`/`hombres`/`hommes`/`uomini`/`femmes`/`donne`/`mujeres`/`맨즈`/
+//     `all-gender` 류 — **넣지 않는다.** 코퍼스 0행이라 A/B 가 획득 0·상실 0·
+//     뒤집힘 0 이었다. "위험이 없으니 미래 대비로" 는 위 두 항목을 실측으로
+//     기각한 것과 같은 기준이 아니다 — 근거가 생기면 그때 A/B 하고 넣는다.
+//   · `우먼즈`/`우먼스` 도 불필요하다 — `우먼` 이 contains 라 이미 걸린다.
+//
+// [HARD] 새 영문 토큰은 반드시 `patterns`(=`\b` 경계) 에 넣고 `contains` 에
+//   넣지 말 것. `contains` 는 부분 문자열 판정이라 **"womenswear" 안에
+//   "menswear" 가 들어 있다**(wo[menswear]). `"womens".includes("men")` 로
+//   여성 상품 41.7% 가 남성 검색에 노출됐던 사고와 같은 계열이다.
+//   교대(alternation)는 긴 것부터 적는다 — 백트래킹에 의존하지 않게.
+
 export const GENDER_RULES: Array<{gender: ProductGender; patterns: RegExp[]; contains?: string[]}> = [
   {
     gender: "men",
@@ -110,6 +144,15 @@ export const GENDER_RULES: Array<{gender: ProductGender; patterns: RegExp[]; con
     contains: ["남녀공용", "공용", "유니섹스"],
   },
 ]
+
+/**
+ * 텍스트에 특정 성별 토큰이 있는지. 교정 스크립트가 자체 정규식을 새로 쓰지
+ * 않도록 공개한다 — GENDER_RULES 가 유일한 어휘 출처여야 한다.
+ */
+export function hasGenderToken(text: string, gender: ProductGender): boolean {
+  const rule = GENDER_RULES.find((r) => r.gender === gender)
+  return rule ? matchesAny(text, rule.patterns, rule.contains) : false
+}
 
 // kids 는 PRODUCT_GENDER_VALUES 에 없어서 cleanGenderScope 가 조용히 버린다
 // (zara-engine 은 ["kids"] 를 반환한다). 그대로 두면 빈 배열 → 사이트 기본값으로
