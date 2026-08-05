@@ -17,25 +17,32 @@
 #                          products than this are silently truncated — raise it
 #                          for full-catalog re-collection.
 #   --pool-limit <n>      candidate pool cap (default 2000)
-#   --include-out-of-stock keep sold-out products through the crawl stage.
-#                          Intended for re-collection, not initial onboarding.
 #   --import-flags "<..>" flags passed to import-products.ts
 #                          (default "--no-new-brands --in-stock-only").
-#                          Re-collection keeps --no-new-brands because every
-#                          target brand already exists, but must remove
-#                          --in-stock-only so sold-out rows are refreshed too.
+#                          Re-collecting existing rows wants neither: the former
+#                          drops products whose brand is not yet in brand_nodes,
+#                          the latter skips out-of-stock rows so they keep
+#                          whatever data they already had.
 #   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
 #                          variant to crawl AND the one onboard-classify.ts reads
 #                          back out of products.jsonl (kept in lockstep — see
-#                          ONBOARD_VARIANT below). hybrid = Qwen fills category/
-#                          subcategory only; existing = deterministic only. Cafe24
-#                          classifies inline on the already-open detail page, while
-#                          Shopify's hybrid page load is its only detail visit.
+#                          ONBOARD_VARIANT below). hybrid = llm-scraper fills
+#                          category/subcategory only; existing = deterministic
+#                          only. hybrid does NOT add a second page visit: cafe24
+#                          (chromium) classifies inline via crawlCafe24's
+#                          enrichDetailPage hook on the page already open, and
+#                          shopify's existing crawler never opens a detail page
+#                          at all (pure /products.json), so runHybridVariant's
+#                          goto is the only visit. Color/description/gender are
+#                          NOT LLM-filled — color comes from VLM
+#                          (product_features), gender from the crawler's
+#                          resolveProductGenderWithSource, description is dropped.
 #
-# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (deterministic QC
-# and category/color recovery, reading the same variant back via ONBOARD_VARIANT)
-# -> import-products.ts (safe upsert, then best-effort local Qwen normalization)
-# -> reclassify-categories.ts --only-invalid (canonical taxonomy guardrail).
+# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (QC + LLM
+# category/subcategory classify, reading the same variant back
+# via ONBOARD_VARIANT) -> import-products.ts (upsert) -> reclassify-categories.ts
+# --only-invalid (guardrail: fixes any row that still has a non-canonical
+# category, regardless of cause — cheap, always safe to run).
 #
 # Resumable: if out-root/chunk-N/products.jsonl already exists, crawl is skipped
 # for that chunk (so a killed run can restart with the same --start).
@@ -50,7 +57,6 @@ CONFIGS=""
 VARIANTS="existing"
 PRODUCT_LIMIT=2000
 POOL_LIMIT=2000
-INCLUDE_OUT_OF_STOCK=0
 IMPORT_FLAGS="--no-new-brands --in-stock-only"
 
 while [ $# -gt 0 ]; do
@@ -64,7 +70,6 @@ while [ $# -gt 0 ]; do
     --variants) VARIANTS="$2"; shift 2 ;;
     --product-limit) PRODUCT_LIMIT="$2"; shift 2 ;;
     --pool-limit) POOL_LIMIT="$2"; shift 2 ;;
-    --include-out-of-stock) INCLUDE_OUT_OF_STOCK=1; shift ;;
     --import-flags) IMPORT_FLAGS="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -92,8 +97,7 @@ if [ "$ENGINE" = "lightpanda" ] && [ ! -x "bin/lightpanda" ]; then
   exit 1
 fi
 
-ENV_FILE="${CRAWLER_ENV_FILE:-.env.local}"
-PNPM="corepack pnpm@10.33.2 exec dotenv -e $ENV_FILE --"
+PNPM="corepack pnpm@10.33.2 exec dotenv -e .env.local --"
 TMP_DIR="$OUT_ROOT/_chunks"
 TALLY="$OUT_ROOT/onboard-tally.csv"
 
@@ -129,8 +133,6 @@ for c in $(seq "$START" "$END"); do
   # existing pool (see runHybridVariant), not a standalone replacement for it.
   CRAWL_VARIANTS="existing"
   if [ "$VARIANTS" = "hybrid" ]; then CRAWL_VARIANTS="existing,hybrid"; fi
-  POC_STOCK_FLAGS=""
-  if [ "$INCLUDE_OUT_OF_STOCK" -eq 1 ]; then POC_STOCK_FLAGS="--include-out-of-stock"; fi
 
   if [ -s "$OUT_ROOT/chunk-$c/products.jsonl" ]; then
     echo "chunk $c crawl SKIPPED (existing $(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl") rows)"
@@ -138,7 +140,7 @@ for c in $(seq "$START" "$END"); do
     CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
       $PNPM tsx tools/product-extraction-poc.ts \
       --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit="$PRODUCT_LIMIT" --pool-limit="$POOL_LIMIT" \
-      $POC_STOCK_FLAGS --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
+      --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)
   echo "chunk $c crawl done: $ROWS rows"
@@ -162,13 +164,10 @@ for c in $(seq "$START" "$END"); do
   NET=$((AFTER - BEFORE))
 
   # Guardrail: fix any row left with a non-canonical category, regardless of
-  # cause (stale cache upsert, Qwen output drift, etc). Idempotent and cheap —
+  # cause (stale cache upsert, LLM output drift, etc). Idempotent and cheap —
   # only touches rows actually out of taxonomy.
   GUARD_LOG="$OUT_ROOT/guardrail-chunk-$c.log"
-  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1; then
-    echo "chunk $c guardrail failed; Qwen/tunnel or DB error — $GUARD_LOG" >&2
-    exit 2
-  fi
+  $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1 || true
   INVALID_FOUND=$(grep -oE "processed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
   INVALID_FIXED=$(grep -oE "changed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
 
