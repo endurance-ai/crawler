@@ -513,10 +513,16 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   "성별 카테고리가 없다"는 unisex 의 근거가 아니라 "모름"이다.
   후보 뽑기: `pnpm propose:site-gender` (gender_source 화이트리스트로 091 의
   brand_scope 백필 오염을 걸러낸다 — 안 거르면 근거 행이 7배 부풀려진다).
-- DB: `chk_products_gender_required` 는 migration 104 에서 재도입 + VALIDATE,
-  **105 에서 `cardinality(gender) = 1` 로 좁혔다.** 읽기 경로는 ai-server
-  `3ea5a29` 로 이미 `products.gender` 1단이다 — fail-open 단이 없으므로 이
-  컬럼의 오염이 검색 결과로 직결된다.
+- DB: `chk_products_gender_required` 가 migration 104 에서 재도입 + **VALIDATE**
+  됐고 (2026-08-03), **105 에서 `cardinality(gender) = 1` 로 좁혔다**
+  (2026-08-05). `products.gender` 는 non-NULL · **단일값** · canonical 이 DB
+  차원에서 보장된다.
+  그래서 읽기 경로의 3단 다리(VLM 폴백 + fail-open)는 걷어냈고
+  `p.gender && ARRAY[p_gender,'unisex']` 단일 출처다 —
+  `search_products_v6.sql`(5곳), `search_products_hybrid_v1.sql`(2곳),
+  `curation_refresh.py`, `products.py`.
+  `LEFT JOIN product_features` 는 유지한다 — color 필터가 쓴다.
+  **fail-open 단이 없으므로 이 컬럼의 오염이 검색 결과로 직결된다.**
   ⚠️ 105 를 적용하기 전에 **다중값 거부 가드가 배포돼 있어야 한다** (연구실 서버
   워커 포함). 옛 코드가 도는 상태에서 걸면 099 color 사고가 재현된다.
 - **상품 단위 근거가 브랜드 단위 backfill 을 이긴다** (2026-08-03 확정). 별도로
