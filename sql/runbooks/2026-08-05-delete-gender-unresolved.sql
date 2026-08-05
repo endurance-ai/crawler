@@ -1,93 +1,86 @@
--- runbook: 성별 확정 불가 상품 삭제 (2026-08-05)
+-- runbook: 성별 확정 불가 상품 정리 (2026-08-05)
 --
--- 목적: migration 105 (`cardinality(gender) = 1`) 의 VALIDATE 를 막는 잔여 행과,
---       근거 없이 남녀 양쪽 검색에 노출되는 행을 제거한다.
+-- ── 1부: 다중값 3,796행 — **완료** ────────────────────────────────────────
 --
--- ⚠️ **이 파일은 ID 목록이 비어 있다.** 아래 3단계를 먼저 실행해 manifest 를
---    만들고, 거기서 나온 ID 를 붙여 넣은 뒤에 실행한다. 대상 행이 WP1 apply 와
---    재크롤 결과에 따라 달라지므로 미리 고정할 수 없다.
---    (2026-08-03 런북은 ID 를 고정했다 — 그때는 대상이 이미 확정돼 있었다.)
+-- `repair:product-gender --scope=multi-gender` 가 16,468행 중 12,672행을 단일값으로
+-- 확정하고 3,796행을 남겼다. 그 잔여분은 SQL 이 아니라
+-- `tools/resolve-multi-gender-residual.ts` 로 처리했다 (2026-08-05 실행):
 --
--- ── 왜 삭제인가 ───────────────────────────────────────────────────────────
+--   A. 1,063행 → gender=['unisex'], gender_source='repair_text'
+--      name/category/subcategory/tags/url 에 men·women 토큰이 **모두** 있는 행.
+--      편집샵이 같은 상품을 Men·Women 부서 양쪽에 등록한 것이다 (browns 565,
+--      concepts 196, bodega 114, mohawk-general 104 …). 스노부츠·벨트·선글라스·
+--      양말 같은 실제 공용 품목이고, 사이트가 양쪽에서 판다고 명시한 근거가 있다.
+--   B. 2,733행 → 삭제
+--      성별 토큰이 아예 없는 행 (slam-jam 1,429, union-la 1,038 …). 태그가
+--      브랜드·색·컬렉션뿐이라 재크롤해도 같은 결과다. kids 가드 행 포함.
 --
--- 검색 RPC 는 `p.gender && ARRAY[p_gender,'unisex']` 다. 성별을 확정하지 못한
--- 상품을 unisex 로 채우면 여성복이 남성 검색 결과로 샌다. 다중값 `['men','women']`
--- 도 결과가 같다 — "남녀공용 확인됨"이 아니라 "판정 실패"인데 검색에서 구별되지
--- 않는다. 근거가 없으면 적재하지 않는다는 것이 이 프로젝트의 규율이므로,
--- 이미 적재된 것도 같은 기준으로 제거한다.
+-- 왜 SQL 이 아니라 스크립트였나: A 와 B 를 가르는 술어가 `tags` 배열 안의 토큰
+-- 검사라 PostgREST/SQL 한 줄로 표현하기 어렵고, 매니페스트를 같은 실행에서
+-- 남겨야 복구 근거가 정확해지기 때문이다.
 --
--- repair 스크립트는 DELETE 를 하지 않는다 (src/repair-product-gender.ts 헤더):
---   · 크롤러 DB role 에 DELETE 권한이 없어 런 도중 permission error 로 부분
---     상태가 남는다
---   · products 는 product_embeddings / product_features / product_reviews 가
---     ON DELETE CASCADE 로 물려 있어 임베딩(halfvec 768)과 리뷰가 영구 소실된다
--- 그래서 이 파일은 관리자가 검토 후 직접 실행한다.
+-- 결과 (실측):
+--   다중값 3,796 → **0**
+--   전체 상품 158,560 → 155,827
+--   exactly {men} 36,785 / {women} 72,837 / {unisex} 46,205 — 합이 전체와 일치
+--   → migration 105 (`cardinality(gender) = 1`) 의 VALIDATE 가 통과 가능하다
 --
--- ── 선행 절차 ─────────────────────────────────────────────────────────────
+-- 매니페스트: data/repair/gender-multi-residual-2026-08-05.json
+--   삭제 2,733행의 전체 컬럼이 들어 있다. products 삭제는 product_embeddings /
+--   product_features 로 CASCADE 되므로 복구하려면 재크롤 + 재임베딩이 필요하다 —
+--   이 파일이 유일한 복구 근거다.
 --
--- 1) 다중값 교정을 먼저 끝낸다. 실측(2026-08-05) 16,468행 중 12,672행은
---    재판정만으로 단일값이 되므로 삭제 대상이 아니다.
 --
---      pnpm repair:product-gender --scope=multi-gender \
---        --plan=data/repair/gender-multi-2026-08-05.json
---      # confirmed_* 샘플 URL 을 실제 사이트에서 육안 확인 (특히 browns 8,757행)
---      pnpm repair:product-gender --apply=data/repair/gender-multi-2026-08-05.json
+-- ── 2부: `unverified_legacy` 25,031행 — **미결** ──────────────────────────
 --
--- 2) 남은 대상을 재크롤 + 재임포트로 한 번 더 회수한다. import 는 성별 미확인
---    상품을 스킵하므로, 재임포트로 고쳐지지 않은 행이 여기 삭제 대상이 된다.
---    (재크롤이 값을 만들 수 있는 경로는 엔진 카테고리 성별 / shopify 태그 /
---     src/configs/gender-defaults.ts 보강 셋뿐이다 — DB 텍스트로는 못 푼다)
+-- 값은 전부 `['unisex']` 인데 근거가 없다. gender-repair.ts 가 근거를 못 찾은 행에
+-- `after: null` 로 출처만 찍은 결과이고, 그 `['unisex']` 는 한 번도 검증된 적이
+-- 없다. 검색 RPC 가 unisex 를 남녀 양쪽에 노출하므로 현재 검색 누수의 최대
+-- 단일 원인이다 (근거 없이 양성 노출되는 행: 25,819 — 그 대부분이 이 버킷).
 --
--- 3) manifest 생성. 삭제 전 복구 정보를 남긴다:
+-- **105 를 막지는 않는다** (단일값이므로 CHECK 을 통과한다). 그래서 이 정리는
+-- 105 적용과 독립적으로 진행할 수 있다.
 --
---      SELECT id, platform, brand, name, product_url, gender, gender_source,
---             in_stock, last_seen_at
---      FROM products
---      WHERE cardinality(gender) <> 1
---         OR gender_source = 'unverified_legacy'
---      ORDER BY platform, id;
+-- ⚠️ 재크롤로 대부분 못 고친다. classifyGenderRepair 를 DB 텍스트에 돌리면
+--    22,134행이 여전히 미해결이고 그중 22,117행은 사이트 기본값도 없다. 값을
+--    만들 수 있는 경로는 셋뿐이다:
+--      (i)  현재 엔진이 뽑지만 구 크롤 캐시엔 없던 카테고리 성별 / shopify 태그
+--      (ii) src/configs/gender-defaults.ts 보강 (그 파일 헤더의 [HARD] 규칙 준수)
+--      (iii) 1부 A 와 같은 "양쪽 부서 등록" 판정
+--    → 60개 사이트를 전량 재크롤하기 전에 상위 3개(unaffected-2757 1,530 /
+--      kith 1,194 / etcseoul 1,115)로 수율을 먼저 재라.
+--      `import:products --dry-run` 의 `🚻 gender 해결: n/m` 로그가 그 수치다.
 --
---    → data/repair/gender-unresolved-delete-manifest.json 으로 저장한다.
+-- 재크롤 후에도 남는 행을 지울 때 이 아래를 쓴다. ID 목록은 비워 뒀다 — 대상이
+-- 재크롤 수율에 따라 달라지므로 미리 고정할 수 없다.
 --
--- ── 대상 정의 ─────────────────────────────────────────────────────────────
---
---   (a) cardinality(gender) <> 1        — 105 VALIDATE 를 직접 막는다
---   (b) gender_source = 'unverified_legacy' — 값은 ['unisex'] 인데 근거가 없다.
---       gender-repair.ts 가 `after: null` 로 출처만 찍은 행이고, 값 자체는
---       한 번도 검증된 적이 없다. 105 는 이 행들을 막지 않으므로 (a) 와 달리
---       마이그레이션 차단 요인은 아니지만, 검색 누수의 최대 단일 원인이다.
---   (c) kids — 성인 카탈로그에 아동복이 섞인 행. kids 가드가 성인 성별 부여를
---       의도적으로 막으므로 재크롤해도 영원히 미확인으로 남는다.
---       (a)/(b) 안에 포함돼 있고, repair plan 의 `kids` 버킷으로 식별한다.
---
--- (b) 를 이번 회차에서 함께 지울지는 재크롤 회수율을 보고 결정한다. 회수율이
--- 높으면 (a) 만 지우고 (b) 는 다음 회차로 미룬다 — 2만 행대 삭제는 검색 모수
--- 자체를 줄이므로 되돌릴 수 없는 결정이다.
---
--- ── 실행 순서 (전체) ──────────────────────────────────────────────────────
---   크롤러 코드 배포 → WP1 repair apply → 재크롤/재임포트 → **이 파일** → 105
+-- repair 스크립트는 DELETE 를 하지 않는다 (src/repair-product-gender.ts 헤더).
+-- 다만 2026-08-05 실측으로 크롤러 role 에 DELETE 권한 자체는 있음을 확인했다 —
+-- 그 헤더의 "권한이 없다" 는 서술은 낡았다. 권한이 있어도 CASCADE 때문에
+-- 관리자 검토를 거치는 절차는 그대로 둔다.
 
 BEGIN;
 
--- 사전 확인 — 아래 두 수를 기록해 두고 사후 확인과 대조한다.
---   SELECT count(*) FROM products WHERE cardinality(gender) <> 1;
+-- 사전 확인 — 기록해 두고 사후 확인과 대조한다.
 --   SELECT count(*) FROM products WHERE gender_source = 'unverified_legacy';
+--   -- 2026-08-05 기준 25,031
 
--- ⚠️ manifest 에서 뽑은 ID 를 여기에 붙여 넣는다. 빈 목록이면 이 DELETE 는
---    아무 행도 지우지 않는다 (안전한 기본값 — 실수로 전량 삭제되지 않는다).
+-- ⚠️ manifest 에서 뽑은 ID 를 붙여 넣는다. 빈 목록이면 아무 행도 지우지 않는다
+--    (안전한 기본값 — 실수로 전량 삭제되지 않는다).
 DELETE FROM products
-WHERE id IN (
-  -- <manifest 의 id 목록>
-);
+WHERE gender_source = 'unverified_legacy'
+  AND id IN (
+    -- <manifest 의 id 목록>
+  );
 
 -- 기대: DELETE <manifest 행 수>
--- 수가 다르면 ROLLBACK 하고 manifest 를 다시 만든다 (그 사이 재임포트가
--- 일부를 고쳤다는 뜻이다).
+-- 수가 다르면 ROLLBACK 하고 manifest 를 다시 만든다 (그 사이 재임포트가 일부를
+-- 고쳤다는 뜻이다).
 COMMIT;
 
 -- ── 사후 확인 ─────────────────────────────────────────────────────────────
 --
--- (a) 를 지웠다면 아래가 0 이어야 105 VALIDATE 가 통과한다:
+-- 다중값은 이미 0 이어야 한다 (1부 완료):
 --   SELECT count(*) FROM products WHERE cardinality(gender) <> 1;
 --
 -- 검색 누수 지표 — 근거 없이 남녀 양쪽에 노출되는 행:
@@ -95,4 +88,4 @@ COMMIT;
 --   WHERE (gender && ARRAY['unisex'] OR cardinality(gender) > 1)
 --     AND (gender_source IS NULL
 --          OR gender_source IN ('unverified_legacy','repair_brand_scope'));
---   -- 2026-08-05 기준선: 40,966
+--   -- 2026-08-05 기준선 40,966 → 1부 완료 후 25,819
