@@ -20,12 +20,16 @@
  * 브랜드 스코프는 근거로 쓰지 않는다 — 2026-08 회귀에서 폴백을 복원하지 않았다
  * (src/lib/product-gender.ts 헤더). 근거를 못 찾으면 unverified 로 남긴다.
  *
- * 이 스크립트는 **UPDATE 만** 한다. DELETE 는 하지 않는다:
- *   - 크롤러 DB role 에 DELETE/TRUNCATE 권한이 없어 런 도중 permission error 로
- *     부분 상태가 남는다.
- *   - products 는 product_embeddings / product_reviews 가 ON DELETE CASCADE 로
- *     물려 있어 삭제 시 임베딩(halfvec 768)과 리뷰가 영구 소실된다.
- * 삭제가 필요한 잔여분은 sql/094 수동 런북에서 관리자가 처리한다.
+ * 이 스크립트는 **UPDATE 만** 한다. DELETE 는 하지 않는다 — products 는
+ * product_embeddings / product_features / product_reviews 가 ON DELETE CASCADE 로
+ * 물려 있어, 삭제하면 임베딩(halfvec 768)과 리뷰가 영구 소실되고 복구에 재크롤 +
+ * 재임베딩이 든다. 그래서 삭제는 매니페스트를 남기고 관리자가 검토하는 런북에서만
+ * 한다 (sql/runbooks/).
+ *
+ * 정정 (2026-08-05): 이 헤더는 원래 "크롤러 DB role 에 DELETE/TRUNCATE 권한이
+ * 없다" 고 적고 있었다. **틀렸다** — 권한은 있다(잔여 2,733행 삭제에 실제로
+ * 썼다). 삭제를 런북으로 미루는 이유는 권한이 아니라 위 CASCADE 다. 권한이
+ * 없다고 믿으면 "스크립트가 못 하니 안전하다" 는 잘못된 안심을 하게 된다.
  *
  * 사용법:
  *   pnpm repair:product-gender --plan=./data/repair/gender-2026-07-27.json

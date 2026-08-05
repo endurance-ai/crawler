@@ -491,6 +491,14 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   근거였고 `['unisex']`·다중값은 거부됐지만, 단일값이면서 틀린 행이 상품으로
   조용히 전파되는 유일한 경로였다. 감사 도구도 수정 UI 도 없다.
   `gender_scope` 는 브랜드 레벨 신호로만 유지한다(상품에 안 씀).
+- **태그가 Men·Women 두 부서에 걸려 있으면 확인된 unisex 다** (2026-08-05).
+  편집샵은 같은 상품을 두 부서에 함께 올린다(browns 스노부츠
+  `["Boots","Men","Rain Boots","Shoes","Women"]`). 이건 "모르겠음"이 아니라
+  양쪽에서 판다는 근거다. `inferDualDepartmentFromTags` 가 **태그만** 본다 —
+  상품명까지 합치면 마케팅 카피가 부서 분류로 둔갑한다(실측: Tibi
+  "Thomas Menswear Check Shirt" 는 태그가 여성 전용인 여성복이다).
+  kids 가드가 이 규칙보다 **먼저** 돈다 — `["Kids","Men","Women"]` 이 아동복에
+  성인 unisex 를 주면 안 된다. A/B: 획득 1,029(전부 unisex) / 상실 0 / 뒤집힘 0.
 - **값은 항상 단일값이다** (2026-08-05 확정, migration 105). `['men','women']` 은
   검색 RPC 에서 unisex 와 **똑같이** 남녀 양쪽에 노출되는데 의미는 "남녀공용
   확인됨"이 아니라 "판정 실패"다. 두 상태가 검색에서 구별되지 않는 것이 문제다.

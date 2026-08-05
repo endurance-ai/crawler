@@ -203,6 +203,31 @@ export function isKidsText(text: string): boolean {
 }
 
 /**
+ * 태그가 **사이트의 부서 분류로** 남녀 양쪽에 등록했는지.
+ *
+ * 편집샵은 같은 상품을 Men·Women 두 부서에 함께 올린다 — browns 의 스노부츠
+ * `["Boots","Men","Rain Boots","Shoes","Women"]`, 032c 의 선글라스
+ * `["accessories","men","mykita","women"]` 처럼. 이건 "모르겠음"이 아니라
+ * **양쪽에서 판다는 적극적 근거**이고, gender-defaults.ts 헤더가 unisex 에
+ * 요구하는 기준("사이트가 명시적으로 남녀공용을 표방할 때")을 만족한다.
+ *
+ * **태그만 본다.** 상품명·카테고리를 합친 문자열로 같은 판정을 하면 마케팅
+ * 카피가 부서 분류로 둔갑한다 — 실측(mohawk-general): Tibi
+ * "Thomas Menswear Check Detached Shirt" 는 태그가 여성 전용인데 상품명에
+ * 남성 어휘가 들어 있다. 그 행이 unisex 가 되면 여성복이 남성 검색에 샌다.
+ * 태그는 사이트가 스스로 붙인 분류 체계라 마케팅 문장과 성격이 다르다.
+ *
+ * 한쪽 성별만 잡히는 경우는 여기서 처리하지 않는다 — 일반 텍스트 추론이
+ * 이미 같은 답을 내므로 중복 규칙을 만들지 않는다.
+ */
+export function inferDualDepartmentFromTags(tags: unknown): ProductGender | null {
+  if (!Array.isArray(tags) || tags.length === 0) return null
+  const blob = tags.filter((t): t is string => typeof t === "string" && t.length > 0).join(" ")
+  if (!blob) return null
+  return hasGenderToken(blob, "men") && hasGenderToken(blob, "women") ? "unisex" : null
+}
+
+/**
  * URL 경로에서 성별을 읽는다. 크롤러가 실제로 진입한 카테고리 랜딩이 남긴
  * 구조적 신호라 상품명(마케팅 카피)보다 신뢰도가 높다.
  *
@@ -264,6 +289,8 @@ function singleEvidence(gender: ProductGender[]): ProductGender[] {
  *   2. kids 가드 (성인 토큰 없이 아동 신호만 있으면 미확인)
  *   3. URL 경로
  *   4. 상품명/카테고리/태그 텍스트
+ *      4b. 4 가 men·women 동시 검출로 모호하면, **태그만** 다시 봐서 사이트가
+ *          두 부서에 함께 올린 상품인지 판정한다 → unisex
  *   5. 3·4 가 서로 다르면 미확인 (추측하지 않음)
  *   6. 사이트 전역 defaultGender (productGenderSource === "config_default")
  *   7. 미확인 — 호출자가 적재에서 제외한다
@@ -288,12 +315,21 @@ export function resolveProductGenderWithSource(
   const text = evidenceText(evidence)
   const url = typeof evidence.productUrl === "string" ? evidence.productUrl : ""
 
-  const fromText = text ? inferGenderFromText(text) : null
+  const rawFromText = text ? inferGenderFromText(text) : null
   const fromUrl = inferGenderFromUrl(url)
 
-  if (fromText === null && fromUrl === null && (isKidsText(text) || isKidsText(url))) {
+  // kids 가드는 태그 부서 분류보다 **먼저** 본다. 순서를 뒤집으면
+  // `["Kids","Men","Women"]` 같은 태그가 아동복에 성인 성별(unisex)을 주고,
+  // unisex 는 검색에서 남녀 양쪽에 노출되므로 정확히 이 모듈이 막으려는 세탁이 된다.
+  if (rawFromText === null && fromUrl === null && (isKidsText(text) || isKidsText(url))) {
     return {gender: [], source: null}
   }
+
+  // 일반 텍스트가 men·women 동시 검출로 모호해졌을 때만 태그 부서 분류를 본다.
+  // 편집샵이 두 부서에 함께 올린 상품은 "판정 실패"가 아니라 "확인된 남녀공용"이다
+  // (inferDualDepartmentFromTags 헤더 참조). 텍스트가 이미 한쪽으로 확정됐으면
+  // 건드리지 않는다 — 구체 성별이 unisex 를 이기는 기존 규율 그대로다.
+  const fromText = rawFromText ?? inferDualDepartmentFromTags(evidence.tags)
 
   // URL 과 텍스트가 어긋나는 경우.
   //
