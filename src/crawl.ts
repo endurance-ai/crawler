@@ -65,6 +65,8 @@ const queueDb =
 // SiteConfig.brand 로 brand_nodes 를 매칭해 폴백.
 async function resolveBrandNodeId(platform: string): Promise<number | null> {
   if (!queueDb) return null
+  const config = getSiteConfig(platform)
+  if (config?.multiBrand) return null
   const {data: statusRow} = await queueDb
     .from("product_crawl_status")
     .select("brand_node_id")
@@ -72,7 +74,7 @@ async function resolveBrandNodeId(platform: string): Promise<number | null> {
     .maybeSingle()
   if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
 
-  const brandName = getSiteConfig(platform)?.brand
+  const brandName = config?.brand
   if (brandName) {
     const {data: node} = await queueDb
       .from("brand_nodes")

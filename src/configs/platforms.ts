@@ -180,7 +180,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "스컬프스토어",
     type: "cafe24",
     baseUrl: "https://sculpstore.com",
-    brand: "SCULPTOR",
+    multiBrand: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,

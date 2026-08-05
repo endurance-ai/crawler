@@ -16,9 +16,13 @@ import {createClient} from "@supabase/supabase-js"
 import {convertToKrw} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
-import {getSiteConfig} from "./configs/platforms"
+import {getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {mergeProductImages} from "./lib/product-images"
+import {
+  canUsePlatformBrandFallback,
+  resolveProductBrandNodeIdFromMaps,
+} from "./lib/brand-node-resolution"
 import {
   isTrustedBrandSource,
   partitionUnknownBrands,
@@ -59,6 +63,9 @@ if (!dbUrl || !dbToken) {
 }
 
 const db = createClient(dbUrl, dbToken)
+const RETAILER_PLATFORM_KEYS = new Set(
+  PLATFORMS.filter((platform) => platform.multiBrand).map((platform) => platform.key),
+)
 
 interface CrawledReview {
   text: string
@@ -126,12 +133,14 @@ interface BrandNodeRow {
 // admin 페이지(product_crawl_brands 뷰)가 이걸 읽는다. 이미 platform_key 가 채워진 status 행이
 // 있으면 그걸로 resolve, 없으면 brand_nodes 를 brand_name 으로 매칭해 폴백한다.
 async function resolveBrandNodeId(platform: string, brandName: string | null): Promise<number | null> {
-  const {data: statusRow} = await db
-    .from("product_crawl_status")
-    .select("brand_node_id")
-    .eq("platform_key", platform)
-    .maybeSingle()
-  if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
+  if (canUsePlatformBrandFallback(platform, RETAILER_PLATFORM_KEYS)) {
+    const {data: statusRow} = await db
+      .from("product_crawl_status")
+      .select("brand_node_id")
+      .eq("platform_key", platform)
+      .maybeSingle()
+    if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
+  }
 
   if (brandName) {
     const {data: node} = await db
@@ -289,7 +298,11 @@ async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
     for (const row of data) {
       const platformKey = (row as {platform_key: string | null}).platform_key
       const brandNodeId = (row as {brand_node_id: number | null}).brand_node_id
-      if (platformKey && typeof brandNodeId === "number") out.set(platformKey, brandNodeId)
+      if (
+        platformKey &&
+        typeof brandNodeId === "number" &&
+        canUsePlatformBrandFallback(platformKey, RETAILER_PLATFORM_KEYS)
+      ) out.set(platformKey, brandNodeId)
     }
     if (data.length < PAGE) break
     offset += PAGE
@@ -303,7 +316,13 @@ function resolveProductBrandNodeId(
   brandIdMap: Map<string, number>,
   platformBrandIdMap: Map<string, number>,
 ): number | null {
-  return brandIdMap.get(brand.toLowerCase()) ?? platformBrandIdMap.get(platform) ?? null
+  return resolveProductBrandNodeIdFromMaps(
+    brand,
+    platform,
+    brandIdMap,
+    platformBrandIdMap,
+    RETAILER_PLATFORM_KEYS,
+  )
 }
 
 /**
