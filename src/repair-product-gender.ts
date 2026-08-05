@@ -7,6 +7,12 @@
  * VLM gender 성능 미달로 크롤러에 회귀했으므로, 재크롤 없이 name/product_url/
  * category/tags 로 되채운다 (`--scope=null-gender`, 기본값).
  *
+ * 주 용도(2026-08-05): `--scope=multi-gender`. products.gender 가 `['men','women']`
+ * 처럼 다중값인 행 — 구 shopify 태그 union(`"womens".includes("men")`) 잔재다.
+ * 검색 RPC 가 `p.gender && ARRAY[p_gender,'unisex']` 로 매칭하므로 unisex 와
+ * 똑같이 남녀 양쪽에 노출되는데, 실제로는 "남녀공용"이 아니라 "판정 실패"다.
+ * 실측: 16,468행 중 12,672행이 DB 텍스트 재판정만으로 단일값 확정된다.
+ *
  * 부차 용도: migration 091 이 brand_nodes.gender_scope 에서 일괄 백필한
  * 13,942행 중 `['unisex']` 세탁분 교정 (`--scope=unisex`). 검색 RPC 는 unisex 를
  * 남녀 양쪽에 노출하므로 그 상품들이 남성 결과에 여성복으로 떠 있다.
@@ -28,7 +34,7 @@
  * 플래그:
  *   --plan=<path>     읽기 전용. 분류 + 분포 출력 + 계획 파일 생성 (= dry run)
  *   --apply=<path>    계획 파일 재검증 후 쓰기
- *   --scope=          null-gender(기본) | unisex | all | source-null
+ *   --scope=          null-gender(기본) | multi-gender | unisex | all | source-null
  *   --platform=       특정 플랫폼만 (단계적 적용)
  *   --brand-node=     특정 brand_node_id 만
  *   --limit=          최대 처리 행 수
@@ -107,6 +113,20 @@ function has(name: string): boolean {
  * offset 페이징(.range)을 쓰면 안 된다 — apply 가 스캔 대상 행을 변경하므로
  * 이후 페이지가 밀려 행이 조용히 누락된다.
  */
+/**
+ * `--scope=multi-gender` 의 행 필터.
+ *
+ * PostgREST 로는 `cardinality(gender) > 1` 을 직접 걸 수 없다. 정규값이
+ * men/women/unisex 3개뿐이라 2개 이상 조합은 아래 3가지가 전부이고, 실측
+ * (2026-08-05) 로 이 술어가 다중값 16,468행 전량과 일치함을 확인했다.
+ *
+ * plan 과 apply 가 **같은 문자열**을 써야 apply 의 재검증 가드가 성립한다.
+ */
+const MULTI_GENDER_FILTER = "gender.cs.{men,women},gender.cs.{men,unisex},gender.cs.{women,unisex}"
+
+/** `--scope` 허용값. `all` 은 필터 없이 전수 스캔이다. */
+const SCOPES = ["null-gender", "multi-gender", "unisex", "source-null", "all"]
+
 /** 플랫폼 키 → 사람이 검증한 사이트 전역 기본 성별 (getSiteConfig 가 gender-defaults.ts 를 병합해 준다). */
 function siteDefaultFor(platform: string | null): string[] {
   if (!platform) return []
@@ -129,6 +149,7 @@ async function* streamProducts(
 
     if (opts.scope === "null-gender") q = q.is("gender", null)
     else if (opts.scope === "unisex") q = q.contains("gender", ["unisex"])
+    else if (opts.scope === "multi-gender") q = q.or(MULTI_GENDER_FILTER)
     else if (opts.scope === "source-null") q = q.is("gender_source", null)
     if (opts.platform) q = q.eq("platform", opts.platform)
     if (opts.brandNodeId !== null) q = q.eq("brand_node_id", opts.brandNodeId)
@@ -211,6 +232,11 @@ async function writePlan(outputPath: string): Promise<void> {
   fs.mkdirSync(path.dirname(absolute), {recursive: true})
 
   const scope = flag("scope") ?? "null-gender"
+  // 오타난 스코프는 streamProducts 에서 필터 없이 전수(15만행) 스캔으로 떨어진다.
+  // 조용히 전체를 대상으로 삼는 대신 여기서 거부한다.
+  if (!SCOPES.includes(scope)) {
+    throw new Error(`알 수 없는 --scope=${scope} (가능: ${SCOPES.join(" | ")})`)
+  }
   const useDescription = has("use-description")
   const platform = flag("platform")
   const brandNodeId = flag("brand-node") !== null ? Number(flag("brand-node")) : null
@@ -229,6 +255,16 @@ async function writePlan(outputPath: string): Promise<void> {
     process.stdout.write(`\r   🔍 ${decisions.length}행 분류`)
   }
   console.log("")
+
+  // 스코프가 0행이면 빈 계획 파일을 조용히 남기지 않는다. `--scope=null-gender`
+  // 는 2026-08-05 기준 0행인데도 기본값이라, 스코프를 지정하지 않은 실행이
+  // "아무 문제 없음"처럼 보이는 빈 계획을 만들어 왔다.
+  if (decisions.length === 0) {
+    throw new Error(
+      `--scope=${scope} 대상이 0행이다 (계획 파일을 만들지 않는다). ` +
+        "스코프를 확인하라 — 다중값은 --scope=multi-gender, 미확인 unisex 는 --scope=unisex.",
+    )
+  }
 
   const summary = summarizeGenderRepair(decisions)
   printSummary(summary)
@@ -379,6 +415,7 @@ async function applyPlan(planPath: string): Promise<void> {
       // 않는다 → 재실행 멱등 + 동시 import 와의 경쟁에서 안전.
       let q = db.from("products").update(payload).in("id", batch.map((r) => r.id))
       if (plan.scope === "unisex") q = q.contains("gender", ["unisex"])
+      if (plan.scope === "multi-gender") q = q.or(MULTI_GENDER_FILTER)
       const {data, error} = await q.select("id")
       if (error) throw new Error(`apply failed (${afterRaw}/${source}): ${error.message}`)
 
