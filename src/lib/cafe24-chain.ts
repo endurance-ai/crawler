@@ -1,7 +1,6 @@
 import type {Cafe24Page} from "./cafe24-page"
 import type {Product, SiteConfig} from "./types"
 import {normalizeObservedPricing} from "./product-pricing"
-
 /**
  * A generic unisex bucket is a site-wide fallback, not product evidence.
  * Keeping it below URL/text inference prevents edit-shop categories from
