@@ -1,5 +1,5 @@
 import {resolveProductBrand} from "./brand-provenance"
-import {toPriceFields} from "./listing-refresh"
+import {toDbPriceFields} from "./product-pricing"
 import type {Product, SiteConfig} from "./types"
 
 export const REFRESH_FALLBACK_IMAGE_VERSION = "refresh-fallback-v1"
@@ -44,7 +44,7 @@ export function productToCandidateDbRow(
 ): Record<string, unknown> {
   const selected = withFallbackImageSelection(product)
   const sourceCurrency = selected.sourceCurrency ?? config.sourceCurrency ?? "KRW"
-  const prices = toPriceFields(selected, sourceCurrency)
+  const prices = toDbPriceFields(selected, sourceCurrency, {requireConfirmed: true})
   if (!prices) throw new Error("candidate price is missing or invalid")
   // 성별이 **정확히 하나**가 아니면 적재하지 않는다. products.gender 는 NOT NULL
   // 계약이고, 미확인을 unisex 로 채우면 검색 RPC 가 남녀 양쪽에 노출시킨다.
@@ -72,8 +72,8 @@ export function productToCandidateDbRow(
     price: prices.price,
     original_price: prices.original_price,
     sale_price: prices.sale_price,
-    source_currency: sourceCurrency,
-    source_price: selected.sourcePrice ?? selected.price,
+    source_currency: prices.source_currency,
+    source_price: prices.source_price,
     product_no: productNumber(selected.productUrl),
     image_url: selected.imageUrl,
     source_image_url: selected.sourceImageUrl ?? selected.imageUrl,

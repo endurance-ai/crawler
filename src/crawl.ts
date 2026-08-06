@@ -506,6 +506,9 @@ async function crawlCafe24WithChromium(
       onDetailProgress,
       existingDetails,
       includeOutOfStock,
+      // Cafe24 목록의 단일 가격은 정상가인지 세일가인지 증명할 수 없다.
+      // 온보딩도 refresh와 같은 가격 계약을 지키도록 미확정 상품을 전수 상세 확인한다.
+      recoverMissingPriceFromDetail: true,
     })
   } finally {
     await browser.close()
@@ -540,6 +543,7 @@ async function crawlCafe24WithSelectedEngine(
       onDetailProgress,
       existingDetails,
       includeOutOfStock,
+      recoverMissingPriceFromDetail: true,
     })
     if (result.stats.totalProducts === 0) {
       throw new Error("Lightpanda returned 0 products")

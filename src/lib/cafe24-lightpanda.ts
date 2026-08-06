@@ -20,6 +20,7 @@ export interface LightpandaCafe24Options {
   onDetailProgress?: CrawlCafe24Options["onDetailProgress"]
   existingDetails?: CrawlCafe24Options["existingDetails"]
   includeOutOfStock?: CrawlCafe24Options["includeOutOfStock"]
+  recoverMissingPriceFromDetail?: CrawlCafe24Options["recoverMissingPriceFromDetail"]
 }
 
 interface LightpandaPageLease extends Cafe24DetailPageLease {
@@ -143,7 +144,7 @@ export async function crawlCafe24WithLightpanda(
   const detailConcurrency = options.detailConcurrency ?? 3
   const mainPage = await openLightpandaPage()
   const detailPool =
-    config.crawlDetails && detailParser
+    (config.crawlDetails && detailParser) || options.recoverMissingPriceFromDetail
       ? new LightpandaPagePool(Math.max(1, detailConcurrency))
       : null
 
@@ -154,6 +155,7 @@ export async function crawlCafe24WithLightpanda(
       onDetailProgress: options.onDetailProgress,
       existingDetails: options.existingDetails,
       includeOutOfStock: options.includeOutOfStock,
+      recoverMissingPriceFromDetail: options.recoverMissingPriceFromDetail,
       createDetailPage: detailPool
         ? async () => {
             const lease = await detailPool.acquire()

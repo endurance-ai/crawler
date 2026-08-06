@@ -18,6 +18,7 @@
 
 import {chromium, type Browser, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
+import {normalizeObservedPricing} from "./product-pricing"
 import {extractStructuredProduct} from "./parsers/structured-data"
 import {CURRENCY_SYMBOL} from "./fx"
 import {
@@ -97,6 +98,13 @@ export function parseImwebListItem(
   if (price === null) return null
 
   const onSale = originalPrice !== null && price !== null && price < originalPrice
+  const pricing = normalizeObservedPricing({
+    currentPrice: price,
+    originalPrice,
+    salePrice: onSale ? price : null,
+    state: onSale ? "sale" : "regular",
+    source: "api",
+  })
   const imageUrl = typeof props.image_url === "string" && /^https?:\/\//.test(props.image_url) ? props.image_url : ""
 
   // imweb 위젯 JSON의 price/original_price는 항상 스토어 원본 통화값이다.
@@ -120,12 +128,10 @@ export function parseImwebListItem(
     genderSource: "config_default" as const,
     name,
     category,
-    price,
-    originalPrice: originalPrice ?? price,
-    salePrice: onSale ? price : null,
+    ...pricing,
     priceFormatted: sourceCurrency === "KRW"
-      ? `₩${price.toLocaleString("ko-KR")}`
-      : `${CURRENCY_SYMBOL[sourceCurrency] ?? sourceCurrency}${price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
+      ? `₩${pricing.price!.toLocaleString("ko-KR")}`
+      : `${CURRENCY_SYMBOL[sourceCurrency] ?? sourceCurrency}${pricing.price!.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})}`,
     imageUrl,
     productUrl: item.link,
     inStock: !item.soldOutBadge,
@@ -134,7 +140,6 @@ export function parseImwebListItem(
     images: imageUrl ? [imageUrl] : undefined,
     productCode: typeof props.code === "string" ? props.code : undefined,
     sourceCurrency,
-    sourcePrice: price,
   }
 }
 

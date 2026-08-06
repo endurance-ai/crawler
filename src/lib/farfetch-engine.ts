@@ -108,6 +108,7 @@
 import {type Browser, chromium, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {checkRobots} from "./robots-check"
+import {normalizeObservedPricing} from "./product-pricing"
 
 // SPEC-006 REQ-002: region drives source currency, price-formatter
 // locale/symbol, and browser context locale + timezone. KR is the
@@ -198,22 +199,25 @@ export function isSafeFarfetchProductUrl(url: string, baseUrl: string): boolean 
  * SPEC: SPEC-006 REQ-003
  */
 export function parseFarfetchPrice(text: string, region: FarfetchRegion): number | null {
-  if (typeof text !== "string" || text.length === 0) return null
+  const values = parseFarfetchPriceTokens(text, region)
+  return values.length > 0 ? values[values.length - 1]! : null
+}
+
+export function parseFarfetchPriceTokens(text: string, region: FarfetchRegion): number[] {
+  if (typeof text !== "string" || text.length === 0) return []
   if (region === "US") {
     const m = text.match(/\$\s*([\d,]+(?:\.\d+)?)/g)
-    if (!m || m.length === 0) return null
-    const last = m[m.length - 1]!.replace(/[$,\s]/g, "")
-    const v = parseFloat(last)
-    if (!Number.isFinite(v) || v <= 0) return null
-    return v
+    if (!m || m.length === 0) return []
+    return m
+      .map((token) => Number.parseFloat(token.replace(/[$,\s]/g, "")))
+      .filter((value) => Number.isFinite(value) && value > 0)
   }
   // KR (KRW integer)
   const m = text.match(/₩\s*([\d,]+)/g)
-  if (!m || m.length === 0) return null
-  const last = m[m.length - 1]!.replace(/[₩,\s]/g, "")
-  const v = parseInt(last, 10)
-  if (!Number.isFinite(v) || v <= 0) return null
-  return v
+  if (!m || m.length === 0) return []
+  return m
+    .map((token) => Number.parseInt(token.replace(/[₩,\s]/g, ""), 10))
+    .filter((value) => Number.isFinite(value) && value > 0)
 }
 
 /**
@@ -328,9 +332,19 @@ export function parseProductsFromCards(
     if (!raw.href || !raw.brand || !raw.name || !raw.priceText) continue
     if (!productUrlPattern.test(raw.href)) continue
     if (!isSafeFarfetchImageUrl(raw.imageUrl)) continue
-    const price = parseFarfetchPrice(raw.priceText, region)
+    const priceTokens = parseFarfetchPriceTokens(raw.priceText, region)
+    const price = priceTokens[priceTokens.length - 1] ?? null
     if (price === null) continue
     if (!isPriceInSaneRange(price, region)) continue
+    const firstPrice = priceTokens[0] ?? price
+    const onSale = priceTokens.length >= 2 && firstPrice > price
+    const pricing = normalizeObservedPricing({
+      currentPrice: price,
+      originalPrice: onSale ? firstPrice : price,
+      salePrice: onSale ? price : null,
+      state: onSale ? "sale" : "regular",
+      source: "listing",
+    })
     const idMatch = raw.href.match(/-item-(\d+)\.aspx$/)
     const productCode = idMatch ? idMatch[1]! : ""
     const gender = genderHint ? [genderHint] : (deriveGenderFromUrl(raw.href) ? [deriveGenderFromUrl(raw.href)] : [])
@@ -338,9 +352,7 @@ export function parseProductsFromCards(
       brand: raw.brand,
       name: raw.name,
       category: "",
-      price,
-      originalPrice: price,
-      salePrice: null,
+      ...pricing,
       priceFormatted: formatFarfetchPrice(price, region),
       imageUrl: raw.imageUrl,
       images: [raw.imageUrl],
@@ -351,7 +363,6 @@ export function parseProductsFromCards(
       crawledAt,
       productCode,
       sourceCurrency,
-      sourcePrice: price,
     })
   }
   return out

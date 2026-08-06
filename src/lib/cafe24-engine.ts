@@ -178,7 +178,7 @@ export interface CrawlCafe24Options {
    * 소스가 `price_missing_rate≈100` 으로 갱신 성공 이력을 한 번도 못 쌓았다.
    */
   recoverMissingPriceFromDetail?: boolean
-  /** Step 3b 의 소스당 상세 방문 상한. 기본 300 — 한 소스가 배치 예산을 삼키지 않게. */
+  /** Step 3b 의 소스당 상세 방문 상한. 생략하면 가격 미확정 상품을 전수 확인한다. */
   priceRecoveryLimit?: number
   /**
    * Chromium 전용: deterministic 상세 파싱 직후, 페이지가 리셋/재사용되기 전에
@@ -626,15 +626,16 @@ async function collectProductsFromPage(
         }
 
         var priceFormatted = ""
-        if (price) {
+        var effectivePrice = salePrice || price
+        if (effectivePrice) {
           if (args.sourceCurrency === "USD") {
-            priceFormatted = "$" + price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            priceFormatted = "$" + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
           } else if (args.sourceCurrency === "EUR") {
-            priceFormatted = "€" + price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            priceFormatted = "€" + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
           } else if (args.sourceCurrency === "GBP") {
-            priceFormatted = "£" + price.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
+            priceFormatted = "£" + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
           } else {
-            priceFormatted = "₩" + price.toLocaleString()
+            priceFormatted = "₩" + effectivePrice.toLocaleString()
           }
         }
 
@@ -642,6 +643,11 @@ async function collectProductsFromPage(
           brand, name, category: args.categoryName,
           price: salePrice || price,
           originalPrice, salePrice,
+          pricingObservation: {
+            state: salePrice !== null ? "sale" : "unknown",
+            source: "listing",
+            version: 2,
+          },
           priceFormatted,
           imageUrl, productUrl, inStock,
           gender: args.gender, genderSource: args.genderSource,
@@ -1006,21 +1012,21 @@ export async function crawlCafe24(
     console.log(`\n${tag} ✅ 상세 크롤링 완료 — ${detailSuccess}/${uniqueProducts.length}개 데이터 수집`)
   }
 
-  // ── Step 3b: 가격 복구 전용 상세 방문 (갱신 경로) ──
+  // ── Step 3b: 가격 확정 전용 상세 방문 (온보딩 + 갱신 경로) ──
   //
-  // 일부 cafe24 상점은 리스트에 가격을 안 띄우고 상세에만 노출한다. 온보딩 크롤은
-  // crawlDetails=true 라 가격을 얻지만, 갱신은 listingOnly 라 구조적으로 못 얻는다
-  // (실측 2026-07-30: 42개 소스 / 재고 6,182건이 price_missing_rate≈100 으로 갱신 불가).
+  // 일부 cafe24 상점은 리스트에 가격을 안 띄우고 상세에만 노출하며, 단일 가격만
+  // 노출하는 상점은 그 값이 정상가인지 세일가인지 목록만으로 증명할 수 없다.
   //
-  // 소스 단위로 상세를 켜지 않고 **가격이 빠진 상품만** 방문한다 — 건강한 상점은
-  // 방문 0회다. detailParser 가 필요 없다: extractCafe24DetailFallbacks 는 페이지만
-  // 받아 name/price 를 DOM 에서 뽑고, applyCafe24DetailFallbacks 가 price===null 인
-  // 경우에만 채운다. 그래서 새 파싱 코드가 없다.
+  // 소스 단위의 전체 상품 상세 파서를 켜지 않고 **가격 관측이 미확정인 상품만**
+  // 방문한다. detailParser 가 필요 없다: extractCafe24DetailFallbacks 는 페이지만
+  // 받아 name/price 를 DOM 에서 뽑고, 상세의 확정 가격 tuple로 교체한다.
   if (!ranFullDetail && options.recoverMissingPriceFromDetail) {
-    const targets = uniqueProducts.filter((p) => p.price === null)
-    // 한 소스가 배치 예산을 삼키지 않도록 상한을 둔다. price_missing_rate=100 인
-    // 상점은 리스트 전체가 대상이 되기 때문이다.
-    const cap = options.priceRecoveryLimit ?? 300
+    const targets = uniqueProducts.filter(
+      (p) => p.pricingObservation?.version !== 2 || p.pricingObservation.state === "unknown",
+    )
+    // 기본은 전수 확인이다. 명시적으로 상한을 준 운영 런만 일부를 처리하며,
+    // 나머지는 unknown으로 남아 가격 UPDATE 대상이 되지 않는다.
+    const cap = options.priceRecoveryLimit ?? targets.length
     const capped = targets.slice(0, cap)
     if (capped.length > 0) {
       const recoveryStart = Date.now()
@@ -1045,7 +1051,7 @@ export async function crawlCafe24(
                 await pg.goto(product.productUrl, {waitUntil: "domcontentloaded", timeout: 20_000})
                 const fallbacks = await extractCafe24DetailFallbacks(pg)
                 applyCafe24DetailFallbacks(product, fallbacks)
-                if (product.price !== null) recovered += 1
+                if (product.pricingObservation?.state !== "unknown") recovered += 1
               } catch {
                 // 한 상품 실패가 나머지를 막지 않는다. 페이지를 재사용하므로 다음
                 // 배치의 goto 가 "interrupted by another navigation" 나지 않도록 리셋한다
@@ -1125,6 +1131,13 @@ export async function crawlCafe24(
     const msg = `Cafe24 quality failed: ${quality.reasons.join(", ")}`
     qualityWarnings.push(msg)
     console.log(`${tag} ⚠️ ${msg} ${JSON.stringify(quality.metrics)}`)
+  }
+  const priceUnknown = uniqueProducts.filter(
+    (product) => !product.pricingObservation || product.pricingObservation.state === "unknown",
+  ).length
+  if (priceUnknown > 0) {
+    qualityWarnings.push(`price_unknown=${priceUnknown}`)
+    console.log(`${tag} ⚠️ 가격 관측 미확정 ${priceUnknown}/${uniqueProducts.length}개`)
   }
 
   // 통계

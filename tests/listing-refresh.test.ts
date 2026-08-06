@@ -24,6 +24,13 @@ const product = (over: Partial<Product> = {}): Product =>
     price: 10000,
     originalPrice: 10000,
     salePrice: null,
+    sourcePrice: over.sourcePrice ?? over.salePrice ?? over.price ?? 10000,
+    sourceCurrency: "KRW",
+    pricingObservation: {
+      state: over.salePrice != null ? "sale" : "regular",
+      source: "listing",
+      version: 2,
+    },
     priceFormatted: "₩10,000",
     imageUrl: "https://x/i.jpg",
     productUrl: "https://x/p/1",
@@ -38,6 +45,8 @@ const row = (over: Partial<RefreshableRow> = {}): RefreshableRow => ({
   price: 10000,
   original_price: 10000,
   sale_price: null,
+  source_price: over.source_price ?? over.sale_price ?? over.price ?? 10000,
+  source_currency: "KRW",
   in_stock: true,
   ...over,
 })
@@ -58,7 +67,7 @@ test("toPriceFields: 가격을 못 읽으면 null — 기존 값을 덮어쓰지
 })
 
 test("toPriceFields: 미지원 통화는 null — 원본 통화 값이 KRW 컬럼에 새지 않는다", () => {
-  assert.equal(toPriceFields(product({price: 99}), "XYZ"), null)
+  assert.equal(toPriceFields(product({price: 99, sourceCurrency: undefined}), "XYZ"), null)
 })
 
 test("diffListing: 변한 게 없으면 업데이트 0건", () => {
@@ -94,6 +103,8 @@ test("diffListing: 가격 변동을 잡고 세 컬럼을 함께 쓴다", () => {
     price: 7000,
     original_price: 10000,
     sale_price: 7000,
+    source_price: 7000,
+    source_currency: "KRW",
   })
 })
 
@@ -242,14 +253,14 @@ test("diffListing: confirmedUrls 는 값이 안 바뀐 상품까지 포함한다
   // last_seen_at 을 올릴 대상은 confirmedUrls 다.
   const diff = diffListing({
     crawled: [
-      {productUrl: "https://s.test/a", price: 1000, inStock: true} as never,
-      {productUrl: "https://s.test/b", price: 2000, inStock: true} as never,
+      product({productUrl: "https://s.test/a", price: 1000, originalPrice: 1000, sourcePrice: 1000}),
+      product({productUrl: "https://s.test/b", price: 2000, originalPrice: 2000, sourcePrice: 2000}),
     ],
     existing: [
       // a: 완전히 동일 → updates 에 안 들어간다
-      {product_url: "https://s.test/a", price: 1000, original_price: 1000, sale_price: null, in_stock: true},
+      {product_url: "https://s.test/a", price: 1000, original_price: 1000, sale_price: null, source_price: 1000, source_currency: "KRW", in_stock: true},
       // b: 가격 변동 → updates 에 들어간다
-      {product_url: "https://s.test/b", price: 9999, original_price: 9999, sale_price: null, in_stock: true},
+      {product_url: "https://s.test/b", price: 9999, original_price: 9999, sale_price: null, source_price: 9999, source_currency: "KRW", in_stock: true},
     ],
     markMissingOutOfStock: false,
   })

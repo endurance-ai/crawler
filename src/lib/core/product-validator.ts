@@ -71,6 +71,13 @@ export const ProductSchema = z
     price: z.number().nullable(),
     originalPrice: z.number().nullable(),
     salePrice: z.number().nullable(),
+    pricingObservation: z
+      .object({
+        state: z.enum(["sale", "regular", "unknown"]),
+        source: z.enum(["variant", "api", "listing", "detail"]),
+        version: z.literal(2),
+      })
+      .optional(),
     priceFormatted: z.string(),
     imageUrl: z.string(),
     sourceImageUrl: z.string().optional(),

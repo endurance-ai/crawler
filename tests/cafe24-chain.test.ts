@@ -2,12 +2,14 @@ import {test} from "node:test"
 import * as assert from "node:assert/strict"
 
 import {
+  applyCafe24DetailFallbacks,
   assessCafe24ProductQuality,
   cafe24CategoryGenderSource,
   cleanCafe24ProductName,
   filterCafe24ProductsWithUsablePrice,
   inferCafe24Currency,
   isGenericCafe24ProductName,
+  parseCafe24LabeledPrice,
   parseCafe24PriceCandidate,
   parseCafe24PriceCandidates,
   parseCafe24CategoryHref,
@@ -139,3 +141,49 @@ function product(overrides: Partial<Product>): Product {
     ...overrides,
   }
 }
+
+test("Cafe24 labeled prices distinguish regular and sale values", () => {
+  const text = "판매가 ₩100,000 할인판매가 ₩70,000"
+
+  assert.equal(parseCafe24LabeledPrice(text, "original", "KRW"), 100_000)
+  assert.equal(parseCafe24LabeledPrice(text, "sale", "KRW"), 70_000)
+  assert.equal(
+    parseCafe24LabeledPrice("10% 할인 적립금 5,000원", "sale", "KRW"),
+    null,
+  )
+})
+
+test("Cafe24 detail pricing replaces an unconfirmed listing price coherently", () => {
+  const item = product({
+    price: 100_000,
+    originalPrice: 100_000,
+    salePrice: null,
+    sourcePrice: 100_000,
+    pricingObservation: {
+      state: "unknown",
+      source: "listing",
+      version: 2,
+    },
+  })
+
+  applyCafe24DetailFallbacks(item, {
+    name: null,
+    price: 70_000,
+    originalPrice: 100_000,
+    salePrice: 70_000,
+    priceFormatted: "₩70,000",
+    sourceCurrency: "KRW",
+    sourcePrice: 70_000,
+    descriptionFirstLine: null,
+  })
+
+  assert.equal(item.price, 70_000)
+  assert.equal(item.originalPrice, 100_000)
+  assert.equal(item.salePrice, 70_000)
+  assert.equal(item.sourcePrice, 70_000)
+  assert.deepEqual(item.pricingObservation, {
+    state: "sale",
+    source: "detail",
+    version: 2,
+  })
+})

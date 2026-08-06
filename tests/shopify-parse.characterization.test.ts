@@ -82,6 +82,32 @@ test("single-brand override ignores a conflicting Shopify vendor", () => {
   assert.ok(products.every((product) => product.brand === "House Brand"))
 })
 
+test("shopify는 구매 가능한 세일 옵션이 하나라도 있으면 가장 낮은 세일 옵션을 대표한다", () => {
+  const fixture = {
+    products: [{
+      id: 1,
+      title: "Variant sale",
+      handle: "variant-sale",
+      vendor: "Brand",
+      product_type: "Shirt",
+      body_html: "",
+      tags: ["men"],
+      variants: [
+        {id: 1, title: "Regular", price: "40.00", compare_at_price: null, available: true, sku: "R"},
+        {id: 2, title: "Sale", price: "60.00", compare_at_price: "100.00", available: true, sku: "S"},
+        {id: 3, title: "Lower sold sale", price: "30.00", compare_at_price: "90.00", available: false, sku: "O"},
+      ],
+      images: [],
+    }],
+  }
+  const [product] = parseShopifyProducts(fixture, BASE_URL, KEY, PARSE_OPTIONS)
+  assert.equal(product.price, 60)
+  assert.equal(product.originalPrice, 100)
+  assert.equal(product.salePrice, 60)
+  assert.equal(product.sourcePrice, 60)
+  assert.equal(product.pricingObservation?.state, "sale")
+})
+
 const IMAGE_HOST_WHITELIST = (host: string, baseHost: string): boolean =>
   host === baseHost ||
   host === "cdn.shopify.com" ||

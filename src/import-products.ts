@@ -13,7 +13,7 @@ import {createClient} from "@supabase/supabase-js"
 // currency is non-KRW (currently Uniqlo US). Cache stores native USD;
 // only the DB upsert payload sees post-conversion KRW.
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
-import {convertToKrw} from "./lib/fx"
+import {isConfirmedPricing, toDbPriceFields} from "./lib/product-pricing"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
@@ -107,6 +107,12 @@ interface CrawledProduct {
   productCode?: string
   /** Source currency (KRW default; "USD" for Uniqlo US cache) */
   sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
+  sourcePrice?: number
+  pricingObservation?: {
+    state: "sale" | "regular" | "unknown"
+    source: "variant" | "api" | "listing" | "detail"
+    version: 2
+  }
   // 리뷰 데이터
   reviewCount?: number
   reviews?: CrawledReview[]
@@ -614,7 +620,16 @@ async function main() {
       }
     }
 
-    let fxSkipped = 0
+    const unconfirmedPricing = raw.filter((product) => !isConfirmedPricing(product))
+    if (unconfirmedPricing.length > 0) {
+      console.error(
+        `   ❌ 가격 관측 v2 미확정 ${unconfirmedPricing.length}/${raw.length}건 — ` +
+          `기존 세일가를 지울 수 있어 플랫폼 파일 전체를 적재하지 않습니다. 최신 엔진으로 상세 재크롤하세요.`,
+      )
+      totalErrors++
+      continue
+    }
+
     let priceSkipped = 0
     let genderSkipped = 0
     const priceSkipSamples: string[] = []
@@ -648,55 +663,9 @@ async function main() {
       const pnoMatch = productUrl.match(/product_no=(\d+)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
 
-      // 가격 정합성: integer 범위(2^31) 초과 or 비현실적 값 제거
-      const MAX_PRICE = 100_000_000 // 1억원
-      const sanitizePrice = (v: unknown): number | null => {
-        const n = typeof v === "number" ? v : null
-        return n && n > 0 && n <= MAX_PRICE ? n : null
-      }
-
-      // SPEC-PLATFORM-EXPANSION-002 REQ-004: import-time USD→KRW
-      // conversion. When the cache's sourceCurrency is non-KRW (currently
-      // only Uniqlo US ships with "USD"), convert numeric price fields
-      // before sanitization. Cached on-disk values remain untouched.
-      // If convertToKrw returns null (unknown currency), skip the product.
       const sourceCurrency = (p.sourceCurrency as string | undefined) ?? "KRW"
-      let priceRaw = p.price as number | null | undefined
-      let originalRaw = p.originalPrice as number | null | undefined
-      let saleRaw = p.salePrice as number | null | undefined
-      if (sourceCurrency !== "KRW") {
-        const conv = (v: number | null | undefined): number | null | undefined => {
-          if (typeof v !== "number") return v
-          return convertToKrw(v, sourceCurrency)
-        }
-        const convPrice = conv(priceRaw)
-        // If the primary price is non-null but conversion yielded null,
-        // the FX table does not contain this currency — skip with warning.
-        if (typeof priceRaw === "number" && convPrice === null) {
-          console.warn(
-            `   ⚠️  Skipping product (unknown currency "${sourceCurrency}"): ${(p.name as string) || productUrl}`,
-          )
-          fxSkipped += 1
-          return null
-        }
-        priceRaw = convPrice
-        const convOriginal = conv(originalRaw)
-        originalRaw = typeof originalRaw === "number" && convOriginal === null ? null : convOriginal
-        const convSale = conv(saleRaw)
-        saleRaw = typeof saleRaw === "number" && convSale === null ? null : convSale
-      }
-
-      // Preserve the original (pre-FX) source price + currency for the
-      // admin UI's USD-first / KRW-fallback display. SPEC-005 amendment
-      // 2026-05-06: schema migration 036 added `source_currency` +
-      // `source_price` columns. KRW-source rows store the same numeric
-      // value as `price`; non-KRW rows (USD, EUR, GBP) store the native
-      // decimal (e.g. USD 99.90).
-      const sourcePriceRaw = typeof p.sourcePrice === "number"
-        ? p.sourcePrice
-        : (typeof p.price === "number" ? p.price : null)
-      const price = sanitizePrice(saleRaw) ?? sanitizePrice(priceRaw)
-      if (price === null) {
+      const prices = toDbPriceFields(p, sourceCurrency, {requireConfirmed: true})
+      if (prices === null) {
         priceSkipped += 1
         if (priceSkipSamples.length < 3) {
           priceSkipSamples.push((p.name as string) || productUrl || "(unnamed)")
@@ -708,14 +677,7 @@ async function main() {
         brand,
         name: p.name as string,
         category: p.category as string,
-        price,
-        original_price: sanitizePrice(originalRaw) ?? sanitizePrice(priceRaw),
-        sale_price: sanitizePrice(saleRaw),
-        source_currency: sourceCurrency,
-        // Sanitize source_price the same way as `price` to reject NaN/
-        // Infinity / out-of-range values from malformed payloads. SPEC-005
-        // P1 security review 2026-05-06.
-        source_price: sanitizePrice(sourcePriceRaw),
+        ...prices,
         product_no: productNo,
         image_url: p.imageUrl as string,
         source_image_url: (p.sourceImageUrl as string | undefined) || (p.imageUrl as string),
@@ -740,9 +702,6 @@ async function main() {
         updated_at: new Date().toISOString(),
       }
     }).filter((r): r is NonNullable<typeof r> => r !== null)
-    if (fxSkipped > 0) {
-      console.log(`   ⚠️  ${fxSkipped} product(s) skipped due to unknown source currency`)
-    }
     if (priceSkipped > 0) {
       console.log(
         `   ⚠️  ${priceSkipped} product(s) skipped due to missing/invalid price: ${priceSkipSamples.join(", ")}`,
@@ -803,8 +762,23 @@ async function main() {
 
       return {
         ...b,
-        sale_price: a.sale_price ?? b.sale_price,
-        original_price: pickRicher("original_price"),
+        // 가격은 하나의 coherent tuple이다. 필드를 개별 병합하면 regular 행의
+        // price와 sale 행의 sale_price가 섞여 운영 DB의 모순 조합이 된다.
+        ...(a.sale_price !== null && b.sale_price === null
+          ? {
+              price: a.price,
+              original_price: a.original_price,
+              sale_price: a.sale_price,
+              source_price: a.source_price,
+              source_currency: a.source_currency,
+            }
+          : {
+              price: b.price,
+              original_price: b.original_price,
+              sale_price: b.sale_price,
+              source_price: b.source_price,
+              source_currency: b.source_currency,
+            }),
         category: pickRicher("category"),
         subcategory: pickRicher("subcategory"),
         gender: genderWinner.gender,

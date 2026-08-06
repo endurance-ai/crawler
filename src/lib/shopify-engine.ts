@@ -8,6 +8,7 @@
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
 import {inferGenderFromText} from "./product-gender"
+import {normalizeObservedPricing} from "./product-pricing"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
 // use by import-products.ts.
@@ -85,6 +86,7 @@ interface ShopifyProduct {
     id: number
     title: string
     price: string
+    compare_at_price?: string | null
     available: boolean
     sku: string
     option1?: string | null
@@ -195,10 +197,32 @@ export function parseShopifyProducts(
       if (SIZE_NAMES.some((s) => n.includes(s))) optionPositions.size = opt.position
     }
 
-    const firstVariant = sp.variants[0]
-    const srcPrice = firstVariant ? parseFloat(firstVariant.price) : null
     const inStock = sp.variants.some((v) => v.available)
     if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
+    const eligibleVariants = inStock ? sp.variants.filter((v) => v.available) : sp.variants
+    const validVariants = eligibleVariants
+      .map((variant) => ({
+        variant,
+        price: Number.parseFloat(variant.price),
+        compareAt: variant.compare_at_price == null
+          ? null
+          : Number.parseFloat(variant.compare_at_price),
+      }))
+      .filter((entry) => Number.isFinite(entry.price) && entry.price > 0)
+    const saleVariants = validVariants.filter(
+      (entry) => entry.compareAt !== null && Number.isFinite(entry.compareAt) && entry.compareAt > entry.price,
+    )
+    const chosen = (saleVariants.length > 0 ? saleVariants : validVariants)
+      .sort((a, b) => a.price - b.price)[0]
+    const pricing = chosen
+      ? normalizeObservedPricing({
+          currentPrice: chosen.price,
+          originalPrice: chosen.compareAt,
+          salePrice: saleVariants.length > 0 ? chosen.price : null,
+          state: saleVariants.length > 0 ? "sale" : "regular",
+          source: "variant",
+        })
+      : normalizeObservedPricing({currentPrice: null, state: "unknown", source: "variant"})
 
     // sizeInfo: options 메타데이터로 정확한 포지션 사용
     let sizeInfo: string | undefined
@@ -221,10 +245,10 @@ export function parseShopifyProducts(
     // value as `price`; import-products.ts handles FX conversion.
     // priceFormatted preserves the symbol + decimal precision
     // (USD/EUR/GBP: 2 decimals; KRW: integer with locale grouping).
-    const priceFormatted = srcPrice !== null
+    const priceFormatted = pricing.price !== null
       ? (currency === "KRW"
-          ? `${symbol}${srcPrice.toLocaleString("ko-KR")}`
-          : `${symbol}${srcPrice.toFixed(2)}`)
+          ? `${symbol}${pricing.price.toLocaleString("ko-KR")}`
+          : `${symbol}${pricing.price.toFixed(2)}`)
       : ""
     if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
 
@@ -257,9 +281,7 @@ export function parseShopifyProducts(
       genderSource: genderFromTags ? ("engine" as const) : ("config_default" as const),
       name: sp.title,
       ...classifyShopifyCategory(sp.product_type || "", sp.title, sp.tags),
-      price: srcPrice,
-      originalPrice: srcPrice,
-      salePrice: null,
+      ...pricing,
       priceFormatted,
       imageUrl,
       productUrl: `${baseUrl}/products/${sp.handle}`,
@@ -270,7 +292,6 @@ export function parseShopifyProducts(
       images: images.length > 0 ? images : undefined,
       tags,
       sourceCurrency: currency,
-      sourcePrice: srcPrice !== null ? srcPrice : undefined,
     })
   }
 

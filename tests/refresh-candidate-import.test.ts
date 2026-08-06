@@ -25,6 +25,8 @@ const product: Product = {
   price: 100,
   originalPrice: 120,
   salePrice: 100,
+  sourcePrice: 100,
+  pricingObservation: {state: "sale", source: "variant", version: 2},
   priceFormatted: "$100",
   imageUrl: "https://cdn.example/a.jpg",
   productUrl: "https://kith.com/products/new-jacket",

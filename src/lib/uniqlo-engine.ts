@@ -13,6 +13,7 @@
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {checkRobots} from "./robots-check"
+import {normalizeObservedPricing} from "./product-pricing"
 
 type UniqloRegion = "KR" | "US"
 
@@ -193,12 +194,19 @@ export function parseProducts(
 
     const baseValue = item.prices?.base?.value
     const promoValue = item.prices?.promo?.value
-    const price = typeof baseValue === "number" ? baseValue : null
+    const basePrice = typeof baseValue === "number" ? baseValue : null
     const symbol = item.prices?.base?.currency?.symbol ?? fallbackSymbol
     const promoPrice =
       typeof promoValue === "number" && typeof baseValue === "number" && promoValue < baseValue
         ? promoValue
         : null
+    const pricing = normalizeObservedPricing({
+      currentPrice: promoPrice ?? basePrice,
+      originalPrice: basePrice,
+      salePrice: promoPrice,
+      state: promoPrice !== null ? "sale" : (basePrice !== null ? "regular" : "unknown"),
+      source: "api",
+    })
 
     const {primary, all} = mapImages(item)
 
@@ -211,10 +219,8 @@ export function parseProducts(
       name: item.name ?? "",
       gender: mapGender(item.genderName),
       category: item.genderCategory ?? "",
-      price,
-      originalPrice: price,
-      salePrice: promoPrice,
-      priceFormatted: price !== null ? `${symbol}${price.toLocaleString(locale)}` : "",
+      ...pricing,
+      priceFormatted: pricing.price !== null ? `${symbol}${pricing.price.toLocaleString(locale)}` : "",
       imageUrl: primary,
       productUrl: `${baseUrl}/products/${item.productId}`,
       inStock: item.representative?.sales ?? true,
@@ -224,7 +230,6 @@ export function parseProducts(
       sizeInfo: sizeNames.length > 0 ? sizeNames.join(", ").slice(0, 200) : undefined,
       images: all.length > 0 ? all : undefined,
       sourceCurrency,
-      sourcePrice: price ?? undefined,
     })
   }
 

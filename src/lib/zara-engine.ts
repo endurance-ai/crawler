@@ -108,6 +108,7 @@
 import {type Browser, chromium, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {checkRobots} from "./robots-check"
+import {normalizeObservedPricing} from "./product-pricing"
 
 // SPEC-PLATFORM-EXPANSION-005 REQ-002: region parameter drives source
 // currency, price-formatter locale/symbol, and browser context locale +
@@ -419,13 +420,19 @@ export function parseProductsFromXhr(
     if (!imageUrl || !isSafeZaraImageUrl(imageUrl)) continue
     const inStock = (raw.availability ?? "").toLowerCase() === "in_stock"
     const normalizedPrice = normalizeZaraPrice(raw.price, region)
+    // 현재 fixture/API는 단일 현재가만 제공하고 정가/세일 여부를 증명할 필드가 없다.
+    // 이를 regular로 단정하면 refresh가 기존 세일가를 지우므로, 접근 가능한 크롤
+    // 호스트에서 가격 pair를 특성화할 때까지 unknown으로 운반한다.
+    const pricing = normalizeObservedPricing({
+      currentPrice: normalizedPrice,
+      state: "unknown",
+      source: "api",
+    })
     out.push({
       brand: "ZARA",
       name: raw.name,
       category: [raw.familyName, raw.subfamilyName].filter(Boolean).join(" / "),
-      price: normalizedPrice,
-      originalPrice: normalizedPrice,
-      salePrice: null,
+      ...pricing,
       priceFormatted: formatZaraPrice(normalizedPrice, region),
       imageUrl,
       images,
@@ -436,7 +443,6 @@ export function parseProductsFromXhr(
       crawledAt,
       productCode: raw.seo?.seoProductId ?? String(raw.id),
       sourceCurrency,
-      sourcePrice: normalizedPrice,
     })
   }
   return out

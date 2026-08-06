@@ -21,6 +21,14 @@ export interface Product {
   price: number | null
   originalPrice: number | null
   salePrice: number | null
+  /**
+   * 가격 쌍을 어떤 표면에서 확정했는지 나타내는 캐시 전용 관측 정보.
+   *
+   * version 2가 없는 과거 캐시는 `salePrice: null`을 "세일 아님"의 근거로
+   * 사용할 수 없다. refresh/import가 오래된 파서의 null로 정상 세일가를
+   * 지우지 않도록 명시적인 상태를 함께 운반한다.
+   */
+  pricingObservation?: PricingObservation
   priceFormatted: string
   imageUrl: string
   /** Crawler-provided primary URL before representative-image selection. */
@@ -85,6 +93,12 @@ export interface Product {
       bodyType: string | null
     } | null
   }>
+}
+
+export interface PricingObservation {
+  state: "sale" | "regular" | "unknown"
+  source: "variant" | "api" | "listing" | "detail"
+  version: 2
 }
 
 // ─── 사이트 설정 ──────────────────────────────────────

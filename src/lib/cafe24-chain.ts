@@ -1,5 +1,6 @@
 import type {Cafe24Page} from "./cafe24-page"
 import type {Product, SiteConfig} from "./types"
+import {normalizeObservedPricing} from "./product-pricing"
 
 /**
  * A generic unisex bucket is a site-wide fallback, not product evidence.
@@ -342,18 +343,32 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     normalizeCafe24Currency(raw.metaCurrency) ??
     normalizeCafe24Currency(raw.jsonLdCurrency) ??
     inferCafe24Currency(raw.priceText)
-  const basePrice =
-    parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.priceText, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.detailPriceText, sourceCurrency)
-  const detailPriceValues = parseCafe24PriceCandidates(raw.detailPriceText, sourceCurrency)
-  const detailSaleCandidate = detailPriceValues.length >= 2 ? Math.min(...detailPriceValues) : null
+  const combinedPriceText = `${raw.priceText} ${raw.detailPriceText}`
+  const detailPriceValues = [...new Set([
+    ...parseCafe24PriceCandidates(raw.priceText, sourceCurrency),
+    ...parseCafe24PriceCandidates(raw.detailPriceText, sourceCurrency),
+  ])]
+  const pairedLow = detailPriceValues.length >= 2 ? Math.min(...detailPriceValues) : null
+  const pairedHigh = detailPriceValues.length >= 2 ? Math.max(...detailPriceValues) : null
+  const labeledSale = parseCafe24LabeledPrice(combinedPriceText, "sale", sourceCurrency)
+  const labeledOriginal = parseCafe24LabeledPrice(combinedPriceText, "original", sourceCurrency)
   const saleCandidate =
     parseCafe24PriceCandidate(raw.metaSalePrice, sourceCurrency) ??
     parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency) ??
-    detailSaleCandidate
+    labeledSale ??
+    pairedLow
+  const regularCandidates = [
+    labeledOriginal,
+    parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency),
+    parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency),
+    parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency),
+    pairedHigh,
+    parseCafe24PriceCandidate(raw.priceText, sourceCurrency),
+    parseCafe24PriceCandidate(raw.detailPriceText, sourceCurrency),
+  ].filter((value): value is number => value !== null)
+  const basePrice = saleCandidate !== null
+    ? (regularCandidates.find((value) => value > saleCandidate) ?? null)
+    : (regularCandidates[0] ?? null)
   const salePrice = saleCandidate !== null && basePrice !== null && saleCandidate > 0 && saleCandidate < basePrice
     ? saleCandidate
     : null
@@ -438,6 +453,32 @@ export function parseCafe24PriceCandidate(
   return Number.isFinite(price) && price >= 1000 ? price : null
 }
 
+export function parseCafe24LabeledPrice(
+  text: string | null | undefined,
+  role: "sale" | "original",
+  currencyHint: Product["sourceCurrency"] | null = "KRW",
+): number | null {
+  if (!text) return null
+  const clean = text
+    .replace(/,/g, "")
+    .replace(/&#36;/gi, "$")
+    .replace(/&pound;/gi, "£")
+    .replace(/&euro;/gi, "€")
+  const currency = currencyHint ?? inferCafe24Currency(clean) ?? "KRW"
+  const label = role === "sale"
+    ? "(?:할인판매가|할인가|세일가|최종가|sale\\s*price|discounted\\s*price)"
+    : "(?:소비자가|정상가|정가|(?<!할인)판매가|list\\s*price|regular\\s*price)"
+  const symbol = currency === "USD" ? "(?:USD|\\$)?"
+    : currency === "EUR" ? "(?:EUR|€)?"
+      : currency === "GBP" ? "(?:GBP|£)?"
+        : "(?:KRW)?[₩￦]?"
+  const decimals = currency === "KRW" ? "(\\d{4,})" : "(\\d+(?:\\.\\d+)?)"
+  const match = clean.match(new RegExp(`${label}\\s*[:：]?\\s*${symbol}\\s*${decimals}`, "i"))
+  if (!match?.[1]) return null
+  const price = Number(match[1])
+  return Number.isFinite(price) && (currency === "KRW" ? price >= 1000 : price > 0) ? price : null
+}
+
 export function parseCafe24PriceCandidates(
   text: string | number | null | undefined,
   currencyHint: Product["sourceCurrency"] | null = "KRW",
@@ -481,15 +522,24 @@ export function applyCafe24DetailFallbacks(
     product.name = detailFallbacks.name
   }
 
-  if (product.price === null && detailFallbacks.price !== null) {
-    product.price = detailFallbacks.price
-    product.originalPrice = product.originalPrice ?? detailFallbacks.originalPrice ?? detailFallbacks.price
-    product.salePrice = detailFallbacks.salePrice
+  if (detailFallbacks.price !== null) {
+    const pricing = normalizeObservedPricing({
+      currentPrice: detailFallbacks.price,
+      originalPrice: detailFallbacks.originalPrice,
+      salePrice: detailFallbacks.salePrice,
+      state: detailFallbacks.salePrice !== null ? "sale" : "regular",
+      source: "detail",
+    })
+    product.price = pricing.price
+    product.originalPrice = pricing.originalPrice
+    product.salePrice = pricing.salePrice
+    product.sourcePrice = pricing.sourcePrice
+    product.pricingObservation = pricing.pricingObservation
     product.priceFormatted = detailFallbacks.priceFormatted ?? product.priceFormatted
   }
   if (detailFallbacks.sourceCurrency) {
     product.sourceCurrency = detailFallbacks.sourceCurrency
-    product.sourcePrice = detailFallbacks.sourcePrice ?? detailFallbacks.price ?? undefined
+    product.sourcePrice = product.sourcePrice ?? detailFallbacks.sourcePrice ?? detailFallbacks.price ?? undefined
   }
 
 }

@@ -9,6 +9,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465760/item/krgoods_66_465760_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465760-000",
@@ -31,8 +37,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465760/sub/krgoods_465760_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465760/sub/goods_465760_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -44,6 +49,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485025/item/krgoods_40_485025_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485025-000",
@@ -62,8 +73,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485025/sub/goods_485025_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485025/sub/goods_485025_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -75,6 +85,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484457/item/krgoods_09_484457_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484457-000",
@@ -91,8 +107,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484457/sub/krgoods_484457_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484457/sub/goods_484457_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -104,6 +119,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483535/item/krgoods_01_483535_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483535-000",
@@ -119,8 +140,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483535/sub/goods_483535_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483535/sub/goods_483535_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -132,6 +152,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/487277/item/krgoods_14_487277_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E487277-000",
@@ -147,8 +173,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487277/sub/goods_487277_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487277/sub/goods_487277_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -160,6 +185,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484001/item/krgoods_03_484001_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484001-000",
@@ -176,8 +207,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484001/sub/goods_484001_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484001/sub/krgoods_484001_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -189,6 +219,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484266001/item/krgoods_60_484266001_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484266-001",
@@ -204,8 +240,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484266001/sub/goods_484266001_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484266001/sub/krgoods_484266001_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -217,6 +252,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484266/item/krgoods_31_484266_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484266-000",
@@ -230,8 +271,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484266/sub/krgoods_484266_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484266/sub/krgoods_484266_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -243,6 +283,12 @@
     "price": 39900,
     "originalPrice": 39900,
     "salePrice": null,
+    "sourcePrice": 39900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩39,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483556/item/krgoods_61_483556_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483556-000",
@@ -259,8 +305,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483556/sub/krgoods_483556_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483556/sub/goods_483556_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 39900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -272,6 +317,12 @@
     "price": 39900,
     "originalPrice": 39900,
     "salePrice": null,
+    "sourcePrice": 39900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩39,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/488721/item/krgoods_69_488721_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E488721-000",
@@ -286,8 +337,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/488721/sub/krgoods_488721_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/488721/sub/goods_488721_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 39900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -299,6 +349,12 @@
     "price": 39900,
     "originalPrice": 39900,
     "salePrice": null,
+    "sourcePrice": 39900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩39,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484874/item/krgoods_10_484874_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484874-000",
@@ -312,8 +368,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484874/sub/krgoods_484874_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484874/sub/goods_484874_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 39900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -325,6 +380,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483596/item/krgoods_59_483596_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483596-000",
@@ -339,8 +400,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483596/item/krgoods_09_483596_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483596/sub/goods_483596_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -352,6 +412,12 @@
     "price": 39900,
     "originalPrice": 39900,
     "salePrice": null,
+    "sourcePrice": 39900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩39,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/item/krgoods_37_465761_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465761-000",
@@ -375,8 +441,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465761/sub/goods_465761_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465761/sub/krgoods_465761_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 39900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -388,6 +453,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483463/item/krgoods_00_483463_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483463-000",
@@ -402,8 +473,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483463/sub/krgoods_483463_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483463/sub/goods_483463_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -415,6 +485,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484047/item/krgoods_33_484047_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484047-000",
@@ -428,8 +504,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484047/sub/goods_484047_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484047/sub/goods_484047_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -441,6 +516,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/424873/item/krgoods_10_424873_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E424873-000",
@@ -464,8 +545,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/sub/goods_424873_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/sub/goods_424873_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -477,6 +557,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483461/item/krgoods_04_483461_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483461-000",
@@ -497,8 +583,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483461/sub/goods_483461_sub13_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483461/sub/goods_483461_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -510,6 +595,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483576/item/krgoods_60_483576_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483576-000",
@@ -533,8 +624,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483576/sub/goods_483576_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483576/sub/goods_483576_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -546,6 +636,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/item/goods_11_424873_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E424873-000",
@@ -562,8 +658,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/sub/goods_424873_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/424873/sub/goods_424873_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -575,6 +670,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/item/krgoods_15_465755_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465755-000",
@@ -596,8 +697,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465755/sub/krgoods_465755_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465755/sub/goods_465755_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -609,6 +709,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/480054/item/krgoods_01_480054_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E480054-000",
@@ -624,8 +730,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/480054/sub/goods_480054_sub7_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/480054/sub/goods_480054_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -637,6 +742,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/474415/item/krgoods_12_474415_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E474415-000",
@@ -653,8 +764,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/474415/sub/krgoods_474415_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/474415/sub/goods_474415_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -666,6 +776,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485300/item/krgoods_60_485300_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485300-000",
@@ -688,8 +804,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485300/sub/goods_485300_sub15_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -701,6 +816,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483457/item/krgoods_32_483457_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483457-000",
@@ -714,8 +835,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483457/sub/krgoods_483457_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483457/sub/goods_483457_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -727,6 +847,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484226/item/krgoods_54_484226_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484226-000",
@@ -746,8 +872,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484226/sub/goods_484226_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484226/sub/goods_484226_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -759,6 +884,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483479/item/krgoods_02_483479_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483479-000",
@@ -776,8 +907,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483479/sub/krgoods_483479_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483479/sub/goods_483479_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -789,6 +919,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484228/item/krgoods_01_484228_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484228-000",
@@ -806,8 +942,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484228/sub/goods_484228_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484228/sub/goods_484228_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -819,6 +954,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484227/item/krgoods_09_484227_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484227-000",
@@ -838,8 +979,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484227/sub/goods_484227_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484227/sub/goods_484227_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -851,6 +991,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485610/item/krgoods_03_485610_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485610-000",
@@ -867,8 +1013,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485610/sub/krgoods_485610_sub4_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485610/sub/goods_485610_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -880,6 +1025,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485642/item/krgoods_16_485642_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485642-000",
@@ -897,8 +1048,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485642/sub/goods_485642_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485642/sub/goods_485642_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -910,6 +1060,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485710/item/krgoods_01_485710_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485710-000",
@@ -925,8 +1081,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485710/sub/krgoods_485710_sub4_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485710/sub/goods_485710_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -938,6 +1093,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485709/item/krgoods_61_485709_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485709-000",
@@ -953,8 +1114,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485709/sub/krgoods_485709_sub4_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485709/sub/goods_485709_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -966,6 +1126,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485711/item/krgoods_69_485711_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485711-000",
@@ -981,8 +1147,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485711/sub/krgoods_485711_sub4_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485711/sub/goods_485711_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -994,6 +1159,12 @@
     "price": 14900,
     "originalPrice": 14900,
     "salePrice": null,
+    "sourcePrice": 14900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩14,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485647/item/krgoods_01_485647_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485647-000",
@@ -1009,8 +1180,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485647/sub/krgoods_485647_sub4_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485647/sub/goods_485647_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 14900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1022,6 +1192,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465751/item/krgoods_00_465751_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465751-000",
@@ -1042,8 +1218,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465751/sub/goods_465751_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465751/sub/goods_465751_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1055,6 +1230,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/487908/item/krgoods_30_487908_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E487908-000",
@@ -1074,8 +1255,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487908/sub/goods_487908_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487908/sub/goods_487908_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1087,6 +1267,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483536/item/krgoods_69_483536_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483536-000",
@@ -1101,8 +1287,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483536/sub/krgoods_483536_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483536/sub/goods_483536_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1114,6 +1299,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/476855/item/krgoods_69_476855_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E476855-000",
@@ -1126,8 +1317,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/476855/item/krgoods_69_476855_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/476855/sub/goods_476855_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1139,6 +1329,12 @@
     "price": 7900,
     "originalPrice": 7900,
     "salePrice": null,
+    "sourcePrice": 7900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩7,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465751/item/krgoods_38_465751_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465751-000",
@@ -1153,8 +1349,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465751/sub/goods_465751_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465751/sub/goods_465751_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 7900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1166,6 +1361,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/487908/item/krgoods_17_487908_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E487908-000",
@@ -1180,8 +1381,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487908/sub/goods_487908_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487908/sub/goods_487908_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1193,6 +1393,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484231/item/krgoods_40_484231_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484231-000",
@@ -1212,8 +1418,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484231/sub/goods_484231_sub12_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484231/sub/goods_484231_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1225,6 +1430,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484795/item/krgoods_67_484795_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484795-000",
@@ -1239,8 +1450,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484795/sub/krgoods_484795_sub3_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484795/sub/goods_484795_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1252,6 +1462,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484050/item/krgoods_37_484050_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484050-000",
@@ -1267,8 +1483,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484050/sub/goods_484050_sub13_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484050/sub/goods_484050_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1280,6 +1495,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484088/item/goods_74_484088_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484088-000",
@@ -1297,8 +1518,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484088/sub/goods_484088_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484088/sub/goods_484088_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1310,6 +1530,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/item/krgoods_70_465185_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465185-000",
@@ -1335,8 +1561,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465185/sub/krgoods_465185_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465185/sub/goods_465185_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1348,6 +1573,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/item/krgoods_03_422992_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E422992-000",
@@ -1372,8 +1603,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/422992/sub/krgoods_422992_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/422992/sub/goods_422992_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1385,6 +1615,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/item/krgoods_04_455365_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E455365-000",
@@ -1408,8 +1644,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/455365/sub/krgoods_455365_sub5_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/455365/sub/goods_455365_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1421,6 +1656,12 @@
     "price": 7900,
     "originalPrice": 7900,
     "salePrice": null,
+    "sourcePrice": 7900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩7,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/item/krgoods_69_465187_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E465187-000",
@@ -1446,8 +1687,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/465187/sub/krgoods_465187_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/465187/sub/goods_465187_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 7900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1459,6 +1699,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/487962/item/krgoods_67_487962_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E487962-000",
@@ -1479,8 +1725,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/487962/sub/krgoods_487962_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487962/sub/goods_487962_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1492,6 +1737,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484508/item/krgoods_69_484508_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484508-000",
@@ -1511,8 +1762,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484508/sub/krgoods_484508_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484508/sub/goods_484508_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1524,6 +1774,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485454/item/krgoods_26_485454_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485454-000",
@@ -1541,8 +1797,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485454/sub/goods_485454_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485454/sub/krgoods_485454_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1554,6 +1809,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484203/item/krgoods_00_484203_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484203-000",
@@ -1571,8 +1832,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484203/sub/krgoods_484203_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484203/sub/krgoods_484203_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1584,6 +1844,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/482301/item/krgoods_18_482301_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E482301-000",
@@ -1605,8 +1871,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482301/sub/goods_482301_sub11_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482301/sub/goods_482301_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1618,6 +1883,12 @@
     "price": 7900,
     "originalPrice": 7900,
     "salePrice": null,
+    "sourcePrice": 7900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩7,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/475376/item/krgoods_12_475376_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E475376-000",
@@ -1638,8 +1909,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/475376/sub/krgoods_475376_sub6_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/475376/sub/goods_475376_sub14_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 7900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1651,6 +1921,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/476528/item/goods_09_476528_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E476528-000",
@@ -1668,8 +1944,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/476528/sub/goods_476528_sub18_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/476528/sub/goods_476528_sub19_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1681,6 +1956,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486708/item/krgoods_01_486708_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486708-000",
@@ -1700,8 +1981,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486708/sub/krgoods_486708_sub24_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486708/sub/krgoods_486708_sub25_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1713,6 +1993,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486707/item/krgoods_09_486707_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486707-000",
@@ -1730,8 +2016,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486707/sub/krgoods_486707_sub25_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486707/sub/krgoods_486707_sub27_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1743,6 +2028,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/482757/item/krgoods_00_482757_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E482757-000",
@@ -1762,8 +2053,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482757/sub/goods_482757_sub21_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482757/sub/goods_482757_sub22_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1775,6 +2065,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486160/item/krgoods_69_486160_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486160-000",
@@ -1793,8 +2089,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486160/sub/goods_486160_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486160/sub/goods_486160_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1806,6 +2101,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486162/item/krgoods_01_486162_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486162-000",
@@ -1823,8 +2124,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486162/sub/goods_486162_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486162/sub/goods_486162_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1836,6 +2136,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486161/item/krgoods_10_486161_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486161-000",
@@ -1851,8 +2157,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486161/sub/goods_486161_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486161/sub/goods_486161_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1864,6 +2169,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484473/item/krgoods_01_484473_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484473-000",
@@ -1877,8 +2188,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484473/sub/goods_484473_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484473/sub/goods_484473_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1890,6 +2200,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484475/item/krgoods_01_484475_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484475-000",
@@ -1906,8 +2222,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484475/sub/goods_484475_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484475/sub/goods_484475_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1919,6 +2234,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484474/item/krgoods_58_484474_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484474-000",
@@ -1932,8 +2253,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484474/sub/goods_484474_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484474/sub/goods_484474_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1945,6 +2265,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484477/item/krgoods_00_484477_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484477-000",
@@ -1959,8 +2285,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484477/sub/goods_484477_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484477/sub/goods_484477_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1972,6 +2297,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483258/item/krgoods_00_483258_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483258-000",
@@ -1986,8 +2317,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483258/sub/goods_483258_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483258/sub/goods_483258_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -1999,6 +2329,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484478/item/krgoods_17_484478_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484478-000",
@@ -2013,8 +2349,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484478/sub/goods_484478_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484478/sub/goods_484478_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2026,6 +2361,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484476/item/krgoods_03_484476_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484476-000",
@@ -2039,8 +2380,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484476/sub/goods_484476_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484476/sub/goods_484476_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2052,6 +2392,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484472/item/krgoods_69_484472_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484472-000",
@@ -2068,8 +2414,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484472/sub/goods_484472_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484472/sub/goods_484472_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2081,6 +2426,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/485347/item/krgoods_07_485347_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E485347-000",
@@ -2098,8 +2449,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485347/sub/goods_485347_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/485347/sub/goods_485347_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2111,6 +2461,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484501/item/krgoods_01_484501_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484501-000",
@@ -2126,8 +2482,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484501/sub/goods_484501_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484501/sub/goods_484501_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2139,6 +2494,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484502/item/krgoods_10_484502_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484502-000",
@@ -2154,8 +2515,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484502/sub/goods_484502_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484502/sub/goods_484502_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2167,6 +2527,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484121/item/krgoods_00_484121_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484121-000",
@@ -2184,8 +2550,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484121/sub/goods_484121_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484121/sub/goods_484121_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2197,6 +2562,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484499/item/krgoods_50_484499_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484499-000",
@@ -2214,8 +2585,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484499/sub/goods_484499_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484499/sub/goods_484499_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2227,6 +2597,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484484/item/krgoods_01_484484_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484484-000",
@@ -2243,8 +2619,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484484/sub/goods_484484_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484484/sub/goods_484484_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2256,6 +2631,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484485/item/krgoods_00_484485_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484485-000",
@@ -2273,8 +2654,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484485/sub/goods_484485_sub21_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484485/sub/goods_484485_sub22_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2286,6 +2666,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483259/item/krgoods_08_483259_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483259-000",
@@ -2301,8 +2687,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483259/sub/goods_483259_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483259/sub/goods_483259_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2314,6 +2699,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484483/item/krgoods_03_484483_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484483-000",
@@ -2332,8 +2723,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484483/sub/goods_484483_sub21_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484483/sub/goods_484483_sub22_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2345,6 +2735,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484471/item/goods_08_484471_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484471-000",
@@ -2360,8 +2756,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484471/sub/krgoods_484471_sub15_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484471/sub/krgoods_484471_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2373,6 +2768,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484470/item/krgoods_41_484470_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484470-000",
@@ -2389,8 +2790,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484470/sub/krgoods_484470_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484470/sub/krgoods_484470_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2402,6 +2802,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484469/item/krgoods_03_484469_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484469-000",
@@ -2417,8 +2823,7 @@
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484469/sub/krgoods_484469_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484469/sub/krgoods_484469_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2430,6 +2835,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483252/item/krgoods_00_483252_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483252-000",
@@ -2444,8 +2855,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483252/sub/goods_483252_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483252/sub/goods_483252_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2457,6 +2867,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484461/item/krgoods_68_484461_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484461-000",
@@ -2472,8 +2888,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484461/sub/goods_484461_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484461/sub/goods_484461_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2485,6 +2900,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484460/item/krgoods_02_484460_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484460-000",
@@ -2500,8 +2921,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484460/sub/goods_484460_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484460/sub/goods_484460_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2513,6 +2933,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484459/item/krgoods_40_484459_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484459-000",
@@ -2529,8 +2955,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484459/sub/goods_484459_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484459/sub/goods_484459_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2542,6 +2967,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484776/item/krgoods_09_484776_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484776-000",
@@ -2559,8 +2990,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484776/sub/goods_484776_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484776/sub/goods_484776_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2572,6 +3002,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/487966/item/krgoods_07_487966_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E487966-000",
@@ -2590,8 +3026,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487966/sub/goods_487966_sub21_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/487966/sub/goods_487966_sub22_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2603,6 +3038,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486158/item/krgoods_62_486158_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486158-000",
@@ -2622,8 +3063,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486158/sub/goods_486158_sub21_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486158/sub/goods_486158_sub22_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2635,6 +3075,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/482756/item/krgoods_00_482756_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E482756-000",
@@ -2651,8 +3097,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482756/sub/goods_482756_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/482756/sub/goods_482756_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2664,6 +3109,12 @@
     "price": 29900,
     "originalPrice": 29900,
     "salePrice": null,
+    "sourcePrice": 29900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩29,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486159/item/krgoods_00_486159_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486159-000",
@@ -2680,8 +3131,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486159/sub/goods_486159_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486159/sub/goods_486159_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 29900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2693,6 +3143,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484492/item/krgoods_60_484492_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484492-000",
@@ -2708,8 +3164,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484492/sub/goods_484492_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484492/sub/goods_484492_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2721,6 +3176,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484493/item/krgoods_02_484493_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484493-000",
@@ -2735,8 +3196,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484493/sub/goods_484493_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484493/sub/goods_484493_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2748,6 +3208,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484491/item/krgoods_00_484491_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484491-000",
@@ -2761,8 +3227,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484491/sub/goods_484491_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484491/sub/goods_484491_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2774,6 +3239,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484490/item/krgoods_07_484490_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484490-000",
@@ -2790,8 +3261,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484490/sub/goods_484490_sub21_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484490/sub/goods_484490_sub22_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2803,6 +3273,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483298/item/krgoods_01_483298_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483298-000",
@@ -2816,8 +3292,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483298/sub/goods_483298_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483298/sub/goods_483298_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2829,6 +3304,12 @@
     "price": 12900,
     "originalPrice": 12900,
     "salePrice": null,
+    "sourcePrice": 12900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩12,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/484494/item/krgoods_36_484494_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E484494-000",
@@ -2844,8 +3325,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484494/sub/goods_484494_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/484494/sub/goods_484494_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 12900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2857,6 +3337,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486830/item/krgoods_09_486830_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486830-000",
@@ -2871,8 +3357,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486830/sub/goods_486830_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486830/sub/goods_486830_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2884,6 +3369,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486827/item/krgoods_02_486827_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486827-000",
@@ -2898,8 +3389,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486827/sub/goods_486827_sub14_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486827/sub/goods_486827_sub20_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2911,6 +3401,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/486829/item/krgoods_00_486829_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E486829-000",
@@ -2927,8 +3423,7 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486829/sub/goods_486829_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/486829/sub/goods_486829_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   },
   {
     "brand": "Uniqlo",
@@ -2940,6 +3435,12 @@
     "price": 19900,
     "originalPrice": 19900,
     "salePrice": null,
+    "sourcePrice": 19900,
+    "pricingObservation": {
+      "state": "regular",
+      "source": "api",
+      "version": 2
+    },
     "priceFormatted": "₩19,900",
     "imageUrl": "https://image.uniqlo.com/UQ/ST3/kr/imagesgoods/483262/item/krgoods_00_483262_3x4.jpg",
     "productUrl": "https://www.uniqlo.com/kr/ko/products/E483262-000",
@@ -2957,7 +3458,6 @@
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483262/sub/goods_483262_sub20_3x4.jpg",
       "https://image.uniqlo.com/UQ/ST3/AsianCommon/imagesgoods/483262/sub/goods_483262_sub21_3x4.jpg"
     ],
-    "sourceCurrency": "KRW",
-    "sourcePrice": 19900
+    "sourceCurrency": "KRW"
   }
 ]

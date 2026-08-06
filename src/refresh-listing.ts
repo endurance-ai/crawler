@@ -56,6 +56,8 @@ interface Flags {
   minCoverage: number
   concurrency: number
   dryRun: boolean
+  auditPrices: boolean
+  priceOnly: boolean
   ignoreBackoff: boolean
 }
 
@@ -68,10 +70,14 @@ function parseFlags(): Flags {
     minCoverage: 0.7,
     concurrency: 2,
     dryRun: false,
+    auditPrices: false,
+    priceOnly: false,
     ignoreBackoff: false,
   }
   for (const arg of process.argv.slice(2)) {
     if (arg === "--dry-run") flags.dryRun = true
+    else if (arg === "--audit-prices") flags.auditPrices = true
+    else if (arg === "--price-only") flags.priceOnly = true
     else if (arg === "--ignore-backoff") flags.ignoreBackoff = true
     else if (arg.startsWith("--budget-minutes=")) flags.budgetMinutes = Number(arg.split("=")[1])
     else if (arg.startsWith("--limit=")) flags.limit = Number(arg.split("=")[1])
@@ -131,7 +137,7 @@ async function fetchExistingRows(
   for (let offset = 0; ; offset += pageSize) {
     const {data, error} = await db
       .from("products")
-      .select("product_url, price, original_price, sale_price, in_stock")
+      .select("product_url, price, original_price, sale_price, source_price, source_currency, in_stock")
       .eq("platform", platformKey)
       // ORDER BY 없는 LIMIT/OFFSET 은 페이지 간 행 순서가 보장되지 않아 누락이 생긴다.
       // 누락된 행은 existing 에 없으므로 크롤된 그 URL 이 **신규 상품으로 오인**되어
@@ -192,13 +198,22 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
 async function applyUpdates(
   db: ProductCollectionClient,
   updates: RefreshUpdate[],
+  options: {audit: boolean; priceOnly: boolean},
 ): Promise<{ok: number; failed: number}> {
   let ok = 0
   let failed = 0
   for (const update of updates) {
+    const payload = options.priceOnly
+      ? Object.fromEntries(Object.entries(update.patch).filter(([key]) => key !== "in_stock"))
+      : update.patch
+    if (Object.keys(payload).length === 0) continue
+    if (options.audit) {
+      ok += 1
+      continue
+    }
     const {error} = await db
       .from("products")
-      .update({...update.patch, updated_at: new Date().toISOString()})
+      .update({...payload, updated_at: new Date().toISOString()})
       .eq("product_url", update.productUrl)
     if (error) {
       failed += 1
@@ -225,11 +240,27 @@ async function main() {
   const startedAt = Date.now()
   const budgetMs = flags.budgetMinutes * 60_000
 
-  if (!flags.dryRun) await syncRefreshSources(db, PLATFORMS)
+  if (!flags.dryRun && !flags.auditPrices) await syncRefreshSources(db, PLATFORMS)
   const [worklist, brands] = await Promise.all([
-    fetchWorklist(db, flags.types, flags.ignoreBackoff),
-    flags.dryRun ? Promise.resolve([]) : loadExistingBrands(db),
+    fetchWorklist(db, flags.types, flags.ignoreBackoff || flags.auditPrices),
+    flags.dryRun || flags.auditPrices ? Promise.resolve([]) : loadExistingBrands(db),
   ])
+
+  if (flags.auditPrices) {
+    const counts = await loadRefreshProductCounts(db)
+    const configs = new Map(PLATFORMS.map((config) => [config.key, config]))
+    const quarantined = [...counts.entries()]
+      .map(([platform, count]) => ({platform, count, config: configs.get(platform)}))
+      .filter((entry) => !entry.config || entry.config.disabled)
+      .sort((a, b) => b.count - a.count)
+    const missingCount = quarantined.reduce((sum, entry) => sum + entry.count, 0)
+    console.log(`🧊 자동 보정 격리: ${quarantined.length}개 소스 · DB ${missingCount}행`)
+    for (const entry of quarantined.slice(0, 30)) {
+      console.log(
+        `   ${entry.platform}: ${entry.count}행 (${entry.config?.disabled ? "disabled" : "config-missing"})`,
+      )
+    }
+  }
 
   let entries = worklist.entries
   if (flags.site) {
@@ -252,6 +283,8 @@ async function main() {
       ` (스킵 ${worklist.skipped.length}) | 예산 ${flags.budgetMinutes}분` +
       ` | 동시 ${flags.concurrency}개 | 완전성 가드 ${flags.minCoverage}`,
   )
+  if (flags.auditPrices) console.log("   🔍 가격 감사 모드 — 크롤/DB 조회만 수행하고 쓰지 않음")
+  if (flags.priceOnly) console.log("   💰 가격 전용 모드 — 재고/last_seen/candidate는 변경하지 않음")
   // 서킷브레이커가 무엇을 억누르고 있는지 항상 보여준다 — 조용히 사라지는 소스가
   // 생기면 이 기능이 오히려 커버리지 구멍을 만든다.
   const backoffSkips = worklist.skipped.filter((item) => item.includes(":backoff("))
@@ -291,16 +324,34 @@ async function main() {
     async (entry) => {
       attempted += 1
       const label = `${entry.platform_key} (${entry.config.type})`
-      const run = await startRefreshRun(db, {
-        platformKey: entry.platform_key,
-        command: "refresh-listing",
-      })
+      const run = flags.auditPrices
+        ? {id: 0, startedAt: Date.now()}
+        : await startRefreshRun(db, {
+            platformKey: entry.platform_key,
+            command: flags.priceOnly ? "refresh-listing --price-only" : "refresh-listing",
+          })
       try {
         const [crawlResult, existing] = await Promise.all([
           crawlListing(entry.config),
           fetchExistingRows(db, entry.platform_key),
         ])
         const crawled = crawlResult.products
+        const pricingMetrics = {
+          sale_detected: crawled.filter((product) => product.pricingObservation?.state === "sale").length,
+          regular_confirmed: crawled.filter((product) => product.pricingObservation?.state === "regular").length,
+          detail_price_checks: crawled.filter(
+            (product) => product.pricingObservation?.source === "detail",
+          ).length,
+          price_unknown: crawled.filter(
+            (product) => !product.pricingObservation || product.pricingObservation.state === "unknown",
+          ).length,
+          invalid_price_pairs: crawled.filter(
+            (product) => product.salePrice !== null &&
+              (!(product.originalPrice !== null && product.salePrice < product.originalPrice) ||
+              product.price !== product.salePrice),
+          ).length,
+        }
+        const priceUpdatesSkipped = pricingMetrics.price_unknown + pricingMetrics.invalid_price_pairs
         const provisional = diffListing({
           crawled,
           existing,
@@ -312,6 +363,12 @@ async function main() {
         // 보지 않는다. 섞여 있던 동안 가격을 못 읽는 것이 재고 이탈 감지까지 막았고
         // 런이 failed 로 남아 성공 이력이 영구히 안 쌓였다 (실측 42개 소스).
         const qualityWarnings = crawlResult.qualityWarnings ?? []
+        if (pricingMetrics.price_unknown > 0) {
+          qualityWarnings.push(`price_unknown=${pricingMetrics.price_unknown}`)
+        }
+        if (pricingMetrics.invalid_price_pairs > 0) {
+          qualityWarnings.push(`invalid_price_pairs=${pricingMetrics.invalid_price_pairs}`)
+        }
         // 닿지 못한 것(unreachable)은 가드에서는 errors 와 동일하게 본다 — 리스트가
         // 안 열렸는데 사라진 상품을 품절 처리하면 안 된다. 백오프에서만 다르게 센다.
         const unreachable = crawlResult.unreachable ?? []
@@ -339,15 +396,22 @@ async function main() {
         const stockN = diff.updates.filter((update) =>
           update.reasons.some((reason) => reason.includes("품절") || reason.includes("재입고")),
         ).length
-        const applied = await applyUpdates(db, diff.updates)
+        const applied = await applyUpdates(db, diff.updates, {
+          audit: flags.auditPrices,
+          priceOnly: flags.priceOnly,
+        })
         // 살아있음이 확인된 상품의 생존 타임스탬프. 완전성 가드와 무관하게 올린다 —
         // 확인된 상품은 실제로 살아있고, 사라진 상품을 죽이는 판단은 가드가 따로 한다.
-        const seen = await touchProductsLastSeen(db, diff.confirmedUrls, new Date(run.startedAt).toISOString())
-        const queued = await enqueueRefreshCandidates(db, {
-          products: unknownProducts(crawled, diff.unknownUrls),
-          config: entry.config,
-          brands,
-        })
+        const seen = flags.auditPrices || flags.priceOnly
+          ? {ok: 0, failed: 0}
+          : await touchProductsLastSeen(db, diff.confirmedUrls, new Date(run.startedAt).toISOString())
+        const queued = flags.auditPrices || flags.priceOnly
+          ? {discovered: 0, brandUnmatched: 0, queued: 0}
+          : await enqueueRefreshCandidates(db, {
+              products: unknownProducts(crawled, diff.unknownUrls),
+              config: entry.config,
+              brands,
+            })
 
         priceChanged += priceN
         stockChanged += stockN
@@ -367,9 +431,10 @@ async function main() {
             ` · 생존확인 ${seen.ok}` +
             ` · LLM후보 ${queued.discovered} · 브랜드불일치 ${queued.brandUnmatched}` +
             (qualityWarnings.length > 0 ? ` · ⚠️ ${qualityWarnings.join("; ")}` : "") +
+            ` · 세일 ${pricingMetrics.sale_detected} · 가격미확정 ${pricingMetrics.price_unknown}` +
             ` · ${minutes(Date.now() - run.startedAt)}`,
         )
-        await finishRefreshRun(db, {
+        if (!flags.auditPrices) await finishRefreshRun(db, {
           id: run.id,
           platformKey: entry.platform_key,
           status: failed ? "failed" : "success",
@@ -399,6 +464,9 @@ async function main() {
             quality_warnings: qualityWarnings,
             unreachable,
             unreachable_only: unreachableOnly,
+            ...pricingMetrics,
+            price_updates_skipped: priceUpdatesSkipped,
+            pricing_complete: pricingMetrics.price_unknown === 0 && pricingMetrics.invalid_price_pairs === 0,
           },
         })
         done += 1
@@ -406,7 +474,7 @@ async function main() {
         const detail = error instanceof Error ? error.message : String(error)
         failures.push(`${entry.platform_key}: ${detail}`)
         console.error(`✖ ${label} 실패: ${detail}`)
-        await finishRefreshRun(db, {
+        if (!flags.auditPrices) await finishRefreshRun(db, {
           id: run.id,
           platformKey: entry.platform_key,
           status: "failed",

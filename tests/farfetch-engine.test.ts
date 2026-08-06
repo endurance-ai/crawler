@@ -112,6 +112,15 @@ test("fixture: every price is a positive KRW integer in sanity range [1000, 100M
   }
 })
 
+test("fixture: 복수 가격 14개 카드는 모두 정가와 세일가를 보존한다", () => {
+  const fx = loadFixture()
+  const products = parseProductsFromCards(fx.cards, KR_BASE, "farfetch-kr", "KR", "KRW", "men")
+  const sales = products.filter((product) => product.pricingObservation?.state === "sale")
+  assert.equal(sales.length, 14)
+  assert.ok(sales.every((product) => product.price === product.salePrice))
+  assert.ok(sales.every((product) => product.originalPrice! > product.salePrice!))
+})
+
 // ─── Unit tests: helper functions ────────────────────────
 
 test("isSafeFarfetchImageUrl accepts whitelisted hosts", () => {
