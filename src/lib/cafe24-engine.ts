@@ -449,7 +449,18 @@ async function collectProductsFromPage(
           var priceClone = priceEl.cloneNode(true) as Element
           var hiddenInClone = priceClone.querySelectorAll(".displaynone")
           for (var hi = 0; hi < hiddenInClone.length; hi++) hiddenInClone[hi].remove()
-          priceText = (priceClone.textContent || "").trim()
+          // 일부 테마는 원가·할인가 텍스트 사이에 공백 없이 태그만 붙여 렌더링한다
+          // (예: aniv `109,000<p class="sale"><s>109,000</s>87,200</p>` — 태그 경계에
+          // 공백이 전혀 없음). textContent를 그대로 읽으면 "109,000109,00087,200"처럼
+          // 서로 다른 숫자가 이어붙어, 뒤에서 /\d[\d,]*/가 이걸 통째로 하나의 가격으로
+          // 오인해 originalPrice가 천문학적 숫자로 오염된다(실측 2026-08-08: aniv,
+          // untiltheyes, oddkidoutfit). 태그 경계마다 공백을 끼워 넣어 서로 다른 요소의
+          // 숫자가 붙지 않게 한 뒤 텍스트를 읽는다 — 이미 공백/줄바꿈이 있는 정상
+          // 테마에는 영향 없다.
+          var spacedHtml = (priceClone as HTMLElement).innerHTML.replace(/<\/?[a-zA-Z][^>]*>/g, " ")
+          var spacer = document.createElement("div")
+          spacer.innerHTML = spacedHtml
+          priceText = (spacer.textContent || "").trim().replace(/\s+/g, " ")
         }
 
         // 셀렉터 실패 시: 아이템 내 모든 span/p에서 가격 패턴 (₩/KRW + 숫자) 탐색
@@ -621,6 +632,36 @@ async function collectProductsFromPage(
               // price2가 더 싸면: price=원가, price2=세일가
               originalPrice = price
               salePrice = p2
+            }
+          }
+        }
+
+        // 클래스 기반 세일가 탐지(.price2/.sale_price/[class*=sale])는 클래스 이름에
+        // "sale"이 들어간 테마에서만 통한다. Cafe24 클래식/기본 스킨 다수는 정가·할인가
+        // li를 클래스로 구분하지 않고 "판매가"/"할인판매가" 라벨 텍스트로만 구분한다
+        // (예: goyowear — 두 li 모두 class="xans-record-"뿐). 이 경우 price2El이 아예
+        // 안 잡혀 salePrice가 계속 null로 남고, 할인 중인 상품의 최종 price가 원가
+        // 그대로 저장된다(실측 2026-08-08: 활성 cafe24 사이트 345개 중 36개, 샘플
+        // 6,517개 상품 중 535개가 이 경로로 할인가 유실). specText 라벨 정규식으로
+        // 한 번 더 시도한다 — price===null일 때만 도는 481~499줄 폴백과 달리, price가
+        // 이미 원가로 채워져 있어도 salePrice가 비어 있으면 항상 시도한다.
+        if (salePrice === null && specText && args.sourceCurrency === "KRW") {
+          var specCleanSale = specText.replace(/,/g, "")
+          var saleLabelM = specCleanSale.match(/할인판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
+          // "판매가"는 "할인판매가"의 부분 문자열이므로, 앞에 공백/문자열 시작이 오는
+          // 경우만 매칭해 "할인판매가" 안의 "판매가"를 오탐하지 않도록 한다.
+          var listLabelM = specCleanSale.match(/(?:^|\s)판매가\s*:?\s*[₩￦]?\s*(\d{4,})/)
+          if (saleLabelM) {
+            var labelSalePrice = Number(saleLabelM[1])
+            var labelListPrice = listLabelM ? Number(listLabelM[1]) : price
+            if (
+              labelSalePrice >= 1000 &&
+              labelListPrice !== null &&
+              labelSalePrice < labelListPrice
+            ) {
+              originalPrice = labelListPrice
+              salePrice = labelSalePrice
+              if (price === null) price = labelListPrice
             }
           }
         }

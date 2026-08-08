@@ -2124,23 +2124,27 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "outdoorserviceworks",
-    name: "아웃도어서비스",
+    name: "outdoorservice",
     type: "cafe24",
     baseUrl: "https://outdoorservice.works",
-    brand: "아웃도어서비스",
+    brand: "outdoorservice",
     paginate: true,
     category: {discovery: "auto"},
     notes: "3차 배치 draft — dry-run 필요",
   },
   {
     key: "rewind",
-    name: "리와인드메이드",
+    name: "rewind",
     type: "cafe24",
     baseUrl: "https://re-wind.co.kr",
-    brand: "리와인드메이드",
+    brand: "rewind",
     paginate: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    selectors: {productPrice: ".product_price"},
+    notes: "3차 배치 draft — dry-run 필요. 판매가 셀렉터가 기본 DEFAULT_SELECTORS(.price 등)와 " +
+      "매칭되지 않아(테마가 .product_price/.prd_price_sale 클래스 사용) price가 null로 떨어지고, " +
+      "이어서 specText 폴백이 할인판매가를 price에 대입해버려 salePrice/originalPrice가 소실되던 문제 " +
+      "(2026-08-08) — .product_price 오버라이드로 원가를 정확히 잡아 할인가 비교가 제대로 되도록 수정.",
   },
   {
     key: "enseennees",
