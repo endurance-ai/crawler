@@ -721,10 +721,10 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "grailz",
-    name: "그레일즈",
+    name: "GRAILZ",
     type: "cafe24",
     baseUrl: "https://grailz.co.kr",
-    brand: "그레일즈",
+    brand: "GRAILZ",
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
