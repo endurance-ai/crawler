@@ -19,6 +19,7 @@ import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normaliza
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {mergeProductImages} from "./lib/product-images"
+import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
 import {
   canUsePlatformBrandFallback,
   resolveProductBrandNodeIdFromMaps,
@@ -641,7 +642,10 @@ async function main() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
       const brand = resolveProductBrand(p.brand, config)
-      const productUrl = (p.productUrl as string) || ""
+      const rawProductUrl = (p.productUrl as string) || ""
+      const productUrl = config?.type === "cafe24"
+        ? canonicalizeCafe24ProductUrl(rawProductUrl)
+        : rawProductUrl
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
 
       // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
@@ -665,7 +669,7 @@ async function main() {
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
       // product_no 추출
-      const pnoMatch = productUrl.match(/product_no=(\d+)/)
+      const pnoMatch = productUrl.match(/product_no=(\d+)/) ?? productUrl.match(/\/product\/[^/]+\/(\d+)(?:\/|$)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
 
       const sourceCurrency = (p.sourceCurrency as string | undefined) ?? "KRW"

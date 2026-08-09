@@ -80,6 +80,85 @@ export function parseCafe24CategoryHref(
   return {name, cateNo, url: url.href}
 }
 
+function cafe24ProductCategoryNo(productUrl: string): number | null {
+  try {
+    const url = new URL(productUrl)
+    const raw = url.searchParams.get("cate_no") ??
+      url.pathname.match(/\/category\/(\d+)(?:\/|$)/i)?.[1] ?? null
+    if (!raw) return null
+    const cateNo = Number(raw)
+    return Number.isInteger(cateNo) && cateNo > 0 ? cateNo : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Cafe24 테마는 실제 목록 앞에 전역 추천 위젯을 렌더하기도 한다. 그 위젯의
+ * 상품 URL은 현재 목록이 아닌 별도 category 번호를 가지므로, 현재 cateNo와
+ * 일치하는 카드가 하나라도 있으면 그것만 진짜 목록으로 인정한다.
+ *
+ * 일치 카드 없이 다른 category 카드만 있으면 stale/빈 category가 공통 위젯만
+ * 보여준 것이므로 빈 결과로 처리한다. category 번호 자체를 URL에 싣지 않는
+ * 테마는 기존 동작을 보존한다.
+ */
+export function filterCafe24ProductsForCategory(products: Product[], cateNo: number): Product[] {
+  const observed = products.map((product) => cafe24ProductCategoryNo(product.productUrl))
+  const hasTaggedProduct = observed.some((value) => value !== null)
+  if (!hasTaggedProduct) return products
+  if (!observed.some((value) => value === cateNo)) return []
+  return products.filter((_, index) => observed[index] === cateNo)
+}
+
+function cafe24ProductIdentityKey(productUrl: string): string | null {
+  try {
+    const url = new URL(productUrl)
+    const productNo = url.searchParams.get("product_no") ??
+      url.pathname.match(/^\/product\/[^/]+\/(\d+)(?:\/|$)/i)?.[1] ?? null
+    return productNo ? `${url.host}#product_no=${productNo}` : null
+  } catch {
+    return null
+  }
+}
+
+/** 같은 Cafe24 상품이 여러 category URL로 노출돼도 한 행만 남긴다. */
+export function dedupeCafe24ProductsByIdentity(products: Product[]): Product[] {
+  const seen = new Set<string>()
+  return products.filter((product) => {
+    if (!product.productUrl) return false
+    const key = cafe24ProductIdentityKey(product.productUrl) ?? product.productUrl
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/**
+ * Cafe24 상품 URL에서 category/display 추적 경로를 제거한다. 같은 product_no가
+ * 홈페이지 개편으로 다른 category에 걸려도 DB upsert key가 바뀌지 않는다.
+ */
+export function canonicalizeCafe24ProductUrl(productUrl: string): string {
+  try {
+    const url = new URL(productUrl)
+    const pretty = url.pathname.match(/^\/product\/[^/]+\/(\d+)(?:\/|$)/i)
+    if (pretty) {
+      const canonical = new URL("/product/detail.html", url.origin)
+      canonical.searchParams.set("product_no", pretty[1])
+      return canonical.toString()
+    }
+
+    const productNo = url.searchParams.get("product_no")
+    if (/\/product\/detail\.html$/i.test(url.pathname) && productNo) {
+      const canonical = new URL(url.pathname, url.origin)
+      canonical.searchParams.set("product_no", productNo)
+      return canonical.toString()
+    }
+    return productUrl
+  } catch {
+    return productUrl
+  }
+}
+
 function cleanCategoryName(raw: string): string {
   return raw
     .replace(/\s+/g, " ")
