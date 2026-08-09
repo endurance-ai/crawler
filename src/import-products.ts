@@ -4,6 +4,7 @@
  * 사용법:
  *   npx dotenv -e .env.local -- npx tsx scripts/import-products.ts                  # data/ 내 전체
  *   npx dotenv -e .env.local -- npx tsx scripts/import-products.ts --site=obscura   # 특정 플랫폼만
+ *   --trusted-category  상세 DOM/LLM 등 신뢰 출처의 canonical category를 이름 규칙보다 우선
  */
 
 import * as fs from "fs"
@@ -428,6 +429,7 @@ async function main() {
   // --in-stock-only: 품절(in_stock=false) 상품을 적재에서 제외.
   // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
   const inStockOnly = process.argv.includes("--in-stock-only")
+  const trustedCategory = process.argv.includes("--trusted-category")
 
   // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
   const dryRun = process.argv.includes("--dry-run")
@@ -590,6 +592,7 @@ async function main() {
     // false) → exact legacy behavior (no gate, all products imported).
     const qcRaw = applyProductQcGate(rawWithGender, platform, {
       kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+      trustedCategory,
     })
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)

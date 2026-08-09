@@ -51,6 +51,7 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.
   twojeys: ["men"],
+  toomuch: ["women"], // 여성 의류/드레스/란제리/스윔웨어 카탈로그, 남성 라인 없음
   rense: ["women"], // OUTWEAR/TOPS/BOTTOMS/DRESS/ACC
   treemingbird: ["women"], // DRESSES/SKIRTS/SWIMWEAR + Halter Neck Backless Knit Top
   yahnsisi: ["women"], // Tops/Knits/Basics/Bottoms/Dresses + Lazy Summer Dress
@@ -145,4 +146,10 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //   ── 판정 불가 (카테고리는 여성형이나 명시 없음) ──
   //     oheshio        OUTERWEAR/TOP/BOTTOMS/DRESS/BAG/ACC
   //     nuuanu         Shop/Lookbook/About 뿐
+}
+
+/** 사이트 문맥상 아동복 신호가 아닌 상품명 표현을 kids 가드에서만 제거한다. */
+export const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 여성용 슬림핏 티셔츠의 상품형 이름. 실제 아동 라인은 없다.
+  toomuch: [/\bbaby[-\s]?(?:t|tee|t[-\s]?shirt)\b/gi],
 }

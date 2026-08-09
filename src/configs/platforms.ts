@@ -6,7 +6,7 @@
  */
 
 import type {SiteConfig} from "../lib/types"
-import {SITE_GENDER_DEFAULTS} from "./gender-defaults"
+import {SITE_GENDER_DEFAULTS, SITE_KIDS_GENDER_NOISE_PATTERNS} from "./gender-defaults"
 import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
@@ -2760,9 +2760,14 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   // 사람이 검증한 보강 맵에서 채운다 — platforms.generated.ts 는
   // AUTO-GENERATED 라 여기에 값을 넣을 수 없기 때문이다.
   // 근거 규칙은 src/configs/gender-defaults.ts 헤더 참조.
-  if (config.defaultGender && config.defaultGender.length > 0) return config
   const fallback = SITE_GENDER_DEFAULTS[key]
-  return fallback ? {...config, defaultGender: fallback} : config
+  const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key]
+  if (!fallback && !kidsGenderNoisePatterns) return config
+  return {
+    ...config,
+    ...(!config.defaultGender?.length && fallback ? {defaultGender: fallback} : {}),
+    ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
+  }
 }
 
 /** 활성화된 사이트만 반환 */
