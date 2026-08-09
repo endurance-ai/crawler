@@ -2705,11 +2705,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
   {
     key: "singularisca",
-    name: "singulari",
+    name: "singularisca",
     type: "imweb",
     baseUrl: "https://singularisca.com",
-    defaultGender: ["women"],
-    brand: "singulari",
+    defaultGender: ["men"],
+    brand: "singularisca",
     notes: "imweb 파일럿 — brand_node_id=5317, detect platform_family=imweb",
   },
   {
