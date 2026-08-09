@@ -9,6 +9,17 @@ test("콘텐츠에 기여하지 않는 리소스 타입을 막는다", () => {
   }
 })
 
+test("Cafe24 재고 갱신은 stylesheet를 허용하되 다른 무거운 리소스는 계속 막는다", () => {
+  // 일부 Cafe24 테마는 모든 카드에 soldout 요소를 렌더한 뒤 CSS display:none으로
+  // 재고 상품의 배지를 숨긴다. stylesheet를 막으면 숨김 상태를 읽을 수 없어
+  // 재고 상품까지 전부 품절로 오판한다 (실측: toomuch).
+  const options = {allowStylesheets: true}
+  assert.equal(shouldBlockRequest("https://shop.example.com/layout.css", "stylesheet", options), false)
+  for (const type of ["image", "media", "font"]) {
+    assert.equal(shouldBlockRequest("https://shop.example.com/a", type, options), true, type)
+  }
+})
+
 test("문서·스크립트·XHR 은 막지 않는다", () => {
   // cafe24 테마는 상품 목록 일부를 앱 스크립트로 그린다. 스크립트를 전면
   // 차단하면 상품 수가 조용히 줄어든다 — 타입이 아니라 호스트로만 막는다.

@@ -25,8 +25,9 @@
  *   `.js` 인 추적 스크립트는 전부 통과했고, 위 16개가 정확히 그것들이다.
  *
  * 안전 원칙 — 상품 렌더링을 깨뜨리지 않는다:
- *   · 리소스 타입 차단은 DOM 구조에 영향이 없는 것만 (image/media/font/stylesheet).
- *     상품 데이터는 셀렉터로 DOM 에서 뽑으므로 스타일·이미지가 없어도 무관하다.
+ *   · 리소스 타입 차단은 기본적으로 DOM 구조에 영향이 없는 것만
+ *     (image/media/font/stylesheet). 다만 Cafe24 목록 재고는 테마가 항상 렌더한
+ *     soldout 배지를 CSS로 숨기는 경우가 있어 stylesheet 허용 옵션을 사용한다.
  *   · 스크립트는 **전면 차단하지 않는다.** cafe24 테마는 상품 목록 일부를 앱
  *     스크립트로 그리기도 한다. 명백한 분석·광고 호스트만 이름으로 막는다.
  *   · `app4you.cafe24.com` / `calendar-app.cafe24.com` 같은 cafe24 앱 호스트는
@@ -37,6 +38,11 @@
 
 /** 콘텐츠에 기여하지 않는 리소스 타입. */
 const BLOCKED_RESOURCE_TYPES = new Set(["image", "media", "font", "stylesheet"])
+
+export interface RequestBlockingOptions {
+  /** CSS computed visibility가 수집 신호인 페이지에서 stylesheet를 허용한다. */
+  allowStylesheets?: boolean
+}
 
 /**
  * 분석·광고·픽셀 호스트. 부분 문자열로 매칭한다(서브도메인 변형 대응).
@@ -79,8 +85,13 @@ export function isBlockingEnabled(env: NodeJS.ProcessEnv = process.env): boolean
  * 순수 함수로 분리해 둔 이유는 테스트 때문이다 — Playwright 라우트 핸들러를
  * 통째로 돌리지 않고 판정 규칙만 고정할 수 있다.
  */
-export function shouldBlockRequest(url: string, resourceType: string): boolean {
-  if (BLOCKED_RESOURCE_TYPES.has(resourceType)) return true
+export function shouldBlockRequest(
+  url: string,
+  resourceType: string,
+  options: RequestBlockingOptions = {},
+): boolean {
+  const allowedStylesheet = resourceType === "stylesheet" && options.allowStylesheets
+  if (BLOCKED_RESOURCE_TYPES.has(resourceType) && !allowedStylesheet) return true
   let host: string
   try {
     host = new URL(url).hostname.toLowerCase()
@@ -114,11 +125,14 @@ interface RoutableContext {
 /**
  * 브라우저 컨텍스트에 차단 규칙을 건다. 페이지를 만들기 **전에** 호출해야 한다.
  */
-export async function installRequestBlocking(context: RoutableContext): Promise<void> {
+export async function installRequestBlocking(
+  context: RoutableContext,
+  options: RequestBlockingOptions = {},
+): Promise<void> {
   if (!isBlockingEnabled()) return
   await context.route("**/*", (route) => {
     const request = route.request()
-    if (shouldBlockRequest(request.url(), request.resourceType())) {
+    if (shouldBlockRequest(request.url(), request.resourceType(), options)) {
       route.abort()
       return
     }
