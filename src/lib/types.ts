@@ -176,6 +176,8 @@ export interface SiteConfig {
    * 상품이 전량 드랍되는 것을 막는 장치다.
    */
   defaultGender?: string[]
+  /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
+  kidsGenderNoisePatterns?: RegExp[]
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
   /** 카테고리 탐색 설정 */

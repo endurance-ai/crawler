@@ -14,4 +14,5 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   )
 
   assert.deepEqual(getSiteConfig("heretic")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("twojeys")?.defaultGender, ["men"])
 })

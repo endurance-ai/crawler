@@ -183,6 +183,28 @@ test("QC reviews (drops) a product with no gender and no text signal", () => {
   assert.equal(result.action, "review")
 })
 
+test("QC kids 가드는 사이트별 캠페인명 노이즈를 제거한 뒤 defaultGender를 쓴다", () => {
+  const result = normalizeProductTextFields(
+    product({
+      name: "Summer Kids Tee",
+      category: "tops",
+      subcategory: "t-shirt",
+      gender: ["men"],
+      genderSource: "config_default",
+      tags: ["summer-kids-2026"],
+    }),
+    {kidsGenderNoisePatterns: [/\bsummer[-\s]kids(?:[-\s]2026)?\b/gi]},
+  )
+  assert.equal(result.action, "keep")
+  assert.deepEqual(result.product.gender, ["men"])
+})
+
+test("QC tie-dye는 액세서리 tie로 오인하지 않는다", () => {
+  const result = normalizeProductTextFields(product({name: "Tie-dye Zipper", category: "tops"}))
+  assert.equal(result.product.category, "tops")
+  assert.ok(!result.reasons.includes("category_text_conflict"))
+})
+
 test("QC gate excludes gender-less products from the batch", () => {
   resetProductQcReport()
   const kept = applyProductQcGate(

@@ -2329,6 +2329,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://twojeys.com",
     brand: "Twojeys",
+    // "Summer Kids"는 성인 XS~XL 의류를 포함한 캠페인명이고 Baby Blue는 색상명.
+    // kids 가드에서만 이 사이트 고유 노이즈를 제거한다(상품 태그 원문은 보존).
+    kidsGenderNoisePatterns: [
+      /\bsummer[-\s]kids(?:[-\s]2026|[12])?\b/gi,
+      /\bbaby[-\s]blue\b/gi,
+      /\bbuy a lighter get the \*+boy tee\b/gi,
+    ],
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,

@@ -47,6 +47,10 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   kupidomovingwear: ["women"], // Clothing/Moving/Vacance + Mermaid Swimsuit
   mausoleum: ["women"], // OUTERWEAR/TOPS/DRESSES + Pleated Skirt, Satin Blouse
   ordes: ["women"], // "contemporary take on femininity"
+  // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
+  // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
+  // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.
+  twojeys: ["men"],
   rense: ["women"], // OUTWEAR/TOPS/BOTTOMS/DRESS/ACC
   treemingbird: ["women"], // DRESSES/SKIRTS/SWIMWEAR + Halter Neck Backless Knit Top
   yahnsisi: ["women"], // Tops/Knits/Basics/Bottoms/Dresses + Lazy Summer Dress
@@ -116,7 +120,6 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //                   함께 운영 — 혼성이라 사이트 기본값이 성립하지 않는다.
   //   a-cold-wall-2808  카탈로그 119건 전체에 성별 신호 없음(상품명이 순수
   //                   제품 서술, 태그·URL 모두 무신호). 재크롤로도 해결 안 됨.
-  //   twojeys         장신구(반지/귀걸이/목걸이).
   //   beheavyer       상품 코퍼스에 성별 어휘 0.
   //   borseoul
   //   9999archive     여성 어휘 1/231 — 표본 대비 너무 약함.

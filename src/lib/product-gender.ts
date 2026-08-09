@@ -87,6 +87,11 @@ export interface GenderResolution {
   conflict?: {url: ProductGender; text: ProductGender}
 }
 
+export interface GenderResolutionOptions {
+  /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
+  kidsGenderNoisePatterns?: RegExp[]
+}
+
 // ─── 규칙 ────────────────────────────────────────────────────────────────
 //
 // 한글 대안은 반드시 `\b()` 그룹 **밖**에 둔다 — \b 는 한글에 적용되지 않아
@@ -299,6 +304,7 @@ export function resolveProductGenderWithSource(
   productGender: unknown,
   evidence: GenderEvidence = {},
   productGenderSource: GenderSource = "engine",
+  options: GenderResolutionOptions = {},
 ): GenderResolution {
   const fromProduct = singleEvidence(cleanGenderScope(productGender))
 
@@ -321,7 +327,15 @@ export function resolveProductGenderWithSource(
   // kids 가드는 태그 부서 분류보다 **먼저** 본다. 순서를 뒤집으면
   // `["Kids","Men","Women"]` 같은 태그가 아동복에 성인 성별(unisex)을 주고,
   // unisex 는 검색에서 남녀 양쪽에 노출되므로 정확히 이 모듈이 막으려는 세탁이 된다.
-  if (rawFromText === null && fromUrl === null && (isKidsText(text) || isKidsText(url))) {
+  const stripKidsNoise = (value: string) => options.kidsGenderNoisePatterns?.reduce(
+    (cleaned, pattern) => cleaned.replace(pattern, " "),
+    value,
+  ) ?? value
+  if (
+    rawFromText === null
+    && fromUrl === null
+    && (isKidsText(stripKidsNoise(text)) || isKidsText(stripKidsNoise(url)))
+  ) {
     return {gender: [], source: null}
   }
 

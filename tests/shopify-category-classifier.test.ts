@@ -116,6 +116,24 @@ test("classify_shopify_empty_type_uses_tags", () => {
   assert.equal(subcategory, "t-shirt")
 })
 
+test("classify_shopify_supports_twojeys_spanish_product_types", () => {
+  assert.equal(classifyShopifyCategory("CAMISETA", "Archive", []).category, "tops")
+  assert.equal(classifyShopifyCategory("ANILLO", "Archive", []).category, "jewelry")
+  assert.equal(classifyShopifyCategory("GORRA", "Archive", []).category, "headwear")
+  assert.equal(classifyShopifyCategory("BAÑADOR", "Archive", []).category, "swimwear")
+  assert.equal(classifyShopifyCategory("MECHERO", "Archive", []).category, "accessories")
+})
+
+test("classify_shopify_supports_common_jewelry_and_headwear_names", () => {
+  assert.equal(classifyShopifyCategory("", "Square Stone Signet", []).category, "jewelry")
+  assert.equal(classifyShopifyCategory("", "Venetian Chain", []).category, "jewelry")
+  assert.equal(classifyShopifyCategory("", "TJ x Cabrio", []).category, "swimwear")
+  assert.equal(classifyShopifyCategory("", "TJ x Cabrio Pinky Ring", []).category, "jewelry")
+  assert.equal(classifyShopifyCategory("", "Black Icon Chain Beanie", []).category, "headwear")
+  assert.equal(classifyShopifyCategory("", "Icon Trucker", []).category, "headwear")
+  assert.equal(classifyShopifyCategory("", "Initials 59Fifty", []).category, "headwear")
+})
+
 // ─── Tag + title fallback ─────────────────────────────────────────────────────
 
 test("classify_shopify_no_type_no_tags_uses_title", () => {

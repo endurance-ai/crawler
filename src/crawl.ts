@@ -790,7 +790,10 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
   // byte-identical; invalid ones are excluded + a structured reject
   // event is emitted. Flag OFF (CRAWLER_VALIDATION_ENABLED=false) →
   // exact legacy behavior (all products written, no gate).
-  const qcProducts = applyProductQcGate(rawProducts, platform)
+  const config = getSiteConfig(platform)
+  const qcProducts = applyProductQcGate(rawProducts, platform, {
+    kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+  })
   const products = applyValidationGate(qcProducts, platform)
   if (products.length === 0) return
 

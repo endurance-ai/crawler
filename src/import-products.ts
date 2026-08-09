@@ -555,13 +555,16 @@ async function main() {
         p.gender,
         evidence,
         (p.genderSource as GenderSource | undefined) ?? "engine",
+        {kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns},
       )
       // 엔진이 사이트 기본값을 찍지 않은 캐시(구 크롤 JSON, 또는 기본값을
       // 소비하지 않는 엔진)를 위해 import 시점에도 같은 폴백을 적용한다.
       // config_default 는 어차피 최하위 rank 라 url/text 를 이기지 못하므로
       // 엔진이 찍었든 여기서 찍었든 결과 순위는 동일하다.
       if (resolved.gender.length === 0 && !resolved.conflict && siteDefaultGender.length > 0) {
-        resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default")
+        resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default", {
+          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+        })
       }
       genderSourceCounts[resolved.source ?? "unresolved"] = (genderSourceCounts[resolved.source ?? "unresolved"] ?? 0) + 1
       if (resolved.conflict) {
@@ -584,7 +587,9 @@ async function main() {
     // + a structured reject event is emitted (does not crash the import
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
-    const qcRaw = applyProductQcGate(rawWithGender, platform)
+    const qcRaw = applyProductQcGate(rawWithGender, platform, {
+      kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+    })
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
 

@@ -51,6 +51,8 @@ export interface ProductQcInput {
 export interface ProductQcOptions {
   /** 입력 category 가 신뢰 가능한 출처(LLM 보강)에서 왔는가. 기본 false. */
   trustedCategory?: boolean
+  /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
+  kidsGenderNoisePatterns?: RegExp[]
 }
 
 export interface ProductQcResult<T extends ProductQcInput = ProductQcInput> {
@@ -131,7 +133,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "accessories",
-    patterns: [/\b(scarf|belt|watch|tie|gloves|socks|wallet|muffler)\b/i],
+    patterns: [/\b(scarf|belt|watch|tie(?![-\s]?dye)|gloves|socks|wallet|muffler)\b/i],
     contains: ["\uc2a4\uce74\ud504", "\ubca8\ud2b8", "\uc2dc\uacc4", "\ub125\ud0c0\uc774", "\uc7a5\uac11", "\uc591\ub9d0", "\uc9c0\uac11", "\uba38\ud50c\ub7ec"],
   },
   {
@@ -356,7 +358,7 @@ function normalizeSubcategoryField(
  * description 은 입력에서 뺐다. 크롤러가 더 이상 수집하지 않고, products.description
  * 은 2000자 마케팅/사이즈표 slice 라 "여성 사이즈 참고" 같은 문구가 오판을 만든다.
  */
-function normalizeGenderField(product: ProductQcInput): {
+function normalizeGenderField(product: ProductQcInput, options: ProductQcOptions): {
   value: string[] | null
   /** value 를 새로 추론했을 때의 출처. 기존 값을 그대로 쓰면 null. */
   source: string | null
@@ -380,6 +382,7 @@ function normalizeGenderField(product: ProductQcInput): {
       productUrl: product.productUrl,
     },
     (product.genderSource as GenderSource | undefined) ?? "engine",
+    {kidsGenderNoisePatterns: options.kidsGenderNoisePatterns},
   )
 
   const normalized = [...new Set(raw.map((g) => normalizeGenderToken(String(g)) ?? normalizeForMatch(String(g))).filter(Boolean))]
@@ -449,7 +452,7 @@ export function normalizeProductTextFields<T extends ProductQcInput>(
     next.subcategory = subcategory.value
   }
 
-  const gender = normalizeGenderField(product)
+  const gender = normalizeGenderField(product, options)
   confidences.push(gender.confidence)
   if (gender.needsReview) needsReview = true
   if (gender.reason) reasons.push(gender.reason)
