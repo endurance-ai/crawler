@@ -5,11 +5,20 @@ import {
   cleanGenderScope,
   hasGenderToken,
   inferDualDepartmentFromTags,
+  inferGenderFromDepartmentTagPrefixes,
   inferGenderFromText,
   inferGenderFromUrl,
   isKidsText,
   resolveProductGenderWithSource,
 } from "../src/lib/product-gender"
+
+test("사이트별 구조화 부서 태그 prefix는 단일/양쪽 성별을 구분한다", () => {
+  const prefixes = {men: ["M_", "man_product"], women: ["W_", "woman_product"]}
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["M_ACCESSORIES"], prefixes), "men")
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["W_TOPS"], prefixes), "women")
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["M_JEWELRY", "W_JEWELRY"], prefixes), "unisex")
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["modelview"], prefixes), null)
+})
 
 // ─── 회귀: unisex 세탁 ────────────────────────────────────────────────────
 //

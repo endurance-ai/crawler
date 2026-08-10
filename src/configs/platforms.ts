@@ -2789,6 +2789,11 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
 ])
 
+const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]}> = {
+  // 공식 Shopify 태그: M_ACCESSORIES / W_ACCESSORIES, man_product / woman_product.
+  "nude-project": {men: ["M_", "man_product"], women: ["W_", "woman_product"]},
+}
+
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
   const config = PLATFORMS.find((p) => p.key === key)
@@ -2802,16 +2807,19 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     : SITE_GENDER_DEFAULTS[key]
   const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
   const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
+  const genderDepartmentTagPrefixes = SITE_GENDER_DEPARTMENT_TAG_PREFIXES[key] ?? config.genderDepartmentTagPrefixes
   if (
     fallback === config.defaultGender
     && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
     && verifiedUnisexDefault === config.verifiedUnisexDefault
+    && genderDepartmentTagPrefixes === config.genderDepartmentTagPrefixes
   ) return config
   return {
     ...config,
     ...(fallback ? {defaultGender: fallback} : {}),
     ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
     ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
+    ...(genderDepartmentTagPrefixes ? {genderDepartmentTagPrefixes} : {}),
   }
 }
 

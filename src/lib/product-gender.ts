@@ -234,6 +234,25 @@ export function inferDualDepartmentFromTags(tags: unknown): ProductGender | null
   return hasGenderToken(blob, "men") && hasGenderToken(blob, "women") ? "unisex" : null
 }
 
+/** 사이트가 명시한 구조화 부서 태그 prefix로 상품 성별을 결의한다. */
+export function inferGenderFromDepartmentTagPrefixes(
+  tags: unknown,
+  prefixes: {men: string[]; women: string[]} | undefined,
+): ProductGender | null {
+  if (!Array.isArray(tags) || !prefixes) return null
+  const values = tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
+  const has = (candidates: string[]) => candidates.some((prefix) => {
+    const normalized = prefix.toLowerCase()
+    return values.some((tag) => tag.startsWith(normalized))
+  })
+  const men = has(prefixes.men)
+  const women = has(prefixes.women)
+  if (men && women) return "unisex"
+  if (men) return "men"
+  if (women) return "women"
+  return null
+}
+
 /**
  * URL 경로에서 성별을 읽는다. 크롤러가 실제로 진입한 카테고리 랜딩이 남긴
  * 구조적 신호라 상품명(마케팅 카피)보다 신뢰도가 높다.

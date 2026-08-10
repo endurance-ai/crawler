@@ -26,6 +26,10 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   const vicinity = getSiteConfig("vicinityclo")
   assert.deepEqual(vicinity?.defaultGender, ["unisex"])
   assert.equal(vicinity?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("nude-project")?.genderDepartmentTagPrefixes, {
+    men: ["M_", "man_product"],
+    women: ["W_", "woman_product"],
+  })
   const margeNoise = getSiteConfig("margesherwood")?.kidsGenderNoisePatterns ?? []
   assert.equal(margeNoise.reduce((text, pattern) => text.replace(pattern, " "), "babypinklight summer girls girls club").trim(), "light")
   assert.equal(getSiteConfig("singularisca")?.brand, "singularisca")

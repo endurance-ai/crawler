@@ -7,7 +7,7 @@
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
-import {inferGenderFromText} from "./product-gender"
+import {inferGenderFromDepartmentTagPrefixes, inferGenderFromText} from "./product-gender"
 import {normalizeObservedPricing} from "./product-pricing"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
@@ -128,6 +128,8 @@ export interface ShopifyParseOptions {
   brandFallback?: string
   /** Site-wide default gender seed (`config.defaultGender`). */
   defaultGender?: string[]
+  /** 사이트별 구조화 성별 부서 태그 prefix. */
+  genderDepartmentTagPrefixes?: SiteConfig["genderDepartmentTagPrefixes"]
   /**
    * 품절 상품을 결과에 남긴다 (갱신 전용). 기본 false — 일반 크롤 출력은 종전과
    * 바이트 동일하다(골든 마스터 불변식). 갱신 경로만 true 로 켜서 "재고→품절"
@@ -271,7 +273,10 @@ export function parseShopifyProducts(
     // inferGenderFromText 는 `\b(men|mens|...)\b` 워드 바운더리를 쓰므로
     // "womens" 를 men 으로 읽지 않고, 남녀가 진짜로 함께 잡히면 null(모호)을
     // 돌려준다 — 추측 대신 미확인이 이 프로젝트의 규율이다.
-    const inferredFromTags = inferGenderFromText(sp.tags.join(" "))
+    const inferredFromTags = inferGenderFromDepartmentTagPrefixes(
+      sp.tags,
+      options.genderDepartmentTagPrefixes,
+    ) ?? inferGenderFromText(sp.tags.join(" "))
     const genderFromTags = inferredFromTags !== null
     const gender: string[] = genderFromTags ? [inferredFromTags] : [...(options.defaultGender || [])]
 
@@ -381,6 +386,7 @@ export async function crawlShopify(
           // 유지하며, 빈 vendor를 플랫폼명으로 채우지 않는다.
           brandOverride: config.multiBrand ? undefined : config.brand,
           defaultGender: config.defaultGender,
+          genderDepartmentTagPrefixes: config.genderDepartmentTagPrefixes,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )

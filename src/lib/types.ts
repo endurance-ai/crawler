@@ -184,6 +184,8 @@ export interface SiteConfig {
    * 결의 단계에서 버리지만, 이 플래그가 있으면 검증된 사이트 기본값으로 허용한다.
    */
   verifiedUnisexDefault?: boolean
+  /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
+  genderDepartmentTagPrefixes?: {men: string[]; women: string[]}
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** Cafe24 셀렉터 오버라이드 */
