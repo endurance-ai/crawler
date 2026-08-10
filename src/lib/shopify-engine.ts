@@ -7,7 +7,11 @@
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
-import {inferGenderFromDepartmentTagPrefixes, inferGenderFromText} from "./product-gender"
+import {
+  inferGenderFromDepartmentTagPrefixes,
+  inferGenderFromModelDescription,
+  inferGenderFromText,
+} from "./product-gender"
 import {normalizeObservedPricing} from "./product-pricing"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
@@ -130,6 +134,8 @@ export interface ShopifyParseOptions {
   defaultGender?: string[]
   /** 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: SiteConfig["genderDepartmentTagPrefixes"]
+  /** 상품 설명의 명시적 Male:/Female: 모델 라벨을 사용한다. */
+  genderFromModelDescription?: boolean
   /**
    * 품절 상품을 결과에 남긴다 (갱신 전용). 기본 false — 일반 크롤 출력은 종전과
    * 바이트 동일하다(골든 마스터 불변식). 갱신 경로만 true 로 켜서 "재고→품절"
@@ -273,17 +279,19 @@ export function parseShopifyProducts(
     // inferGenderFromText 는 `\b(men|mens|...)\b` 워드 바운더리를 쓰므로
     // "womens" 를 men 으로 읽지 않고, 남녀가 진짜로 함께 잡히면 null(모호)을
     // 돌려준다 — 추측 대신 미확인이 이 프로젝트의 규율이다.
-    const inferredFromTags = inferGenderFromDepartmentTagPrefixes(
+    const inferredGender = inferGenderFromDepartmentTagPrefixes(
       sp.tags,
       options.genderDepartmentTagPrefixes,
-    ) ?? inferGenderFromText(sp.tags.join(" "))
-    const genderFromTags = inferredFromTags !== null
-    const gender: string[] = genderFromTags ? [inferredFromTags] : [...(options.defaultGender || [])]
+    ) ?? (options.genderFromModelDescription
+      ? inferGenderFromModelDescription(sp.body_html)
+      : null) ?? inferGenderFromText(sp.tags.join(" "))
+    const genderFromEvidence = inferredGender !== null
+    const gender: string[] = genderFromEvidence ? [inferredGender] : [...(options.defaultGender || [])]
 
     allProducts.push({
       brand: options.brandOverride || sp.vendor || options.brandFallback || "",
       gender,
-      genderSource: genderFromTags ? ("engine" as const) : ("config_default" as const),
+      genderSource: genderFromEvidence ? ("engine" as const) : ("config_default" as const),
       name: sp.title,
       ...classifyShopifyCategory(sp.product_type || "", sp.title, sp.tags),
       ...pricing,
@@ -387,6 +395,7 @@ export async function crawlShopify(
           brandOverride: config.multiBrand ? undefined : config.brand,
           defaultGender: config.defaultGender,
           genderDepartmentTagPrefixes: config.genderDepartmentTagPrefixes,
+          genderFromModelDescription: config.genderFromModelDescription,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )

@@ -2779,6 +2779,11 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
     /\bsummer[-\s]girls\b/gi,
     /\bgirls[-\s]club\b/gi,
   ],
+  // Cold Culture 성인 상품의 색상명/그래픽명. 실제 아동 라인은 아니다.
+  coldcultureworldwide: [
+    /\bbaby[-\s]+(?:blue|pink)\b/gi,
+    /\b(?:good|top)[-\s]+boy\b/gi,
+  ],
 }
 
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
@@ -2792,7 +2797,14 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]}> = {
   // 공식 Shopify 태그: M_ACCESSORIES / W_ACCESSORIES, man_product / woman_product.
   "nude-project": {men: ["M_", "man_product"], women: ["W_", "woman_product"]},
+  // 공식 Woman 컬렉션의 태그: woman, women, womanpants, womantees, ea#woman 등.
+  coldcultureworldwide: {men: ["MEN"], women: ["woman", "women", "ea#woman"]},
 }
+
+const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
+  // 공식 상품 설명에 Male (키): 사이즈 / Female (키): 사이즈 형식이 일관되게 존재한다.
+  "coldcultureworldwide",
+])
 
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
@@ -2808,11 +2820,13 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
   const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
   const genderDepartmentTagPrefixes = SITE_GENDER_DEPARTMENT_TAG_PREFIXES[key] ?? config.genderDepartmentTagPrefixes
+  const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
   if (
     fallback === config.defaultGender
     && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
     && verifiedUnisexDefault === config.verifiedUnisexDefault
     && genderDepartmentTagPrefixes === config.genderDepartmentTagPrefixes
+    && genderFromModelDescription === config.genderFromModelDescription
   ) return config
   return {
     ...config,
@@ -2820,6 +2834,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
     ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
     ...(genderDepartmentTagPrefixes ? {genderDepartmentTagPrefixes} : {}),
+    ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
   }
 }
 

@@ -6,6 +6,7 @@ import {
   hasGenderToken,
   inferDualDepartmentFromTags,
   inferGenderFromDepartmentTagPrefixes,
+  inferGenderFromModelDescription,
   inferGenderFromText,
   inferGenderFromUrl,
   isKidsText,
@@ -18,6 +19,13 @@ test("사이트별 구조화 부서 태그 prefix는 단일/양쪽 성별을 구
   assert.equal(inferGenderFromDepartmentTagPrefixes(["W_TOPS"], prefixes), "women")
   assert.equal(inferGenderFromDepartmentTagPrefixes(["M_JEWELRY", "W_JEWELRY"], prefixes), "unisex")
   assert.equal(inferGenderFromDepartmentTagPrefixes(["modelview"], prefixes), null)
+})
+
+test("명시적 모델 라벨은 한쪽/양쪽 착용을 구분하고 일반 문장은 무시한다", () => {
+  assert.equal(inferGenderFromModelDescription("Male (184cm): L"), "men")
+  assert.equal(inferGenderFromModelDescription("Female: (173cm): S"), "women")
+  assert.equal(inferGenderFromModelDescription("Male (184cm): L - Female (177cm): S"), "unisex")
+  assert.equal(inferGenderFromModelDescription("A feminine fit for all models"), null)
 })
 
 // ─── 회귀: unisex 세탁 ────────────────────────────────────────────────────

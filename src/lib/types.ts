@@ -186,6 +186,8 @@ export interface SiteConfig {
   verifiedUnisexDefault?: boolean
   /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: {men: string[]; women: string[]}
+  /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */
+  genderFromModelDescription?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** Cafe24 셀렉터 오버라이드 */

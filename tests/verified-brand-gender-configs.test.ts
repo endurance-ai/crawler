@@ -30,6 +30,18 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     men: ["M_", "man_product"],
     women: ["W_", "woman_product"],
   })
+  const coldCulture = getSiteConfig("coldcultureworldwide")
+  assert.deepEqual(coldCulture?.defaultGender, ["men"])
+  assert.deepEqual(coldCulture?.genderDepartmentTagPrefixes, {
+    men: ["MEN"],
+    women: ["woman", "women", "ea#woman"],
+  })
+  assert.equal(coldCulture?.genderFromModelDescription, true)
+  const coldCultureNoise = coldCulture?.kidsGenderNoisePatterns ?? []
+  assert.equal(
+    coldCultureNoise.reduce((text, pattern) => text.replace(pattern, " "), "baby blue good boy top boy").trim(),
+    "",
+  )
   const margeNoise = getSiteConfig("margesherwood")?.kidsGenderNoisePatterns ?? []
   assert.equal(margeNoise.reduce((text, pattern) => text.replace(pattern, " "), "babypinklight summer girls girls club").trim(), "light")
   assert.equal(getSiteConfig("singularisca")?.brand, "singularisca")

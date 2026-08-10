@@ -46,6 +46,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 2026-07-15 브랜드 리서치: 공식 홈페이지·Instagram 및 판매 상품군 교차 확인.
   // https://www.vicinityclo.de/ / https://www.instagram.com/vicinity_de/
   vicinityclo: ["unisex"],
+  // 공식몰은 일반/Man 상품군과 별도 Woman 컬렉션을 운영한다. Woman 상품은
+  // Shopify 태그로 먼저 판정하고, 그 신호가 없는 일반 상품군에만 men을 적용한다.
+  // https://coldcultureworldwide.com/collections/all-products
+  // https://coldcultureworldwide.com/collections/woman
+  coldcultureworldwide: ["men"],
   // ── 사이트 직접 확인 (2026-08-03) ────────────────────────────
   // 내비게이션에 DRESS/SKIRT 등 여성 전용 카테고리가 있고 남성 라인이 없음.
   aru: ["women"], // Dresses/Tops/Bottoms

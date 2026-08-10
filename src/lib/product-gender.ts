@@ -253,6 +253,18 @@ export function inferGenderFromDepartmentTagPrefixes(
   return null
 }
 
+/** 상품 설명의 명시적 모델 라벨만 읽는다. 양쪽 모델 착용은 확인된 unisex다. */
+export function inferGenderFromModelDescription(value: unknown): ProductGender | null {
+  if (typeof value !== "string" || !value) return null
+  const text = value.replace(/<[^>]+>/g, " ")
+  const men = /\bmale\s*(?:[:(])/i.test(text)
+  const women = /\bfemale\s*(?:[:(])/i.test(text)
+  if (men && women) return "unisex"
+  if (men) return "men"
+  if (women) return "women"
+  return null
+}
+
 /**
  * URL 경로에서 성별을 읽는다. 크롤러가 실제로 진입한 카테고리 랜딩이 남긴
  * 구조적 신호라 상품명(마케팅 카피)보다 신뢰도가 높다.

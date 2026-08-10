@@ -82,6 +82,39 @@ test("single-brand override ignores a conflicting Shopify vendor", () => {
   assert.ok(products.every((product) => product.brand === "House Brand"))
 })
 
+test("shopify 모델 설명 성별은 opt-in이며 구조화 부서 태그가 우선한다", () => {
+  const base = {
+    id: 1,
+    vendor: "Cold Culture",
+    product_type: "Hoodie",
+    variants: [{id: 1, title: "S", price: "100", available: true, sku: "S"}],
+    images: [],
+  }
+  const products = parseShopifyProducts({products: [
+    {
+      ...base,
+      title: "Shared Hoodie",
+      handle: "shared-hoodie",
+      body_html: "Male (184cm): L - Female (177cm): S",
+      tags: [],
+    },
+    {
+      ...base,
+      id: 2,
+      title: "Woman Hoodie",
+      handle: "woman-hoodie",
+      body_html: "Male (184cm): L - Female (177cm): S",
+      tags: ["womanhoodies"],
+    },
+  ]}, BASE_URL, KEY, {
+    ...KRW_PARSE_OPTIONS,
+    genderFromModelDescription: true,
+    genderDepartmentTagPrefixes: {men: ["MEN"], women: ["woman"]},
+  })
+  assert.deepEqual(products.map((product) => product.gender), [["unisex"], ["women"]])
+  assert.deepEqual(products.map((product) => product.genderSource), ["engine", "engine"])
+})
+
 test("shopify는 구매 가능한 세일 옵션이 하나라도 있으면 가장 낮은 세일 옵션을 대표한다", () => {
   const fixture = {
     products: [{
