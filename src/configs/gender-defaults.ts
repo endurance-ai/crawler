@@ -47,6 +47,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   kupidomovingwear: ["women"], // Clothing/Moving/Vacance + Mermaid Swimsuit
   mausoleum: ["women"], // OUTERWEAR/TOPS/DRESSES + Pleated Skirt, Satin Blouse
   ordes: ["women"], // "contemporary take on femininity"
+  porterna: ["women"], // Official storefront has dresses/skirts/blouses and no men's department; current corpus includes halter/off-shoulder/blouse items.
+  margesherwood: ["women"], // Official storefront collections include DRESS and other womenswear alongside bags/shoes, with no men's department.
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

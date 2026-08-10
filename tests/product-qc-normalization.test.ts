@@ -3,6 +3,7 @@ import * as assert from "node:assert/strict"
 
 import type {Product} from "../src/lib/types"
 import {
+  inferCategoryFromText,
   applyProductQcGate,
   normalizeProductTextFields,
   resetProductQcReport,
@@ -103,10 +104,11 @@ test("QC passes a canonical family through unchanged (knitwear stays knitwear)",
   assert.ok(!result.reasons.includes("category_canonicalized"))
 })
 
-test("QC holds non-canonical noise category for review (not loaded) when name gives no signal", () => {
+test("QC stores unresolved category as other so Qwen can normalize it after insert", () => {
   const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "~50%"}))
-  assert.equal(result.action, "review")
-  assert.ok(result.reasons.includes("category_noncanonical_dropped"))
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "other")
+  assert.ok(result.reasons.includes("category_unresolved_other_fallback"))
 })
 
 test("QC recovers canonical from name when category is noise (모두 보기 -> dresses)", () => {
@@ -144,11 +146,12 @@ test("QC infers subcategory from the product name when the field is missing", ()
   assert.ok(result.reasons.includes("subcategory_missing_text_fallback"))
 })
 
-test("QC nulls subcategory when category itself was dropped as non-canonical", () => {
+test("QC nulls subcategory when category falls back to other", () => {
   const result = normalizeProductTextFields(
     product({name: "Archive Piece 001", category: "~50%", subcategory: "skirt"}),
   )
-  assert.equal(result.action, "review")
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "other")
   assert.equal(result.product.subcategory, null)
   assert.ok(result.reasons.includes("subcategory_no_category"))
 })
@@ -254,4 +257,10 @@ test("QC 가 gender 를 채우면 genderSource 도 함께 갱신한다", () => {
   )
   assert.deepEqual(result.product.gender, ["women"])
   assert.equal(result.product.genderSource, "url")
+})
+
+test("BMUET Korean product names resolve before the import conflict gate", () => {
+  assert.equal(inferCategoryFromText("아플리케 로고 자수 티셔츠 화이트"), "tops")
+  assert.equal(inferCategoryFromText("깅엄 체크 라인 디테일 볼륨 스커트 블랙"), "bottoms")
+  assert.equal(inferCategoryFromText("도트 리본 디테일 미니 원피스"), "dresses")
 })

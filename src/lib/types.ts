@@ -78,6 +78,8 @@ export interface Product {
   llmEnrichedAt?: string
   /** 보강에 사용된 모델 (배치 간 결과를 비교할 때 필요). */
   llmModel?: string
+  /** 보강 입력이 달라졌는지 판정하는 SHA-256 체크포인트. */
+  llmInputHash?: string
   // ── 리뷰 데이터 (Phase 3) ──
   reviewCount?: number
   reviews?: Array<{

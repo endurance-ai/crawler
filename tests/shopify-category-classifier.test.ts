@@ -78,6 +78,27 @@ test("classify_shopify_specific_type_accessories_to_accessories", () => {
   assert.equal(subcategory, "belt")
 })
 
+test("classify_cafe24_wallet_does_not_treat_zipper_as_a_top", () => {
+  const {category} = classifyShopifyCategory("Cat66", "HEART ZIPPER WALLET_silver logo", [])
+  assert.equal(category, "accessories")
+})
+
+test("classify_cafe24_underscore_colour_keeps_cardigan_as_knitwear", () => {
+  const {category, subcategory} = classifyShopifyCategory("Cat66", "RIBBED COLLAR CARDIGAN_black", [])
+  assert.equal(category, "knitwear")
+  assert.equal(subcategory, "cardigan")
+})
+
+test("classify_shearling_wallet_by_product_noun_not_material", () => {
+  const {category} = classifyShopifyCategory("Cat66", "SHEARLING ZIPPER WALLET_beige shearling", [])
+  assert.equal(category, "accessories")
+})
+
+test("classify_knit_vest_as_knitwear_before_generic_vest", () => {
+  const {category} = classifyShopifyCategory("Cat66", "TAIL STRIPE KNIT VEST_grey", [])
+  assert.equal(category, "knitwear")
+})
+
 // ─── Split families (Accessories → eyewear / jewelry / headwear) ─────────────
 
 test("classify_shopify_sunglasses_to_eyewear", () => {

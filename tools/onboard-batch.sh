@@ -30,11 +30,10 @@
 #                          each detail page a second time for category/subcategory/
 #                          color/description/gender; existing = deterministic only.
 #
-# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (QC + LLM
-# category/subcategory classify + color recovery, reading the same variant back
-# via ONBOARD_VARIANT) -> import-products.ts (upsert) -> reclassify-categories.ts
-# --only-invalid (guardrail: fixes any row that still has a non-canonical
-# category, regardless of cause — cheap, always safe to run).
+# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (deterministic QC
+# and category/color recovery, reading the same variant back via ONBOARD_VARIANT)
+# -> import-products.ts (safe upsert, then best-effort local Qwen normalization)
+# -> reclassify-categories.ts --only-invalid (canonical taxonomy guardrail).
 #
 # Resumable: if out-root/chunk-N/products.jsonl already exists, crawl is skipped
 # for that chunk (so a killed run can restart with the same --start).
@@ -156,7 +155,7 @@ for c in $(seq "$START" "$END"); do
   NET=$((AFTER - BEFORE))
 
   # Guardrail: fix any row left with a non-canonical category, regardless of
-  # cause (stale cache upsert, LLM output drift, etc). Idempotent and cheap —
+  # cause (stale cache upsert, Qwen output drift, etc). Idempotent and cheap —
   # only touches rows actually out of taxonomy.
   GUARD_LOG="$OUT_ROOT/guardrail-chunk-$c.log"
   $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1 || true

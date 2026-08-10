@@ -12,9 +12,9 @@
 #   3. select-onboard-batch.ts — status_updated_at 최신순으로 N개를 골라
 #      onboard-batch.sh용 --configs JSON을 만든다 (반드시 getSiteConfig()의 완전한
 #      config를 그대로 씀 — stub 절대 금지, 2026-07-21 사고 참조).
-#   4. onboard-batch.sh --variants hybrid — 크롤 + LLM 카테고리/subcategory 분류 +
-#      import + guardrail까지 한 번에. 색상·설명은 2026-07-29 에 빠졌고(색상은 VLM
-#      단일 출처), 성별은 LLM 이 아니라 크롤 단계가 결의한다.
+#   4. onboard-batch.sh --variants hybrid — 크롤 + canonical DB import + local Qwen
+#      category/subcategory 보강 + guardrail. 색상·설명은 2026-07-29 에 빠졌고
+#      (색상은 VLM 단일 출처), 성별은 Qwen 이 아니라 크롤 단계가 결의한다.
 #   5. check-onboard-anomalies.ts — 오늘 처리한 브랜드들만 대상으로 가격/브랜드/성별
 #      이상 패턴을 검사해 리포트. 색상 체크는 VLM 이관으로 제거됐다. 원인 조사·코드
 #      수정은 여기서 자동으로 하지 않는다(오판 위험) — 이상 발견 시 그 리포트를

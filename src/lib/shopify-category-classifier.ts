@@ -36,12 +36,14 @@ const NOISE_TYPES = new Set([
 const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // Dresses first (so "shirt dress" → dresses, not tops)
   [/\b(dress|dresses|jumpsuit|romper)\b/, "dresses"],
+  // A knit vest is knitwear; generic `vest` below remains outerwear.
+  [/\bknit(?:ted)?[-\s]+vest\b/, "knitwear"],
   // Outerwear (cardigan intentionally excluded → knitwear)
-  [/\b(coat|jacket|parka|anorak|blazer|vest|bomber|windbreaker|fleece|cape|poncho|shearling|outerwear|overshirt|blouson|trench|overcoat|puffer|chaqueta)\b/, "outerwear"],
+  [/\b(coat|jacket|parka|anorak|blazer|vest|bomber|windbreaker|fleece|cape|poncho|outerwear|overshirt|blouson|trench|overcoat|puffer|chaqueta)\b/, "outerwear"],
   // Knitwear (sweater/knit/cardigan split out of Top)
   [/\b(sweater|sweaters|cardigan|cardigans|knitwear|knits|knit|pullover|turtleneck)\b/, "knitwear"],
   // Tops
-  [/\b(shirt|shirts|top|tops|tee|tees|t-shirt|t-shirts|hoodie|hoodies|sweatshirt|sweatshirts|blouse|blouses|polo|polos|tank|longsleeve|long[-\s]?sleeve|sleeveless|crewneck|zipper|full[-\s]?zip|jersey|henley|camisole|rugby|crop-top|camiseta)\b/, "tops"],
+  [/\b(shirt|shirts|top|tops|tee|tees|t-shirt|t-shirts|hoodie|hoodies|sweatshirt|sweatshirts|blouse|blouses|polo|polos|tank|longsleeve|long[-\s]?sleeve|sleeveless|crewneck|full[-\s]?zip|jersey|henley|camisole|rugby|crop-top|camiseta)\b/, "tops"],
   // Swimwear before bottoms/underwear: "bikini bottoms" and "swim trunks"
   // are swimwear products, not generic trousers or underwear.
   [/\b(swimsuit|swimwear|bikini|trunks|rashguard|rash\s+guard|bañador)\b/, "swimwear"],
@@ -50,7 +52,7 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // Shoes
   [/\b(shoe|shoes|sneaker|sneakers|boot|boots|loafer|loafers|sandal|sandals|footwear|mule|mules|heel|heels|flat|flats|slide|slides|oxford|derby|trainer|trainers)\b/, "shoes"],
   // Bags
-  [/\b(bag|bags|tote|totes|backpack|backpacks|clutch|purse|purses|wallet|wallets|messenger|pouch|pouches|satchel|bolsa)\b/, "bags"],
+  [/\b(bag|bags|tote|totes|backpack|backpacks|clutch|purse|purses|messenger|pouch|pouches|satchel|bolsa)\b/, "bags"],
   // Eyewear (before accessories)
   [/\b(sunglass|sunglasses|eyewear|glasses|goggles)\b/, "eyewear"],
   // Jewelry
@@ -58,7 +60,7 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // Headwear
   [/\b(hat|hats|cap|caps|beanie|balaclava|beret|bucket\s*hat|trucker|59fifty|gorra)\b/, "headwear"],
   // Accessories (residual)
-  [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|accessories|accessory|muffler|lighter|towel|money[-\s]?clip|carabiner|keychain|ashtray|golf[-\s]?balls?|steering[-\s]?wheel[-\s]?cover|door[-\s]?latch|stamp|mechero|cenicero|cerrojo|golf)\b/, "accessories"],
+  [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|wallet|wallets|accessories|accessory|muffler|lighter|towel|money[-\s]?clip|carabiner|keychain|ashtray|golf[-\s]?balls?|steering[-\s]?wheel[-\s]?cover|door[-\s]?latch|stamp|mechero|cenicero|cerrojo|golf)\b/, "accessories"],
   // Underwear
   [/\b(underwear|briefs|boxer|boxers|bra|bras|lingerie|panties|panty)\b/, "underwear"],
   // Activewear
@@ -89,9 +91,14 @@ export function classifyShopifyCategory(
   title: string,
   tags: string[],
 ): ClassifyResult {
-  const typeLower = productType.trim().toLowerCase()
-  const titleLower = title.toLowerCase()
-  const tagsText = tags.map((t) => t.toLowerCase()).join(" ")
+  // Cafe24 often joins the product name and colour with an underscore
+  // (`CARDIGAN_black`). In JavaScript regexes `_` is a word character, so a
+  // normal `\bcardigan\b` rule cannot see the category token unless separators
+  // are normalized first.
+  const normalizeSeparators = (value: string) => value.toLowerCase().replace(/_/g, " ")
+  const typeLower = normalizeSeparators(productType.trim())
+  const titleLower = normalizeSeparators(title)
+  const tagsText = tags.map((t) => normalizeSeparators(t)).join(" ")
   // combined signal for subcategory and fallback category matching
   const combined = `${titleLower} ${tagsText}`
 

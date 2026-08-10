@@ -58,14 +58,14 @@ engines/
     └── index.ts
 
 configs/
-├── platforms.ts               # PLATFORMS: SiteConfig[] — one entry = one site
-└── analyze-prompt.ts
+└── platforms.ts               # PLATFORMS: SiteConfig[] — one entry = one site
 
 lib/
 ├── types.ts
 ├── database.types.ts          # supabase gen types output
 ├── body-info-extractor.ts
-└── product-analyzer.ts
+├── qwen-client.ts             # local OpenAI-compatible Qwen provider
+└── product-qwen-normalization.ts
 
 output/                        # gitignored (per-run cache)
 ```

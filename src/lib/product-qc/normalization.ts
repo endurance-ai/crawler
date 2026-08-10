@@ -270,7 +270,7 @@ function currentCategoryCompat(raw: string): Category | null {
   return CATEGORY_COMPAT[normalized] ?? null
 }
 
-function inferCategoryFromText(text: string): Category | null {
+export function inferCategoryFromText(text: string): Category | null {
   if (!text.trim()) return null
   const matches = CATEGORY_ALIASES.filter((entry) => matchesAny(text, entry.patterns, entry.contains)).map((entry) => entry.category)
   const unique = [...new Set(matches)]
@@ -309,7 +309,9 @@ function normalizeCategoryField(
   }
 
   if (inferred) return {value: inferred, reason: "category_noise_text_fallback", confidence: 0.8, needsReview: false}
-  return {value: null, reason: "category_noncanonical_dropped", confidence: 0, needsReview: true}
+  // 상품 적재는 Qwen 가용성에 종속되지 않는다. 결정론적으로 분류할 수 없는
+  // 값은 canonical `other` 로 먼저 저장하고 후속 Qwen 정규화가 조건부 PATCH한다.
+  return {value: "other", reason: "category_unresolved_other_fallback", confidence: 0.2, needsReview: false}
 }
 
 // subcategory is optional (unlike category — no NOT NULL constraint, no

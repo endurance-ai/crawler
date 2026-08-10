@@ -32,6 +32,15 @@ import {
 } from "./lib/brand-provenance"
 import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
 import {emit} from "./lib/core/observability"
+import {isValidCategory, isValidSubcategory, type Category} from "./lib/enums/product-enums"
+import {
+  buildQwenNormalizationPatch,
+  classifyProductWithQwen,
+  needsQwenNormalization,
+  qwenNormalizationInputHash,
+  type ProductNormalizationInput,
+} from "./lib/product-qwen-normalization"
+import {QwenDisabledError, QwenUnavailableError} from "./lib/qwen-client"
 
 /**
  * 성별 출처 신뢰도 순위 (dedup merge 용).
@@ -113,9 +122,105 @@ interface CrawledProduct {
     source: "variant" | "api" | "listing" | "detail"
     version: 2
   }
+  llmEnrichedAt?: string
+  llmModel?: string
+  llmInputHash?: string
   // 리뷰 데이터
   reviewCount?: number
   reviews?: CrawledReview[]
+}
+
+interface QwenImportStats {
+  targeted: number
+  succeeded: number
+  deferred: number
+  schemaFailed: number
+  raceSkipped: number
+}
+
+function emptyQwenImportStats(): QwenImportStats {
+  return {targeted: 0, succeeded: 0, deferred: 0, schemaFailed: 0, raceSkipped: 0}
+}
+
+function writeJsonCheckpoint(filePath: string, products: readonly CrawledProduct[]): void {
+  const tmp = `${filePath}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(products, null, 2), "utf-8")
+  fs.renameSync(tmp, filePath)
+}
+
+async function normalizePersistedRows(
+  rows: Array<{
+    product_url: string
+    name: string
+    brand: string
+    category: string
+    subcategory: string | null
+    tags: string[] | null
+    updated_at: string
+  }>,
+  fileProducts: CrawledProduct[],
+  stats: QwenImportStats,
+): Promise<boolean> {
+  let checkpointChanged = false
+  await Promise.all(rows.map(async (row) => {
+    const input: ProductNormalizationInput = {
+      productUrl: row.product_url,
+      name: row.name,
+      brand: row.brand,
+      category: row.category,
+      subcategory: row.subcategory,
+      tags: row.tags,
+    }
+    if (!needsQwenNormalization(input)) return
+    stats.targeted++
+
+    try {
+      const prediction = await classifyProductWithQwen(input)
+      const patch = buildQwenNormalizationPatch(input, prediction.value)
+      if (!patch) {
+        stats.deferred++
+        return
+      }
+
+      const normalizedAt = new Date().toISOString()
+      const {data, error} = await db
+        .from("products")
+        .update({...patch, updated_at: normalizedAt})
+        .eq("product_url", row.product_url)
+        .eq("updated_at", row.updated_at)
+        .select("id")
+        .maybeSingle()
+      if (error) throw error
+      if (!data) {
+        stats.raceSkipped++
+        return
+      }
+
+      for (const product of fileProducts) {
+        if (product.productUrl !== row.product_url) continue
+        product.category = patch.category
+        product.subcategory = patch.subcategory ?? undefined
+        product.llmEnrichedAt = normalizedAt
+        product.llmModel = prediction.model
+        product.llmInputHash = qwenNormalizationInputHash({
+          ...input,
+          category: patch.category,
+          subcategory: patch.subcategory,
+        })
+        checkpointChanged = true
+      }
+      stats.succeeded++
+    } catch (error) {
+      if (error instanceof QwenDisabledError || error instanceof QwenUnavailableError) {
+        stats.deferred++
+      } else if (/zod|schema|validation|object generated/i.test(error instanceof Error ? `${error.name}: ${error.message}` : String(error))) {
+        stats.schemaFailed++
+      } else {
+        stats.deferred++
+      }
+    }
+  }))
+  return checkpointChanged
 }
 
 // ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
@@ -526,6 +631,7 @@ async function main() {
   for (const file of files) {
     const platform = file.replace("-products.json", "")
     const config = getSiteConfig(platform)
+    const filePath = path.join(dataDir, file)
 
     const cached = fileCache.get(file)
     if (!cached) {
@@ -678,10 +784,16 @@ async function main() {
         return null
       }
 
+      const category: Category = isValidCategory(p.category) ? p.category : "other"
+      const rawSubcategory = typeof p.subcategory === "string" ? p.subcategory.trim() : ""
+      const subcategory = rawSubcategory && isValidSubcategory(rawSubcategory, category)
+        ? rawSubcategory
+        : null
+
       return {
         brand,
         name: p.name as string,
-        category: p.category as string,
+        category,
         ...prices,
         product_no: productNo,
         image_url: p.imageUrl as string,
@@ -695,7 +807,7 @@ async function main() {
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
-        subcategory: p.subcategory || null,
+        subcategory,
         // Kept out of the products upsert below and merged atomically through
         // merge_product_images. A listing-only crawl must never erase richer
         // detail images collected by an earlier run.
@@ -811,6 +923,7 @@ async function main() {
     const BATCH = 50
     let inserted = 0
     let errors = 0
+    const qwenStats = emptyQwenImportStats()
 
     for (let i = 0; i < deduped.length; i += BATCH) {
       const batch = deduped.slice(i, i + BATCH)
@@ -827,6 +940,8 @@ async function main() {
         console.error(`   ❌ 배치 ${i}-${i + batch.length} 실패:`, error.message)
         errors++
       } else {
+        const checkpointChanged = await normalizePersistedRows(batch, rawAll, qwenStats)
+        if (checkpointChanged) writeJsonCheckpoint(filePath, rawAll)
         const {error: imageError} = imageUpdates.length > 0
           ? await db.rpc("merge_product_images", {updates: imageUpdates})
           : {error: null}
@@ -841,6 +956,11 @@ async function main() {
     }
 
     console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
+    console.log(
+      `   🤖 Qwen target=${qwenStats.targeted} success=${qwenStats.succeeded}` +
+        ` deferred=${qwenStats.deferred} schema_failed=${qwenStats.schemaFailed}` +
+        ` race_skip=${qwenStats.raceSkipped}`,
+    )
     // 단일브랜드 자사몰: 파일의 대표 브랜드명으로 brand_node 해석 폴백에 사용
     const dominantBrand =
       resolveProductBrand(rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand, config) || null

@@ -7,8 +7,8 @@
  * 함수로 관측된다 (docs/operations.md §13 큐 모델 참조).
  *
  * 실행 경로는 검증된 bulk-onboarding 파이프라인(tools/onboard-batch.sh)을 청크
- * 단위로 재사용한다: 게이트 OFF 크롤(poc) → LLM 분류(onboard-classify) → import
- * (QC 게이트가 DB 보호) → guardrail. 평범한 `crawl --site` 게이트 ON 경로는
+ * 단위로 재사용한다: 게이트 OFF 크롤(poc) → 규칙 기반 finalize → canonical import
+ * → local Qwen 조건부 보강 → guardrail. 평범한 `crawl --site` 게이트 ON 경로는
  * 온보딩된 브랜드의 비canonical 카테고리 라벨("Cat42" 등)을 전량 드랍해 저장
  * 파일조차 안 남기므로 재수집에 쓸 수 없다 (2026-07-18 saurusgirl 실측,
  * docs/bulk-onboarding.md §0 참조).
@@ -288,13 +288,6 @@ async function main() {
   const db = createProductCollectionClient()
   const startedAt = Date.now()
   const budgetMs = flags.budgetMinutes * 60_000
-
-  if (!flags.dryRun && !process.env.OPENAI_API_KEY) {
-    // onboard-classify.ts 의 LLM 분류(gpt-5.4-nano)에 필요 — 없으면 청크가 전부
-    // 분류 실패로 무너지므로 크롤 시작 전에 조기 종료한다.
-    console.error("OPENAI_API_KEY 가 필요합니다 (onboard-classify LLM 분류)")
-    process.exit(1)
-  }
 
   const worklist = await fetchWorklist(db, flags.types)
   let entries = worklist.entries

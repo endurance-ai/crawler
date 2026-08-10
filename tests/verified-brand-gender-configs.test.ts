@@ -15,6 +15,10 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
 
   assert.deepEqual(getSiteConfig("heretic")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("twojeys")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("porterna")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("margesherwood")?.defaultGender, ["women"])
+  const margeNoise = getSiteConfig("margesherwood")?.kidsGenderNoisePatterns ?? []
+  assert.equal(margeNoise.reduce((text, pattern) => text.replace(pattern, " "), "babypinklight summer girls girls club").trim(), "light")
   assert.equal(getSiteConfig("singularisca")?.brand, "singularisca")
   assert.deepEqual(getSiteConfig("singularisca")?.defaultGender, ["men"])
 })

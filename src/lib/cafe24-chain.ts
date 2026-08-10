@@ -356,17 +356,24 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency) ??
     labeledSale ??
     pairedLow
-  const regularCandidates = [
+  const explicitRegularCandidates = [
     labeledOriginal,
     parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency),
     parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency),
     parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency),
+  ].filter((value): value is number => value !== null)
+  const regularCandidates = [
+    ...explicitRegularCandidates,
     pairedHigh,
     parseCafe24PriceCandidate(raw.priceText, sourceCurrency),
     parseCafe24PriceCandidate(raw.detailPriceText, sourceCurrency),
   ].filter((value): value is number => value !== null)
   const basePrice = saleCandidate !== null
-    ? (regularCandidates.find((value) => value > saleCandidate) ?? null)
+    ? (
+        regularCandidates.find((value) => value > saleCandidate)
+        ?? explicitRegularCandidates.find((value) => value === saleCandidate)
+        ?? null
+      )
     : (regularCandidates[0] ?? null)
   const salePrice = saleCandidate !== null && basePrice !== null && saleCandidate > 0 && saleCandidate < basePrice
     ? saleCandidate

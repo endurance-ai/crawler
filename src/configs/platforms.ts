@@ -13,6 +13,24 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   // ─── Manual 설정 완료 (카테고리 구조 깔끔) ─────────
 
   {
+    key: "bmuettestore",
+    name: "BMUET(TE)",
+    type: "cafe24",
+    baseUrl: "https://bmuettestore.com",
+    brand: "BMUET(TE)",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "WOMEN", cateNo: 112, gender: ["women"]},
+        {name: "MEN", cateNo: 113, gender: ["men"]},
+      ],
+    },
+    notes: "Official storefront gender departments verified: WOMEN /category/women/112, MEN /category/men/113.",
+  },
+  {
     key: "shopamomento",
     name: "샵아모멘토",
     type: "cafe24",
@@ -2752,6 +2770,17 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
 
 export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]
 
+// AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
+// generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
+const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // MARGE SHERWOOD 성인 여성 상품의 색상/Peanuts 협업명. 실제 아동 라인이 아니다.
+  margesherwood: [
+    /baby[-\s]?pink/gi,
+    /\bsummer[-\s]girls\b/gi,
+    /\bgirls[-\s]club\b/gi,
+  ],
+}
+
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
   const config = PLATFORMS.find((p) => p.key === key)
@@ -2760,9 +2789,16 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   // 사람이 검증한 보강 맵에서 채운다 — platforms.generated.ts 는
   // AUTO-GENERATED 라 여기에 값을 넣을 수 없기 때문이다.
   // 근거 규칙은 src/configs/gender-defaults.ts 헤더 참조.
-  if (config.defaultGender && config.defaultGender.length > 0) return config
-  const fallback = SITE_GENDER_DEFAULTS[key]
-  return fallback ? {...config, defaultGender: fallback} : config
+  const fallback = config.defaultGender && config.defaultGender.length > 0
+    ? config.defaultGender
+    : SITE_GENDER_DEFAULTS[key]
+  const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
+  if (fallback === config.defaultGender && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns) return config
+  return {
+    ...config,
+    ...(fallback ? {defaultGender: fallback} : {}),
+    ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
+  }
 }
 
 /** 활성화된 사이트만 반환 */

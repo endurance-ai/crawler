@@ -22,10 +22,9 @@
 // Resumable: processes products ordered by id in pages; prints the last id per
 // page so a killed run can resume with --start-id.
 import {createClient} from "@supabase/supabase-js"
-import {openai} from "@ai-sdk/openai"
-import {generateText, Output, wrapLanguageModel} from "ai"
 import {z} from "zod"
 import {CATEGORIES, buildEnumReference, isValidCategory, isValidSubcategory, type Category} from "../src/lib/enums/product-enums"
+import {generateQwenObject} from "../src/lib/qwen-client"
 import {classifyShopifyCategory} from "../src/lib/shopify-category-classifier"
 
 const args = process.argv.slice(2)
@@ -41,21 +40,8 @@ const CONCURRENCY = 8
 const db = createClient(process.env.DB_URL!, process.env.DB_TOKEN!)
 
 const usage = {i: 0, o: 0}
-const OPENAI_MODEL = process.env.LLM_SCRAPER_MODEL || "gpt-5.4-nano"
+let qwenModel = process.env.QWEN_MODEL || "qwen3-vl-30b-awq"
 const num = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "number" ? v.total : 0)
-const model = wrapLanguageModel({
-  model: openai(OPENAI_MODEL),
-  middleware: {
-    specificationVersion: "v3",
-    wrapGenerate: async ({doGenerate}) => {
-      const r = await doGenerate()
-      const u = r.usage as any
-      usage.i += num(u?.inputTokens)
-      usage.o += num(u?.outputTokens)
-      return r
-    },
-  },
-})
 
 const ClsSchema = z.object({
   items: z.array(z.object({i: z.number(), category: z.string(), subcategory: z.string().nullable()})),
@@ -65,13 +51,15 @@ const SYSTEM = `You classify fashion e-commerce products into a fixed taxonomy. 
 async function classifyBatch(items: {i: number; name: string; hint: string; brand: string}[]): Promise<Record<number, {category: Category; subcategory: string | null}>> {
   const out: Record<number, {category: Category; subcategory: string | null}> = {}
   try {
-    const res = await generateText({
-      model,
-      output: Output.object({schema: ClsSchema}),
+    const res = await generateQwenObject({
+      schema: ClsSchema,
       system: SYSTEM,
-      messages: [{role: "user", content: JSON.stringify(items.map((it) => ({i: it.i, name: it.name, brand: it.brand, hint: it.hint})))}],
+      prompt: JSON.stringify(items.map((it) => ({i: it.i, name: it.name, brand: it.brand, hint: it.hint}))),
     })
-    for (const it of (res.output as any).items) {
+    qwenModel = res.model
+    usage.i += num(res.usage.inputTokens)
+    usage.o += num(res.usage.outputTokens)
+    for (const it of (res.value as z.infer<typeof ClsSchema>).items) {
       const cat = String(it.category || "").toLowerCase().trim()
       if (!isValidCategory(cat)) {
         out[it.i] = {category: "other", subcategory: null}
@@ -80,7 +68,7 @@ async function classifyBatch(items: {i: number; name: string; hint: string; bran
       const sub = it.subcategory ? String(it.subcategory).toLowerCase().trim() : null
       out[it.i] = {category: cat as Category, subcategory: sub && isValidSubcategory(sub, cat as Category) ? sub : null}
     }
-  } catch (e) {
+  } catch {
     // leave unclassified indices; caller falls back to keeping row unchanged
   }
   return out
@@ -153,7 +141,7 @@ async function main() {
         const res = await classifyBatch(items)
         for (let k = 0; k < slice.length; k++) {
           const p = res[k]
-          preds[slice[k].id] = p ?? {category: "other", subcategory: null}
+          if (p) preds[slice[k].id] = p
         }
       })
     }
@@ -190,7 +178,7 @@ async function main() {
     }
 
     lastId = data[data.length - 1].id
-    console.log(`  page done · processed=${processed} changed=${changed} · det=${detCount} llm=${llmRows.length} · lastId=${lastId} · model=${OPENAI_MODEL} · LLM tokens in=${usage.i} out=${usage.o}`)
+    console.log(`  page done · processed=${processed} changed=${changed} · det=${detCount} llm=${llmRows.length} · lastId=${lastId} · model=${qwenModel} · LLM tokens in=${usage.i} out=${usage.o}`)
 
     if (LIMIT && processed >= LIMIT) break
     if (data.length < PAGE) break
@@ -199,7 +187,7 @@ async function main() {
   }
 
   console.log(`\n=== DONE ${DRY ? "(DRY-RUN, no writes)" : "(LIVE)"} ===`)
-  console.log(`processed=${processed} changed=${changed} · model=${OPENAI_MODEL} · LLM tokens in=${usage.i} out=${usage.o}`)
+  console.log(`processed=${processed} changed=${changed} · model=${qwenModel} · LLM tokens in=${usage.i} out=${usage.o}`)
   console.log("new family distribution:")
   Object.entries(newDist).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${k}: ${v}`))
   console.log("\nsample old→new (changed):")

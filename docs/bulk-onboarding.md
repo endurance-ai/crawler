@@ -19,14 +19,14 @@ tools/onboard-batch.sh  ── 청크 단위(기본 20개)로 반복 ──┐
   │      → poc-runs/chunk-N/products.jsonl
   │
   ├─ 2. finalize (tools/onboard-classify.ts)
-  │      QC 이상치 필터 → LLM 배치 분류(category/subcategory) → 색상 복구
+  │      QC 이상치 필터 → 규칙 기반 분류(category/subcategory) → 색상 복구
   │      → data/<key>-products.json  (import 스키마)
   │
   ├─ 3. import (src/import-products.ts --site=<key>)
-  │      QC 게이트(canonical-strict 정규화/review 분리) → DB upsert
+  │      canonical DB upsert → local Qwen best-effort 조건부 보강
   │
   └─ 4. guardrail (tools/reclassify-categories.ts --only-invalid)
-         비canonical category가 남아있으면(원인 무관) 규칙+LLM으로 즉시 수정
+         비canonical category가 남아있으면 규칙+local Qwen으로 수정
                                                             │
                                                             ▼
                                               chunk N+1로 반복
@@ -34,7 +34,7 @@ tools/onboard-batch.sh  ── 청크 단위(기본 20개)로 반복 ──┐
 
 **핵심 원칙**: category/subcategory의 단일 진실 원천은 `src/lib/enums/product-enums.ts`다.
 크롤 파이프라인의 모든 분류기(QC의 `normalization.ts`, 규칙기반 `shopify-category-classifier.ts`,
-LLM 프롬프트 `analyze-prompt.ts`)는 이 파일의 `CATEGORIES`/`SUBCATEGORIES`를 참조한다 —
+Qwen 정규화 스키마(`product-qwen-normalization.ts`)는 이 파일의 `CATEGORIES`/`SUBCATEGORIES`를 참조한다 —
 taxonomy를 바꿀 땐 이 파일부터 고친다 (§5 참조).
 
 ---
@@ -106,7 +106,7 @@ tools/onboard-batch.sh --configs /tmp/batch.json \
 ### 2-3. 결과 확인
 
 - `<out-root>/onboard-tally.csv` — 청크별 `pass/crawled/import/net/invalid_found/invalid_fixed`
-- `<out-root>/chunk-N-finalize.log` — 분류 fill rate(category/color) + LLM 비용
+- `<out-root>/chunk-N-finalize.log` — 규칙 기반 분류 fill rate(category/color)
 - `<out-root>/guardrail-chunk-N.log` — 가드레일이 이번 청크 이후 잡아낸 비canonical 값
 
 ### 2-4. 중단 후 재개
@@ -132,7 +132,7 @@ ZARA류(Akamai 방어)는 항상 real Chrome 경로를 쓴다 — lightpanda 대
 ## 4. 재분류 도구 (`tools/reclassify-categories.ts`)
 
 DB에 이미 적재된 상품의 category/subcategory를 재분류할 때 쓴다. 규칙기반
-(`classifyShopifyCategory`, 비용 없음) 우선 → 매칭 안 되면 LLM(gpt-5.4-nano) 폴백.
+(`classifyShopifyCategory`, 비용 없음) 우선 → 매칭 안 되면 local Qwen 폴백.
 
 ```bash
 # 전체 DB 재분류 (id 순서로 페이지 처리, 재개 가능)
@@ -165,7 +165,7 @@ npx dotenv -e .env.local -- npx tsx tools/reclassify-categories.ts --only-invali
 4. **out-root 재사용 충돌** (§2-2 경고): 다른 배치가 같은 `chunk-N` 이름을 재사용하면 잔여
    파일 때문에 크롤이 스킵되고 엉뚱한 브랜드 결과가 섞인다.
 5. **규칙기반 분류기는 영어 패턴만 매칭**: `classifyShopifyCategory`의 `TYPE_TO_CATEGORY`는 영어
-   정규식뿐이라, 한글 전용 상품명(자사몰 특유)은 자주 `other`로 떨어진다. LLM 폴백이 이걸 잡아준다 —
+   정규식뿐이라, 한글 전용 상품명(자사몰 특유)은 자주 `other`로 떨어진다. import 후 Qwen 보강이 이걸 잡아준다 —
    `--only-invalid` 가드레일은 `other`를 "이미 유효한 canonical 값"으로 보고 건드리지 않으므로,
    `other` 비율이 비정상적으로 높으면 별도로 LLM 재검토가 필요할 수 있다(수동 판단 필요).
 
@@ -176,16 +176,15 @@ npx dotenv -e .env.local -- npx tsx tools/reclassify-categories.ts --only-invali
 `product-enums.ts`의 `CATEGORIES`/`SUBCATEGORIES`를 변경했다면, 다음을 **모두** 갱신해야 한다
 (순서대로 grep 확인 권장 — 자세한 내역은 `git log --oneline -- src/lib/enums/product-enums.ts`):
 
-1. `src/lib/enums/product-enums.ts` — 원천. `buildEnumReference()`가 LLM 프롬프트에 자동 주입.
+1. `src/lib/enums/product-enums.ts` — 원천. Qwen JSON Schema와 프롬프트에 자동 주입.
 2. `src/lib/product-qc/normalization.ts` — `CATEGORY_ALIASES`(이름 텍스트 추론), `CATEGORY_COMPAT`
    (구/동의어 → 신규 family 매핑). canonical-strict 로직 자체는 안 바뀜.
 3. `src/lib/shopify-category-classifier.ts` — `TYPE_TO_CATEGORY`, `SUBCATEGORY_BY_CATEGORY`
    (Shopify 규칙기반 분류기, 온보딩 재분류 가드레일도 이걸 재사용).
-4. `tools/onboard-classify.ts` — 자체 `CANON` 상수 (온보딩 LLM 분류 프롬프트용, product-enums와
-   별도로 하드코딩되어 있음 — **가장 놓치기 쉬운 지점**).
-5. `src/configs/analyze-prompt.ts` — 출력 예시(JSON 스니펫)가 리터럴로 박혀 있어 수동 갱신 필요.
+4. `tools/onboard-classify.ts` — `product-enums.ts`의 canonical enum을 직접 사용.
+5. `src/lib/product-qwen-normalization.ts` — strict JSON Schema와 category/subcategory 검증.
 6. 테스트: `tests/product-qc-normalization.test.ts`, `tests/shopify-category-classifier.test.ts`,
-   `tests/product-analyzer-category.test.ts`, `tests/fixtures/shopify-parse*.golden.json`.
+   `tests/product-qwen-normalization.test.ts`, `tests/fixtures/shopify-parse*.golden.json`.
 7. 기존 DB 데이터 재분류: `tools/reclassify-categories.ts` (전체 실행, §4 참조).
 
 `npm run typecheck && npm test` 로 205개 이상의 테스트가 그린인지 확인 후 커밋.

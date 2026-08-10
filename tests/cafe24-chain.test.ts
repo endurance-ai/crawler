@@ -7,6 +7,7 @@ import {
   cafe24CategoryGenderSource,
   cleanCafe24ProductName,
   filterCafe24ProductsWithUsablePrice,
+  extractCafe24DetailFallbacks,
   inferCafe24Currency,
   isGenericCafe24ProductName,
   parseCafe24LabeledPrice,
@@ -183,6 +184,39 @@ test("Cafe24 detail pricing replaces an unconfirmed listing price coherently", (
   assert.equal(item.sourcePrice, 70_000)
   assert.deepEqual(item.pricingObservation, {
     state: "sale",
+    source: "detail",
+    version: 2,
+  })
+})
+
+test("Cafe24 equal product and sale meta prices confirm a regular detail price", async () => {
+  const page = {
+    evaluate: async () => ({
+      names: ["BRICK_black plain"],
+      priceText: "price KRW 268,000",
+      metaPrice: "268000",
+      metaSalePrice: "268000",
+      metaCurrency: "KRW",
+      jsonLdPrice: "",
+      jsonLdCurrency: "",
+      scriptProductPrice: "268000",
+      scriptSalePrice: "",
+      detailPriceText: "",
+      descFirstLine: "",
+    }),
+  } as unknown as Parameters<typeof extractCafe24DetailFallbacks>[0]
+
+  const detail = await extractCafe24DetailFallbacks(page)
+  assert.equal(detail.price, 268_000)
+  assert.equal(detail.originalPrice, 268_000)
+  assert.equal(detail.salePrice, null)
+
+  const item = product({
+    pricingObservation: {state: "unknown", source: "listing", version: 2},
+  })
+  applyCafe24DetailFallbacks(item, detail)
+  assert.deepEqual(item.pricingObservation, {
+    state: "regular",
     source: "detail",
     version: 2,
   })

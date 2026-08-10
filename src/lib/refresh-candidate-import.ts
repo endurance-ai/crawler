@@ -1,4 +1,5 @@
 import {resolveProductBrand} from "./brand-provenance"
+import {isValidCategory, isValidSubcategory, type Category} from "./enums/product-enums"
 import {toDbPriceFields} from "./product-pricing"
 import type {Product, SiteConfig} from "./types"
 
@@ -64,11 +65,15 @@ export function productToCandidateDbRow(
   // 빈 브랜드도 import-products 와 같이 적재하지 않는다. products.brand 는 NOT NULL
   // 이지만 빈 문자열은 제약을 통과해 버려서, "브랜드 없음" 으로 조용히 적재된다.
   if (!brand) throw new Error("candidate brand is missing")
+  const category: Category = isValidCategory(selected.category) ? selected.category : "other"
+  const subcategory = selected.subcategory && isValidSubcategory(selected.subcategory, category)
+    ? selected.subcategory
+    : null
   const now = new Date().toISOString()
   return {
     brand,
     name: selected.name,
-    category: selected.category,
+    category,
     price: prices.price,
     original_price: prices.original_price,
     sale_price: prices.sale_price,
@@ -84,7 +89,7 @@ export function productToCandidateDbRow(
     gender: selected.gender,
     gender_source: selected.genderSource ?? null,
     crawled_at: selected.crawledAt,
-    subcategory: selected.subcategory ?? null,
+    subcategory,
     images: selected.images ?? null,
     // tags/size_info/product_code 는 import-products 와 같은 절단 규칙으로 함께
     // 싣는다. 특히 **tags 는 성별 근거다** — resolveProductGenderWithSource 가

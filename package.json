@@ -15,7 +15,6 @@
     "import:attributes": "dotenv -e .env -- tsx src/import-attributes.ts",
     "import:brand-nodes": "dotenv -e .env -- tsx src/import-brand-nodes.ts",
     "probe:reviews": "dotenv -e .env -- tsx src/probe-reviews.ts",
-    "analyze:products": "dotenv -e .env -- tsx src/analyze-products.ts",
     "test:detail": "dotenv -e .env -- tsx src/test-detail-crawl.ts",
     "test:parser": "dotenv -e .env -- tsx src/test-parser.ts",
     "brand-crawl": "dotenv -e .env.local -- tsx src/brand-crawl.ts",
@@ -23,6 +22,7 @@
     "refresh": "dotenv -e .env -e .env.local -- tsx src/refresh-listing.ts",
     "refresh:candidates": "dotenv -e .env -e .env.local -- tsx src/refresh-candidates.ts",
     "enrich:products": "dotenv -e .env -e .env.local -- tsx src/enrich-products-file.ts",
+    "smoke:qwen": "dotenv -e .env -e .env.local -- tsx tools/qwen-smoke.ts",
     "recollect:metrics": "dotenv -e .env -e .env.local -- tsx tools/recollect-metrics.ts",
     "invalidate:embeddings": "dotenv -e .env -e .env.local -- tsx tools/invalidate-changed-embeddings.ts",
     "repair:product-platforms": "dotenv -e .env -e .env.local -- tsx tools/repair-product-platforms.ts",
@@ -42,12 +42,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.96",
     "@ai-sdk/openai": "^3.0.83",
     "@supabase/supabase-js": "^2.100.1",
     "ai": "^6.0.222",
     "llm-scraper": "^2.0.0",
-    "openai": "^6.32.0",
     "playwright": "^1.58.2",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
