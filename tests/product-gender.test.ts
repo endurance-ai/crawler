@@ -146,6 +146,28 @@ test("config_default unisex 는 미확정을 공용으로 세탁하지 않는다
   assert.equal(r.source, null)
 })
 
+test("공식 검증된 사이트만 config_default unisex를 허용한다", () => {
+  const r = resolveProductGenderWithSource(
+    ["unisex"],
+    {name: "Signature Wool Coat"},
+    "config_default",
+    {verifiedUnisexDefault: true},
+  )
+  assert.deepEqual(r.gender, ["unisex"])
+  assert.equal(r.source, "config_default")
+})
+
+test("공식 검증된 unisex 기본값도 kids에는 적용하지 않는다", () => {
+  const r = resolveProductGenderWithSource(
+    ["unisex"],
+    {name: "Kids Puffer Jacket"},
+    "config_default",
+    {verifiedUnisexDefault: true},
+  )
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
 test("명시적인 unisex 상품 신호는 config_default 와 무관하게 유지한다", () => {
   const r = resolveProductGenderWithSource(["unisex"], {name: "Unisex Crewneck"}, "config_default")
   assert.deepEqual(r.gender, ["unisex"])

@@ -259,6 +259,20 @@ test("QC 가 gender 를 채우면 genderSource 도 함께 갱신한다", () => {
   assert.equal(result.product.genderSource, "url")
 })
 
+test("QC는 공식 검증된 config_default unisex를 보존한다", () => {
+  const result = normalizeProductTextFields(
+    product({
+      name: "Archive Piece 001",
+      category: "tops",
+      gender: ["unisex"],
+      genderSource: "config_default",
+    }),
+    {verifiedUnisexDefault: true},
+  )
+  assert.notEqual(result.action, "review")
+  assert.deepEqual(result.product.gender, ["unisex"])
+})
+
 test("BMUET Korean product names resolve before the import conflict gate", () => {
   assert.equal(inferCategoryFromText("아플리케 로고 자수 티셔츠 화이트"), "tops")
   assert.equal(inferCategoryFromText("깅엄 체크 라인 디테일 볼륨 스커트 블랙"), "bottoms")

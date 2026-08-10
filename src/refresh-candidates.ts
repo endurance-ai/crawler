@@ -283,12 +283,18 @@ async function processCandidate(
       productUrl: raw.productUrl,
     },
     raw.genderSource ?? "engine",
+    {
+      kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
+      verifiedUnisexDefault: config.verifiedUnisexDefault,
+    },
   )
   const withGender =
     resolvedGender.gender.length > 0
       ? resolvedGender
       : config.defaultGender && config.defaultGender.length > 0
-        ? resolveProductGenderWithSource(config.defaultGender, {}, "config_default")
+        ? resolveProductGenderWithSource(config.defaultGender, {}, "config_default", {
+            verifiedUnisexDefault: config.verifiedUnisexDefault,
+          })
         : resolvedGender
   if (withGender.gender.length === 0) {
     // PermanentCandidateError 여야 한다 — 일반 Error 면 maxAttempts 까지 같은
@@ -297,7 +303,11 @@ async function processCandidate(
   }
   raw.gender = withGender.gender
   raw.genderSource = withGender.source ?? undefined
-  const qc = applyProductQcGate([raw], candidate.platform_key)
+  const qc = applyProductQcGate([raw], candidate.platform_key, {
+    trustedCategory: config.type === "shopify",
+    kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
+    verifiedUnisexDefault: config.verifiedUnisexDefault,
+  })
   if (qc.length !== 1) throw new PermanentCandidateError("product QC rejected initial product")
   const validated = applyValidationGate(qc, candidate.platform_key)
   if (validated.length !== 1) throw new PermanentCandidateError("product validation rejected initial product")

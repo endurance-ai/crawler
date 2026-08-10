@@ -53,6 +53,8 @@ export interface ProductQcOptions {
   trustedCategory?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
+  /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
+  verifiedUnisexDefault?: boolean
 }
 
 export interface ProductQcResult<T extends ProductQcInput = ProductQcInput> {
@@ -384,7 +386,10 @@ function normalizeGenderField(product: ProductQcInput, options: ProductQcOptions
       productUrl: product.productUrl,
     },
     (product.genderSource as GenderSource | undefined) ?? "engine",
-    {kidsGenderNoisePatterns: options.kidsGenderNoisePatterns},
+    {
+      kidsGenderNoisePatterns: options.kidsGenderNoisePatterns,
+      verifiedUnisexDefault: options.verifiedUnisexDefault,
+    },
   )
 
   const normalized = [...new Set(raw.map((g) => normalizeGenderToken(String(g)) ?? normalizeForMatch(String(g))).filter(Boolean))]

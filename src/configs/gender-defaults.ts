@@ -37,6 +37,15 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // 공식 상품 설명에 남·여 모델 착용이 함께 나오고, 상품 자체에도 Unisex 명시.
+  // https://bitethebullet.xyz/products/bite-the-bullet-tee
+  brand: ["unisex"],
+  // 2026-07-15 브랜드 리서치: 공식 홈페이지·Instagram 출처로 유니섹스 확인.
+  // https://www.reaven.co/en / https://www.instagram.com/reaven/
+  reaven: ["unisex"],
+  // 2026-07-15 브랜드 리서치: 공식 홈페이지·Instagram 및 판매 상품군 교차 확인.
+  // https://www.vicinityclo.de/ / https://www.instagram.com/vicinity_de/
+  vicinityclo: ["unisex"],
   // ── 사이트 직접 확인 (2026-08-03) ────────────────────────────
   // 내비게이션에 DRESS/SKIRT 등 여성 전용 카테고리가 있고 남성 라인이 없음.
   aru: ["women"], // Dresses/Tops/Bottoms

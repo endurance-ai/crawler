@@ -121,7 +121,11 @@ function evidenceOf(row: ProductGenderRow, source: GenderSource | null): string 
  */
 export function classifyGenderRepair(
   row: ProductGenderRow,
-  opts: {useDescription?: boolean; siteDefaultGender?: string[]} = {},
+  opts: {
+    useDescription?: boolean
+    siteDefaultGender?: string[]
+    verifiedUnisexDefault?: boolean
+  } = {},
 ): GenderRepairDecision {
   const before = cleanGenderScope(row.gender)
 
@@ -144,7 +148,9 @@ export function classifyGenderRepair(
   // 사이트 기본값을 밀어넣는 것은 판정이 아니라 추측이다.
   const siteDefault = cleanGenderScope(opts.siteDefaultGender)
   if (resolved.gender.length === 0 && !resolved.conflict && siteDefault.length > 0 && !isKidsRow(row)) {
-    resolved = resolveProductGenderWithSource(siteDefault, {}, "config_default")
+    resolved = resolveProductGenderWithSource(siteDefault, {}, "config_default", {
+      verifiedUnisexDefault: opts.verifiedUnisexDefault,
+    })
   }
 
   const base = {

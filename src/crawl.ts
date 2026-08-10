@@ -792,7 +792,9 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
   // exact legacy behavior (all products written, no gate).
   const config = getSiteConfig(platform)
   const qcProducts = applyProductQcGate(rawProducts, platform, {
+    trustedCategory: config?.type === "shopify",
     kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+    verifiedUnisexDefault: config?.verifiedUnisexDefault,
   })
   const products = applyValidationGate(qcProducts, platform)
   if (products.length === 0) return

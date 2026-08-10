@@ -108,6 +108,15 @@ export function classifyShopifyCategory(
     category = matchCategory(typeLower)
   }
 
+  // 일부 몰은 후디·액티브웨어를 넓은 Shopify 타입인 "Sweater"로 묶는다.
+  // 프로젝트 taxonomy에서는 명시적 Hoodie는 tops, activewear 태그 상품은
+  // activewear다. 구체적인 상품명/부서 태그가 generic knitwear 타입을 이긴다.
+  if (category === "knitwear" && /\b(zip[-\s]?)?hoodie\b/.test(titleLower)) {
+    category = "tops"
+  } else if (category === "knitwear" && /\bactivewear\b/.test(tagsText)) {
+    category = "activewear"
+  }
+
   // 2. Try tags
   if (!category && tagsText) {
     category = matchCategory(tagsText)

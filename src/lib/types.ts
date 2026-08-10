@@ -178,6 +178,12 @@ export interface SiteConfig {
    * 상품이 전량 드랍되는 것을 막는 장치다.
    */
   defaultGender?: string[]
+  /**
+   * 공식 사이트에서 전 상품군의 남녀공용 범위를 확인한 경우에만 켠다.
+   * 일반적인 `defaultGender: ["unisex"]`는 미확인을 공용으로 세탁할 수 있어
+   * 결의 단계에서 버리지만, 이 플래그가 있으면 검증된 사이트 기본값으로 허용한다.
+   */
+  verifiedUnisexDefault?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** Cafe24 셀렉터 오버라이드 */

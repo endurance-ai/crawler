@@ -39,6 +39,30 @@ test("classify_shopify_sweater_type_to_knitwear", () => {
   assert.equal(subcategory, "sweater")
 })
 
+test("구체적인 hoodie 상품명은 generic Sweater 타입보다 우선한다", () => {
+  const {category, subcategory} = classifyShopifyCategory("Sweater", "SOFTS ZIP-HOODIE NAVY", [])
+  assert.equal(category, "tops")
+  assert.equal(subcategory, "hoodie")
+})
+
+test("activewear 부서 태그는 generic Sweater 타입보다 우선한다", () => {
+  const {category} = classifyShopifyCategory(
+    "Sweater",
+    "ACTIVEWEAR COMPRESSION LONGSLEEVE BLACK",
+    ["activewear", "T-Shirt"],
+  )
+  assert.equal(category, "activewear")
+})
+
+test("구체적인 Footwear 타입은 상품명의 소재 Denim보다 우선한다", () => {
+  const {category} = classifyShopifyCategory(
+    "FOOTWEAR",
+    'AKIMBO LOWS "FORGOTTEN DENIM"',
+    ["footwear"],
+  )
+  assert.equal(category, "shoes")
+})
+
 test("classify_shopify_cardigan_type_to_knitwear", () => {
   const {category, subcategory} = classifyShopifyCategory("Cardigans", "Wool Cardigan", [])
   assert.equal(category, "knitwear")

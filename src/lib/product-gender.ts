@@ -90,6 +90,8 @@ export interface GenderResolution {
 export interface GenderResolutionOptions {
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
+  /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
+  verifiedUnisexDefault?: boolean
 }
 
 // ─── 규칙 ────────────────────────────────────────────────────────────────
@@ -367,7 +369,9 @@ export function resolveProductGenderWithSource(
   // 상품 근거 없이 저장하면 검색에서 남녀 양쪽에 노출되는 세탁 버그가 재발한다.
   // 단일 성별로 검증된 men/women 기본값만 최후 fallback 으로 허용한다.
   if (fromProduct.length > 0 && isConfigDefault) {
-    return fromProduct.length === 1 && fromProduct[0] !== "unisex"
+    return fromProduct.length === 1 && (
+      fromProduct[0] !== "unisex" || options.verifiedUnisexDefault === true
+    )
       ? {gender: fromProduct, source: "config_default"}
       : {gender: [], source: null}
   }

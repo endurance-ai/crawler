@@ -2781,6 +2781,14 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
   ],
 }
 
+// defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
+// 성별 메뉴가 없다는 사실만으로는 여기에 추가하지 않는다.
+const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
+  "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
+  "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
+  "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
+])
+
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
   const config = PLATFORMS.find((p) => p.key === key)
@@ -2793,11 +2801,17 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ? config.defaultGender
     : SITE_GENDER_DEFAULTS[key]
   const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
-  if (fallback === config.defaultGender && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns) return config
+  const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
+  if (
+    fallback === config.defaultGender
+    && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
+    && verifiedUnisexDefault === config.verifiedUnisexDefault
+  ) return config
   return {
     ...config,
     ...(fallback ? {defaultGender: fallback} : {}),
     ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
+    ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
   }
 }
 
