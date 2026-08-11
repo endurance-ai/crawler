@@ -2854,6 +2854,8 @@ const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
 // 목록 템플릿이 모든 상품에 품절 아이콘을 렌더링하지만 상세 옵션에는 실제 재고가 있는 사이트.
 const SITE_CAFE24_DETAIL_STOCK_SITES = new Set([
   "opening-project",
+  // Listing cards do not reliably expose sold-out state; product options do.
+  "wouldbe",
 ])
 
 /** key로 사이트 설정 조회 */

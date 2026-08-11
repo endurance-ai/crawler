@@ -224,6 +224,9 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
     patterns: [
       /\btie[-\s]?down\s+cap\b/i,
       /\b(?:shell\s+)?knit\s+(?:cowboy\s+)?(?:bucket\s+)?(?:hat|cap|beanie)s?\b/i,
+      // Product titles commonly end the noun with "Cap - Color". Giving that
+      // terminal noun priority avoids Denim/Watch fabric-detail ambiguity.
+      /\bcaps?\s*(?:[-–—]|$)/i,
     ],
   },
   {
@@ -233,6 +236,8 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
   {
     category: "accessories",
     patterns: [
+      // A terminal "Tie - Color" is the product noun, not knitwear material.
+      /\bties?(?![-\s]?dye)\s*(?:[-–—]|$)/i,
       /\bhair[-\s]?(pin|band)\b/i,
       /\bhood(?:ie|ed)?\s+scarf\b/i,
       /\b(?:arm|leg|mitten)\s+warmers?\b/i,

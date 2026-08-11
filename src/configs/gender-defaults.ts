@@ -109,6 +109,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 명시하고 이를 PUBLIC FIGURE의 현재 의류로 재해석한다고 설명한다.
   // https://publicfigure.kr/about
   publicfigure: ["men"],
+  // The official product description explicitly says BANTS focuses on the
+  // fabrics and patterns important in men's wear. The brand-only category is
+  // configured separately so retailer inventory cannot inherit this value.
+  // https://bants.co.kr/product/bants-bgs-vintage-baseball-coach-jacket-navy/588/
+  bants: ["men"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

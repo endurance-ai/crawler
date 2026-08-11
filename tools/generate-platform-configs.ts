@@ -166,6 +166,15 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
     {name: "하의", cateNo: 56},
     {name: "악세서리", cateNo: 57},
   ],
+  // The official store separates the main menswear catalogue from Women.
+  // Aggregate Sale is omitted because it mixes and duplicates both ranges.
+  wouldbe: [
+    {name: "Shop", cateNo: 42, gender: ["men"]},
+    {name: "Women", cateNo: 83, gender: ["women"]},
+  ],
+  // bants.co.kr is also a multi-brand retailer. Only the BANTS brand
+  // department is in scope; ITEM categories contain HOUSTON/WHEELROBE/etc.
+  bants: [{name: "BANTS", cateNo: 54, gender: ["men"]}],
 }
 
 const IMWEB_CATEGORY_URLS_BY_KEY: Partial<Record<string, string[]>> = {

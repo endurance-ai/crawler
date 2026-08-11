@@ -4,7 +4,7 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-11T06:45:02.948Z.
+ * transitions. Generated 2026-08-11T07:04:52.758Z.
  * Total: 465 (active 444 / disabled 21)
  */
 
@@ -9005,10 +9005,11 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat42", cateNo: 42},
+        {name: "Shop", cateNo: 42, gender: ["men"]},
+        {name: "Women", cateNo: 83, gender: ["women"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=5852, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5852, status=imported, auto-generated",
   },
   {
     key: "omotodenim",
@@ -9075,29 +9076,9 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat54", cateNo: 54},
-        {name: "Cat82", cateNo: 82},
-        {name: "Cat83", cateNo: 83},
-        {name: "Cat93", cateNo: 93},
-        {name: "Cat104", cateNo: 104},
-        {name: "Cat105", cateNo: 105},
-        {name: "Cat96", cateNo: 96},
-        {name: "Cat108", cateNo: 108},
-        {name: "Cat109", cateNo: 109},
-        {name: "Cat112", cateNo: 112},
-        {name: "Cat113", cateNo: 113},
-        {name: "Cat64", cateNo: 64},
-        {name: "Cat55", cateNo: 55},
-        {name: "Cat101", cateNo: 101},
-        {name: "Cat56", cateNo: 56},
-        {name: "Cat58", cateNo: 58},
-        {name: "Cat65", cateNo: 65},
-        {name: "Cat100", cateNo: 100},
-        {name: "Cat102", cateNo: 102},
-        {name: "Cat103", cateNo: 103},
-        {name: "Cat62", cateNo: 62},
+        {name: "BANTS", cateNo: 54, gender: ["men"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=5867, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5867, status=imported, auto-generated",
   },
 ]

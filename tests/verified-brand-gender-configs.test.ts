@@ -57,6 +57,18 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(publicfigure?.defaultGender, ["men"])
   assert.deepEqual(publicfigure?.categoryUrls, ["https://publicfigure.kr/shop"])
   assert.equal(publicfigure?.defaultCategory, "other")
+  const wouldbe = getSiteConfig("wouldbe")
+  assert.equal(wouldbe?.defaultGender, undefined)
+  assert.deepEqual(wouldbe?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Shop", cateNo: 42, gender: ["men"]},
+    {name: "Women", cateNo: 83, gender: ["women"]},
+  ])
+  assert.equal(wouldbe?.verifyStockFromDetail, true)
+  const bants = getSiteConfig("bants")
+  assert.deepEqual(bants?.defaultGender, ["men"])
+  assert.deepEqual(bants?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "BANTS", cateNo: 54, gender: ["men"]},
+  ])
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)
