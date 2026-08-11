@@ -4,8 +4,8 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-11T06:23:36.040Z.
- * Total: 458 (active 437 / disabled 21)
+ * transitions. Generated 2026-08-11T06:35:44.681Z.
+ * Total: 465 (active 444 / disabled 21)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -2313,6 +2313,14 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     maxPages: 300,
     crawlDelay: 1500,
     notes: "generate-platform-configs.ts — brand_node_id=2453, status=tech_detected, auto-generated",
+  },
+  {
+    key: "emostanceclub-global",
+    name: "EMOSTANCECLUB",
+    type: "imweb",
+    baseUrl: "https://emostanceclub-global.com",
+    brand: "EMOSTANCECLUB",
+    notes: "generate-platform-configs.ts — brand_node_id=2470, status=tech_detected, auto-generated",
   },
   {
     key: "opening-project",
@@ -8976,6 +8984,31 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     notes: "generate-platform-configs.ts — brand_node_id=5837, status=imported, auto-generated",
   },
   {
+    key: "publicfigure",
+    name: "PUBLIC FIGURE",
+    type: "imweb",
+    baseUrl: "https://publicfigure.kr",
+    brand: "PUBLIC FIGURE",
+    notes: "generate-platform-configs.ts — brand_node_id=5848, status=tech_detected, auto-generated",
+  },
+  {
+    key: "wouldbe",
+    name: "WOULDBE",
+    type: "cafe24",
+    baseUrl: "https://wouldbe.co.kr",
+    brand: "WOULDBE",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Cat42", cateNo: 42},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=5852, status=tech_detected, auto-generated",
+  },
+  {
     key: "omotodenim",
     name: "OMOTO DENIM",
     type: "shopify",
@@ -8985,5 +9018,84 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     maxPages: 300,
     crawlDelay: 1500,
     notes: "generate-platform-configs.ts — brand_node_id=5862, status=qc_failed, auto-generated",
+  },
+  {
+    key: "refomed",
+    name: "REFOMED",
+    type: "shopify",
+    baseUrl: "https://refomed.jp",
+    brand: "REFOMED",
+    sourceCurrency: "KRW",
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "generate-platform-configs.ts — brand_node_id=5863, status=tech_detected, auto-generated",
+  },
+  {
+    key: "kibata",
+    name: "KIBATA",
+    type: "imweb",
+    baseUrl: "https://www.kibata.kr",
+    brand: "KIBATA",
+    categoryUrls: ["https://www.kibata.kr/Online-Store/"],
+    defaultCategory: "bottoms",
+    defaultSubcategory: "jeans",
+    notes: "generate-platform-configs.ts — brand_node_id=5864, status=imported, auto-generated",
+  },
+  {
+    key: "iyso",
+    name: "IYSO",
+    type: "cafe24",
+    baseUrl: "https://iyso.kr",
+    brand: "IYSO",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Cat25", cateNo: 25},
+        {name: "Cat228", cateNo: 228},
+        {name: "Cat162", cateNo: 162},
+        {name: "Cat251", cateNo: 251},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=5866, status=tech_detected, auto-generated",
+  },
+  {
+    key: "bants",
+    name: "BANTS",
+    type: "cafe24",
+    baseUrl: "https://bants.co.kr",
+    brand: "BANTS",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Cat54", cateNo: 54},
+        {name: "Cat82", cateNo: 82},
+        {name: "Cat83", cateNo: 83},
+        {name: "Cat93", cateNo: 93},
+        {name: "Cat104", cateNo: 104},
+        {name: "Cat105", cateNo: 105},
+        {name: "Cat96", cateNo: 96},
+        {name: "Cat108", cateNo: 108},
+        {name: "Cat109", cateNo: 109},
+        {name: "Cat112", cateNo: 112},
+        {name: "Cat113", cateNo: 113},
+        {name: "Cat64", cateNo: 64},
+        {name: "Cat55", cateNo: 55},
+        {name: "Cat101", cateNo: 101},
+        {name: "Cat56", cateNo: 56},
+        {name: "Cat58", cateNo: 58},
+        {name: "Cat65", cateNo: 65},
+        {name: "Cat100", cateNo: 100},
+        {name: "Cat102", cateNo: 102},
+        {name: "Cat103", cateNo: 103},
+        {name: "Cat62", cateNo: 62},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=5867, status=tech_detected, auto-generated",
   },
 ]

@@ -100,6 +100,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://kmong.com/portfolio/view/152027
   // https://churchillromper.com/product/list.html?cate_no=52
   churchillromper: ["men"],
+  // 브랜드 사전은 KIBATA를 "데님 중심의 도메스틱 남성 브랜드"로 명시한다.
+  // 공식몰의 현행 데님 사이즈도 성인 남성 28–36 체계이고 상품별 성별 필드는 없다.
+  // https://fruitsfamily.com/brand/KIBATA
+  // https://www.kibata.kr/Online-Store/?idx=48
+  kibata: ["men"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

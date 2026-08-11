@@ -48,6 +48,11 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     {name: "하의", cateNo: 56},
     {name: "악세서리", cateNo: 57},
   ])
+  const kibata = getSiteConfig("kibata")
+  assert.deepEqual(kibata?.defaultGender, ["men"])
+  assert.deepEqual(kibata?.categoryUrls, ["https://www.kibata.kr/Online-Store/"])
+  assert.equal(kibata?.defaultCategory, "bottoms")
+  assert.equal(kibata?.defaultSubcategory, "jeans")
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)

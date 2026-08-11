@@ -168,6 +168,22 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
   ],
 }
 
+const IMWEB_CATEGORY_URLS_BY_KEY: Partial<Record<string, string[]>> = {
+  // The Home page navigation is script-rendered too late for generic discovery,
+  // while the official store page exposes the complete current catalogue.
+  kibata: ["https://www.kibata.kr/Online-Store/"],
+}
+
+const IMWEB_DEFAULT_CATEGORY_BY_KEY: Partial<Record<string, string>> = {
+  // The current official catalogue is exclusively adult denim/sashiko pants.
+  kibata: "bottoms",
+}
+
+const IMWEB_DEFAULT_SUBCATEGORY_BY_KEY: Partial<Record<string, string>> = {
+  // Official detail pages identify the collection as 5-pocket denim jeans.
+  kibata: "jeans",
+}
+
 interface CandidateRow {
   brand_node_id: number
   brand_name: string
@@ -369,6 +385,13 @@ function buildEntrySource(
     lines.push(`    sourceCurrency: ${JSON.stringify(row.kr_price_currency === "KRW" ? "KRW" : (shopifyCurrencyResult?.currency ?? "KRW"))},`)
     lines.push("    maxPages: 300,")
     lines.push("    crawlDelay: 1500,")
+  } else if (row.platform_type === "imweb") {
+    const categoryUrls = IMWEB_CATEGORY_URLS_BY_KEY[row.platform_key]
+    if (categoryUrls?.length) lines.push(`    categoryUrls: ${JSON.stringify(categoryUrls)},`)
+    const defaultCategory = IMWEB_DEFAULT_CATEGORY_BY_KEY[row.platform_key]
+    if (defaultCategory) lines.push(`    defaultCategory: ${JSON.stringify(defaultCategory)},`)
+    const defaultSubcategory = IMWEB_DEFAULT_SUBCATEGORY_BY_KEY[row.platform_key]
+    if (defaultSubcategory) lines.push(`    defaultSubcategory: ${JSON.stringify(defaultSubcategory)},`)
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected

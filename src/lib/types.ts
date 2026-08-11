@@ -201,6 +201,10 @@ export interface SiteConfig {
   verifyStockFromDetail?: boolean
   /** 카테고리 탐색 설정 */
   category?: CategoryConfig
+  /** 단일 상품군 스토어에서 목록이 카테고리명을 제공하지 않을 때 쓰는 검증된 기본 대분류. */
+  defaultCategory?: string
+  /** 단일 상품군 스토어에서 공식 상세로 검증한 기본 소분류. */
+  defaultSubcategory?: string
   /** 가격 파싱 정규식 (기본: /[\d,]+/ — KRW, ₩, 숫자만 등 다양한 포맷 대응) */
   pricePattern?: RegExp
   /** 가격 통화 접두사 (기본: ₩) */
