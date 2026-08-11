@@ -237,7 +237,7 @@ export function inferDualDepartmentFromTags(tags: unknown): ProductGender | null
 /** 사이트가 명시한 구조화 부서 태그 prefix로 상품 성별을 결의한다. */
 export function inferGenderFromDepartmentTagPrefixes(
   tags: unknown,
-  prefixes: {men: string[]; women: string[]} | undefined,
+  prefixes: {men: string[]; women: string[]; unisex?: string[]} | undefined,
 ): ProductGender | null {
   if (!Array.isArray(tags) || !prefixes) return null
   const values = tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase())
@@ -247,7 +247,8 @@ export function inferGenderFromDepartmentTagPrefixes(
   })
   const men = has(prefixes.men)
   const women = has(prefixes.women)
-  if (men && women) return "unisex"
+  const unisex = has(prefixes.unisex ?? [])
+  if (unisex || (men && women)) return "unisex"
   if (men) return "men"
   if (women) return "women"
   return null

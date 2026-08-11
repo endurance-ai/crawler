@@ -5,4 +5,5 @@ export const VERIFIED_MIXED_GENDER_BRANDS = [
   {brandId: 1461, brandName: "YOKE", sources: ["https://rakutenfashionweektokyo.com/en/brands/detail/yoke/"]},
   {brandId: 1749, brandName: "thom/krom", sources: ["https://thomkrom.com/collections/men", "https://thomkrom.com/collections/women"]},
   {brandId: 2368, brandName: "BASTONG", sources: ["https://en.bastong.com/", "https://en.bastong.com/category/women/88/"]},
+  {brandId: 5739, brandName: "Scuffers", sources: ["https://scuffers.com/collections/new-arrivals-men", "https://scuffers.com/collections/woman"]},
 ] as const

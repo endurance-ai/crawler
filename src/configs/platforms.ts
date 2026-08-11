@@ -2784,6 +2784,15 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
     /\bbaby[-\s]+(?:blue|pink)\b/gi,
     /\b(?:good|top)[-\s]+boy\b/gi,
   ],
+  // 모두 공식 성인 사이즈(XS-XXL)와 남녀 모델로 확인한 상품/컬렉션명이다.
+  // 범용 baby/boy/kids 제거는 실제 아동복을 통과시키므로 확인된 조합만 좁게 제거한다.
+  scuffers: [
+    /\bscff[-\s]+baby\b/gi,
+    /\bbaby[-\s]+tee\b/gi,
+    /\bboys?[-\s]+or[-\s]+girls?\b/gi,
+    /\bboys?[-\s]+(?:green|grey)[-\s]+striped[-\s]+t[-\s]?shirt\b/gi,
+    /\bkids?[-\s]+(?:orange|purple|green)[-\s]+t[-\s]?shirt\b/gi,
+  ],
 }
 
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
@@ -2792,13 +2801,21 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
   "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
+  "scuffers", // 일반 상품 상세에 남녀 모델을 함께 명시하고 별도 Just Women 라인을 운영
 ])
 
-const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]}> = {
+const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
   // 공식 Shopify 태그: M_ACCESSORIES / W_ACCESSORIES, man_product / woman_product.
   "nude-project": {men: ["M_", "man_product"], women: ["W_", "woman_product"]},
   // 공식 Woman 컬렉션의 태그: woman, women, womanpants, womantees, ea#woman 등.
   coldcultureworldwide: {men: ["MEN"], women: ["woman", "women", "ea#woman"]},
+  // woman/women/mujer/hombre는 공용 성별 사전이 처리한다. 사이트 전용 규칙은
+  // 아동복이 아니라 실제 공용 컬렉션명으로 확인된 태그에만 한정한다.
+  scuffers: {
+    men: [],
+    women: [],
+    unisex: ["BOYS OR GIRLS DROP"],
+  },
 }
 
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([

@@ -51,6 +51,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://coldcultureworldwide.com/collections/all-products
   // https://coldcultureworldwide.com/collections/woman
   coldcultureworldwide: ["men"],
+  // 공식몰의 일반 상품 상세는 Model (man)과 Model (woman)을 함께 명시하며, 별도로
+  // Just Women 상품군을 운영한다. 여성/남성 전용 태그를 먼저 판정하고 일반 라인만 공용 처리한다.
+  // https://scuffers.com/collections/all/products/eggplant-green-shorts
+  // https://scuffers.com/collections/new-arrivals-men/products/roster-brown-jorts
+  scuffers: ["unisex"],
   // ── 사이트 직접 확인 (2026-08-03) ────────────────────────────
   // 내비게이션에 DRESS/SKIRT 등 여성 전용 카테고리가 있고 남성 라인이 없음.
   aru: ["women"], // Dresses/Tops/Bottoms

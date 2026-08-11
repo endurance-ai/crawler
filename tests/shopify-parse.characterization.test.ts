@@ -306,6 +306,48 @@ test("shopify preserves every safe product image without a ten-image cap", () =>
   assert.deepEqual(product.images, expected.map((image) => image.src))
 })
 
+test("shopify site department tag can explicitly mark a unisex collection", () => {
+  const fixture = {
+    products: [{
+      id: 1,
+      title: "Boys or Girls Hoodie",
+      handle: "boys-or-girls-hoodie",
+      vendor: "Scuffers",
+      product_type: "Hoodie",
+      body_html: "",
+      tags: ["BOYS OR GIRLS DROP"],
+      options: [],
+      variants: [{id: 1, title: "S", price: "100", available: true, sku: "S"}],
+      images: [],
+    }],
+  }
+  const [product] = parseShopifyProducts(fixture, BASE_URL, KEY, {
+    ...KRW_PARSE_OPTIONS,
+    defaultGender: ["unisex"],
+    genderDepartmentTagPrefixes: {men: [], women: [], unisex: ["BOYS OR GIRLS DROP"]},
+  })
+  assert.deepEqual(product.gender, ["unisex"])
+  assert.equal(product.genderSource, "engine")
+})
+
+test("shopify excludes exact protection-service products", () => {
+  const fixture = {
+    products: [{
+      id: 1,
+      title: "Return Protection",
+      handle: "reveni-return-protection-43",
+      vendor: "Reveni",
+      product_type: "",
+      body_html: "",
+      tags: [],
+      options: [],
+      variants: [{id: 1, title: "Default Title", price: "4000", available: true, sku: ""}],
+      images: [],
+    }],
+  }
+  assert.deepEqual(parseShopifyProducts(fixture, BASE_URL, KEY, KRW_PARSE_OPTIONS), [])
+})
+
 test("characterize: shopify skip-rules exclude lookbook/gift-card/Rise.ai/unsafe-handle", () => {
   const fixture = loadFixture()
   const products = parseShopifyProducts(fixture, BASE_URL, KEY, PARSE_OPTIONS)

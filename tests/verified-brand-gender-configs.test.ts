@@ -37,6 +37,23 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     women: ["woman", "women", "ea#woman"],
   })
   assert.equal(coldCulture?.genderFromModelDescription, true)
+  const scuffers = getSiteConfig("scuffers")
+  assert.deepEqual(scuffers?.defaultGender, ["unisex"])
+  assert.equal(scuffers?.verifiedUnisexDefault, true)
+  assert.deepEqual(scuffers?.genderDepartmentTagPrefixes?.unisex, ["BOYS OR GIRLS DROP"])
+  const scuffersNoise = scuffers?.kidsGenderNoisePatterns ?? []
+  for (const verifiedAdultLabel of [
+    "SCFF Baby",
+    "baby tee",
+    "Boys or Girls",
+    "Boy Green Striped T-Shirt",
+    "Kids Purple T-Shirt",
+  ]) {
+    assert.equal(
+      scuffersNoise.reduce((text, pattern) => text.replace(pattern, " "), verifiedAdultLabel).trim(),
+      "",
+    )
+  }
   const coldCultureNoise = coldCulture?.kidsGenderNoisePatterns ?? []
   assert.equal(
     coldCultureNoise.reduce((text, pattern) => text.replace(pattern, " "), "baby blue good boy top boy").trim(),
