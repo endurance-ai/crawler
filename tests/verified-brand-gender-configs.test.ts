@@ -41,6 +41,19 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(scuffers?.defaultGender, ["unisex"])
   assert.equal(scuffers?.verifiedUnisexDefault, true)
   assert.deepEqual(scuffers?.genderDepartmentTagPrefixes?.unisex, ["BOYS OR GIRLS DROP"])
+  assert.deepEqual(getSiteConfig("threetimes333")?.defaultGender, ["women"])
+  const threetimesNoise = getSiteConfig("threetimes333")?.kidsGenderNoisePatterns ?? []
+  for (const verifiedWomenProduct of [
+    "Baby shower swim bolero",
+    "Baby boo cardigan",
+    "tht Seamless boy short",
+    "Organic milky boy short",
+  ]) {
+    assert.equal(
+      threetimesNoise.reduce((text, pattern) => text.replace(pattern, " "), verifiedWomenProduct).trim(),
+      verifiedWomenProduct.replace(/baby (?:shower|boo)|boy short/gi, " ").trim(),
+    )
+  }
   const scuffersNoise = scuffers?.kidsGenderNoisePatterns ?? []
   for (const verifiedAdultLabel of [
     "SCFF Baby",

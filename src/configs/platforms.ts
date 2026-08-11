@@ -2793,6 +2793,12 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
     /\bboys?[-\s]+(?:green|grey)[-\s]+striped[-\s]+t[-\s]?shirt\b/gi,
     /\bkids?[-\s]+(?:orange|purple|green)[-\s]+t[-\s]?shirt\b/gi,
   ],
+  // threetimes 공식 여성 라인의 상품명이다. baby shower/boo는 컬렉션명이고,
+  // boy short는 여성 속옷 실루엣명이므로 kids 가드에서만 제거한다.
+  threetimes333: [
+    /\bbaby[-\s]+(?:shower|boo)\b/gi,
+    /\bboy[-\s]+short\b/gi,
+  ],
 }
 
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.

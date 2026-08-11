@@ -245,3 +245,10 @@ test("classify_shopify_noise_type_no_other_signal_returns_empty", () => {
   const {category} = classifyShopifyCategory("Clothing", "XYZ 001 Special Edition", [])
   assert.equal(category, "")
 })
+
+test("threetimes Shopify tags recover missing taxonomy categories", () => {
+  assert.equal(classifyShopifyCategory("", "Bubblegum iphone case", ["acc", "phonecase"]).category, "accessories")
+  assert.equal(classifyShopifyCategory("", "Organic milky thong", ["home-under"]).category, "underwear")
+  assert.equal(classifyShopifyCategory("", "Baby shower swim bolero", ["swim"]).category, "swimwear")
+  assert.equal(classifyShopifyCategory("", "Evelyn bolero", ["outers"]).category, "outerwear")
+})

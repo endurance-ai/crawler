@@ -56,6 +56,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://scuffers.com/collections/all/products/eggplant-green-shorts
   // https://scuffers.com/collections/new-arrivals-men/products/roster-brown-jorts
   scuffers: ["unisex"],
+  // 공식몰은 dresses/skirts/bras/underwear 등 여성 상품군과 별도 unisex 컬렉션을 운영한다.
+  // 명시적 unisex 태그는 엔진 근거가 우선하고, 그 외 상품에만 women을 적용한다.
+  // https://threetimes333.com/collections/dresses
+  // https://threetimes333.com/collections/unisex
+  threetimes333: ["women"],
   // ── 사이트 직접 확인 (2026-08-03) ────────────────────────────
   // 내비게이션에 DRESS/SKIRT 등 여성 전용 카테고리가 있고 남성 라인이 없음.
   aru: ["women"], // Dresses/Tops/Bottoms

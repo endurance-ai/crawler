@@ -186,6 +186,7 @@ export function parseShopifyProducts(
     const typeLower = (sp.product_type || "").toLowerCase()
     if (
       titleLower.startsWith("lookbook") ||
+      titleLower.endsWith("gift card") ||
       titleLower === "return protection" ||
       titleLower === "shipping protection" ||
       titleLower === "package protection" ||

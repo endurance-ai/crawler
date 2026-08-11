@@ -330,20 +330,34 @@ test("shopify site department tag can explicitly mark a unisex collection", () =
   assert.equal(product.genderSource, "engine")
 })
 
-test("shopify excludes exact protection-service products", () => {
+test("shopify excludes exact protection-service and title-only gift-card products", () => {
   const fixture = {
-    products: [{
-      id: 1,
-      title: "Return Protection",
-      handle: "reveni-return-protection-43",
-      vendor: "Reveni",
-      product_type: "",
-      body_html: "",
-      tags: [],
-      options: [],
-      variants: [{id: 1, title: "Default Title", price: "4000", available: true, sku: ""}],
-      images: [],
-    }],
+    products: [
+      {
+        id: 1,
+        title: "Return Protection",
+        handle: "reveni-return-protection-43",
+        vendor: "Reveni",
+        product_type: "",
+        body_html: "",
+        tags: [],
+        options: [],
+        variants: [{id: 1, title: "Default Title", price: "4000", available: true, sku: ""}],
+        images: [],
+      },
+      {
+        id: 2,
+        title: "threetimes gift card",
+        handle: "threetimes-gift-card",
+        vendor: "threetimes",
+        product_type: "",
+        body_html: "",
+        tags: [],
+        options: [],
+        variants: [{id: 2, title: "50000", price: "50000", available: true, sku: ""}],
+        images: [],
+      },
+    ],
   }
   assert.deepEqual(parseShopifyProducts(fixture, BASE_URL, KEY, KRW_PARSE_OPTIONS), [])
 })

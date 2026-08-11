@@ -39,14 +39,14 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // A knit vest is knitwear; generic `vest` below remains outerwear.
   [/\bknit(?:ted)?[-\s]+vest\b/, "knitwear"],
   // Outerwear (cardigan intentionally excluded → knitwear)
-  [/\b(coat|jacket|parka|anorak|blazer|vest|bomber|windbreaker|fleece|cape|poncho|outerwear|overshirt|blouson|trench|overcoat|puffer|chaqueta)\b/, "outerwear"],
+  [/\b(coat|jacket|parka|anorak|blazer|vest|bomber|windbreaker|fleece|cape|poncho|outerwear|outers|overshirt|blouson|trench|overcoat|puffer|chaqueta)\b/, "outerwear"],
   // Knitwear (sweater/knit/cardigan split out of Top)
   [/\b(sweater|sweaters|cardigan|cardigans|knitwear|knits|knit|pullover|turtleneck)\b/, "knitwear"],
   // Tops
   [/\b(shirt|shirts|top|tops|tee|tees|t-shirt|t-shirts|hoodie|hoodies|sweatshirt|sweatshirts|blouse|blouses|polo|polos|tank|longsleeve|long[-\s]?sleeve|sleeveless|crewneck|full[-\s]?zip|jersey|henley|camisole|rugby|crop-top|camiseta)\b/, "tops"],
   // Swimwear before bottoms/underwear: "bikini bottoms" and "swim trunks"
   // are swimwear products, not generic trousers or underwear.
-  [/\b(swimsuit|swimwear|bikini|trunks|rashguard|rash\s+guard|bañador)\b/, "swimwear"],
+  [/\b(swim|swimsuit|swimwear|bikini|trunks|rashguard|rash\s+guard|bañador)\b/, "swimwear"],
   // Bottoms
   [/\b(pant|pants|jean|jeans|trouser|trousers|short|shorts|skirt|skirts|bottom|bottoms|chino|chinos|jogger|joggers|cargo|legging|leggings|culotte|culottes|sweatpant|sweatpants)\b/, "bottoms"],
   // Shoes
@@ -60,9 +60,9 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // Headwear
   [/\b(hat|hats|cap|caps|beanie|balaclava|beret|bucket\s*hat|trucker|59fifty|gorra)\b/, "headwear"],
   // Accessories (residual)
-  [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|wallet|wallets|accessories|accessory|muffler|lighter|towel|money[-\s]?clip|carabiner|keychain|ashtray|golf[-\s]?balls?|steering[-\s]?wheel[-\s]?cover|door[-\s]?latch|stamp|mechero|cenicero|cerrojo|golf)\b/, "accessories"],
+  [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|wallet|wallets|accessories|accessory|acc|leatheracc|phonecase|iphone[-\s]?case|card[-\s]?holder|diary|laptop[-\s]?sleeve|tablet[-\s]?sleeve|rug|home[-\s]?acc|muffler|lighter|towel|money[-\s]?clip|carabiner|keychain|ashtray|golf[-\s]?balls?|steering[-\s]?wheel[-\s]?cover|door[-\s]?latch|stamp|mechero|cenicero|cerrojo|golf)\b/, "accessories"],
   // Underwear
-  [/\b(underwear|briefs|boxer|boxers|bra|bras|lingerie|panties|panty)\b/, "underwear"],
+  [/\b(underwear|brief|briefs|boxer|boxers|bra|bras|lingerie|panties|panty|thong|thongs|home[-\s]?under)\b/, "underwear"],
   // Activewear
   [/\b(activewear|tracksuit|sportswear|sports\s*bra|athletic|yoga)\b/, "activewear"],
 ]
