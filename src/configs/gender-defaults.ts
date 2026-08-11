@@ -95,6 +95,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://blog.naver.com/ghr11192/223798673041
   // https://noclaim.co.kr/product/list.html?cate_no=1925
   oscitare: ["men"],
+  // 공식몰 제작사가 해당 프로젝트를 "남성 브랜드 처칠롬퍼"로 명시한다.
+  // 공식몰 상품·카테고리에는 개별 성별 표기가 없어 사이트 기본값으로만 보완한다.
+  // https://kmong.com/portfolio/view/152027
+  // https://churchillromper.com/product/list.html?cate_no=52
+  churchillromper: ["men"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

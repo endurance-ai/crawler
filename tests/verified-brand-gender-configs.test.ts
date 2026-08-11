@@ -39,6 +39,15 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     {name: "bottom", cateNo: 46},
     {name: "acc", cateNo: 47},
   ])
+  const churchillromper = getSiteConfig("churchillromper")
+  assert.deepEqual(churchillromper?.defaultGender, ["men"])
+  assert.deepEqual(churchillromper?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
+    {name: "아우터", cateNo: 54},
+    {name: "니트", cateNo: 77},
+    {name: "상의", cateNo: 55},
+    {name: "하의", cateNo: 56},
+    {name: "악세서리", cateNo: 57},
+  ])
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)

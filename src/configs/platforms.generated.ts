@@ -4,8 +4,8 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-11T05:47:42.808Z.
- * Total: 457 (active 436 / disabled 21)
+ * transitions. Generated 2026-08-11T06:23:36.040Z.
+ * Total: 458 (active 437 / disabled 21)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -8941,7 +8941,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "acc", cateNo: 47},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=5835, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5835, status=imported, auto-generated",
   },
   {
     key: "haversack",
@@ -8953,6 +8953,27 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     maxPages: 300,
     crawlDelay: 1500,
     notes: "generate-platform-configs.ts — brand_node_id=5836, status=imported, auto-generated",
+  },
+  {
+    key: "churchillromper",
+    name: "CHURCHILLROMPER",
+    type: "cafe24",
+    baseUrl: "https://www.churchillromper.com",
+    brand: "CHURCHILLROMPER",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "아우터", cateNo: 54},
+        {name: "니트", cateNo: 77},
+        {name: "상의", cateNo: 55},
+        {name: "하의", cateNo: 56},
+        {name: "악세서리", cateNo: 57},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=5837, status=imported, auto-generated",
   },
   {
     key: "omotodenim",

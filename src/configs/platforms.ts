@@ -2815,6 +2815,11 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
     /\bbaby[-\s]+(?:shower|boo)\b/gi,
     /\bboy[-\s]+short\b/gi,
   ],
+  // 공식 남성 브랜드의 성인 FREE 사이즈 캡에 쓰인 그래픽/상품명이다.
+  // 실제 옵션도 BLACK-FREE 단일 성인 액세서리로 확인했다.
+  churchillromper: [
+    /\bkids[-\s]+vintage[-\s]+5[-\s]+panel[-\s]+cap\b/gi,
+  ],
 }
 
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.

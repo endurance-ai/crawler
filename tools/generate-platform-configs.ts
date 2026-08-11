@@ -157,6 +157,15 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
     {name: "bottom", cateNo: 46},
     {name: "acc", cateNo: 47},
   ],
+  // Current official Shop navigation. Use the five product-family leaves;
+  // All/New/Season Off are aggregate views and would duplicate products.
+  churchillromper: [
+    {name: "아우터", cateNo: 54},
+    {name: "니트", cateNo: 77},
+    {name: "상의", cateNo: 55},
+    {name: "하의", cateNo: 56},
+    {name: "악세서리", cateNo: 57},
+  ],
 }
 
 interface CandidateRow {
