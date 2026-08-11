@@ -291,6 +291,11 @@ async function detectBrand(brand: ProductCrawlBrand): Promise<DetectResult> {
     homepageHtml: html,
     platformType,
     originCountry,
+    verifiedStorefront:
+      typeof brand.wiki?.homepage_storefront === "string" ? brand.wiki.homepage_storefront : null,
+    verifiedCurrency:
+      typeof brand.wiki?.homepage_currency === "string" ? brand.wiki.homepage_currency : null,
+    verifiedSources: brand.wiki?.homepage_sources,
   })
   return {
     platform_type: platformType,

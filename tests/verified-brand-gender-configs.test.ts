@@ -31,6 +31,14 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     {name: "Earring", cateNo: 43, gender: ["women"]},
     {name: "Goods", cateNo: 63, gender: ["women"]},
   ])
+  const oscitare = getSiteConfig("oscitare")
+  assert.deepEqual(oscitare?.defaultGender, ["men"])
+  assert.deepEqual(oscitare?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
+    {name: "outer", cateNo: 44},
+    {name: "top", cateNo: 45},
+    {name: "bottom", cateNo: 46},
+    {name: "acc", cateNo: 47},
+  ])
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)

@@ -86,6 +86,15 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://butter-ring.com/shopinfo/company.html
   // https://www.musinsa.com/products/6041628
   "butter-ring": ["women"],
+  // 공식몰 카탈로그가 bikini/swimsuit/brief 여성 컬렉션으로만 구성된다.
+  // https://orogee.com/category/lets-swim/24/
+  orogee: ["women"],
+  // 공식 상세에는 성별 문자열이 없지만 공식 룩북은 184cm 모델/size 2로
+  // 전개하며, 현재 공식 취급처 NOCLAIM은 별도 '여성상품' 카테고리 밖의
+  // 일반 아우터/상의/하의에 OSCITARE 전 상품을 분류한다.
+  // https://blog.naver.com/ghr11192/223798673041
+  // https://noclaim.co.kr/product/list.html?cate_no=1925
+  oscitare: ["men"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

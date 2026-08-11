@@ -88,7 +88,39 @@ const CAFE24_BASE_URL_BY_KEY: Partial<Record<string, string>> = {
 
 const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
 
+const CAFE24_SELECTORS_BY_KEY: Partial<Record<string, SiteConfig["selectors"]>> = {
+  // The theme's generic heading selector resolves to a navigation label.
+  openyy: {productName: ".title a"},
+}
+
 const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
+  // Verified storefront departments. Keep only the two gender-bearing source
+  // categories instead of the many Cafe24 system/editorial category IDs.
+  openyy: [
+    {name: "UNISEX", cateNo: 215, gender: ["unisex"]},
+    {name: "WOMENS", cateNo: 214, gender: ["women"]},
+  ],
+  "opening-project": [
+    {name: "Man", cateNo: 137, gender: ["men"]},
+    {name: "Woman", cateNo: 138, gender: ["women"]},
+    {name: "EASTPAK X OPENING PROJECT", cateNo: 157},
+    {name: "Best", cateNo: 205},
+    {name: "New", cateNo: 59},
+    {name: "All", cateNo: 23},
+  ],
+  "intl-5332": [
+    {name: "BODY PARTS", cateNo: 24},
+    {name: "OBJECT", cateNo: 25},
+    {name: "SALE", cateNo: 56},
+    {name: "HYOVASMI", cateNo: 62},
+    {name: "HYOVASMI MINI", cateNo: 63},
+  ],
+  orogee: [
+    {name: "Let's Swim", cateNo: 24, gender: ["women"]},
+    {name: "Sea Wear", cateNo: 44, gender: ["women"]},
+    {name: "Beach Acc", cateNo: 25, gender: ["women"]},
+    {name: "All", cateNo: 42, gender: ["women"]},
+  ],
   kamadeva: [
     {name: "All Items", cateNo: 24},
     {name: "Outerwear", cateNo: 25},
@@ -116,6 +148,14 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
     {name: "Bracelet", cateNo: 42, gender: ["women"]},
     {name: "Earring", cateNo: 43, gender: ["women"]},
     {name: "Goods", cateNo: 63, gender: ["women"]},
+  ],
+  // Official Shop navigation. The homepage detector only sees Cafe24 system
+  // categories 29/42; the real product families are nested under Shop.
+  oscitare: [
+    {name: "outer", cateNo: 44},
+    {name: "top", cateNo: 45},
+    {name: "bottom", cateNo: 46},
+    {name: "acc", cateNo: 47},
   ],
 }
 
@@ -272,6 +312,9 @@ function buildEntrySource(
   const cafe24Categories = row.platform_type === "cafe24"
     ? CAFE24_CATEGORIES_BY_KEY[row.platform_key]
     : undefined
+  const cafe24Selectors = row.platform_type === "cafe24"
+    ? CAFE24_SELECTORS_BY_KEY[row.platform_key]
+    : undefined
   const lines: string[] = []
   lines.push("  {")
   lines.push(`    key: ${JSON.stringify(row.platform_key)},`)
@@ -291,6 +334,7 @@ function buildEntrySource(
     lines.push("    paginate: true,")
     lines.push("    maxPages: 300,")
     lines.push("    crawlDetails: true,")
+    if (cafe24Selectors) lines.push(`    selectors: ${JSON.stringify(cafe24Selectors)},`)
     if (cafe24Categories?.length || (row.category_discovery === "manual" && row.categories.length > 0)) {
       lines.push("    category: {")
       lines.push('      discovery: "manual",')
