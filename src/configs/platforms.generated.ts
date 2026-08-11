@@ -4,7 +4,7 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-11T07:04:52.758Z.
+ * transitions. Generated 2026-08-11T07:33:54.704Z.
  * Total: 465 (active 444 / disabled 21)
  */
 
@@ -9031,7 +9031,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=5863, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5863, status=crawled, auto-generated",
   },
   {
     key: "kibata",
@@ -9056,13 +9056,18 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat25", cateNo: 25},
-        {name: "Cat228", cateNo: 228},
-        {name: "Cat162", cateNo: 162},
-        {name: "Cat251", cateNo: 251},
+        {name: "Shoes", cateNo: 289, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 62, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 317, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 312, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 248, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 249, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 91, gender: ["unisex"]},
+        {name: "Socks", cateNo: 292, gender: ["unisex"]},
+        {name: "Shoes", cateNo: 246, gender: ["unisex"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=5866, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5866, status=crawled, auto-generated",
   },
   {
     key: "bants",

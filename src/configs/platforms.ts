@@ -2830,6 +2830,7 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "scuffers", // 일반 상품 상세에 남녀 모델을 함께 명시하고 별도 Just Women 라인을 운영
   "enlowool", // 공식 소개에서 진주·혼합 소재를 genderless products로 명시
+  "iyso", // 공식 KLOGG 설명: gender와 무관하게 everyone을 위해 제작
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {

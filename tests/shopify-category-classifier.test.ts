@@ -102,6 +102,16 @@ test("classify_shopify_specific_type_accessories_to_accessories", () => {
   assert.equal(subcategory, "belt")
 })
 
+test("REFOMED bare trunks are shorts, while explicit swim trunks stay swimwear", () => {
+  assert.equal(classifyShopifyCategory("", 'REPT-064 | "KINCHAKU" WOOL TRUNKS', []).category, "bottoms")
+  assert.equal(classifyShopifyCategory("", "Classic Swim Trunks", []).category, "swimwear")
+})
+
+test("REFOMED ambiguous names recover their official product families", () => {
+  assert.equal(classifyShopifyCategory("", "RECU-YN01 | WOOL BASE", []).category, "tops")
+  assert.equal(classifyShopifyCategory("", 'REPF-003 | FRAGRANCE "NEXT MAN"', []).category, "accessories")
+})
+
 test("classify_cafe24_wallet_does_not_treat_zipper_as_a_top", () => {
   const {category} = classifyShopifyCategory("Cat66", "HEART ZIPPER WALLET_silver logo", [])
   assert.equal(category, "accessories")

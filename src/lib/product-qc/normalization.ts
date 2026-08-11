@@ -102,7 +102,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
     // 다만 그 때문에 "Short Sleeve"(반팔=tops)가 bottoms 로 잡히는 오탐이 생겼다.
     // 부정 전방탐색으로 그 한 갈래만 뺀다 — "Short Sleeve Shorts" 는 뒤쪽
     // "Shorts" 에서 여전히 매치된다.
-    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
+    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|trunks?|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
     contains: ["\ud558\uc758", "\ud32c\uce20", "\ubc14\uc9c0", "\ub370\ub2d8", "\uc9c4", "\uc1fc\uce20", "\uc2a4\ucee4\ud2b8", "\uce58\ub9c8", "\uc2ac\ub799\uc2a4", "\uc870\uac70"],
   },
   {
@@ -137,7 +137,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "accessories",
-    patterns: [/\b(scarf|belt|watch|tie(?![-\s]?dye)|gloves|socks|wallet|muffler)\b/i],
+    patterns: [/\b(scarf|belt|watch|tie(?![-\s]?dye)|gloves|socks|wallet|muffler|fragrance|perfume)\b/i],
     contains: ["\uc2a4\uce74\ud504", "\ubca8\ud2b8", "\uc2dc\uacc4", "\ub125\ud0c0\uc774", "\uc7a5\uac11", "\uc591\ub9d0", "\uc9c0\uac11", "\uba38\ud50c\ub7ec"],
   },
   {
@@ -147,7 +147,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "swimwear",
-    patterns: [/\b(swimsuit|bikini|swimwear|trunks|rashguard)\b/i],
+    patterns: [/\b(swimsuit|bikini|swimwear|(?:swim|swimming|bathing)[-\s]+trunks?|rashguard)\b/i],
     contains: ["\uc218\uc601\ubcf5", "\ube44\ud0a4\ub2c8", "\ub798\uc2dc\uac00\ub4dc", "\uc2a4\uc714"],
   },
   {
@@ -164,7 +164,10 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
 const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}> = [
   {
     category: "swimwear",
-    patterns: [/\b(?:swimming|swim)\s+caps?\b/i],
+    patterns: [
+      /\b(?:swimming|swim)\s+caps?\b/i,
+      /\b(?:swim|swimming|bathing)[-\s]+trunks?\b/i,
+    ],
   },
   {
     category: "knitwear",
@@ -204,7 +207,10 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
   },
   {
     category: "bottoms",
-    patterns: [/\b(sweatpants?|jeans?|bootcut|tights?)\b/i],
+    patterns: [
+      /\b(sweatpants?|jeans?|bootcut|tights?)\b/i,
+      /^(?!.*\b(?:swim|swimming|bathing)\b).*\btrunks?\b/i,
+    ],
   },
   {
     category: "tops",
@@ -213,6 +219,7 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
       /\blong[-\s]?sleeve\b/i,
       /\bhood(?:ed)?\s+zip[-\s]?up\b/i,
       /\b(tops?|shirts?|sleeveless)\b/i,
+      /\bwool\s+base\b/i,
     ],
   },
   {

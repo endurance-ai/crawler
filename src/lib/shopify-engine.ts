@@ -331,6 +331,16 @@ export interface CrawlShopifyOptions {
   includeOutOfStock?: boolean
 }
 
+/**
+ * Shopify Markets localization must be explicit in the feed URL. Some stores
+ * ignore the localization cookie for `/products.json`, which can make a KRW
+ * config ingest the default-market JPY/USD amount as if it were KRW.
+ */
+export function buildShopifyProductsUrl(baseUrl: string, page: number, country: string): string {
+  const separator = baseUrl.includes("?") ? "&" : "?"
+  return `${baseUrl}/products.json${separator}page=${page}&limit=250&country=${encodeURIComponent(country)}`
+}
+
 export async function crawlShopify(
   config: SiteConfig,
   options: CrawlShopifyOptions = {},
@@ -350,7 +360,7 @@ export async function crawlShopify(
 
   for (let page = 1; page <= maxPages; page++) {
     try {
-      const url = `${config.baseUrl}/products.json?page=${page}&limit=250`
+      const url = buildShopifyProductsUrl(config.baseUrl, page, country)
       // Full Chrome-131 header set — node fetch's default header set
       // (UA + Accept only) was being fingerprinted as bot by Cloudflare
       // even though curl with same UA + Cookie returned 200. Adding the

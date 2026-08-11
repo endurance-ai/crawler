@@ -44,11 +44,11 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   [/\b(sweater|sweaters|cardigan|cardigans|knitwear|knits|knit|pullover|turtleneck)\b/, "knitwear"],
   // Tops
   [/\b(shirt|shirts|top|tops|tee|tees|t-shirt|t-shirts|hoodie|hoodies|sweatshirt|sweatshirts|blouse|blouses|polo|polos|tank|longsleeve|long[-\s]?sleeve|sleeveless|crewneck|full[-\s]?zip|jersey|henley|camisole|rugby|crop-top|camiseta)\b/, "tops"],
-  // Swimwear before bottoms/underwear: "bikini bottoms" and "swim trunks"
-  // are swimwear products, not generic trousers or underwear.
-  [/\b(swim|swimsuit|swimwear|bikini|trunks|rashguard|rash\s+guard|bañador)\b/, "swimwear"],
+  // Swimwear before bottoms/underwear: explicit swim trunks are swimwear,
+  // while fashion brands also use bare "trunks" for tailored shorts.
+  [/\b(swim|swimsuit|swimwear|bikini|(?:swim|swimming|bathing)[-\s]+trunks?|rashguard|rash\s+guard|bañador)\b/, "swimwear"],
   // Bottoms
-  [/\b(pant|pants|jean|jeans|trouser|trousers|short|shorts|skirt|skirts|bottom|bottoms|chino|chinos|jogger|joggers|cargo|legging|leggings|culotte|culottes|sweatpant|sweatpants)\b/, "bottoms"],
+  [/\b(pant|pants|jean|jeans|trouser|trousers|short|shorts|trunk|trunks|skirt|skirts|bottom|bottoms|chino|chinos|jogger|joggers|cargo|legging|leggings|culotte|culottes|sweatpant|sweatpants)\b/, "bottoms"],
   // Shoes
   [/\b(shoe|shoes|sneaker|sneakers|boot|boots|loafer|loafers|sandal|sandals|footwear|mule|mules|heel|heels|flat|flats|slide|slides|oxford|derby|trainer|trainers)\b/, "shoes"],
   // Bags
@@ -60,7 +60,7 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // Headwear
   [/\b(hat|hats|cap|caps|beanie|balaclava|beret|bucket\s*hat|trucker|59fifty|gorra)\b/, "headwear"],
   // Accessories (residual)
-  [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|wallet|wallets|accessories|accessory|acc|leatheracc|phonecase|iphone[-\s]?case|card[-\s]?holder|diary|laptop[-\s]?sleeve|tablet[-\s]?sleeve|rug|home[-\s]?acc|muffler|lighter|towel|money[-\s]?clip|carabiner|keychain|ashtray|golf[-\s]?balls?|steering[-\s]?wheel[-\s]?cover|door[-\s]?latch|stamp|mechero|cenicero|cerrojo|golf)\b/, "accessories"],
+  [/\b(scarf|scarves|belt|belts|watch|watches|tie|ties|glove|gloves|sock|socks|wallet|wallets|fragrance|perfume|accessories|accessory|acc|leatheracc|phonecase|iphone[-\s]?case|card[-\s]?holder|diary|laptop[-\s]?sleeve|tablet[-\s]?sleeve|rug|home[-\s]?acc|muffler|lighter|towel|money[-\s]?clip|carabiner|keychain|ashtray|golf[-\s]?balls?|steering[-\s]?wheel[-\s]?cover|door[-\s]?latch|stamp|mechero|cenicero|cerrojo|golf)\b/, "accessories"],
   // Underwear
   [/\b(underwear|brief|briefs|boxer|boxers|bra|bras|lingerie|panties|panty|thong|thongs|home[-\s]?under)\b/, "underwear"],
   // Activewear
@@ -130,6 +130,7 @@ export function classifyShopifyCategory(
     // Chain as the final noun denotes the jewelry itself. Do not match names
     // such as "Icon Chain Beanie", where Chain is only a design modifier.
     else if (/\bchain$/.test(titleLower.trim())) category = "jewelry"
+    else if (/\bwool\s+base\b/.test(titleLower)) category = "tops"
     else category = matchCategory(titleLower)
   }
 

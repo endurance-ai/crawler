@@ -114,6 +114,18 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // configured separately so retailer inventory cannot inherit this value.
   // https://bants.co.kr/product/bants-bgs-vintage-baseball-coach-jacket-navy/588/
   bants: ["men"],
+  // IYSO describes KLOGG as made for everyone regardless of gender, and its
+  // official footwear size range spans 230-300. Product categories carry the
+  // same explicit seed; this default only covers future uncategorized items.
+  // https://iyso.kr/product/klogg-black/476/
+  iyso: ["unisex"],
+  // The official March 2026 notice calls its popup-only shirt the brand's
+  // first women's project. That item is absent from the current online store;
+  // current inventory is the main men's range (FRESH/OLD/NEXT MAN). Explicit
+  // future women evidence still outranks this fallback at product level.
+  // https://refomed.jp/blogs/news/shibuya-parco-popup-store
+  // https://refomed.jp/collections/online-store
+  refomed: ["men"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

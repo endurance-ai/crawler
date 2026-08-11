@@ -69,6 +69,21 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(bants?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
     {name: "BANTS", cateNo: 54, gender: ["men"]},
   ])
+  const iyso = getSiteConfig("iyso")
+  assert.deepEqual(iyso?.defaultGender, ["unisex"])
+  assert.equal(iyso?.verifiedUnisexDefault, true)
+  assert.deepEqual(iyso?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Shoes", cateNo: 289, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 62, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 317, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 312, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 248, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 249, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 91, gender: ["unisex"]},
+    {name: "Socks", cateNo: 292, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 246, gender: ["unisex"]},
+  ])
+  assert.deepEqual(getSiteConfig("refomed")?.defaultGender, ["men"])
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)

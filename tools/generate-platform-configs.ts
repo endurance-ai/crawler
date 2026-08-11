@@ -175,6 +175,19 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
   // bants.co.kr is also a multi-brand retailer. Only the BANTS brand
   // department is in scope; ITEM categories contain HOUSTON/WHEELROBE/etc.
   bants: [{name: "BANTS", cateNo: 54, gender: ["men"]}],
+  // Official Products navigation. Use leaf collections so every item retains
+  // its product family; the final ALL category catches non-shoe accessories.
+  iyso: [
+    {name: "Shoes", cateNo: 289, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 62, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 317, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 312, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 248, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 249, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 91, gender: ["unisex"]},
+    {name: "Socks", cateNo: 292, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 246, gender: ["unisex"]},
+  ],
 }
 
 const IMWEB_CATEGORY_URLS_BY_KEY: Partial<Record<string, string[]>> = {

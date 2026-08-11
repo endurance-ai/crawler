@@ -49,7 +49,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import {fileURLToPath} from "node:url"
 
-import {parseShopifyProducts} from "../src/lib/shopify-engine"
+import {buildShopifyProductsUrl, parseShopifyProducts} from "../src/lib/shopify-engine"
 import type {Product} from "../src/lib/types"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -71,6 +71,17 @@ const KRW_PARSE_OPTIONS = {
   sourceCurrency: "KRW" as const,
   brandFallback: "Example Store",
 }
+
+test("Shopify products URL explicitly requests the configured market", () => {
+  assert.equal(
+    buildShopifyProductsUrl("https://refomed.jp", 2, "KR"),
+    "https://refomed.jp/products.json?page=2&limit=250&country=KR",
+  )
+  assert.equal(
+    buildShopifyProductsUrl("https://example.com/en-kr", 1, "KR"),
+    "https://example.com/en-kr/products.json?page=1&limit=250&country=KR",
+  )
+})
 
 test("single-brand override ignores a conflicting Shopify vendor", () => {
   const fixture = loadFixture()

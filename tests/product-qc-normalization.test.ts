@@ -174,6 +174,13 @@ test("QC classifies plural shirts and underscore-suffixed tees through category 
   assert.equal(tee.product.subcategory, "t-shirt")
 })
 
+test("QC keeps fashion trunks out of swimwear and recovers REFOMED product nouns", () => {
+  assert.equal(normalizeProductTextFields(product({name: 'REPT-064 | "KINCHAKU" WOOL TRUNKS', category: "other"})).product.category, "bottoms")
+  assert.equal(normalizeProductTextFields(product({name: "Classic Swim Trunks", category: "other"})).product.category, "swimwear")
+  assert.equal(normalizeProductTextFields(product({name: "RECU-YN01 | WOOL BASE", category: "other"})).product.category, "tops")
+  assert.equal(normalizeProductTextFields(product({name: 'REPF-003 | FRAGRANCE "NEXT MAN"', category: "other"})).product.category, "accessories")
+})
+
 test("QC resolves explicit compound product names before broad category aliases", () => {
   const cases: Array<[string, string]> = [
     ["W Biker Jersey Jacket", "outerwear"],
