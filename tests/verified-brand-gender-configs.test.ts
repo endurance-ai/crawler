@@ -43,6 +43,13 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(scuffers?.genderDepartmentTagPrefixes?.unisex, ["BOYS OR GIRLS DROP"])
   assert.deepEqual(getSiteConfig("threetimes333")?.defaultGender, ["women"])
   assert.equal(getSiteConfig("opening-project")?.verifyStockFromDetail, true)
+  const openyy = getSiteConfig("openyy")
+  assert.equal(openyy?.baseUrl, "https://open-yy.com")
+  assert.equal(openyy?.selectors?.productName, ".title a")
+  assert.deepEqual(openyy?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 215, gender: ["unisex"]},
+    {cateNo: 214, gender: ["women"]},
+  ])
   const threetimesNoise = getSiteConfig("threetimes333")?.kidsGenderNoisePatterns ?? []
   for (const verifiedWomenProduct of [
     "Baby shower swim bolero",

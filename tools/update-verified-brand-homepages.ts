@@ -3,6 +3,7 @@
 import {createClient} from "@supabase/supabase-js"
 
 const VERIFIED_HOMEPAGES = [
+  {brandId: 244, brandName: "OPEN YY", homepageUrl: "https://open-yy.com", source: "https://open-yy.com/", storefront: "KR", currency: "KRW"},
   {
     brandId: 5793,
     brandName: "AUTUMN",
@@ -36,12 +37,16 @@ const VERIFIED_HOMEPAGES = [
 ] as const
 
 const apply = process.argv.includes("--apply")
+const brandIdsArg = process.argv.find((arg) => arg.startsWith("--brand-ids="))
+const brandIds = brandIdsArg
+  ? new Set(brandIdsArg.split("=", 2)[1].split(",").map(Number).filter(Number.isFinite))
+  : null
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
 if (!dbUrl || !dbToken) throw new Error("DB_URL and DB_TOKEN are required")
 const db = createClient(dbUrl, dbToken)
 
-for (const verified of VERIFIED_HOMEPAGES) {
+for (const verified of VERIFIED_HOMEPAGES.filter((item) => !brandIds || brandIds.has(item.brandId))) {
   const {data, error} = await db
     .from("brand_nodes")
     .select("id,brand_name,wiki")

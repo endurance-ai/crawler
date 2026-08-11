@@ -127,6 +127,17 @@ test("QC resolves explicit compound product names before broad category aliases"
     ["Shirring Slim Long Sleeve", "tops"],
     ["Ribbon Tie Down Cap", "headwear"],
     ["W 2Way Hoodie Scarf", "accessories"],
+    ["BALLET SLOUCHY SHORT BOOTS", "shoes"],
+    ["METALLIC PILLOW HANDLE MINI", "bags"],
+    ["LEATHER MOTO HOBO MINI", "bags"],
+    ["CUT OUT LEG WARMERS", "accessories"],
+    ["YY CRINKLED BRALETTE", "underwear"],
+    ["ALPACA TURTLE SHRUG", "knitwear"],
+    ["SHIRRING WORK VEST", "outerwear"],
+    ["CORDUROY LOOSE BOOTCUT", "bottoms"],
+    ["DAWN GRAPHIC U-NECK TOP", "tops"],
+    ["PLEATED ZIP KNIT VEST", "knitwear"],
+    ["CONVERTIBLE HOOK TOP DRESS", "dresses"],
   ]
 
   for (const [name, expected] of cases) {
@@ -139,6 +150,17 @@ test("QC promotes fallback other when product-name evidence becomes available", 
   assert.equal(result.action, "auto_fix")
   assert.equal(result.product.category, "outerwear")
   assert.ok(result.reasons.includes("category_other_text_fallback"))
+})
+
+test("QC auto-fixes only explicit priority phrases when a previous category conflicts", () => {
+  const vest = normalizeProductTextFields(product({name: "CARGO POCKET FIELD VEST", category: "bottoms"}))
+  assert.equal(vest.action, "auto_fix")
+  assert.equal(vest.product.category, "outerwear")
+  assert.ok(vest.reasons.includes("category_priority_text_override"))
+
+  const knitVest = normalizeProductTextFields(product({name: "PLEATED ZIP KNIT VEST", category: "knitwear"}))
+  assert.equal(knitVest.product.category, "knitwear")
+  assert.ok(!knitVest.reasons.includes("category_priority_text_override"))
 })
 
 // ─── subcategory ───────────────────────────────────────────────────────────

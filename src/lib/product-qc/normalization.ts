@@ -161,8 +161,21 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
 // single-match gate below.
 const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}> = [
   {
+    category: "knitwear",
+    patterns: [
+      /\b(shrug|cowichan)\b/i,
+      /\bknit(?:ted)?\b.*\b(top|sleeveless|hoodie|jacket|vest)\b/i,
+      /\b(top|sleeveless|hoodie|jacket|vest)\b.*\bknit(?:ted)?\b/i,
+    ],
+  },
+  {
+    category: "dresses",
+    patterns: [/\b(top|shirt|hoodie)\s+dress\b/i],
+  },
+  {
     category: "outerwear",
     patterns: [
+      /\b(jackets?|coats?|bombers?|puffers?|vests?)\b/i,
       /\bjersey[-\s]?jacket\b/i,
       /\bshirt[-\s]?jacket\b/i,
       /\bblouson\b/i,
@@ -175,15 +188,29 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
   },
   {
     category: "bags",
-    patterns: [/\beastpak\s*[x×]\b/i, /\b(rucksack|pouch|xpack|pak['’]?r)\b/i],
+    patterns: [
+      /\beastpak\s*[x×]\b/i,
+      /\b(rucksack|pouch|xpack|pak['’]?r|hobo)\b/i,
+      /\b(wallet|belt)\s+bag\b/i,
+      /\bpillow\s+handle(?:\s+mini)?\b/i,
+    ],
   },
   {
     category: "bottoms",
-    patterns: [/\b(sweatpants?|jeans?)\b/i],
+    patterns: [/\b(sweatpants?|jeans?|bootcut|tights?)\b/i],
   },
   {
     category: "tops",
-    patterns: [/\bjersey\b/i, /\blong[-\s]?sleeve\b/i, /\bhood(?:ed)?\s+zip[-\s]?up\b/i],
+    patterns: [
+      /\bjersey\b/i,
+      /\blong[-\s]?sleeve\b/i,
+      /\bhood(?:ed)?\s+zip[-\s]?up\b/i,
+      /\b(top|sleeveless)\b/i,
+    ],
+  },
+  {
+    category: "shoes",
+    patterns: [/\b(short\s+boots?|trainers?|flip[-\s]?flops?|mary\s+jane)\b/i],
   },
   {
     category: "headwear",
@@ -191,9 +218,29 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
   },
   {
     category: "accessories",
-    patterns: [/\bhair[-\s]?pin\b/i, /\bhoodie\s+scarf\b/i],
+    patterns: [
+      /\bhair[-\s]?(pin|band)\b/i,
+      /\bhood(?:ie|ed)?\s+scarf\b/i,
+      /\b(?:arm|leg|mitten)\s+warmers?\b/i,
+      /\bkeychains?\b/i,
+    ],
+  },
+  {
+    category: "underwear",
+    patterns: [/\bbralettes?\b/i],
+  },
+  {
+    category: "dresses",
+    patterns: [/\b(dotty|hoody)suit\b/i],
   },
 ]
+
+function inferPriorityCategoryFromText(text: string): Category | null {
+  for (const entry of CATEGORY_PRIORITY_ALIASES) {
+    if (entry.patterns.some((pattern) => pattern.test(text))) return entry.category
+  }
+  return null
+}
 
 // Raw category string \u2192 family. Includes legacy capitalized DB values
 // (Outer/Top/\u2026 lowercased by normalizeForMatch) so values passing through QC are
@@ -314,9 +361,8 @@ function currentCategoryCompat(raw: string): Category | null {
 
 export function inferCategoryFromText(text: string): Category | null {
   if (!text.trim()) return null
-  for (const entry of CATEGORY_PRIORITY_ALIASES) {
-    if (entry.patterns.some((pattern) => pattern.test(text))) return entry.category
-  }
+  const priority = inferPriorityCategoryFromText(text)
+  if (priority) return priority
   const matches = CATEGORY_ALIASES.filter((entry) => matchesAny(text, entry.patterns, entry.contains)).map((entry) => entry.category)
   const unique = [...new Set(matches)]
   return unique.length === 1 ? unique[0] : null
@@ -333,6 +379,7 @@ function normalizeCategoryField(
 } {
   const raw = typeof product.category === "string" ? product.category.trim() : ""
   const inferred = inferCategoryFromText(product.name)
+  const priorityInferred = inferPriorityCategoryFromText(product.name)
 
   if (!raw) {
     if (inferred) return {value: inferred, reason: "category_missing_text_fallback", confidence: 0.84, needsReview: false}
@@ -349,6 +396,9 @@ function normalizeCategoryField(
     // later pass finds explicit product-name evidence, promote it directly.
     if (current === "other" && inferred) {
       return {value: inferred, reason: "category_other_text_fallback", confidence: 0.8, needsReview: false}
+    }
+    if (priorityInferred && current !== priorityInferred && !trustedCategory) {
+      return {value: priorityInferred, reason: "category_priority_text_override", confidence: 0.9, needsReview: false}
     }
     // ② 이름 기반 번복. 신뢰 출처에서는 건너뛴다 — 구제할 원본이 아니다.
     // 아래 두 text_fallback 은 남긴다: 값이 **없을 때** 채우는 것이라 번복이 아니다.

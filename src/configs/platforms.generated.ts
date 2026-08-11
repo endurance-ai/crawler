@@ -4,8 +4,8 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-10T03:07:06.075Z.
- * Total: 455 (active 439 / disabled 16)
+ * transitions. Generated 2026-08-11T01:56:47.790Z.
+ * Total: 456 (active 440 / disabled 16)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -198,6 +198,25 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     },
     disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=208, status=tech_detected, auto-generated",
+  },
+  {
+    key: "openyy",
+    name: "OPEN YY",
+    type: "cafe24",
+    baseUrl: "https://open-yy.com",
+    brand: "OPEN YY",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    selectors: {productName: ".title a"},
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "UNISEX", cateNo: 215, gender: ["unisex"]},
+        {name: "WOMENS", cateNo: 214, gender: ["women"]},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=244, status=tech_detected, auto-generated",
   },
   {
     key: "le17septembre",
