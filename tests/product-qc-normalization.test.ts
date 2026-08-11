@@ -133,6 +133,35 @@ test("QC canonicalizes jewelry category labels even when the product name is abb
   }
 })
 
+test("QC keeps briefs in an explicit official swim category as swimwear", () => {
+  const result = normalizeProductTextFields(product({name: "FIG PURPLE BRIEF", category: "Let's Swim"}))
+  assert.equal(result.product.category, "swimwear")
+  assert.ok(!result.reasons.includes("category_text_conflict"))
+})
+
+test("QC treats swimming caps as swimwear before the generic headwear rule", () => {
+  for (const name of ["SPELLING SWIMMING CAP", "MIML SWIM CAP"]) {
+    const result = normalizeProductTextFields(product({name, category: "Let's Swim"}))
+    assert.equal(result.product.category, "swimwear")
+    assert.ok(!result.reasons.includes("category_text_conflict"))
+  }
+})
+
+test("QC classifies underscore-suffixed apparel and accessories after text normalization", () => {
+  const cases: Array<[string, string]> = [
+    ["LACE TANK-BK", "tops"],
+    ["AMALFI SPORTY MOTO JERSEY_IVORY", "tops"],
+    ["THIRSTY CAMEL T-SHIRTS_DARK GREY", "tops"],
+    ["SHELL KNIT COWBOY BUCKET HAT_NAVY", "headwear"],
+    ["Tangled Swim Knit Bag_Red", "bags"],
+    ["Tanning Knit Cap_Navy", "headwear"],
+    ["PUNTA PERDIZ SCRUNCHIE", "accessories"],
+  ]
+  for (const [name, expected] of cases) {
+    assert.equal(inferCategoryFromText(name), expected, name)
+  }
+})
+
 test("QC resolves explicit compound product names before broad category aliases", () => {
   const cases: Array<[string, string]> = [
     ["W Biker Jersey Jacket", "outerwear"],

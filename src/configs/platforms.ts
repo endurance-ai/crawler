@@ -1295,19 +1295,22 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
-    defaultGender: ["unisex"],
+    verifyStockFromDetail: true,
+    // 공식 ABOUT: "여성 디자이너 브랜드" (2026-08-11 확인).
+    // https://yuse.co.kr/shopinfo/company.html
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Top", cateNo: 290, gender: ["unisex"]},
-        {name: "Knitwear", cateNo: 59, gender: ["unisex"]},
-        {name: "Outer", cateNo: 47, gender: ["unisex"]},
-        {name: "Bottom", cateNo: 291, gender: ["unisex"]},
-        {name: "Dress", cateNo: 28, gender: ["unisex"]},
-        {name: "Accessories", cateNo: 43, gender: ["unisex"]},
+        {name: "Top", cateNo: 290, gender: ["women"]},
+        {name: "Knitwear", cateNo: 59, gender: ["women"]},
+        {name: "Outer", cateNo: 47, gender: ["women"]},
+        {name: "Bottom", cateNo: 291, gender: ["women"]},
+        {name: "Dress", cateNo: 28, gender: ["women"]},
+        {name: "Accessories", cateNo: 43, gender: ["women"]},
       ],
     },
-    notes: "brand_nodes id=258, gender_scope=unisex. 홈 nav 확인: NEW/BEST/REFURB/SAMPLE SALE 등 컬렉션성 cate_no는 타입 카테고리와 중복이라 제외.",
+    notes: "공식 ABOUT의 여성 디자이너 브랜드 근거로 women. NEW/BEST/REFURB/SAMPLE SALE 등 컬렉션성 cate_no는 타입 카테고리와 중복이라 제외.",
   },
   {
     key: "ojos",

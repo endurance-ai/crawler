@@ -90,7 +90,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "tops",
-    patterns: [/\b(t[-\s]?shirt|tee|shirt|blouse|polo|hoodie|sweatshirt|tank[-\s]?top|crop[-\s]?top|henley|camisole)\b/i],
+    patterns: [/\b(t[-\s]?shirts?|tee|shirt|blouse|polo|hoodie|sweatshirt|tanks?|tank[-\s]?top|crop[-\s]?top|henley|camisole)\b/i],
     contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1"],
   },
   {
@@ -161,6 +161,10 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
 // single-match gate below.
 const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}> = [
   {
+    category: "swimwear",
+    patterns: [/\b(?:swimming|swim)\s+caps?\b/i],
+  },
+  {
     category: "knitwear",
     patterns: [
       /\b(shrug|cowichan)\b/i,
@@ -193,6 +197,7 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
       /\b(rucksack|pouch|xpack|pak['’]?r|hobo)\b/i,
       /\b(wallet|belt)\s+bag\b/i,
       /\bpillow\s+handle(?:\s+mini)?\b/i,
+      /\b(?:swim\s+)?knit\s+bags?\b/i,
     ],
   },
   {
@@ -214,7 +219,10 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
   },
   {
     category: "headwear",
-    patterns: [/\btie[-\s]?down\s+cap\b/i],
+    patterns: [
+      /\btie[-\s]?down\s+cap\b/i,
+      /\b(?:shell\s+)?knit\s+(?:cowboy\s+)?(?:bucket\s+)?(?:hat|cap|beanie)s?\b/i,
+    ],
   },
   {
     category: "jewelry",
@@ -228,6 +236,7 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
       /\b(?:arm|leg|mitten)\s+warmers?\b/i,
       /\bkeychains?\b/i,
       /\bkeyrings?\b/i,
+      /\bscrunchies?\b/i,
     ],
   },
   {
@@ -241,8 +250,9 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
 ]
 
 function inferPriorityCategoryFromText(text: string): Category | null {
+  const normalized = normalizeForMatch(text)
   for (const entry of CATEGORY_PRIORITY_ALIASES) {
-    if (entry.patterns.some((pattern) => pattern.test(text))) return entry.category
+    if (entry.patterns.some((pattern) => pattern.test(text) || pattern.test(normalized))) return entry.category
   }
   return null
 }
@@ -333,6 +343,8 @@ const CATEGORY_COMPAT: Record<string, Category> = {
   swimwear: "swimwear",
   swimsuit: "swimwear",
   bikini: "swimwear",
+  "let's swim": "swimwear",
+  "lets swim": "swimwear",
   activewear: "activewear",
   sportswear: "activewear",
   // passthrough
@@ -412,6 +424,11 @@ function normalizeCategoryField(
     // later pass finds explicit product-name evidence, promote it directly.
     if (current === "other" && inferred) {
       return {value: inferred, reason: "category_other_text_fallback", confidence: 0.8, needsReview: false}
+    }
+    // A brief listed in an explicit swim category is a bikini/swim bottom,
+    // not underwear. Keep the stronger official taxonomy evidence.
+    if (current === "swimwear" && inferred === "underwear") {
+      return {value: current, reason: current === raw ? null : "category_canonicalized", confidence: 0.9, needsReview: false}
     }
     if (priorityInferred && current !== priorityInferred && !trustedCategory) {
       return {value: priorityInferred, reason: "category_priority_text_override", confidence: 0.9, needsReview: false}

@@ -55,6 +55,20 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(lowool?.defaultGender, ["unisex"])
   assert.equal(lowool?.verifiedUnisexDefault, true)
   assert.equal(lowool?.trustedCategory, true)
+  const yuse = getSiteConfig("yuse")
+  assert.deepEqual(yuse?.defaultGender, ["women"])
+  assert.equal(yuse?.verifyStockFromDetail, true)
+  assert.deepEqual(yuse?.category?.categories?.map((category) => category.gender), [
+    ["women"], ["women"], ["women"], ["women"], ["women"], ["women"],
+  ])
+  const orogee = getSiteConfig("orogee")
+  assert.deepEqual(orogee?.defaultGender, ["women"])
+  assert.deepEqual(orogee?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 24, gender: ["women"]},
+    {cateNo: 44, gender: ["women"]},
+    {cateNo: 25, gender: ["women"]},
+    {cateNo: 42, gender: ["women"]},
+  ])
   const threetimesNoise = getSiteConfig("threetimes333")?.kidsGenderNoisePatterns ?? []
   for (const verifiedWomenProduct of [
     "Baby shower swim bolero",

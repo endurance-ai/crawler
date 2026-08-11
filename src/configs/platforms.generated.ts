@@ -6056,11 +6056,15 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    // 공식몰은 여성용 bikini/swimsuit/brief 카탈로그만 운영한다 (2026-08-11 확인).
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
+        {name: "Let's Swim", cateNo: 24, gender: ["women"]},
+        {name: "Sea Wear", cateNo: 44, gender: ["women"]},
+        {name: "Beach Acc", cateNo: 25, gender: ["women"]},
+        {name: "All", cateNo: 42, gender: ["women"]},
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5389, status=tech_detected, auto-generated",
