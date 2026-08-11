@@ -4074,12 +4074,10 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
-        {name: "Cat273", cateNo: 273},
-        {name: "Cat237", cateNo: 237},
+        {name: "ALL", cateNo: 24},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=5240, status=tech_detected, auto-generated",
   },
   {
@@ -6075,21 +6073,21 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://kamadeva.kr",
     brand: "KAMADEVA (카마데바)",
+    multiBrand: true,
+    disabled: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
-        {name: "Cat24", cateNo: 24},
-        {name: "Cat25", cateNo: 25},
-        {name: "Cat26", cateNo: 26},
-        {name: "Cat27", cateNo: 27},
-        {name: "Cat28", cateNo: 28},
-        {name: "Cat42", cateNo: 42},
-        {name: "Cat43", cateNo: 43},
+        {name: "All Items", cateNo: 24},
+        {name: "Outerwear", cateNo: 25},
+        {name: "Tops", cateNo: 26},
+        {name: "Bottoms", cateNo: 27},
+        {name: "Bag & Shoes", cateNo: 28},
+        {name: "Accessories", cateNo: 42},
+        {name: "Etc", cateNo: 43},
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5390, status=qc_failed, auto-generated",
@@ -6275,7 +6273,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     key: "sideservice",
     name: "SIDE",
     type: "cafe24",
-    baseUrl: "https://sideservice.shop",
+    baseUrl: "https://sideservice.store",
     brand: "SIDE",
     paginate: true,
     maxPages: 300,
@@ -6283,11 +6281,10 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
-        {name: "Cat1", cateNo: 1},
+        {name: "ALL", cateNo: 1, url: "/shop/all.html"},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=5400, status=tech_detected, auto-generated",
   },
   {
@@ -7599,10 +7596,10 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
+        {name: "All", cateNo: 23},
       ],
     },
+    disabled: true,
     notes: "generate-platform-configs.ts — brand_node_id=5496, status=tech_detected, auto-generated",
   },
   {

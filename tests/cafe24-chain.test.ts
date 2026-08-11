@@ -189,6 +189,36 @@ test("Cafe24 detail pricing replaces an unconfirmed listing price coherently", (
   })
 })
 
+test("Cafe24 lower detail price preserves a higher listing price as the sale original", () => {
+  const item = product({
+    price: 195_000,
+    originalPrice: 195_000,
+    salePrice: null,
+    sourcePrice: 195_000,
+    pricingObservation: {state: "unknown", source: "listing", version: 2},
+  })
+
+  applyCafe24DetailFallbacks(item, {
+    name: null,
+    price: 97_500,
+    originalPrice: 97_500,
+    salePrice: null,
+    priceFormatted: "₩97,500",
+    sourceCurrency: "KRW",
+    sourcePrice: 97_500,
+    descriptionFirstLine: null,
+  })
+
+  assert.equal(item.price, 97_500)
+  assert.equal(item.originalPrice, 195_000)
+  assert.equal(item.salePrice, 97_500)
+  assert.deepEqual(item.pricingObservation, {
+    state: "sale",
+    source: "detail",
+    version: 2,
+  })
+})
+
 test("Cafe24 equal product and sale meta prices confirm a regular detail price", async () => {
   const page = {
     evaluate: async () => ({

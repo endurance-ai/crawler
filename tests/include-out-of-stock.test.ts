@@ -18,14 +18,33 @@ import * as assert from "node:assert/strict"
 
 import {parseShopifyProducts} from "../src/lib/shopify-engine"
 import {
+  cafe24BrandOverride,
+  cafe24ManualCategoryUrl,
   cafe24ProductIdentityKey,
   inferCafe24DetailStock,
   mergeCafe24DuplicateCategory,
   mergeCafe24DuplicateGender,
   shouldKeepOutOfStock,
 } from "../src/lib/cafe24-engine"
+
 import type {Product} from "../src/lib/types"
 import fixture from "./fixtures/shopify-products.fixture.json" with {type: "json"}
+
+test("cafe24: custom shop page can be used as a manual category URL", () => {
+  assert.equal(
+    cafe24ManualCategoryUrl("https://sideservice.store", {cateNo: 1, url: "/shop/all.html"}),
+    "https://sideservice.store/shop/all.html",
+  )
+  assert.equal(
+    cafe24ManualCategoryUrl("https://example.com", {cateNo: 24}),
+    "https://example.com/product/list.html?cate_no=24",
+  )
+})
+
+test("cafe24: 멀티브랜드 편집샵은 config.brand를 상품 브랜드로 고정하지 않는다", () => {
+  assert.equal(cafe24BrandOverride({brand: "KAMADEVA", multiBrand: true}), undefined)
+  assert.equal(cafe24BrandOverride({brand: "LOWOOL", multiBrand: false}), "LOWOOL")
+})
 
 test("cafe24: 상세 옵션 중 판매 가능 재고가 하나라도 있으면 재고 있음으로 판정한다", () => {
   assert.equal(inferCafe24DetailStock({

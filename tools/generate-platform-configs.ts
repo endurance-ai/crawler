@@ -59,6 +59,18 @@ const DISABLED_KEYS = new Set<string>([
   // 2026-08-11: official KR and international storefronts both expose only
   // the region selector and no current product_no entries.
   "intl-5332", // HYOVASMI
+  // 2026-08-11: multi-brand secondhand select shop; product pages expose no
+  // item-level gender evidence and titles are often only the designer name.
+  "kamadeva",
+  // 2026-08-11: official storefront has no gender navigation or item-level
+  // gender evidence; 17/19 current products remain unresolved (2 name-only).
+  "sideservice",
+  // 2026-08-11: official retailer records show a mix of men/unisex products,
+  // while the source storefront exposes no item-level gender field (0/10 POC).
+  "wellmadecom",
+  // 2026-08-11: bags/caps-only catalogue with no explicit gender evidence;
+  // accessory-only is not sufficient evidence for a blanket unisex default.
+  "thepaze",
 ])
 
 const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCurrency"]>> = {
@@ -67,6 +79,32 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
   "en-3887": "USD",
   // Sienne English Cafe24 storefront declares SHOP_CURRENCY_INFO currency_code=USD.
   "en-4821": "USD",
+}
+
+const CAFE24_BASE_URL_BY_KEY: Partial<Record<string, string>> = {
+  // The former .shop host no longer has DNS; the KR storefront is live here.
+  sideservice: "https://sideservice.store",
+}
+
+const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
+
+const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
+  kamadeva: [
+    {name: "All Items", cateNo: 24},
+    {name: "Outerwear", cateNo: 25},
+    {name: "Tops", cateNo: 26},
+    {name: "Bottoms", cateNo: 27},
+    {name: "Bag & Shoes", cateNo: 28},
+    {name: "Accessories", cateNo: 42},
+    {name: "Etc", cateNo: 43},
+  ],
+  // This theme returns 404 for /product/list.html and exposes the catalogue
+  // through custom shop pages instead.
+  sideservice: [{name: "ALL", cateNo: 1, url: "/shop/all.html"}],
+  // Current official navigation's complete catalogue. The prior 9/13 and
+  // lookbook 273/237 detections are non-product Cafe24 system categories.
+  wellmadecom: [{name: "ALL", cateNo: 24}],
+  thepaze: [{name: "All", cateNo: 23}],
 }
 
 interface CandidateRow {
@@ -203,7 +241,7 @@ function buildEntrySource(
     row.kr_eligibility_status === "eligible_storefront" && row.kr_storefront_url
       ? row.kr_storefront_url.replace(/\/$/, "")
       : null
-  const baseUrl = verifiedKrStorefront ?? `https://${host}`
+  const baseUrl = CAFE24_BASE_URL_BY_KEY[row.platform_key] ?? verifiedKrStorefront ?? `https://${host}`
   const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
   const disabled =
     DISABLED_KEYS.has(row.platform_key) ||
@@ -219,6 +257,9 @@ function buildEntrySource(
   const cafe24SourceCurrency = row.platform_type === "cafe24"
     ? CAFE24_SOURCE_CURRENCY_BY_KEY[row.platform_key]
     : undefined
+  const cafe24Categories = row.platform_type === "cafe24"
+    ? CAFE24_CATEGORIES_BY_KEY[row.platform_key]
+    : undefined
   const lines: string[] = []
   lines.push("  {")
   lines.push(`    key: ${JSON.stringify(row.platform_key)},`)
@@ -233,17 +274,25 @@ function buildEntrySource(
   // (실측: etce 1,604건 — brand 필드 미설정 상태로 생성된 게 원인).
   lines.push(`    brand: ${JSON.stringify(row.brand_name)},`)
   if (row.platform_type === "cafe24") {
+    if (CAFE24_MULTI_BRAND_KEYS.has(row.platform_key)) lines.push("    multiBrand: true,")
     if (cafe24SourceCurrency) lines.push(`    sourceCurrency: ${JSON.stringify(cafe24SourceCurrency)},`)
     lines.push("    paginate: true,")
     lines.push("    maxPages: 300,")
     lines.push("    crawlDetails: true,")
-    if (row.category_discovery === "manual" && row.categories.length > 0) {
+    if (cafe24Categories?.length || (row.category_discovery === "manual" && row.categories.length > 0)) {
       lines.push("    category: {")
       lines.push('      discovery: "manual",')
       lines.push("      categories: [")
-      for (const c of row.categories) {
+      const categories: NonNullable<NonNullable<SiteConfig["category"]>["categories"]> =
+        cafe24Categories ?? row.categories.map((c) => ({
+          name: `Cat${c.cateNo}`,
+          cateNo: c.cateNo,
+        }))
+      for (const c of categories) {
+        const url = c.url ? `, url: ${JSON.stringify(c.url)}` : ""
+        const gender = c.gender?.length ? `, gender: ${JSON.stringify(c.gender)}` : ""
         lines.push(
-          `        {name: ${JSON.stringify(`Cat${c.cateNo}`)}, cateNo: ${c.cateNo}},`,
+          `        {name: ${JSON.stringify(c.name)}, cateNo: ${c.cateNo}${gender}${url}},`,
         )
       }
       lines.push("      ],")

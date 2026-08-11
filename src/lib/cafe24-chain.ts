@@ -529,11 +529,20 @@ export function applyCafe24DetailFallbacks(
   }
 
   if (detailFallbacks.price !== null) {
+    const listingRegularPrice = Math.max(
+      product.originalPrice ?? 0,
+      product.price ?? 0,
+    ) || null
+    const detailRevealsListingSale =
+      detailFallbacks.salePrice === null &&
+      listingRegularPrice !== null &&
+      detailFallbacks.price > 0 &&
+      detailFallbacks.price < listingRegularPrice
     const pricing = normalizeObservedPricing({
       currentPrice: detailFallbacks.price,
-      originalPrice: detailFallbacks.originalPrice,
-      salePrice: detailFallbacks.salePrice,
-      state: detailFallbacks.salePrice !== null ? "sale" : "regular",
+      originalPrice: detailRevealsListingSale ? listingRegularPrice : detailFallbacks.originalPrice,
+      salePrice: detailRevealsListingSale ? detailFallbacks.price : detailFallbacks.salePrice,
+      state: detailFallbacks.salePrice !== null || detailRevealsListingSale ? "sale" : "regular",
       source: "detail",
     })
     product.price = pricing.price

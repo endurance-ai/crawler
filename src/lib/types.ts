@@ -136,7 +136,7 @@ export interface CategoryConfig {
    * manual일 때: 고정 카테고리 번호 목록
    * auto일 때: 카테고리 링크를 찾을 CSS 셀렉터 (기본: a[href*="cate_no="])
    */
-  categories?: { name: string; cateNo: number; gender?: string[] }[]
+  categories?: { name: string; cateNo: number; gender?: string[]; url?: string }[]
   /** auto 탐색 시 시작 URL (기본: baseUrl) */
   discoveryUrl?: string
   /** auto 탐색 시 카테고리 링크 셀렉터 */

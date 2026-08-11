@@ -138,6 +138,15 @@ interface CrawlTiming {
   listWaitMs: number
 }
 
+export function cafe24ManualCategoryUrl(
+  baseUrl: string,
+  category: {cateNo: number; url?: string},
+): string {
+  return category.url
+    ? new URL(category.url, `${baseUrl.replace(/\/$/, "")}/`).toString()
+    : `${baseUrl}/product/list.html?cate_no=${category.cateNo}`
+}
+
 export interface CrawlCafe24Options {
   detailConcurrency?: number
   createDetailPage?: () => Promise<Cafe24DetailPageLease>
@@ -250,6 +259,11 @@ export function mergeCafe24DuplicateGender(existing: Product, incoming: Product)
     existing.gender = [...incoming.gender]
     existing.genderSource = incoming.genderSource
   }
+}
+
+/** 멀티브랜드 편집샵에서는 config.brand를 상품 브랜드로 고정하지 않는다. */
+export function cafe24BrandOverride(config: Pick<SiteConfig, "brand" | "multiBrand">): string | undefined {
+  return config.multiBrand ? undefined : config.brand
 }
 
 /** 범용 Shop/New에서 먼저 잡힌 other를 뒤의 Necklace/Bracelet 같은 구체 분류로 승격한다. */
@@ -869,7 +883,7 @@ async function crawlCategory(
         config,
         category.name,
         category.gender,
-        config.brand,
+        cafe24BrandOverride(config),
         timing
       )
 
@@ -932,7 +946,7 @@ export async function crawlCafe24(
       name: c.name,
       cateNo: c.cateNo,
       gender: c.gender || [],
-      url: `${config.baseUrl}/product/list.html?cate_no=${c.cateNo}`,
+      url: cafe24ManualCategoryUrl(config.baseUrl, c),
     }))
     console.log(`${tag} 📋 수동 카테고리 ${categories.length}개`)
   } else {
@@ -955,7 +969,14 @@ export async function crawlCafe24(
         timeout: 30000,
       })
       await page.waitForTimeout(1500)
-      const products = await collectProductsFromPage(page, config, config.name, config.defaultGender || [], config.brand, timing)
+      const products = await collectProductsFromPage(
+        page,
+        config,
+        config.name,
+        config.defaultGender || [],
+        cafe24BrandOverride(config),
+        timing,
+      )
       allProducts.push(...products)
       console.log(`${tag} 📦 메인: ${products.length}개 상품`)
     } catch (err) {
