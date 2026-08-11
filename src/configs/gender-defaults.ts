@@ -126,6 +126,18 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://refomed.jp/blogs/news/shibuya-parco-popup-store
   // https://refomed.jp/collections/online-store
   refomed: ["men"],
+  // Official bag descriptions explicitly say the size suits both men and
+  // women. The catalogue is bags/accessories rather than gendered apparel.
+  // https://maziuntitled.com/product/suede-nook-bag-brown/967/
+  maziuntitled: ["unisex"],
+  // Current official inventory has two explicitly named WOMEN'S JACKET
+  // products; product-level evidence keeps those women. The remaining denim
+  // fits use the brand's main 28-40 / jacket 36-44 men's size system and its
+  // official partner list points to menswear heritage retailers. This value
+  // is therefore only the fallback for the 28 non-women products.
+  // https://omotodenim.jp/en/products/womens-3115-13-5oz-type-1-denim-jacket
+  // https://omotodenim.jp/en/pages/retailer
+  omotodenim: ["men"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

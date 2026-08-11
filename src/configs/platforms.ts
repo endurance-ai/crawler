@@ -2782,6 +2782,33 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     brand: "HAUSOU",
     notes: "imweb 파일럿 — brand_node_id=5484, detect platform_family=imweb",
   },
+  {
+    key: "maziuntitled",
+    name: "MAZI UNTITLED",
+    type: "cafe24",
+    baseUrl: "https://maziuntitled.com",
+    brand: "MAZI UNTITLED",
+    defaultGender: ["unisex"],
+    verifiedUnisexDefault: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    trustedCategory: true,
+    verifyStockFromDetail: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Bags", cateNo: 101, gender: ["unisex"]},
+        {name: "Bags", cateNo: 102, gender: ["unisex"]},
+        {name: "Bags", cateNo: 104, gender: ["unisex"]},
+        {name: "Bags", cateNo: 105, gender: ["unisex"]},
+        {name: "Bags", cateNo: 106, gender: ["unisex"]},
+        {name: "Bags", cateNo: 107, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 109, gender: ["unisex"]},
+      ],
+    },
+    notes: "brand_node_id=5840. Official bag catalogue; product descriptions explicitly state suitability for both men and women.",
+  },
 ]
 
 export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]
@@ -2831,6 +2858,7 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "scuffers", // 일반 상품 상세에 남녀 모델을 함께 명시하고 별도 Just Women 라인을 운영
   "enlowool", // 공식 소개에서 진주·혼합 소재를 genderless products로 명시
   "iyso", // 공식 KLOGG 설명: gender와 무관하게 everyone을 위해 제작
+  "maziuntitled", // 공식 가방 설명에 남녀 모두에게 어울리는 크기로 명시
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {

@@ -84,6 +84,21 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     {name: "Shoes", cateNo: 246, gender: ["unisex"]},
   ])
   assert.deepEqual(getSiteConfig("refomed")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("omotodenim")?.defaultGender, ["men"])
+  const mazi = getSiteConfig("maziuntitled")
+  assert.deepEqual(mazi?.defaultGender, ["unisex"])
+  assert.equal(mazi?.verifiedUnisexDefault, true)
+  assert.equal(mazi?.verifyStockFromDetail, true)
+  assert.equal(mazi?.trustedCategory, true)
+  assert.deepEqual(mazi?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Bags", cateNo: 101, gender: ["unisex"]},
+    {name: "Bags", cateNo: 102, gender: ["unisex"]},
+    {name: "Bags", cateNo: 104, gender: ["unisex"]},
+    {name: "Bags", cateNo: 105, gender: ["unisex"]},
+    {name: "Bags", cateNo: 106, gender: ["unisex"]},
+    {name: "Bags", cateNo: 107, gender: ["unisex"]},
+    {name: "Accessories", cateNo: 109, gender: ["unisex"]},
+  ])
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)

@@ -39,6 +39,10 @@ test("classify_shopify_sweater_type_to_knitwear", () => {
   assert.equal(subcategory, "sweater")
 })
 
+test("OMOTO denim happi is outerwear despite the denim material token", () => {
+  assert.equal(classifyShopifyCategory("", "8820 12OZ CUBE SASHIKO DENIM HAPPI", []).category, "outerwear")
+})
+
 test("구체적인 hoodie 상품명은 generic Sweater 타입보다 우선한다", () => {
   const {category, subcategory} = classifyShopifyCategory("Sweater", "SOFTS ZIP-HOODIE NAVY", [])
   assert.equal(category, "tops")

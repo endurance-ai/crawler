@@ -39,7 +39,7 @@ const TYPE_TO_CATEGORY: [RegExp, Category][] = [
   // A knit vest is knitwear; generic `vest` below remains outerwear.
   [/\bknit(?:ted)?[-\s]+vest\b/, "knitwear"],
   // Outerwear (cardigan intentionally excluded → knitwear)
-  [/\b(coat|jacket|parka|anorak|blazer|vest|bomber|windbreaker|fleece|cape|poncho|outerwear|outers|overshirt|blouson|trench|overcoat|puffer|chaqueta)\b/, "outerwear"],
+  [/\b(coat|jacket|parka|anorak|blazer|vest|bomber|windbreaker|fleece|cape|poncho|happi|outerwear|outers|overshirt|blouson|trench|overcoat|puffer|chaqueta)\b/, "outerwear"],
   // Knitwear (sweater/knit/cardigan split out of Top)
   [/\b(sweater|sweaters|cardigan|cardigans|knitwear|knits|knit|pullover|turtleneck)\b/, "knitwear"],
   // Tops

@@ -82,7 +82,7 @@ const qcReport = new Map<string, ProductQcStats>()
 const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?: string[]}> = [
   {
     category: "outerwear",
-    patterns: [/\b(coat|jacket|blazer|parka|anorak|windbreaker|bomber|trench|overcoat|outerwear)\b/i],
+    patterns: [/\b(coat|jacket|blazer|parka|anorak|windbreaker|bomber|trench|overcoat|happi|outerwear)\b/i],
     contains: ["\uc544\uc6b0\ud130", "\ucf54\ud2b8", "\uc7ac\ud0b7", "\uc790\ucf13", "\ube14\ub808\uc774\uc800", "\ud30c\uce74", "\uc810\ud37c", "\uc57c\uc0c1"],
   },
   {
@@ -184,6 +184,7 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
   {
     category: "outerwear",
     patterns: [
+      /\bhappi\b/i,
       /\b(jackets?|coats?|bombers?|puffers?|vests?)\b/i,
       /\bjersey[-\s]?jacket\b/i,
       /\bshirt[-\s]?jacket\b/i,
