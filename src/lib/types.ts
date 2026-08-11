@@ -192,6 +192,8 @@ export interface SiteConfig {
   kidsGenderNoisePatterns?: RegExp[]
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
+  /** Cafe24 목록의 품절 표시가 부정확한 사이트에서 상세 옵션 재고로 최종 판정한다. */
+  verifyStockFromDetail?: boolean
   /** 카테고리 탐색 설정 */
   category?: CategoryConfig
   /** 가격 파싱 정규식 (기본: /[\d,]+/ — KRW, ₩, 숫자만 등 다양한 포맷 대응) */

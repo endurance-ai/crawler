@@ -2296,6 +2296,28 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     notes: "generate-platform-configs.ts — brand_node_id=2453, status=tech_detected, auto-generated",
   },
   {
+    key: "opening-project",
+    name: "Opening Project",
+    type: "cafe24",
+    baseUrl: "https://opening-project.com",
+    brand: "Opening Project",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Man", cateNo: 137, gender: ["men"]},
+        {name: "Woman", cateNo: 138, gender: ["women"]},
+        {name: "EASTPAK X OPENING PROJECT", cateNo: 157},
+        {name: "Best", cateNo: 205},
+        {name: "New", cateNo: 59},
+        {name: "All", cateNo: 23},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=2563, status=tech_detected, auto-generated",
+  },
+  {
     key: "eastpacifictrade",
     name: "East Pacific Trade",
     type: "shopify",

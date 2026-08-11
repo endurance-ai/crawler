@@ -117,6 +117,30 @@ test("QC recovers canonical from name when category is noise (모두 보기 -> d
   assert.ok(result.reasons.includes("category_noise_text_fallback"))
 })
 
+test("QC resolves explicit compound product names before broad category aliases", () => {
+  const cases: Array<[string, string]> = [
+    ["W Biker Jersey Jacket", "outerwear"],
+    ["Oversized Shirt Jacket", "outerwear"],
+    ["EASTPAK x Opening Project DAY PAK'R", "bags"],
+    ["Double Knee Bermuda Sweatpant", "bottoms"],
+    ["Logo Football Jersey", "tops"],
+    ["Shirring Slim Long Sleeve", "tops"],
+    ["Ribbon Tie Down Cap", "headwear"],
+    ["W 2Way Hoodie Scarf", "accessories"],
+  ]
+
+  for (const [name, expected] of cases) {
+    assert.equal(inferCategoryFromText(name), expected, name)
+  }
+})
+
+test("QC promotes fallback other when product-name evidence becomes available", () => {
+  const result = normalizeProductTextFields(product({name: "Oversized Shirt Jacket", category: "other"}))
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "outerwear")
+  assert.ok(result.reasons.includes("category_other_text_fallback"))
+})
+
 // ─── subcategory ───────────────────────────────────────────────────────────
 
 test("QC collapses mini/midi/plural skirt variants to canonical 'skirt'", () => {

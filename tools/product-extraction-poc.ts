@@ -436,6 +436,7 @@ async function crawlCafe24Chromium(
     page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
     const result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
       sampleLimit: limit,
+      detailConcurrency: cafe24DetailConcurrency(),
       // Chromium detail-crawl pages are real Playwright Pages under the hood
       // (createPlaywrightDetailPageFactory) even though crawlCafe24's own
       // Cafe24Page type is narrower — safe to cast only on this branch.

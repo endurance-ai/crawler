@@ -207,6 +207,87 @@ export function shouldKeepOutOfStock(
   return Boolean(options.listingOnly || options.includeOutOfStock)
 }
 
+interface Cafe24DetailStockEvidence {
+  optionStockData: unknown
+  buyVisible: boolean
+  soldOutVisible: boolean
+}
+
+/** Cafe24 상세의 옵션 재고와 구매 UI를 목록 품절 아이콘보다 우선해 해석한다. */
+export function inferCafe24DetailStock(evidence: Cafe24DetailStockEvidence): boolean | null {
+  let raw = evidence.optionStockData
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw)
+    } catch {
+      raw = null
+    }
+  }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const options = Object.values(raw as Record<string, Record<string, unknown>>)
+    if (options.length > 0) {
+      const sellable = options.filter((option) => option.is_display !== "F" && option.is_selling !== "F")
+      if (sellable.length === 0) return false
+      return sellable.some((option) => {
+        const managesStock = option.use_stock === true || option.use_stock === "T"
+        return !managesStock || Number(option.stock_number) > 0
+      })
+    }
+  }
+  if (evidence.buyVisible) return true
+  if (evidence.soldOutVisible) return false
+  return null
+}
+
+export function mergeCafe24DuplicateGender(existing: Product, incoming: Product): void {
+  const genders = new Set([...(existing.gender ?? []), ...(incoming.gender ?? [])])
+  if (genders.has("unisex") || (genders.has("men") && genders.has("women"))) {
+    existing.gender = ["unisex"]
+    existing.genderSource = "engine"
+    return
+  }
+  if ((existing.gender?.length ?? 0) === 0 && (incoming.gender?.length ?? 0) > 0) {
+    existing.gender = [...incoming.gender]
+    existing.genderSource = incoming.genderSource
+  }
+}
+
+export function cafe24ProductIdentityKey(productUrl: string): string {
+  try {
+    const url = new URL(productUrl)
+    const queryId = url.searchParams.get("product_no")
+    if (queryId && /^\d+$/.test(queryId)) return `${url.hostname}:product:${queryId}`
+    const prettyId = url.pathname.match(/\/product\/(?:[^/]+\/)?(\d+)(?:\/|$)/)?.[1]
+    if (prettyId) return `${url.hostname}:product:${prettyId}`
+  } catch {
+    // 상대/손상 URL은 원문 키로 안전하게 폴백한다.
+  }
+  return productUrl
+}
+
+async function extractCafe24DetailStock(page: Cafe24Page): Promise<boolean | null> {
+  const evidence = await page.evaluate(() => {
+    // page.evaluate 내부의 로컬 함수는 tsx가 __name을 주입할 수 있으므로 단순 식으로 유지한다.
+    var buyElement = document.querySelector("#actionBuy, .btnSubmit, [class*=btn_buy]") as HTMLElement | null
+    var soldOutElement = document.querySelector("#actionSoldout, .soldout, .sold-out, [class*=btn_soldout]") as HTMLElement | null
+    var buyStyle = buyElement ? window.getComputedStyle(buyElement) : null
+    var soldOutStyle = soldOutElement ? window.getComputedStyle(soldOutElement) : null
+    var stockWindow = window as typeof window & {option_stock_data?: unknown}
+    return {
+      optionStockData: stockWindow.option_stock_data ?? null,
+      buyVisible: Boolean(
+        buyElement && buyStyle?.display !== "none" && buyStyle?.visibility !== "hidden"
+        && !buyElement.classList.contains("displaynone"),
+      ),
+      soldOutVisible: Boolean(
+        soldOutElement && soldOutStyle?.display !== "none" && soldOutStyle?.visibility !== "hidden"
+        && !soldOutElement.classList.contains("displaynone"),
+      ),
+    }
+  })
+  return inferCafe24DetailStock(evidence)
+}
+
 function createPlaywrightDetailPageFactory(page: Cafe24Page): () => Promise<Cafe24DetailPageLease> {
   const browser = (
     page as unknown as {
@@ -919,13 +1000,19 @@ export async function crawlCafe24(
 
   // 중복 제거 + 품절 제외 (productUrl 기준). listingOnly(갱신)와
   // includeOutOfStock(재수집)에서는 품절도 남긴다.
-  const seen = new Set<string>()
-  const dedupedAll = allProducts.filter((p) => {
-    if (!p.productUrl || seen.has(p.productUrl)) return false
-    seen.add(p.productUrl)
-    return true
-  })
-  const dedupedProducts = shouldKeepOutOfStock(options)
+  const byUrl = new Map<string, Product>()
+  for (const product of allProducts) {
+    if (!product.productUrl) continue
+    const identityKey = cafe24ProductIdentityKey(product.productUrl)
+    const existing = byUrl.get(identityKey)
+    if (existing) {
+      mergeCafe24DuplicateGender(existing, product)
+      continue
+    }
+    byUrl.set(identityKey, product)
+  }
+  const dedupedAll = [...byUrl.values()]
+  const dedupedProducts = (config.verifyStockFromDetail || shouldKeepOutOfStock(options))
     ? dedupedAll
     : dedupedAll.filter((p) => p.inStock)
   let uniqueProducts = options.sampleLimit
@@ -969,11 +1056,12 @@ export async function crawlCafe24(
             // 상세크롤을 반복하지 않기 위함). 마커는 Product.detailFetchedAt 이다
             // (2026-07-29 이전에는 color 유무로 판정 → color 가 VLM 으로 이관되며 교체).
             const known = options.existingDetails?.get(product.productUrl)
-            if (known && product.detailFetchedAt) {
+            if (known && product.detailFetchedAt && !config.verifyStockFromDetail) {
               return {
                 product,
                 detail: known,
                 detailFallbacks: null,
+                detailStock: null,
                 images: product.images ?? (product.imageUrl ? [product.imageUrl] : []),
               }
             }
@@ -986,6 +1074,9 @@ export async function crawlCafe24(
                 `detail:${product.productUrl.slice(-50)}`
               )
               const detailFallbacks = await extractCafe24DetailFallbacks(pg)
+              const detailStock = config.verifyStockFromDetail
+                ? await extractCafe24DetailStock(pg)
+                : null
               const images = await collectProductImagesFromPage(pg, [
                 product.imageUrl,
                 ...(product.images ?? []),
@@ -994,7 +1085,7 @@ export async function crawlCafe24(
                 await options.enrichDetailPage(pg, product).catch(() => {})
               }
               product.detailFetchedAt = new Date().toISOString()
-              return {product, detail, detailFallbacks, images}
+              return {product, detail, detailFallbacks, detailStock, images}
             } catch {
               // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서
               // 계속 진행 중일 수 있다 — 페이지를 재사용하므로, 다음 배치가 같은
@@ -1002,20 +1093,24 @@ export async function crawlCafe24(
               // 에러가 나는 걸 막기 위해 about:blank로 강제 리셋해 정리한다
               // (2026-07-06, 페이지 재사용 도입 후 A.R.U 등에서 확인된 회귀).
               const detailFallbacks = await extractCafe24DetailFallbacks(pg).catch(() => null)
+              const detailStock = config.verifyStockFromDetail
+                ? await extractCafe24DetailStock(pg).catch(() => null)
+                : null
               const images = await collectProductImagesFromPage(pg, [
                 product.imageUrl,
                 ...(product.images ?? []),
               ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
               await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
-              return {product, detail: null, detailFallbacks, images}
+              return {product, detail: null, detailFallbacks, detailStock, images}
             } finally {
               if (externalDetailFactory) await lease.close()
             }
           })
         )
 
-        for (const {product, detail, detailFallbacks, images} of results) {
+        for (const {product, detail, detailFallbacks, detailStock, images} of results) {
           if (!detail && !detailFallbacks && images.length === 0) continue
+          if (detailStock !== null) product.inStock = detailStock
           if (images.length > 0) {
             product.images = images
             product.imageCollectionVersion = PRODUCT_IMAGE_COLLECTION_VERSION
@@ -1061,6 +1156,11 @@ export async function crawlCafe24(
   // 소스 단위의 전체 상품 상세 파서를 켜지 않고 **가격 관측이 미확정인 상품만**
   // 방문한다. detailParser 가 필요 없다: extractCafe24DetailFallbacks 는 페이지만
   // 받아 name/price 를 DOM 에서 뽑고, 상세의 확정 가격 tuple로 교체한다.
+  // 상세 재고 검증 사이트는 목록 품절 표시 때문에 먼저 버리지 않고, 상세 확인 뒤 필터링한다.
+  if (config.verifyStockFromDetail && !shouldKeepOutOfStock(options)) {
+    uniqueProducts = uniqueProducts.filter((product) => product.inStock)
+  }
+
   if (!ranFullDetail && options.recoverMissingPriceFromDetail) {
     const targets = uniqueProducts.filter(
       (p) => p.pricingObservation?.version !== 2 || p.pricingObservation.state === "unknown",

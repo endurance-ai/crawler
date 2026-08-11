@@ -155,6 +155,46 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
 ]
 
+// Compound product names can match multiple broad aliases (for example,
+// "Shirt Jacket" matches both tops and outerwear). Resolve only the phrases
+// whose merchandising family is sufficiently explicit before the generic
+// single-match gate below.
+const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}> = [
+  {
+    category: "outerwear",
+    patterns: [
+      /\bjersey[-\s]?jacket\b/i,
+      /\bshirt[-\s]?jacket\b/i,
+      /\bblouson\b/i,
+      /\btrucker\b/i,
+      /\binsulated\s+vest\b/i,
+      /\b(short\s+)?down\s+jacket\b/i,
+      /\b(fuzzy|hood(?:ed)?)\s+jumper\b/i,
+      /\bbolero\b/i,
+    ],
+  },
+  {
+    category: "bags",
+    patterns: [/\beastpak\s*[x×]\b/i, /\b(rucksack|pouch|xpack|pak['’]?r)\b/i],
+  },
+  {
+    category: "bottoms",
+    patterns: [/\b(sweatpants?|jeans?)\b/i],
+  },
+  {
+    category: "tops",
+    patterns: [/\bjersey\b/i, /\blong[-\s]?sleeve\b/i, /\bhood(?:ed)?\s+zip[-\s]?up\b/i],
+  },
+  {
+    category: "headwear",
+    patterns: [/\btie[-\s]?down\s+cap\b/i],
+  },
+  {
+    category: "accessories",
+    patterns: [/\bhair[-\s]?pin\b/i, /\bhoodie\s+scarf\b/i],
+  },
+]
+
 // Raw category string \u2192 family. Includes legacy capitalized DB values
 // (Outer/Top/\u2026 lowercased by normalizeForMatch) so values passing through QC are
 // canonicalized to the new taxonomy. Ambiguous legacy splits default to the most
@@ -274,6 +314,9 @@ function currentCategoryCompat(raw: string): Category | null {
 
 export function inferCategoryFromText(text: string): Category | null {
   if (!text.trim()) return null
+  for (const entry of CATEGORY_PRIORITY_ALIASES) {
+    if (entry.patterns.some((pattern) => pattern.test(text))) return entry.category
+  }
   const matches = CATEGORY_ALIASES.filter((entry) => matchesAny(text, entry.patterns, entry.contains)).map((entry) => entry.category)
   const unique = [...new Set(matches)]
   return unique.length === 1 ? unique[0] : null
@@ -302,6 +345,11 @@ function normalizeCategoryField(
   // null(NOT NULL 에 걸려 적재 제외)로 떨어뜨린다.
   const current = currentCategoryCompat(raw)
   if (current) {
+    // `other` is a fallback rather than a trusted taxonomy decision. When a
+    // later pass finds explicit product-name evidence, promote it directly.
+    if (current === "other" && inferred) {
+      return {value: inferred, reason: "category_other_text_fallback", confidence: 0.8, needsReview: false}
+    }
     // ② 이름 기반 번복. 신뢰 출처에서는 건너뛴다 — 구제할 원본이 아니다.
     // 아래 두 text_fallback 은 남긴다: 값이 **없을 때** 채우는 것이라 번복이 아니다.
     if (inferred && current !== inferred && !trustedCategory) {

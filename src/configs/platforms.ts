@@ -2829,6 +2829,11 @@ const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   "coldcultureworldwide",
 ])
 
+// 목록 템플릿이 모든 상품에 품절 아이콘을 렌더링하지만 상세 옵션에는 실제 재고가 있는 사이트.
+const SITE_CAFE24_DETAIL_STOCK_SITES = new Set([
+  "opening-project",
+])
+
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
   const config = PLATFORMS.find((p) => p.key === key)
@@ -2844,12 +2849,14 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
   const genderDepartmentTagPrefixes = SITE_GENDER_DEPARTMENT_TAG_PREFIXES[key] ?? config.genderDepartmentTagPrefixes
   const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
+  const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
   if (
     fallback === config.defaultGender
     && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
     && verifiedUnisexDefault === config.verifiedUnisexDefault
     && genderDepartmentTagPrefixes === config.genderDepartmentTagPrefixes
     && genderFromModelDescription === config.genderFromModelDescription
+    && verifyStockFromDetail === config.verifyStockFromDetail
   ) return config
   return {
     ...config,
@@ -2858,6 +2865,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
     ...(genderDepartmentTagPrefixes ? {genderDepartmentTagPrefixes} : {}),
     ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
+    ...(verifyStockFromDetail ? {verifyStockFromDetail: true} : {}),
   }
 }
 

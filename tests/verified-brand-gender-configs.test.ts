@@ -42,6 +42,7 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.equal(scuffers?.verifiedUnisexDefault, true)
   assert.deepEqual(scuffers?.genderDepartmentTagPrefixes?.unisex, ["BOYS OR GIRLS DROP"])
   assert.deepEqual(getSiteConfig("threetimes333")?.defaultGender, ["women"])
+  assert.equal(getSiteConfig("opening-project")?.verifyStockFromDetail, true)
   const threetimesNoise = getSiteConfig("threetimes333")?.kidsGenderNoisePatterns ?? []
   for (const verifiedWomenProduct of [
     "Baby shower swim bolero",
