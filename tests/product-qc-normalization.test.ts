@@ -6,6 +6,7 @@ import {
   inferCategoryFromText,
   applyProductQcGate,
   normalizeProductTextFields,
+  getProductQcReport,
   resetProductQcReport,
 } from "../src/lib/product-qc/normalization"
 
@@ -186,6 +187,14 @@ test("QC resolves explicit compound product names before broad category aliases"
     ["Pignose pearl belt necklace", "jewelry"],
     ["White dew earcuff", "jewelry"],
     ["Blue heart keyring", "accessories"],
+    ["Clear color hair clip (4color)", "accessories"],
+    ["White cat hair brush", "accessories"],
+    ["Minimal hand mirror (3color)", "accessories"],
+    ["Logo iphone jelly case", "accessories"],
+    ["Shearing bear gripp tok (3color)", "accessories"],
+    ["FLUFFY BEAR KEY RIING", "accessories"],
+    ["[925silver] Letter pendent", "jewelry"],
+    ["[925silver] Color cubic piercing (3color)", "jewelry"],
   ]
 
   for (const [name, expected] of cases) {
@@ -238,6 +247,14 @@ test("QC infers subcategory from the product name when the field is missing", ()
   const result = normalizeProductTextFields(product({name: "Pleated Midi Skirt", subcategory: undefined}))
   assert.equal(result.product.subcategory, "skirt")
   assert.ok(result.reasons.includes("subcategory_missing_text_fallback"))
+})
+
+test("QC does not classify a hair tie as neckwear", () => {
+  const result = normalizeProductTextFields(
+    product({name: "Heart pattern hair tie (8color)", category: "NEW", subcategory: undefined}),
+  )
+  assert.equal(result.product.category, "accessories")
+  assert.equal(result.product.subcategory ?? null, null)
 })
 
 test("QC nulls subcategory when category falls back to other", () => {
@@ -310,6 +327,17 @@ test("QC gate excludes gender-less products from the batch", () => {
   )
   assert.equal(kept.length, 1)
   assert.deepEqual(kept[0].gender, ["women"])
+})
+
+test("QC checkpoint mode normalizes without duplicating the final report", () => {
+  resetProductQcReport()
+  const input = [product({name: "Clear color hair clip", category: "NEW", subcategory: undefined})]
+  const checkpoint = applyProductQcGate(input, "checkpoint-shop", {recordReport: false})
+  assert.equal(checkpoint[0].category, "accessories")
+  assert.equal(getProductQcReport().has("checkpoint-shop"), false)
+
+  applyProductQcGate(input, "checkpoint-shop")
+  assert.equal(getProductQcReport().get("checkpoint-shop")?.total, 1)
 })
 
 test("QC does not launder an unresolvable gender into unisex", () => {

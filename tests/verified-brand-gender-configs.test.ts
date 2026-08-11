@@ -17,6 +17,11 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(getSiteConfig("twojeys")?.defaultGender, ["men"])
   assert.deepEqual(getSiteConfig("porterna")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("margesherwood")?.defaultGender, ["women"])
+  const mosxe = getSiteConfig("mosxe")
+  assert.deepEqual(mosxe?.defaultGender, ["women"])
+  assert.deepEqual(mosxe?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
+    {name: "NEW", cateNo: 52},
+  ])
   const biteTheBullet = getSiteConfig("brand")
   assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
   assert.equal(biteTheBullet?.verifiedUnisexDefault, true)

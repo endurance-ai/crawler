@@ -118,7 +118,7 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     [/\bwatch(?:es)?\b/, "watch"],
     [/\bscarf\b|\bscarves\b|\bmufflers?\b/, "scarf"],
     [/\bbelts?\b/, "belt"],
-    [/\bties?\b|\bneckties?\b|\bbow\s+ties?\b/, "tie"],
+    [/(?<!hair )\bties?\b|\bneckties?\b|\bbow\s+ties?\b/, "tie"],
     [/\bgloves?\b|\bmittens?\b/, "gloves"],
     [/\bsocks?\b|\bhosiery\b/, "socks"],
   ],

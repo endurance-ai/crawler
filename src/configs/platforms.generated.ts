@@ -6738,9 +6738,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
-        {name: "Cat1", cateNo: 1},
+        {name: "NEW", cateNo: 52},
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5437, status=tech_detected, auto-generated",

@@ -42,6 +42,23 @@ import {
 } from "./lib/product-qwen-normalization"
 import {QwenDisabledError, QwenUnavailableError} from "./lib/qwen-client"
 
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log(`
+Crawler product import
+
+Usage:
+  tsx src/import-products.ts [--site=KEY] [--dry-run] [--no-new-brands] [--in-stock-only]
+
+Options:
+  --site=KEY        Import only data/KEY-products.json
+  --dry-run         Validate and report without writing to the database
+  --no-new-brands   Skip products whose brand_node mapping is missing
+  --in-stock-only   Import only products currently in stock
+  --help, -h        Show this help and exit
+`)
+  process.exit(0)
+}
+
 /**
  * 성별 출처 신뢰도 순위 (dedup merge 용).
  *

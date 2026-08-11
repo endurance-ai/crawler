@@ -105,6 +105,9 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
   // lookbook 273/237 detections are non-product Cafe24 system categories.
   wellmadecom: [{name: "ALL", cateNo: 24}],
   thepaze: [{name: "All", cateNo: 23}],
+  // Official NEW catalogue contains the complete current range. The prior
+  // 9/13/1 detections are Cafe24 system/navigation categories, not products.
+  mosxe: [{name: "NEW", cateNo: 52}],
 }
 
 interface CandidateRow {

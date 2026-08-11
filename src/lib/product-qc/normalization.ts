@@ -55,6 +55,8 @@ export interface ProductQcOptions {
   kidsGenderNoisePatterns?: RegExp[]
   /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
   verifiedUnisexDefault?: boolean
+  /** Do not duplicate QC stats/events when writing repeated crawl checkpoints. */
+  recordReport?: boolean
 }
 
 export interface ProductQcResult<T extends ProductQcInput = ProductQcInput> {
@@ -125,7 +127,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "jewelry",
-    patterns: [/\b(necklace|bracelet|ring|earrings?|jewelry|jewellery|pendant|anklet)\b/i],
+    patterns: [/\b(necklace|bracelet|ring|earrings?|jewelry|jewellery|pendants?|pendents?|anklet|piercings?)\b/i],
     contains: ["\ubaa9\uac78\uc774", "\ud314\ucc0c", "\ubc18\uc9c0", "\uadc0\uac78\uc774", "\uc8fc\uc5bc\ub9ac", "\uc96c\uc5bc\ub9ac", "\ud39c\ub358\ud2b8"],
   },
   {
@@ -237,6 +239,11 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
       /\bkeychains?\b/i,
       /\bkeyrings?\b/i,
       /\bscrunchies?\b/i,
+      /\bhair\s*-?\s*(?:clips?|pins?|sticks?|ties?|bands?|brush(?:es)?|acc(?:essories)?)\b/i,
+      /\b(?:hand|button)\s+mirrors?\b/i,
+      /\bgripp?\s*-?\s*toks?\b/i,
+      /\biphone\s+(?:jelly\s+)?cases?\b/i,
+      /\bkey\s+r+i+n+g+s?\b/i,
     ],
   },
   {
@@ -630,19 +637,21 @@ export function applyProductQcGate<T extends ProductQcInput>(
   const accepted: T[] = []
   for (const product of products) {
     const result = normalizeProductTextFields(product, options)
-    record(site, result)
+    if (options.recordReport !== false) record(site, result)
 
     if (result.action === "review" || result.action === "reject") {
       const firstReason = result.reasons[0] ?? "product_qc_uncertain"
-      emit({
-        kind: "product_qc_review",
-        site,
-        sku: skuOf(product),
-        action: result.action,
-        reason: firstReason,
-        confidence: result.confidence,
-        changes: result.changes,
-      })
+      if (options.recordReport !== false) {
+        emit({
+          kind: "product_qc_review",
+          site,
+          sku: skuOf(product),
+          action: result.action,
+          reason: firstReason,
+          confidence: result.confidence,
+          changes: result.changes,
+        })
+      }
       continue
     }
 

@@ -76,6 +76,12 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   ordes: ["women"], // "contemporary take on femininity"
   porterna: ["women"], // Official storefront has dresses/skirts/blouses and no men's department; current corpus includes halter/off-shoulder/blouse items.
   margesherwood: ["women"], // Official storefront collections include DRESS and other womenswear alongside bags/shoes, with no men's department.
+  // 공식몰의 반지·목걸이·헤어 액세서리 카탈로그와 일치하는 무신사 상품들이
+  // 성별 '여'로 명시되어 있다. 남성/공용 상품 또는 별도 남성 부문은 확인되지 않았다.
+  // https://www.musinsa.com/products/5670923
+  // https://www.musinsa.com/products/5758840
+  // https://www.musinsa.com/products/5654447
+  mosxe: ["women"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.
