@@ -273,6 +273,21 @@ test("QC resolves subcategory against the canonicalized category, not the raw al
   assert.equal(result.product.subcategory, "turtleneck")
 })
 
+test("QC preserves a narrow official category as subcategory evidence for code-only names", () => {
+  for (const [category, expected] of [
+    ["Ring", "ring"],
+    ["Necklace", "necklace"],
+    ["Bracelet", "bracelet"],
+    ["Earring", "earrings"],
+  ] as const) {
+    const result = normalizeProductTextFields(
+      product({name: "BR0077S", category, subcategory: undefined}),
+    )
+    assert.equal(result.product.category, "jewelry")
+    assert.equal(result.product.subcategory, expected)
+  }
+})
+
 
 // ─── 성별 (2026-08 크롤러 회귀) ────────────────────────────────
 

@@ -463,7 +463,14 @@ function normalizeSubcategoryField(
   product: ProductQcInput,
   canonicalCategory: Category | null,
 ): {value: string | null; reason: string | null; confidence: number} {
-  const resolved = resolveSubcategory(product.subcategory, canonicalCategory, product.name)
+  // Preserve an official narrow category label (for example Ring/Necklace)
+  // as evidence after its broad category has been canonicalized to jewelry.
+  // Code-only product names otherwise lose all subcategory information.
+  const resolved = resolveSubcategory(
+    product.subcategory,
+    canonicalCategory,
+    `${product.name} ${product.category ?? ""}`,
+  )
 
   switch (resolved.reason) {
     case null:

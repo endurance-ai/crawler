@@ -108,6 +108,15 @@ const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["c
   // Official NEW catalogue contains the complete current range. The prior
   // 9/13/1 detections are Cafe24 system/navigation categories, not products.
   mosxe: [{name: "NEW", cateNo: 52}],
+  // Official Shop navigation. Exclude Cafe24 system categories and the
+  // aggregate All/Best views so code-only product names retain their family.
+  "butter-ring": [
+    {name: "Ring", cateNo: 30, gender: ["women"]},
+    {name: "Necklace", cateNo: 31, gender: ["women"]},
+    {name: "Bracelet", cateNo: 42, gender: ["women"]},
+    {name: "Earring", cateNo: 43, gender: ["women"]},
+    {name: "Goods", cateNo: 63, gender: ["women"]},
+  ],
 }
 
 interface CandidateRow {

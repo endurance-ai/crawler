@@ -82,6 +82,10 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://www.musinsa.com/products/5758840
   // https://www.musinsa.com/products/5654447
   mosxe: ["women"],
+  // 공식 소개는 페미닌 주얼리로 정의하고, 무신사 동일 상품도 성별 '여'로 명시한다.
+  // https://butter-ring.com/shopinfo/company.html
+  // https://www.musinsa.com/products/6041628
+  "butter-ring": ["women"],
   // 창업자들이 2025 Hypebeast 인터뷰와 브랜드 인터뷰에서 TwoJeys를
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.

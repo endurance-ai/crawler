@@ -1104,7 +1104,7 @@ export async function crawlCafe24(
             }
             const lease = externalDetailFactory ? await externalDetailFactory() : workerLeases[slot]!
             const pg = lease.page
-            try {
+            const collectDetail = async () => {
               const detail = await withTimeout(
                 detailParser.parse(pg, product.productUrl),
                 25_000,
@@ -1123,7 +1123,22 @@ export async function crawlCafe24(
               }
               product.detailFetchedAt = new Date().toISOString()
               return {product, detail, detailFallbacks, detailStock, images}
-            } catch {
+            }
+            try {
+              return await collectDetail()
+            } catch (firstError) {
+              // Some themes perform another client-side navigation after
+              // domcontentloaded, destroying the evaluate context while the
+              // product page itself remains healthy. Retry that transient once.
+              if (/execution context was destroyed|interrupted by another navigation/i.test(String(firstError))) {
+                await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
+                await pg.waitForTimeout(250).catch(() => {})
+                try {
+                  return await collectDetail()
+                } catch {
+                  // Fall through to the listing-preserving fallback below.
+                }
+              }
               // withTimeout이 포기해도 내부 parse()의 page.goto는 백그라운드에서
               // 계속 진행 중일 수 있다 — 페이지를 재사용하므로, 다음 배치가 같은
               // 슬롯에서 새 URL로 goto할 때 "interrupted by another navigation"
