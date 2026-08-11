@@ -4,7 +4,7 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-11T07:33:54.704Z.
+ * transitions. Generated 2026-08-11T08:14:10.707Z.
  * Total: 465 (active 444 / disabled 21)
  */
 
@@ -9020,7 +9020,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=5862, status=qc_failed, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5862, status=imported, auto-generated",
   },
   {
     key: "refomed",
@@ -9031,7 +9031,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=5863, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5863, status=imported, auto-generated",
   },
   {
     key: "kibata",
@@ -9067,7 +9067,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Shoes", cateNo: 246, gender: ["unisex"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=5866, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5866, status=imported, auto-generated",
   },
   {
     key: "bants",

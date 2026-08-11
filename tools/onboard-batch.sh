@@ -88,7 +88,8 @@ if [ "$ENGINE" = "lightpanda" ] && [ ! -x "bin/lightpanda" ]; then
   exit 1
 fi
 
-PNPM="corepack pnpm@10.33.2 exec dotenv -e .env.local --"
+ENV_FILE="${CRAWLER_ENV_FILE:-.env.local}"
+PNPM="corepack pnpm@10.33.2 exec dotenv -e $ENV_FILE --"
 TMP_DIR="$OUT_ROOT/_chunks"
 TALLY="$OUT_ROOT/onboard-tally.csv"
 
