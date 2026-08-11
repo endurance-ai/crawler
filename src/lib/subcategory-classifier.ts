@@ -11,6 +11,7 @@
  */
 
 import {isValidSubcategory, type Category} from "./enums/product-enums"
+import {normalizeForMatch} from "./text-match"
 
 export type SubcategoryMap = [RegExp, string][]
 
@@ -187,7 +188,10 @@ export function resolveSubcategory(
     return {value: raw, reason: null}
   }
 
-  const text = `${raw} ${fallbackText}`.toLowerCase()
+  // Product titles commonly use `_`/`-` as colour delimiters. Regex word
+  // boundaries treat `_` as a word character, so normalize them to spaces
+  // before matching (for example `SHIRTS_IVORY`, `S/S TEE_BLACK`).
+  const text = normalizeForMatch(`${raw} ${fallbackText}`)
   const inferred = matchSubcategory(category, text)
   if (inferred) return {value: inferred, reason: raw ? "canonicalized" : "text_fallback"}
 

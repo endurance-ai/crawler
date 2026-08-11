@@ -172,11 +172,16 @@ const IMWEB_CATEGORY_URLS_BY_KEY: Partial<Record<string, string[]>> = {
   // The Home page navigation is script-rendered too late for generic discovery,
   // while the official store page exposes the complete current catalogue.
   kibata: ["https://www.kibata.kr/Online-Store/"],
+  publicfigure: ["https://publicfigure.kr/shop"],
 }
 
 const IMWEB_DEFAULT_CATEGORY_BY_KEY: Partial<Record<string, string>> = {
   // The current official catalogue is exclusively adult denim/sashiko pants.
   kibata: "bottoms",
+  // The shop is a mixed apparel catalogue without category labels in its
+  // Imweb item JSON. Product-name inference refines known families; truly
+  // ambiguous items remain in the canonical catch-all instead of dropping.
+  publicfigure: "other",
 }
 
 const IMWEB_DEFAULT_SUBCATEGORY_BY_KEY: Partial<Record<string, string>> = {

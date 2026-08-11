@@ -153,6 +153,7 @@ test("QC classifies underscore-suffixed apparel and accessories after text norma
     ["LACE TANK-BK", "tops"],
     ["AMALFI SPORTY MOTO JERSEY_IVORY", "tops"],
     ["THIRSTY CAMEL T-SHIRTS_DARK GREY", "tops"],
+    ["COTTON 160`S LOOSE SHIRTS_IVORY", "tops"],
     ["SHELL KNIT COWBOY BUCKET HAT_NAVY", "headwear"],
     ["Tangled Swim Knit Bag_Red", "bags"],
     ["Tanning Knit Cap_Navy", "headwear"],
@@ -161,6 +162,16 @@ test("QC classifies underscore-suffixed apparel and accessories after text norma
   for (const [name, expected] of cases) {
     assert.equal(inferCategoryFromText(name), expected, name)
   }
+})
+
+test("QC classifies plural shirts and underscore-suffixed tees through category and subcategory", () => {
+  const shirt = normalizeProductTextFields(product({name: "COTTON PAPER LOOSE SHIRTS_IVORY", category: "other"}))
+  assert.equal(shirt.product.category, "tops")
+  assert.equal(shirt.product.subcategory, "shirt")
+
+  const tee = normalizeProductTextFields(product({name: "SORONA COTTON S/S TEE_BLACK", category: "other"}))
+  assert.equal(tee.product.category, "tops")
+  assert.equal(tee.product.subcategory, "t-shirt")
 })
 
 test("QC resolves explicit compound product names before broad category aliases", () => {
@@ -182,6 +193,7 @@ test("QC resolves explicit compound product names before broad category aliases"
     ["SHIRRING WORK VEST", "outerwear"],
     ["CORDUROY LOOSE BOOTCUT", "bottoms"],
     ["DAWN GRAPHIC U-NECK TOP", "tops"],
+    ["COTTON OXFORD LOOSE SHIRTS_IVORY", "tops"],
     ["PLEATED ZIP KNIT VEST", "knitwear"],
     ["CONVERTIBLE HOOK TOP DRESS", "dresses"],
     ["Pignose pearl belt necklace", "jewelry"],

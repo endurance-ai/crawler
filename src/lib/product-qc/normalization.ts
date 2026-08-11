@@ -92,7 +92,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "tops",
-    patterns: [/\b(t[-\s]?shirts?|tee|shirt|blouse|polo|hoodie|sweatshirt|tanks?|tank[-\s]?top|crop[-\s]?top|henley|camisole)\b/i],
+    patterns: [/\b(t[-\s]?shirts?|tees?|shirts?|blouses?|polos?|hoodies?|sweatshirts?|tanks?|tank[-\s]?tops?|crop[-\s]?tops?|henleys?|camisoles?)\b/i],
     contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1"],
   },
   {
@@ -212,7 +212,7 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
       /\bjersey\b/i,
       /\blong[-\s]?sleeve\b/i,
       /\bhood(?:ed)?\s+zip[-\s]?up\b/i,
-      /\b(top|sleeveless)\b/i,
+      /\b(tops?|shirts?|sleeveless)\b/i,
     ],
   },
   {

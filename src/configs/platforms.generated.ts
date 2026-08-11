@@ -4,7 +4,7 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-11T06:35:44.681Z.
+ * transitions. Generated 2026-08-11T06:45:02.948Z.
  * Total: 465 (active 444 / disabled 21)
  */
 
@@ -8989,7 +8989,9 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://publicfigure.kr",
     brand: "PUBLIC FIGURE",
-    notes: "generate-platform-configs.ts — brand_node_id=5848, status=tech_detected, auto-generated",
+    categoryUrls: ["https://publicfigure.kr/shop"],
+    defaultCategory: "other",
+    notes: "generate-platform-configs.ts — brand_node_id=5848, status=imported, auto-generated",
   },
   {
     key: "wouldbe",
