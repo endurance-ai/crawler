@@ -12,6 +12,7 @@
  */
 import {createProductCollectionClient} from "../src/lib/product-collection"
 import {cleanGenderScope} from "../src/lib/product-gender"
+import {getSiteConfig} from "../src/configs/platforms"
 
 function flag(name: string): string | undefined {
   const arg = process.argv.find((a) => a.startsWith(`--${name}=`))
@@ -53,6 +54,7 @@ function topSources(rows: ProductRow[]): string {
 
 async function checkPlatform(db: ReturnType<typeof createProductCollectionClient>, platform: string): Promise<string[]> {
   const findings: string[] = []
+  const verifiedUnisexDefault = getSiteConfig(platform)?.verifiedUnisexDefault === true
   const {data, error} = await db
     .from("products")
     .select("id,platform,name,brand,price,source_currency,in_stock,gender,gender_source")
@@ -112,7 +114,7 @@ async function checkPlatform(db: ReturnType<typeof createProductCollectionClient
     const single = rows.filter((r) => cleanGenderScope(r.gender).length === 1)
     const unisex = single.filter((r) => cleanGenderScope(r.gender)[0] === "unisex")
     const unisexShare = unisex.length / single.length
-    if (single.length > 0 && unisexShare >= UNISEX_SHARE_WARN) {
+    if (single.length > 0 && unisexShare >= UNISEX_SHARE_WARN && !verifiedUnisexDefault) {
       // unisex 는 검색 RPC 가 남녀 양쪽에 노출시키므로(p.gender && ARRAY[p_gender,
       // 'unisex']) 세탁되면 여성 상품이 남성 검색으로 샌다. 근거 분포를 함께
       // 찍어 "확인된 unisex"(engine/text 태그 근거)와 "사이트 기본값 일괄"을

@@ -56,6 +56,9 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://scuffers.com/collections/all/products/eggplant-green-shorts
   // https://scuffers.com/collections/new-arrivals-men/products/roster-brown-jorts
   scuffers: ["unisex"],
+  // 공식 영문몰 소개: "We use pearls and various materials in genderless products."
+  // https://en.lowool.com/index.html
+  enlowool: ["unisex"],
   // 공식몰은 dresses/skirts/bras/underwear 등 여성 상품군과 별도 unisex 컬렉션을 운영한다.
   // 명시적 unisex 태그는 엔진 근거가 우선하고, 그 외 상품에만 women을 적용한다.
   // https://threetimes333.com/collections/dresses

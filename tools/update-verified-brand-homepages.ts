@@ -4,6 +4,7 @@ import {createClient} from "@supabase/supabase-js"
 
 const VERIFIED_HOMEPAGES = [
   {brandId: 244, brandName: "OPEN YY", homepageUrl: "https://open-yy.com", source: "https://open-yy.com/", storefront: "KR", currency: "KRW"},
+  {brandId: 5332, brandName: "HYOVASMI", homepageUrl: "https://hyovasmi.com", source: "https://hyovasmi.com/", storefront: "KR", currency: "KRW"},
   {
     brandId: 5793,
     brandName: "AUTUMN",

@@ -304,7 +304,7 @@ async function processCandidate(
   raw.gender = withGender.gender
   raw.genderSource = withGender.source ?? undefined
   const qc = applyProductQcGate([raw], candidate.platform_key, {
-    trustedCategory: config.type === "shopify",
+    trustedCategory: config.type === "shopify" || config.trustedCategory === true,
     kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
     verifiedUnisexDefault: config.verifiedUnisexDefault,
   })

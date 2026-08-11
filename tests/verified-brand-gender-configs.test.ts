@@ -50,6 +50,11 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     {cateNo: 215, gender: ["unisex"]},
     {cateNo: 214, gender: ["women"]},
   ])
+  const lowool = getSiteConfig("enlowool")
+  assert.equal(lowool?.sourceCurrency, "USD")
+  assert.deepEqual(lowool?.defaultGender, ["unisex"])
+  assert.equal(lowool?.verifiedUnisexDefault, true)
+  assert.equal(lowool?.trustedCategory, true)
   const threetimesNoise = getSiteConfig("threetimes333")?.kidsGenderNoisePatterns ?? []
   for (const verifiedWomenProduct of [
     "Baby shower swim bolero",

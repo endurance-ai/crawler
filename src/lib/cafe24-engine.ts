@@ -252,6 +252,21 @@ export function mergeCafe24DuplicateGender(existing: Product, incoming: Product)
   }
 }
 
+/** 범용 Shop/New에서 먼저 잡힌 other를 뒤의 Necklace/Bracelet 같은 구체 분류로 승격한다. */
+export function mergeCafe24DuplicateCategory(existing: Product, incoming: Product): void {
+  const existingCategory = existing.category?.trim().toLowerCase()
+  const incomingCategory = incoming.category?.trim().toLowerCase()
+  const genericCategories = new Set(["shop", "new", "new arrivals", "best", "all", "view all", "sale", "other"])
+  if (
+    (!existingCategory || genericCategories.has(existingCategory))
+    && incomingCategory
+    && !genericCategories.has(incomingCategory)
+  ) {
+    existing.category = incoming.category
+    if (incoming.subcategory) existing.subcategory = incoming.subcategory
+  }
+}
+
 export function cafe24ProductIdentityKey(productUrl: string): string {
   try {
     const url = new URL(productUrl)
@@ -1007,6 +1022,7 @@ export async function crawlCafe24(
     const existing = byUrl.get(identityKey)
     if (existing) {
       mergeCafe24DuplicateGender(existing, product)
+      mergeCafe24DuplicateCategory(existing, product)
       continue
     }
     byUrl.set(identityKey, product)

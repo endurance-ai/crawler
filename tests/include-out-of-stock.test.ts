@@ -20,6 +20,7 @@ import {parseShopifyProducts} from "../src/lib/shopify-engine"
 import {
   cafe24ProductIdentityKey,
   inferCafe24DetailStock,
+  mergeCafe24DuplicateCategory,
   mergeCafe24DuplicateGender,
   shouldKeepOutOfStock,
 } from "../src/lib/cafe24-engine"
@@ -58,6 +59,22 @@ test("cafe24: 같은 상품이 공식 Man/Woman 부서에 모두 있으면 공�
   mergeCafe24DuplicateGender(existing, product(["women"]))
   assert.deepEqual(existing.gender, ["unisex"])
   assert.equal(existing.genderSource, "engine")
+})
+
+test("cafe24: 범용 Shop보다 뒤에서 발견한 구체 상품 카테고리를 보존한다", () => {
+  const product = (category: string, subcategory: string | null = null): Product => ({
+    brand: "LOWOOL", name: "Sang", category, subcategory, gender: ["unisex"],
+    genderSource: "config_default", price: 100, originalPrice: 100, salePrice: null,
+    priceFormatted: "$100", imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://example.com/product/1", inStock: true, platform: "enlowool",
+  })
+  const existing = product("Shop")
+  mergeCafe24DuplicateCategory(existing, product("jewelry", "necklace"))
+  assert.equal(existing.category, "jewelry")
+  assert.equal(existing.subcategory, "necklace")
+
+  mergeCafe24DuplicateCategory(existing, product("other"))
+  assert.equal(existing.category, "jewelry")
 })
 
 test("cafe24: 카테고리 경로가 달라도 같은 상품번호는 하나의 상품으로 본다", () => {

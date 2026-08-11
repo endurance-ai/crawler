@@ -56,6 +56,9 @@ const DISABLED_KEYS = new Set<string>([
   // 24(outer)/25(tops)/27(bottoms)/28(acc)/42(all)/47(remix)/59(best) — detect
   // 시점 이후 카테고리 번호가 바뀐 것으로 추정. cateNo 재탐지 필요.
   "noscouleurs",
+  // 2026-08-11: official KR and international storefronts both expose only
+  // the region selector and no current product_no entries.
+  "intl-5332", // HYOVASMI
 ])
 
 const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCurrency"]>> = {

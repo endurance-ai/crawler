@@ -92,6 +92,15 @@ test("trustedCategory keeps the subcategory cascade correct", () => {
   assert.equal(result.product.subcategory, "t-shirt")
 })
 
+test("trustedCategory keeps a verified jewelry category despite apparel words in the name", () => {
+  const result = normalizeProductTextFields(
+    product({name: "Denim Big Star", category: "Necklace", subcategory: undefined}),
+    {trustedCategory: true},
+  )
+  assert.equal(result.product.category, "jewelry")
+  assert.ok(!result.reasons.includes("category_text_conflict"))
+})
+
 test("QC folds non-canonical mappable category to canonical family (sweater -> knitwear)", () => {
   const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "sweater"}))
   assert.equal(result.product.category, "knitwear")
@@ -117,6 +126,13 @@ test("QC recovers canonical from name when category is noise (모두 보기 -> d
   assert.ok(result.reasons.includes("category_noise_text_fallback"))
 })
 
+test("QC canonicalizes jewelry category labels even when the product name is abbreviated", () => {
+  for (const category of ["Necklace", "Bracelet", "Earrings", "Ring"]) {
+    const result = normalizeProductTextFields(product({name: "thorn B", category}))
+    assert.equal(result.product.category, "jewelry", category)
+  }
+})
+
 test("QC resolves explicit compound product names before broad category aliases", () => {
   const cases: Array<[string, string]> = [
     ["W Biker Jersey Jacket", "outerwear"],
@@ -138,6 +154,9 @@ test("QC resolves explicit compound product names before broad category aliases"
     ["DAWN GRAPHIC U-NECK TOP", "tops"],
     ["PLEATED ZIP KNIT VEST", "knitwear"],
     ["CONVERTIBLE HOOK TOP DRESS", "dresses"],
+    ["Pignose pearl belt necklace", "jewelry"],
+    ["White dew earcuff", "jewelry"],
+    ["Blue heart keyring", "accessories"],
   ]
 
   for (const [name, expected] of cases) {

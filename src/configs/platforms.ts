@@ -1666,9 +1666,22 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://en.lowool.com",
     brand: "LOWOOL",
+    sourceCurrency: "USD",
     paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    crawlDetails: true,
+    trustedCategory: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Necklace", cateNo: 102},
+        {name: "Bracelet", cateNo: 104},
+        {name: "Earrings", cateNo: 113},
+        {name: "Ring", cateNo: 99},
+        {name: "Exclusive", cateNo: 87},
+        {name: "Shop", cateNo: 61},
+      ],
+    },
+    notes: "공식 영문몰: genderless products, USD. 상품형 하위 메뉴만 수집하고 Press/Lookbook/Offline 제외.",
   },
   {
     key: "rollingstudios",
@@ -2808,6 +2821,7 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "scuffers", // 일반 상품 상세에 남녀 모델을 함께 명시하고 별도 Just Women 라인을 운영
+  "enlowool", // 공식 소개에서 진주·혼합 소재를 genderless products로 명시
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {

@@ -698,7 +698,7 @@ async function main() {
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
     const qcRaw = applyProductQcGate(rawWithGender, platform, {
-      trustedCategory: config?.type === "shopify",
+      trustedCategory: config?.type === "shopify" || config?.trustedCategory === true,
       kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
       verifiedUnisexDefault: config?.verifiedUnisexDefault,
     })

@@ -184,6 +184,11 @@ export interface SiteConfig {
    * 결의 단계에서 버리지만, 이 플래그가 있으면 검증된 사이트 기본값으로 허용한다.
    */
   verifiedUnisexDefault?: boolean
+  /**
+   * Trust an explicitly verified site category over conflicting product-name
+   * heuristics. Canonical category folding still applies.
+   */
+  trustedCategory?: boolean
   /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
   /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */
