@@ -93,6 +93,22 @@ test("single-brand override ignores a conflicting Shopify vendor", () => {
   assert.ok(products.every((product) => product.brand === "House Brand"))
 })
 
+test("Shopify 단일 상품군 기본값은 상품 모델명의 오탐보다 우선한다", () => {
+  const products = parseShopifyProducts({products: [{
+    id: 1,
+    title: "BRA - LATTE SPAZZOLATO LEATHER",
+    handle: "bra-latte",
+    vendor: "FANE",
+    product_type: "",
+    body_html: "A leather bag.",
+    tags: [],
+    variants: [{id: 1, title: "Default", price: "100", available: true, sku: "BRA"}],
+    images: [],
+  }]}, BASE_URL, KEY, {...KRW_PARSE_OPTIONS, defaultCategory: "bags"})
+
+  assert.equal(products[0]?.category, "bags")
+})
+
 test("shopify 모델 설명 성별은 opt-in이며 구조화 부서 태그가 우선한다", () => {
   const base = {
     id: 1,

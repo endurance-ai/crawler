@@ -110,6 +110,26 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://racil.com/collections/ready-to-wear
   shopdoen: ["women"], // 공식 women’s dresses/tops/skirts 카탈로그
   // https://shopdoen.com/collections/clothing
+  pommedor: ["women"], // 공식 홈이 브랜드를 "feminine style" 슈즈로 명시
+  // https://pommedor.it/
+  "sineadodwyer-1472": ["women"], // 공식 전체몰이 dresses/bridal/briefs/leotards 여성 컬렉션으로 구성
+  // https://sineadodwyer.com/collections/all
+  stapleandhue: ["women"], // 공식 컬렉션 설명이 feminine으로 명시되고 dresses/pumps 중심
+  // https://stapleandhue.co/collections/pointelle
+  "carnebollente-1704": ["unisex"], // 공식 상품이 남녀 모델 착용을 보여주고 상품 설명도 Unisex로 명시
+  // https://carnebollente.com/en-jp/products/love-chronicles-grey
+  // https://carnebollente.com/products/benefits-with-friends
+  abagavelli: ["men"], // 공식 About이 컬렉션을 menswear staples/elegance로 설명
+  // https://abagavelli.com/pages/about-us
+  ceciletulkens: ["unisex"], // 공식 안내가 남녀 의류임을 밝히고 상품 설명에 남녀 사이즈를 명시
+  // https://www.ceciletulkens.com/pages/information
+  // https://www.ceciletulkens.com/products/irregular-rib-socks-natural
+  avvattev: ["unisex"], // 공식 AW26이 남녀 룩을 하나의 통합된 워드로브로 제시
+  // https://www.avvattev.com/blogs/collections/autumn-winter-26-nocturne
+  "sansangear-5471": ["unisex"], // 공식 TOJI 동일 SKU에 남녀 모델 착용 사이즈를 함께 명시
+  // https://sansangear.com/en/products/breeze-basic-t-shirt
+  faneofficiel: ["women"], // 공식 보도자료가 브랜드 가방이 여성을 대상으로 한다고 명시
+  // https://www.faneofficiel.fr/pages/fane-in-the-press
 
   // 공식 상품 설명에 남·여 모델 착용이 함께 나오고, 상품 자체에도 Unisex 명시.
   // https://bitethebullet.xyz/products/bite-the-bullet-tee

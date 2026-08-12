@@ -24,6 +24,32 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])
     assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true)
   }
+  for (const key of ["pommedor", "sineadodwyer-1472", "stapleandhue"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["women"])
+  }
+  const stapleAndHue = getSiteConfig("stapleandhue")
+  const stapleAndHueNoise = stapleAndHue?.kidsGenderNoisePatterns ?? []
+  assert.equal(
+    stapleAndHueNoise.reduce((text, pattern) => text.replace(pattern, " "), "Baby Pink Pointelle Dress").trim(),
+    "Pointelle Dress",
+  )
+  const carneBollente = getSiteConfig("carnebollente-1704")
+  assert.deepEqual(carneBollente?.defaultGender, ["unisex"])
+  assert.equal(carneBollente?.verifiedUnisexDefault, true)
+  assert.equal(
+    (carneBollente?.kidsGenderNoisePatterns ?? [])
+      .reduce((text, pattern) => text.replace(pattern, " "), "Burn Baby Burn Baby Blue").trim(),
+    "Burn   Burn   Blue",
+  )
+  assert.deepEqual(getSiteConfig("abagavelli")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("ceciletulkens")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("ceciletulkens")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("avvattev")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("avvattev")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("sansangear-5471")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("sansangear-5471")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("faneofficiel")?.defaultGender, ["women"])
+  assert.equal(getSiteConfig("faneofficiel")?.defaultCategory, "bags")
   const mosxe = getSiteConfig("mosxe")
   assert.deepEqual(mosxe?.defaultGender, ["women"])
   assert.deepEqual(mosxe?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
@@ -132,6 +158,7 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(scuffers?.genderDepartmentTagPrefixes?.unisex, ["BOYS OR GIRLS DROP"])
   assert.deepEqual(getSiteConfig("threetimes333")?.defaultGender, ["women"])
   assert.equal(getSiteConfig("opening-project")?.verifyStockFromDetail, true)
+  assert.equal(getSiteConfig("phingerin")?.genderFromModelDescription, true)
   const openyy = getSiteConfig("openyy")
   assert.equal(openyy?.baseUrl, "https://open-yy.com")
   assert.equal(openyy?.selectors?.productName, ".title a")

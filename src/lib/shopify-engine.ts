@@ -140,6 +140,8 @@ export interface ShopifyParseOptions {
   brandFallback?: string
   /** Site-wide default gender seed (`config.defaultGender`). */
   defaultGender?: string[]
+  /** 공식몰 전체가 단일 상품군일 때 사용하는 사이트 단위 기본 카테고리. */
+  defaultCategory?: SiteConfig["defaultCategory"]
   /** 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: SiteConfig["genderDepartmentTagPrefixes"]
   /** 공식 Shopify 성별 컬렉션에서 확인한 product handle별 성별. */
@@ -311,7 +313,7 @@ export function parseShopifyProducts(
       gender,
       genderSource: genderFromEvidence ? ("engine" as const) : ("config_default" as const),
       name: sp.title,
-      ...classifyShopifyCategory(sp.product_type || "", sp.title, sp.tags),
+      ...classifyShopifyCategory(options.defaultCategory || sp.product_type || "", sp.title, sp.tags),
       ...pricing,
       priceFormatted,
       imageUrl,
@@ -491,6 +493,7 @@ export async function crawlShopify(
           // 유지하며, 빈 vendor를 플랫폼명으로 채우지 않는다.
           brandOverride: config.multiBrand ? undefined : config.brand,
           defaultGender: config.defaultGender,
+          defaultCategory: config.defaultCategory,
           genderDepartmentTagPrefixes: config.genderDepartmentTagPrefixes,
           genderByHandle,
           genderFromModelDescription: config.genderFromModelDescription,

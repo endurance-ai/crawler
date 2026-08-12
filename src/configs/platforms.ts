@@ -2824,6 +2824,16 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
 const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 공식 여성 컬렉션의 성인 XXS-2XL 상품에서 쓰는 색상명이다.
+  // `baby pink`의 baby만으로 아동복으로 분류하면 여성 기본값이 막힌다.
+  stapleandhue: [
+    /\bbaby[-\s]+pink\b/gi,
+  ],
+  // 공식 성인 XS-XL 의류에 쓰인 색상명이라 아동복 신호에서 제외한다.
+  // https://carnebollente.com/products/burn-baby-burn-baby-blue
+  "carnebollente-1704": [
+    /\bbaby\b/gi,
+  ],
   // MARGE SHERWOOD 성인 여성 상품의 색상/Peanuts 협업명. 실제 아동 라인이 아니다.
   margesherwood: [
     /baby[-\s]?pink/gi,
@@ -2869,6 +2879,10 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "maziuntitled", // 공식 가방 설명에 남녀 모두에게 어울리는 크기로 명시
   "en-2706", // 공식 취급처가 유니섹스 슈즈 전문 브랜드로 명시
   "nomanual-shop", // 공식 브랜드 취급처의 현재 전개가 유니섹스
+  "carnebollente-1704", // 공식 상품 설명의 Unisex 및 남녀 모델 착용 근거
+  "ceciletulkens", // 공식 브랜드·상품 설명이 남녀를 모두 명시
+  "avvattev", // 공식 AW26이 남녀 룩을 하나의 워드로브로 제시
+  "sansangear-5471", // 공식 TOJI 동일 SKU에 남녀 모델 사이즈를 함께 명시
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
@@ -2932,7 +2946,16 @@ const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTe
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   // 공식 상품 설명에 Male (키): 사이즈 / Female (키): 사이즈 형식이 일관되게 존재한다.
   "coldcultureworldwide",
+  // 공식 상품 설명에 `男性着用モデル`/`女性着用モデル`과 착용 사이즈를 명시한다.
+  "phingerin",
 ])
+
+// generated 설정을 다시 만들더라도 유지돼야 하는, 공식몰 전체 상품군 기본값.
+const SITE_DEFAULT_CATEGORIES: Record<string, string> = {
+  // 공식 About이 FANE을 가방 라인으로 명시한다. BRA/LOGE/LISSE/MIE는 가방 모델명이다.
+  // https://www.faneofficiel.fr/pages/about
+  faneofficiel: "bags",
+}
 
 // 목록 템플릿이 모든 상품에 품절 아이콘을 렌더링하지만 상세 옵션에는 실제 재고가 있는 사이트.
 const SITE_CAFE24_DETAIL_STOCK_SITES = new Set([
@@ -2958,6 +2981,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const shopifyGenderCollections = SITE_SHOPIFY_GENDER_COLLECTIONS[key] ?? config.shopifyGenderCollections
   const genderTextPatterns = SITE_GENDER_TEXT_PATTERNS[key] ?? config.genderTextPatterns
   const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
+  const defaultCategory = SITE_DEFAULT_CATEGORIES[key] ?? config.defaultCategory
   const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
   if (
     fallback === config.defaultGender
@@ -2967,6 +2991,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     && shopifyGenderCollections === config.shopifyGenderCollections
     && genderTextPatterns === config.genderTextPatterns
     && genderFromModelDescription === config.genderFromModelDescription
+    && defaultCategory === config.defaultCategory
     && verifyStockFromDetail === config.verifyStockFromDetail
   ) return config
   return {
@@ -2978,6 +3003,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ...(shopifyGenderCollections ? {shopifyGenderCollections} : {}),
     ...(genderTextPatterns ? {genderTextPatterns} : {}),
     ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
+    ...(defaultCategory ? {defaultCategory} : {}),
     ...(verifyStockFromDetail ? {verifyStockFromDetail: true} : {}),
   }
 }

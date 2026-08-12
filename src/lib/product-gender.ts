@@ -277,8 +277,8 @@ export function inferGenderFromDepartmentTagPrefixes(
 export function inferGenderFromModelDescription(value: unknown): ProductGender | null {
   if (typeof value !== "string" || !value) return null
   const text = value.replace(/<[^>]+>/g, " ")
-  const men = /\bmale\s*(?:[:(])/i.test(text)
-  const women = /\bfemale\s*(?:[:(])/i.test(text)
+  const men = /\bmale\s*(?:[:(])/i.test(text) || /男性着用モデル/.test(text)
+  const women = /\bfemale\s*(?:[:(])/i.test(text) || /女性着用モデル/.test(text)
   if (men && women) return "unisex"
   if (men) return "men"
   if (women) return "women"
