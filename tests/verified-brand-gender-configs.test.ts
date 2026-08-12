@@ -53,6 +53,9 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(getSiteConfig("fandco")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("fandco")?.verifiedUnisexDefault, true)
   assert.equal(getSiteConfig("fandco")?.defaultCategory, "headwear")
+  assert.deepEqual(getSiteConfig("luvz")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("luvz")?.verifiedUnisexDefault, true)
+  assert.equal(getSiteConfig("luvz")?.defaultCategory, "headwear")
   const mosxe = getSiteConfig("mosxe")
   assert.deepEqual(mosxe?.defaultGender, ["women"])
   assert.deepEqual(mosxe?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [

@@ -133,6 +133,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   fandco: ["unisex"], // 공식 상품 여러 건이 동일 헤드웨어를 him/her 모두에게 적합하다고 명시
   // https://fandco.co.nz/products/heart-monogram-cap-wide-brim-5-panel-off-white-trucker
   // https://fandco.co.nz/products/floral-patch-cap-short-brim-5-panel-brown
+  luvz: ["unisex"], // 공식 발라클라바 상세가 전 상품군을 One size, unisex로 명시
+  // https://www.luvz.ch/products/swiss-light-red-white
 
   // 공식 상품 설명에 남·여 모델 착용이 함께 나오고, 상품 자체에도 Unisex 명시.
   // https://bitethebullet.xyz/products/bite-the-bullet-tee
