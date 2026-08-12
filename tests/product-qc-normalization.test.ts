@@ -127,6 +127,15 @@ test("QC recovers canonical from name when category is noise (모두 보기 -> d
   assert.ok(result.reasons.includes("category_noise_text_fallback"))
 })
 
+test("QC resolves common Korean top names and skort deterministically", () => {
+  for (const name of ["피그먼트 반팔", "컨피던스 브이넥 롱 슬리브", "스터드 포인트 골지 홀터넥", "백 트위스트 슬리브리스"]) {
+    const result = normalizeProductTextFields(product({name, category: "other"}))
+    assert.equal(result.product.category, "tops", name)
+  }
+  const skort = normalizeProductTextFields(product({name: "SEQUIN MINI SKORT / CREAM", category: "other"}))
+  assert.equal(skort.product.category, "bottoms")
+})
+
 test("QC canonicalizes jewelry category labels even when the product name is abbreviated", () => {
   for (const category of ["Necklace", "Bracelet", "Earrings", "Ring"]) {
     const result = normalizeProductTextFields(product({name: "thorn B", category}))

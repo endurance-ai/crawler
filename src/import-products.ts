@@ -40,7 +40,7 @@ import {
   qwenNormalizationInputHash,
   type ProductNormalizationInput,
 } from "./lib/product-qwen-normalization"
-import {QwenDisabledError, QwenUnavailableError} from "./lib/qwen-client"
+import {assertQwenReady, QwenDisabledError, QwenUnavailableError} from "./lib/qwen-client"
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`
@@ -54,6 +54,9 @@ Options:
   --dry-run         Validate and report without writing to the database
   --no-new-brands   Skip products whose brand_node mapping is missing
   --in-stock-only   Import only products currently in stock
+  --allow-qwen-deferred
+                    Emergency escape hatch: allow DB writes without healthy
+                    Qwen endpoints. Automated jobs must not use this flag.
   --help, -h        Show this help and exit
 `)
   process.exit(0)
@@ -150,13 +153,23 @@ interface CrawledProduct {
 interface QwenImportStats {
   targeted: number
   succeeded: number
-  deferred: number
+  unchanged: number
+  unavailable: number
+  failed: number
   schemaFailed: number
   raceSkipped: number
 }
 
 function emptyQwenImportStats(): QwenImportStats {
-  return {targeted: 0, succeeded: 0, deferred: 0, schemaFailed: 0, raceSkipped: 0}
+  return {
+    targeted: 0,
+    succeeded: 0,
+    unchanged: 0,
+    unavailable: 0,
+    failed: 0,
+    schemaFailed: 0,
+    raceSkipped: 0,
+  }
 }
 
 function writeJsonCheckpoint(filePath: string, products: readonly CrawledProduct[]): void {
@@ -195,7 +208,7 @@ async function normalizePersistedRows(
       const prediction = await classifyProductWithQwen(input)
       const patch = buildQwenNormalizationPatch(input, prediction.value)
       if (!patch) {
-        stats.deferred++
+        stats.unchanged++
         return
       }
 
@@ -229,11 +242,11 @@ async function normalizePersistedRows(
       stats.succeeded++
     } catch (error) {
       if (error instanceof QwenDisabledError || error instanceof QwenUnavailableError) {
-        stats.deferred++
+        stats.unavailable++
       } else if (/zod|schema|validation|object generated/i.test(error instanceof Error ? `${error.name}: ${error.message}` : String(error))) {
         stats.schemaFailed++
       } else {
-        stats.deferred++
+        stats.failed++
       }
     }
   }))
@@ -552,6 +565,7 @@ async function main() {
 
   // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
   const dryRun = process.argv.includes("--dry-run")
+  const allowQwenDeferred = process.argv.includes("--allow-qwen-deferred")
 
   // data/ 내 *-products.json 파일 찾기
   const files = fs.readdirSync(dataDir)
@@ -565,6 +579,19 @@ async function main() {
   if (files.length === 0) {
     console.error("❌ 적재할 파일 없음")
     process.exit(1)
+  }
+
+  // HARD operational gate: category/subcategory normalization is part of a
+  // production import. Verify every SSH-forwarded endpoint before the first DB
+  // mutation so an absent tunnel cannot silently become deferred=N.
+  if (!dryRun && !allowQwenDeferred) {
+    console.log("🤖 Qwen 사전 점검: 모든 엔드포인트와 모델 확인 중...")
+    const ready = await assertQwenReady()
+    console.log(
+      `   ✅ Qwen 준비 완료: ${ready.map(({endpoint, model}) => `${endpoint} (${model})`).join(", ")}\n`,
+    )
+  } else if (!dryRun) {
+    console.warn("⚠️  --allow-qwen-deferred 사용: Qwen 정규화 누락을 명시적으로 허용합니다.")
   }
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
@@ -965,8 +992,19 @@ async function main() {
         console.error(`   ❌ 배치 ${i}-${i + batch.length} 실패:`, error.message)
         errors++
       } else {
+        const qwenFailuresBefore =
+          qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
         const checkpointChanged = await normalizePersistedRows(batch, rawAll, qwenStats)
         if (checkpointChanged) writeJsonCheckpoint(filePath, rawAll)
+        const qwenFailuresAfter =
+          qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
+        if (!allowQwenDeferred && qwenFailuresAfter > qwenFailuresBefore) {
+          throw new Error(
+            `Qwen normalization failed during ${platform}; import stopped before false completion ` +
+              `(unavailable=${qwenStats.unavailable}, failed=${qwenStats.failed}, ` +
+              `schema_failed=${qwenStats.schemaFailed})`,
+          )
+        }
         const {error: imageError} = imageUpdates.length > 0
           ? await db.rpc("merge_product_images", {updates: imageUpdates})
           : {error: null}
@@ -981,9 +1019,12 @@ async function main() {
     }
 
     console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
+    const deferred = qwenStats.unchanged + qwenStats.unavailable + qwenStats.failed
     console.log(
       `   🤖 Qwen target=${qwenStats.targeted} success=${qwenStats.succeeded}` +
-        ` deferred=${qwenStats.deferred} schema_failed=${qwenStats.schemaFailed}` +
+        ` unchanged=${qwenStats.unchanged} unavailable=${qwenStats.unavailable}` +
+        ` failed=${qwenStats.failed} deferred=${deferred}` +
+        ` schema_failed=${qwenStats.schemaFailed}` +
         ` race_skip=${qwenStats.raceSkipped}`,
     )
     // 단일브랜드 자사몰: 파일의 대표 브랜드명으로 brand_node 해석 폴백에 사용
@@ -1144,4 +1185,7 @@ function printProductQcReport() {
   }
 }
 
-main().catch(console.error)
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error)
+  process.exitCode = 1
+})

@@ -24,7 +24,7 @@
 import {createClient} from "@supabase/supabase-js"
 import {z} from "zod"
 import {CATEGORIES, buildEnumReference, isValidCategory, isValidSubcategory, type Category} from "../src/lib/enums/product-enums"
-import {generateQwenObject} from "../src/lib/qwen-client"
+import {assertQwenReady, generateQwenObject} from "../src/lib/qwen-client"
 import {classifyShopifyCategory} from "../src/lib/shopify-category-classifier"
 
 const args = process.argv.slice(2)
@@ -68,7 +68,10 @@ async function classifyBatch(items: {i: number; name: string; hint: string; bran
       const sub = it.subcategory ? String(it.subcategory).toLowerCase().trim() : null
       out[it.i] = {category: cat as Category, subcategory: sub && isValidSubcategory(sub, cat as Category) ? sub : null}
     }
-  } catch {
+  } catch (error) {
+    // A live guardrail must never report completion after silently losing its
+    // Qwen fallback. Dry-run remains best-effort because it writes nothing.
+    if (!DRY) throw error
     // leave unclassified indices; caller falls back to keeping row unchanged
   }
   return out
@@ -93,6 +96,12 @@ async function main() {
     `reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · ${ONLY_INVALID ? "mode=only-invalid (guardrail)" : `limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`}` +
       (PLATFORM_FILTER ? ` · platform=${PLATFORM_FILTER.join(",")}` : ""),
   )
+  if (!DRY) {
+    const ready = await assertQwenReady()
+    console.log(
+      `Qwen ready · ${ready.map(({endpoint, model}) => `${endpoint} (${model})`).join(", ")}`,
+    )
+  }
   let lastId = START_ID
   let processed = 0
   let changed = 0

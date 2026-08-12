@@ -38,6 +38,13 @@ test("allows Qwen to replace other with a validated category pair", () => {
   )
 })
 
+test("does not count other/null to other/null as a successful enrichment", () => {
+  assert.equal(
+    buildQwenNormalizationPatch(product(), {category: "other", subcategory: null}),
+    null,
+  )
+})
+
 test("protects an existing canonical category", () => {
   const existing = product({category: "tops"})
   assert.equal(

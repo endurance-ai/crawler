@@ -96,7 +96,9 @@ tools/recollect-batch.sh --keys-file tools/recollect-batches/batch-1.txt \
 ## 파일럿에서 반드시 확인할 것
 
 1. 두 local Qwen endpoint의 `/v1/models` health check가 통과하는지 확인한다.
-2. import 로그의 Qwen `success/deferred/schema_failed/race_skip` 카운터를 확인한다.
-   Qwen 장애가 있어도 canonical 상품 행은 먼저 적재되고 보강만 재시도 대상으로 남는다.
+   `import-products.ts`도 DB 쓰기 전에 이를 강제하며, SSH 터널이 없으면 즉시 실패한다.
+2. import 로그의 Qwen `success/unchanged/unavailable/failed/schema_failed/race_skip`
+   카운터를 확인한다. `unavailable` 또는 `failed`가 있으면 완료가 아니다.
+   `unchanged`만 Qwen 응답 후 안전 정책에 따라 기존 공식 분류를 보존한 상태다.
 3. zara/uniqlo 크롤의 `jsonLd`/`breadcrumb`와 필수 결정론적 필드가 채워지는지 확인한다.
 4. 임베딩 무효화 비율. 20% 초과면 정규화가 CDN 패턴을 놓친 것이다.

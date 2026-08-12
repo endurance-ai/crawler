@@ -2,7 +2,12 @@
 
 Crawler LLM work uses the local OpenAI-compatible Qwen endpoints. There is no
 OpenAI fallback. Product import writes the safe canonical row first and applies
-Qwen output afterward as a best-effort conditional patch.
+Qwen output afterward as a conditional patch.
+
+> **HARD GATE:** production imports require every configured Qwen endpoint to
+> expose the configured model through `/models` before the first DB mutation.
+> Missing SSH tunnels must fail the job. `success=0 deferred=N` is not a
+> completed import.
 
 ## Configuration
 
@@ -47,8 +52,19 @@ Exercise the crawler provider, strict JSON Schema output, and round-robin routin
 pnpm smoke:qwen
 ```
 
+`import:products` performs this endpoint/model check automatically. If an
+endpoint becomes unavailable or returns an invalid schema during the run, the
+command exits non-zero so batch scripts cannot create a completion marker.
+
+`--allow-qwen-deferred` is an incident-only escape hatch. Scheduled onboarding
+and recollection jobs must never use it. When explicitly used, unresolved rows
+remain visible as `category=other` or `subcategory=null`.
+
 Start with a small import or `refresh:candidates --limit=...`, confirm the Qwen
-success/deferred/schema/race counters, then restore the normal batch limit.
+`success/unchanged/unavailable/failed/schema/race` counters, then restore the
+normal batch limit. `unchanged` means Qwen responded but the safe patch policy
+preserved the existing official category. `unavailable` means the model was not
+reached and is always an operational failure.
 
 `enrich:products` remains a manual file preflight tool. Normal production imports
 perform Qwen normalization only after the database upsert succeeds.

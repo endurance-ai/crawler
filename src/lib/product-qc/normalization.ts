@@ -94,8 +94,8 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "tops",
-    patterns: [/\b(t[-\s]?shirts?|tees?|shirts?|blouses?|polos?|hoodies?|sweatshirts?|tanks?|tank[-\s]?tops?|crop[-\s]?tops?|henleys?|camisoles?)\b/i],
-    contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1"],
+    patterns: [/\b(t[-\s]?shirts?|tees?|shirts?|blouses?|polos?|hoodies?|sweatshirts?|tanks?|tank[-\s]?tops?|crop[-\s]?tops?|henleys?|camisoles?|sleeveless|long[-\s]?sleeves?)\b/i],
+    contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1", "\ubc18\ud314", "\ub871\uc2ac\ub9ac\ube0c", "\ub871 \uc2ac\ub9ac\ube0c", "\uc2ac\ub9ac\ube0c\ub9ac\uc2a4", "\ud640\ud130\ub125"],
   },
   {
     category: "bottoms",
@@ -104,7 +104,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
     // 다만 그 때문에 "Short Sleeve"(반팔=tops)가 bottoms 로 잡히는 오탐이 생겼다.
     // 부정 전방탐색으로 그 한 갈래만 뺀다 — "Short Sleeve Shorts" 는 뒤쪽
     // "Shorts" 에서 여전히 매치된다.
-    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|trunks?|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
+    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|trunks?|skirts?|skorts?|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
     contains: ["\ud558\uc758", "\ud32c\uce20", "\ubc14\uc9c0", "\ub370\ub2d8", "\uc9c4", "\uc1fc\uce20", "\uc2a4\ucee4\ud2b8", "\uce58\ub9c8", "\uc2ac\ub799\uc2a4", "\uc870\uac70"],
   },
   {

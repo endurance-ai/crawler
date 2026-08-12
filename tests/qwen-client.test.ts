@@ -5,6 +5,7 @@ import test, {afterEach} from "node:test"
 import {z} from "zod"
 
 import {
+  assertQwenReady,
   generateQwenObject,
   loadQwenConfig,
   QwenUnavailableError,
@@ -39,6 +40,55 @@ test("rejects non-loopback Qwen endpoints", () => {
   assert.throws(
     () => loadQwenConfig({QWEN_BASE_URLS: "https://api.openai.com/v1"}),
     /loopback host/,
+  )
+})
+
+test("preflight requires every endpoint to expose the configured model", async () => {
+  const healthy = await listen((_request, response) => {
+    response.writeHead(200, {"content-type": "application/json"})
+    response.end(JSON.stringify({data: [{id: "qwen3-vl-30b-awq"}]}))
+  })
+  const wrongModel = await listen((_request, response) => {
+    response.writeHead(200, {"content-type": "application/json"})
+    response.end(JSON.stringify({data: [{id: "another-model"}]}))
+  })
+
+  try {
+    const ready = await assertQwenReady(loadQwenConfig({
+      QWEN_BASE_URLS: healthy.baseUrl,
+      QWEN_MODEL: "qwen3-vl-30b-awq",
+    }))
+    assert.deepEqual(ready, [{endpoint: healthy.baseUrl, model: "qwen3-vl-30b-awq"}])
+
+    await assert.rejects(
+      assertQwenReady(loadQwenConfig({
+        QWEN_BASE_URLS: `${healthy.baseUrl},${wrongModel.baseUrl}`,
+        QWEN_MODEL: "qwen3-vl-30b-awq",
+      })),
+      /configured model qwen3-vl-30b-awq not found/,
+    )
+  } finally {
+    await close(healthy.server)
+    await close(wrongModel.server)
+  }
+})
+
+test("preflight reports the missing SSH tunnel as unavailable", async () => {
+  const server = createServer()
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const address = server.address()
+  assert(address && typeof address === "object")
+  const baseUrl = `http://127.0.0.1:${address.port}/v1`
+  await close(server)
+
+  await assert.rejects(
+    assertQwenReady(loadQwenConfig({
+      QWEN_BASE_URLS: baseUrl,
+      QWEN_MAX_RETRIES: "0",
+    })),
+    (error: unknown) =>
+      error instanceof QwenUnavailableError &&
+      /Create the SSH tunnel first/.test(error.message),
   )
 })
 

@@ -34,6 +34,11 @@ export interface QwenObjectResult<T> extends QwenRunResult<T> {
   usage: LanguageModelUsage
 }
 
+export interface QwenHealthResult {
+  endpoint: string
+  model: string
+}
+
 export class QwenDisabledError extends Error {
   constructor() {
     super("Qwen normalization is disabled")
@@ -111,6 +116,44 @@ export function loadQwenConfig(env: NodeJS.ProcessEnv = process.env): QwenRuntim
     maxRetries: parseInteger(env.QWEN_MAX_RETRIES, 2, 0),
     concurrencyPerEndpoint: parseInteger(env.QWEN_CONCURRENCY_PER_ENDPOINT, 1, 1),
   }
+}
+
+/**
+ * DB 쓰기 작업용 fail-fast 점검. 단순 포트 연결이 아니라 각 endpoint가
+ * 설정된 모델을 /models 응답으로 실제 제공하는지 확인한다.
+ */
+export async function assertQwenReady(
+  config: QwenRuntimeConfig = loadQwenConfig(),
+): Promise<QwenHealthResult[]> {
+  if (!config.enabled) throw new QwenDisabledError()
+
+  const timeoutMs = Math.min(config.timeoutMs, 10_000)
+  return Promise.all(config.baseUrls.map(async (endpoint) => {
+    try {
+      const response = await fetch(`${endpoint}/models`, {
+        headers: {authorization: `Bearer ${LOCAL_API_KEY}`},
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+      const payload = await response.json() as {data?: Array<{id?: unknown}>}
+      const models = (payload.data ?? [])
+        .map((entry) => typeof entry.id === "string" ? entry.id : "")
+        .filter(Boolean)
+      if (!models.includes(config.model)) {
+        throw new Error(
+          `configured model ${config.model} not found (available: ${models.join(", ") || "none"})`,
+        )
+      }
+      return {endpoint, model: config.model}
+    } catch (error) {
+      throw new QwenUnavailableError(
+        `Qwen preflight failed for ${endpoint}: ${errorMessage(error)}. ` +
+          "Create the SSH tunnel first; see docs/qwen-local.md.",
+        {cause: error},
+      )
+    }
+  }))
 }
 
 function runtimeKey(config: QwenRuntimeConfig): string {

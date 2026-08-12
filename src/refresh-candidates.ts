@@ -12,6 +12,7 @@ import {
 } from "./lib/product-qwen-normalization"
 import {createProductCollectionClient, type ProductCollectionClient} from "./lib/product-collection"
 import {isValidCategory} from "./lib/enums/product-enums"
+import {assertQwenReady} from "./lib/qwen-client"
 import {applyProductQcGate} from "./lib/product-qc/normalization"
 import {resolveProductGenderWithSource} from "./lib/product-gender"
 import {productToCandidateDbRow} from "./lib/refresh-candidate-import"
@@ -492,6 +493,12 @@ async function main(): Promise<void> {
   let browser: Browser | null = null
 
   try {
+    // HARD operational gate: claim 자체가 후보 상태를 DB에서 변경하므로 첫 claim
+    // 이전에 Qwen 두 endpoint와 모델을 검증한다.
+    const ready = await assertQwenReady()
+    console.log(
+      `🤖 Qwen 준비 완료: ${ready.map(({endpoint, model}) => `${endpoint} (${model})`).join(", ")}`,
+    )
     for (;;) {
       const candidates = await claimCandidates(db, batchSize, maxAttempts, originCountry, platform, inStockOnly)
       if (candidates.length === 0) {

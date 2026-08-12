@@ -26,6 +26,15 @@ pnpm import:brand-nodes
 
 Run crawler/import commands carefully. They may hit external sites or write to DB depending on flags and env.
 
+## Qwen Import Hard Rule
+
+- Category/subcategory normalization is part of a completed production import.
+- Before any DB-writing `import:products`, onboarding, recollection, or candidate-refresh run, create the SSH forwards for both local Qwen endpoints and verify both `/v1/models` responses plus `pnpm smoke:qwen`.
+- The current lab tunnel is `ssh -N -L 8001:127.0.0.1:8001 -L 8002:127.0.0.1:8002 kjk@100.70.101.17`.
+- Never report an import complete when Qwen shows `unavailable`, `failed`, or `schema_failed`. `success=0 deferred=N` is a failed/incomplete run and must be retried after restoring the tunnel.
+- `unchanged` is different: Qwen responded, but the safe patch policy preserved the existing official category. Report it separately from connection failures.
+- Do not use `--allow-qwen-deferred` in normal or automated runs. It is an explicit incident-only escape hatch.
+
 ## Key Directories
 
 - `src/configs/platforms.ts`: registered platform configs

@@ -234,7 +234,10 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
 
   # ── 7. guardrail + verify ──
   log "5/7 guardrail — 비canonical category 정리"
-  $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$KEY_DIR/guardrail.log" 2>&1 || true
+  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$KEY_DIR/guardrail.log" 2>&1; then
+    log "  ❌ guardrail 실패(Qwen/SSH tunnel 또는 DB 오류) — 완료 마커를 만들지 않음"
+    FAILED_KEYS="$FAILED_KEYS $KEY"; continue
+  fi
 
   log "6/7 verify — 사후 지표"
   $PNPM tsx tools/recollect-metrics.ts \

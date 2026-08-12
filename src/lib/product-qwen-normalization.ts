@@ -53,7 +53,9 @@ export function buildQwenNormalizationPatch(
     : null
 
   if (product.category === "other") {
-    if (prediction.category === "other") return {category: "other", subcategory: null}
+    // A valid response is not necessarily an enrichment. Preserve other/null
+    // without counting a no-op DB update as a Qwen success.
+    if (prediction.category === "other") return null
     return {category: prediction.category, subcategory: validSubcategory}
   }
 
