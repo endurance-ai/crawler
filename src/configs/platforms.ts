@@ -2187,8 +2187,16 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://en.seen-nees.com",
     brand: "SEEN NEES",
     paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    crawlDetails: true,
+    // 공식 홈의 현행 SHOP 상품 링크가 모두 cate_no=64에 연결된다. 자동 탐색은
+    // LOOKBOOK/COLLABORATION 등 14개 메뉴를 상품 카테고리로 오인해 가격 없는
+    // 과거·품절 행을 반복 수집하므로 현재 판매 카테고리만 고정한다.
+    // https://en.seen-nees.com/category/shop/64/
+    category: {
+      discovery: "manual",
+      categories: [{name: "Shop", cateNo: 64, gender: ["women"]}],
+    },
+    notes: "공식 현행 SHOP cate_no=64 고정. 상세 가격 관측 필수.",
   },
   {
     key: "aftrsmmr",
@@ -2875,6 +2883,50 @@ const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women:
   },
 }
 
+// `/products.json`에 컬렉션 소속이 빠지는 Shopify 혼성몰용 공식 근거.
+// 상품 handle이 아래 공식 부서 컬렉션에 속할 때만 engine 성별을 부여한다.
+const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["shopifyGenderCollections"]>> = {
+  // https://www.amiparis.com/collections/women-view-all
+  // https://www.amiparis.com/collections/men-view-all
+  // https://www.amiparis.com/collections/unisex-ami-must-haves
+  "amiparis-689": {
+    women: ["women-view-all"],
+    men: ["men-view-all"],
+    unisex: ["unisex-ami-must-haves", "denim-unisexe"],
+  },
+  // https://www.camielfortgens.com/collections/shop-men
+  // https://www.camielfortgens.com/collections/shop-women
+  camielfortgens: {men: ["shop-men"], women: ["shop-women"]},
+  // 현재 공식 시즌이 MAN/WOMAN으로 분리되어 있다.
+  // https://haikure.com/collections/fw-26-man
+  // https://haikure.com/collections/pre-fw-26-woman
+  haikure: {
+    men: ["fw-26-man", "ss-26-man"],
+    women: ["pre-fw-26-woman", "pre-ss-26-woman"],
+  },
+  // https://ophyeyewear.com/collections/man
+  // https://ophyeyewear.com/collections/woman
+  // https://ophyeyewear.com/collections/unisex
+  ophyeyewear: {men: ["man"], women: ["woman"], unisex: ["unisex"]},
+  // 공식 Rick Owens/DRKSHDW 라인별 남녀 컬렉션.
+  // https://www.rickowens.eu/collections/men-rick-owens
+  // https://www.rickowens.eu/collections/rick-owens-women
+  "rickowens-1997": {
+    men: ["men-rick-owens", "men-drkshdw", "men-fw26-tower"],
+    women: ["rick-owens-women", "line-drk-women", "all-fw25"],
+  },
+  // 여성 카탈로그 안의 명시적 공용 예외. 나머지는 검증된 women 기본값.
+  // https://charoruiz.com/collections/unisex
+  charoruiz: {unisex: ["unisex"]},
+}
+
+const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTextPatterns"]>> = {
+  // 공식 메인 컬렉션의 두 상품명이 INNERPASSION VOL.01 HER / HIM이고,
+  // 각 링크도 공식몰에서 별도 HER/HIM 상세로 제공된다.
+  // https://a82.co.kr/collection/list.html?cate_no=47
+  a82: {women: [/\bHER\b/i], men: [/\bHIM\b/i]},
+}
+
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   // 공식 상품 설명에 Male (키): 사이즈 / Female (키): 사이즈 형식이 일관되게 존재한다.
   "coldcultureworldwide",
@@ -2901,6 +2953,8 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
   const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
   const genderDepartmentTagPrefixes = SITE_GENDER_DEPARTMENT_TAG_PREFIXES[key] ?? config.genderDepartmentTagPrefixes
+  const shopifyGenderCollections = SITE_SHOPIFY_GENDER_COLLECTIONS[key] ?? config.shopifyGenderCollections
+  const genderTextPatterns = SITE_GENDER_TEXT_PATTERNS[key] ?? config.genderTextPatterns
   const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
   const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
   if (
@@ -2908,6 +2962,8 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
     && verifiedUnisexDefault === config.verifiedUnisexDefault
     && genderDepartmentTagPrefixes === config.genderDepartmentTagPrefixes
+    && shopifyGenderCollections === config.shopifyGenderCollections
+    && genderTextPatterns === config.genderTextPatterns
     && genderFromModelDescription === config.genderFromModelDescription
     && verifyStockFromDetail === config.verifyStockFromDetail
   ) return config
@@ -2917,6 +2973,8 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
     ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
     ...(genderDepartmentTagPrefixes ? {genderDepartmentTagPrefixes} : {}),
+    ...(shopifyGenderCollections ? {shopifyGenderCollections} : {}),
+    ...(genderTextPatterns ? {genderTextPatterns} : {}),
     ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
     ...(verifyStockFromDetail ? {verifyStockFromDetail: true} : {}),
   }

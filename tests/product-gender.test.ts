@@ -21,6 +21,19 @@ test("사이트별 구조화 부서 태그 prefix는 단일/양쪽 성별을 구
   assert.equal(inferGenderFromDepartmentTagPrefixes(["modelview"], prefixes), null)
 })
 
+test("사이트 고유 HER/HIM 표기는 해당 사이트 설정에서만 성별 근거가 된다", () => {
+  const patterns = {women: [/\bHER\b/i], men: [/\bHIM\b/i]}
+  assert.deepEqual(
+    resolveProductGenderWithSource([], {name: "INNERPASSION VOL.01 HER"}, "engine", {genderTextPatterns: patterns}),
+    {gender: ["women"], source: "text"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource([], {name: "INNERPASSION VOL.01 HIM"}, "engine", {genderTextPatterns: patterns}),
+    {gender: ["men"], source: "text"},
+  )
+  assert.deepEqual(resolveProductGenderWithSource([], {name: "A gift for her"}).gender, [])
+})
+
 test("명시적 모델 라벨은 한쪽/양쪽 착용을 구분하고 일반 문장은 무시한다", () => {
   assert.equal(inferGenderFromModelDescription("Male (184cm): L"), "men")
   assert.equal(inferGenderFromModelDescription("Female: (173cm): S"), "women")

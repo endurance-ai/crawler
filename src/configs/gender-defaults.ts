@@ -37,6 +37,72 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // ── 2026-08-12 import=0 55개 공식몰 재검증 ────────────────────
+  // 아래 값은 공식몰의 현재 전체 컬렉션/소개에서 여성 상품군을 명시하고,
+  // 남성 부서가 없음을 함께 확인한 사이트만 기록한다. 여성 카테고리 하나가
+  // 있다는 이유만으로 넣지 않았다. 별도 공용 컬렉션이 있는 charoruiz는
+  // Shopify 컬렉션 근거가 이 기본값보다 먼저 적용된다(platforms.ts).
+  aeyde: ["women"], // 공식 All Women's Footwear / Jewelry 컬렉션
+  // https://www.aeyde.com/collections/all-footwear
+  alessandrarich: ["women"], // 공식 RTW 전체: Dresses/Skirts/Swimwear, 남성 부서 없음
+  // https://alessandrarich.com/collections/ready-to-wear
+  aminamuaddi: ["women"], // 공식 여성 슈즈·백·주얼리 하우스 카탈로그
+  // https://www.aminamuaddi.com/collections/view-all-shoes
+  charoruiz: ["women"], // 여성 리조트웨어 + 별도 공식 Unisex 컬렉션
+  // https://charoruiz.com/collections/all
+  chopovalowena: ["women"], // Dresses/Skirts/Lingerie/Swimwear, 남성 부서 없음
+  // https://chopovalowena.com/collections/clothing
+  demellierlondon: ["women"], // 공식 Women's Bags 컬렉션
+  // https://demellierlondon.com/collections/womens-bags
+  estermanas: ["women"], // Dresses/Skirts/Lingerie/Bump, 남성 부서 없음
+  // https://estermanas.com/collections/all
+  foreu: ["women"], // 공식 메타 설명: "미니멀 여성의류"
+  // https://foreu.kr/
+  chicks: ["women"], // 공식몰 스커트/드레스 등 여성 전용 어휘 44건, 남성 어휘 0건(n=322)
+  // https://chicks.co.kr/
+  fakiii: ["women"], // 공식몰 one-piece/skirt/blouse 21건, 남성 어휘 0건(n=110)
+  // https://fakiii.com/
+  moifaire: ["women"], // 공식몰 bralette/skirt/blouse/dress 43건, 남성 어휘 0건(n=158)
+  // https://moifaire.com/
+  sorbee: ["women"], // 공식몰 off-shoulder dress/skirt/blouse, 남성 어휘 0건(n=54)
+  // https://sorbee.co.kr/
+  taey: ["women"], // 공식몰 shirring dress/blouse/skirt, 남성 어휘 0건(n=92)
+  // https://taey.kr/
+  frankiesbikinis: ["women"], // 공식 여성 swim/clothing 카탈로그
+  // https://frankiesbikinis.com/collections/swimwear
+  heidiklein: ["women"], // 공식 women’s swimwear/bikinis/dresses 카탈로그
+  // https://heidiklein.com/collections/swimwear
+  leset: ["women"], // Dresses/Skirts/Mama & Bebe, 남성 부서 없음
+  // https://leset.com/collections/all
+  marahoffman: ["women"], // 공식 women’s ready-to-wear/swim 카탈로그
+  // https://marahoffman.com/collections/all
+  marieadamleenaerdt: ["women"], // 공식 DRESSES & SKIRTS 전체 컬렉션, 남성 부서 없음
+  // https://marieadamleenaerdt.com/collections/all
+  nayarea: ["women"], // Dresses/Skirts/Co-Ord Sets, 남성 부서 없음
+  // https://nayarea.com/collections/all-products
+  norba: ["women"], // Bras/Leggings/Lingerie/Dresses 공식 카탈로그, 남성 부서 없음
+  // https://norba.clothing/collections/shop-all
+  odorshop: ["women"], // 공식 전체몰 DRESS/UNDERWEAR + bra/brief 상품군
+  // https://odorshop.co.kr/category/all/42/
+  enseennees: ["women"], // 공식 전체몰 tube top/mesh skirt 등 여성복, 남성 부서 없음
+  // https://en.seen-nees.com/
+  kanari: ["women"], // 공식 전체몰 ONE PIECE 및 여성 의류, 남성 부서 없음
+  // https://kanari.co.kr/category/all/23/
+  notfoursix: ["women"], // 공식 Dress / Onepiece 부서, 남성 부서 없음
+  // https://notfoursix.kr/category/all/24/
+  poev: ["women"], // 공식몰 off-shoulder/tank-top 여성 컬렉션, 남성 부서 없음
+  // https://poev.kr/
+  "self-service": ["women"], // 공식 DRESS/JEWELRY 의류몰, 남성 부서 없음
+  // https://self-service.kr/
+  yuheelee: ["women"], // 공식 DRESS 및 여성 실루엣 전체 컬렉션, 남성 부서 없음
+  // https://yuheelee.com/
+  otiumberg: ["women"], // 공식 Gifts For Her 및 women 대상 주얼리 설명
+  // https://otiumberg.com/collections/gifts-for-her
+  racil: ["women"], // 공식 dresses/skirts/smoking suits 여성 RTW, 남성 부서 없음
+  // https://racil.com/collections/ready-to-wear
+  shopdoen: ["women"], // 공식 women’s dresses/tops/skirts 카탈로그
+  // https://shopdoen.com/collections/clothing
+
   // 공식 상품 설명에 남·여 모델 착용이 함께 나오고, 상품 자체에도 Unisex 명시.
   // https://bitethebullet.xyz/products/bite-the-bullet-tee
   brand: ["unisex"],
@@ -204,7 +270,6 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //   ceyesseoul      표본 2~21건으로 판정 불가.
   //   dearunknown
   //   groundiam
-  //   kanari
   //   parrtofficial
   //
   //   aekki           주얼리 전용(반지/팔찌/귀걸이). 사이트가 남녀 컬렉션을

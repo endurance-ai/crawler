@@ -795,6 +795,7 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
     trustedCategory: config?.type === "shopify" || config?.trustedCategory === true,
     kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
     verifiedUnisexDefault: config?.verifiedUnisexDefault,
+    genderTextPatterns: config?.genderTextPatterns,
     recordReport: recordQc,
   })
   const products = applyValidationGate(qcProducts, platform)

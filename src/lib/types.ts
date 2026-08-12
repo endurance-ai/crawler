@@ -191,6 +191,14 @@ export interface SiteConfig {
   trustedCategory?: boolean
   /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
+  /**
+   * Shopify 공식 성별 컬렉션 handle. `/products.json`이 컬렉션 정보를 주지
+   * 않는 사이트에서 컬렉션별 products endpoint를 함께 읽어 상품 단위 성별
+   * 근거로 사용한다. 공식몰에서 직접 확인한 handle만 등록한다.
+   */
+  shopifyGenderCollections?: {men?: string[]; women?: string[]; unisex?: string[]}
+  /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
+  genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
   /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */
   genderFromModelDescription?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */

@@ -681,6 +681,7 @@ async function main() {
         {
           kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
           verifiedUnisexDefault: config?.verifiedUnisexDefault,
+          genderTextPatterns: config?.genderTextPatterns,
         },
       )
       // 엔진이 사이트 기본값을 찍지 않은 캐시(구 크롤 JSON, 또는 기본값을
@@ -691,6 +692,7 @@ async function main() {
         resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default", {
           kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
           verifiedUnisexDefault: config?.verifiedUnisexDefault,
+          genderTextPatterns: config?.genderTextPatterns,
         })
       }
       genderSourceCounts[resolved.source ?? "unresolved"] = (genderSourceCounts[resolved.source ?? "unresolved"] ?? 0) + 1

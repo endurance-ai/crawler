@@ -92,6 +92,8 @@ export interface GenderResolutionOptions {
   kidsGenderNoisePatterns?: RegExp[]
   /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
   verifiedUnisexDefault?: boolean
+  /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
+  genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
 }
 
 // ─── 규칙 ────────────────────────────────────────────────────────────────
@@ -234,6 +236,23 @@ export function inferDualDepartmentFromTags(tags: unknown): ProductGender | null
   return hasGenderToken(blob, "men") && hasGenderToken(blob, "women") ? "unisex" : null
 }
 
+/** 범용 사전에 넣기 위험한 사이트 고유 성별 표기를 좁게 판정한다. */
+export function inferGenderFromSiteTextPatterns(
+  text: string,
+  patterns: GenderResolutionOptions["genderTextPatterns"],
+): ProductGender | null {
+  if (!patterns) return null
+  const matches = (Object.entries(patterns) as Array<[ProductGender, RegExp[] | undefined]>)
+    .filter(([, rules]) => (rules ?? []).some((rule) => {
+      rule.lastIndex = 0
+      return rule.test(text)
+    }))
+    .map(([gender]) => gender)
+  const unique = [...new Set(matches)]
+  if (unique.length === 1) return unique[0]
+  return unique.includes("unisex") ? "unisex" : null
+}
+
 /** 사이트가 명시한 구조화 부서 태그 prefix로 상품 성별을 결의한다. */
 export function inferGenderFromDepartmentTagPrefixes(
   tags: unknown,
@@ -355,7 +374,9 @@ export function resolveProductGenderWithSource(
   const text = evidenceText(evidence)
   const url = typeof evidence.productUrl === "string" ? evidence.productUrl : ""
 
-  const rawFromText = text ? inferGenderFromText(text) : null
+  const rawFromText = text
+    ? inferGenderFromSiteTextPatterns(text, options.genderTextPatterns) ?? inferGenderFromText(text)
+    : null
   const fromUrl = inferGenderFromUrl(url)
 
   // kids 가드는 태그 부서 분류보다 **먼저** 본다. 순서를 뒤집으면

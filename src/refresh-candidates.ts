@@ -286,6 +286,7 @@ async function processCandidate(
     {
       kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
       verifiedUnisexDefault: config.verifiedUnisexDefault,
+      genderTextPatterns: config.genderTextPatterns,
     },
   )
   const withGender =
@@ -294,6 +295,7 @@ async function processCandidate(
       : config.defaultGender && config.defaultGender.length > 0
         ? resolveProductGenderWithSource(config.defaultGender, {}, "config_default", {
             verifiedUnisexDefault: config.verifiedUnisexDefault,
+            genderTextPatterns: config.genderTextPatterns,
           })
         : resolvedGender
   if (withGender.gender.length === 0) {

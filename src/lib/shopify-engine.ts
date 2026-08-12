@@ -11,6 +11,7 @@ import {
   inferGenderFromDepartmentTagPrefixes,
   inferGenderFromModelDescription,
   inferGenderFromText,
+  type ProductGender,
 } from "./product-gender"
 import {normalizeObservedPricing} from "./product-pricing"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
@@ -39,7 +40,14 @@ const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/
 async function fetchWithBackoff(url: string, init: RequestInit): Promise<Response> {
   const MAX_RETRIES = 3
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const res = await fetch(url, init)
+    // 일부 Shopify/Cloudflare endpoint는 연결만 잡고 응답 body를 끝내지 않아
+    // 사이트 하나가 전체 다중 브랜드 배치를 영구 정지시킨다. 개별 요청을
+    // 30초로 제한하고 호출자가 해당 사이트 오류를 기록한 뒤 다음으로 간다.
+    const timeoutSignal = AbortSignal.timeout(30_000)
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal
+    const res = await fetch(url, {...init, signal})
     if (res.status !== 429 && res.status !== 503) return res
     if (attempt === MAX_RETRIES - 1) return res
     const retryAfter = res.headers.get("Retry-After")
@@ -134,6 +142,8 @@ export interface ShopifyParseOptions {
   defaultGender?: string[]
   /** 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: SiteConfig["genderDepartmentTagPrefixes"]
+  /** 공식 Shopify 성별 컬렉션에서 확인한 product handle별 성별. */
+  genderByHandle?: Record<string, ProductGender>
   /** 상품 설명의 명시적 Male:/Female: 모델 라벨을 사용한다. */
   genderFromModelDescription?: boolean
   /**
@@ -226,6 +236,10 @@ export function parseShopifyProducts(
     )
     const chosen = (saleVariants.length > 0 ? saleVariants : validVariants)
       .sort((a, b) => a.price - b.price)[0]
+    // 가격이 없는 engraving/consultation 같은 서비스 add-on은 판매 상품이
+    // 아니다. unknown 관측으로 남기면 import의 플랫폼 단위 가격 안전장치가
+    // 정상 상품 전체를 막으므로 크롤 단계에서 제외한다.
+    if (!chosen) continue
     const pricing = chosen
       ? normalizeObservedPricing({
           currentPrice: chosen.price,
@@ -283,7 +297,7 @@ export function parseShopifyProducts(
     // inferGenderFromText 는 `\b(men|mens|...)\b` 워드 바운더리를 쓰므로
     // "womens" 를 men 으로 읽지 않고, 남녀가 진짜로 함께 잡히면 null(모호)을
     // 돌려준다 — 추측 대신 미확인이 이 프로젝트의 규율이다.
-    const inferredGender = inferGenderFromDepartmentTagPrefixes(
+    const inferredGender = options.genderByHandle?.[sp.handle] ?? inferGenderFromDepartmentTagPrefixes(
       sp.tags,
       options.genderDepartmentTagPrefixes,
     ) ?? (options.genderFromModelDescription
@@ -332,6 +346,74 @@ export interface CrawlShopifyOptions {
 }
 
 /**
+ * 공식 성별 컬렉션 소속 상품 handle을 읽는다. 같은 상품이 men/women 양쪽
+ * 공식 부서에 있으면 양쪽에서 판다는 적극적 근거이므로 unisex로 결의한다.
+ * 명시적 unisex 컬렉션은 가장 직접적인 근거로 우선한다.
+ */
+export async function fetchShopifyGenderByHandle(
+  config: SiteConfig,
+  country: string,
+  localizationCookie: string,
+  errors: string[] = [],
+): Promise<Record<string, ProductGender>> {
+  const configured = config.shopifyGenderCollections
+  if (!configured) return {}
+
+  const memberships = new Map<string, Set<ProductGender>>()
+  const entries = (Object.entries(configured) as Array<[ProductGender, string[] | undefined]>)
+    .flatMap(([gender, handles]) => (handles ?? []).map((handle) => ({gender, handle})))
+
+  for (const {gender, handle} of entries) {
+    if (!SAFE_HANDLE.test(handle)) {
+      errors.push(`gender collection ${handle}: unsafe handle`)
+      continue
+    }
+    for (let page = 1; page <= (config.maxPages || 20); page++) {
+      try {
+        const url = `${config.baseUrl}/collections/${handle}/products.json?page=${page}&limit=250&country=${encodeURIComponent(country)}`
+        const res = await fetchWithBackoff(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            Accept: "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+            Referer: config.baseUrl + "/",
+            Cookie: localizationCookie,
+          },
+        })
+        if (!res.ok) {
+          errors.push(`gender collection ${handle}: HTTP ${res.status} on page ${page}`)
+          break
+        }
+        const data = await res.json() as ShopifyResponse
+        if (!data.products || data.products.length === 0) break
+        for (const product of data.products) {
+          if (!product.handle || !SAFE_HANDLE.test(product.handle)) continue
+          const set = memberships.get(product.handle) ?? new Set<ProductGender>()
+          set.add(gender)
+          memberships.set(product.handle, set)
+        }
+        if (data.products.length < 250) break
+      } catch (err) {
+        errors.push(`gender collection ${handle} page ${page}: ${err}`)
+        break
+      }
+    }
+  }
+
+  const result: Record<string, ProductGender> = {}
+  for (const [handle, genders] of memberships) {
+    if (genders.has("unisex") || (genders.has("men") && genders.has("women"))) {
+      result[handle] = "unisex"
+    } else if (genders.has("men")) {
+      result[handle] = "men"
+    } else if (genders.has("women")) {
+      result[handle] = "women"
+    }
+  }
+  return result
+}
+
+/**
  * Shopify Markets localization must be explicit in the feed URL. Some stores
  * ignore the localization cookie for `/products.json`, which can make a KRW
  * config ingest the default-market JPY/USD amount as if it were KRW.
@@ -353,6 +435,7 @@ export async function crawlShopify(
   const currency = config.sourceCurrency || "KRW"
   const country = CURRENCY_TO_COUNTRY[currency]
   const localizationCookie = `localization=${country}`
+  const genderByHandle = await fetchShopifyGenderByHandle(config, country, localizationCookie, errors)
 
   console.log(`\n${"─".repeat(50)}`)
   console.log(`🏪 ${config.name} (${config.baseUrl}) [Shopify]`)
@@ -409,6 +492,7 @@ export async function crawlShopify(
           brandOverride: config.multiBrand ? undefined : config.brand,
           defaultGender: config.defaultGender,
           genderDepartmentTagPrefixes: config.genderDepartmentTagPrefixes,
+          genderByHandle,
           genderFromModelDescription: config.genderFromModelDescription,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),

@@ -55,6 +55,8 @@ export interface ProductQcOptions {
   kidsGenderNoisePatterns?: RegExp[]
   /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
   verifiedUnisexDefault?: boolean
+  /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
+  genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
   /** Do not duplicate QC stats/events when writing repeated crawl checkpoints. */
   recordReport?: boolean
 }
@@ -547,6 +549,7 @@ function normalizeGenderField(product: ProductQcInput, options: ProductQcOptions
     {
       kidsGenderNoisePatterns: options.kidsGenderNoisePatterns,
       verifiedUnisexDefault: options.verifiedUnisexDefault,
+      genderTextPatterns: options.genderTextPatterns,
     },
   )
 
