@@ -2115,9 +2115,29 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://texture-seoul.co.kr",
     brand: "TEXTURE SEOUL",
-    paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    paginate: false,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      productName: "h3.project-excerpt-title-inner",
+      productPrice: ".project-excerpt-tags > .project-excerpt-tags-inner:nth-of-type(2)",
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: 'a[href*="/product/"]',
+    },
+    category: {
+      discovery: "manual",
+      // 이 테마는 표준 product/list.html?cate_no=N을 비워 두고 공식 pretty URL에만
+      // 상품 카드를 렌더링한다. sitemap의 상위 판매 카테고리를 직접 사용한다.
+      categories: [
+        {name: "OUTERWEARS", cateNo: 42, url: "/category/outerwears/42/"},
+        {name: "TOP", cateNo: 43, url: "/category/top/43/"},
+        {name: "KNITWEARS", cateNo: 132, url: "/category/knitwears/132/"},
+        {name: "BOTTOMS", cateNo: 44, url: "/category/bottoms/44/"},
+        {name: "DRESSES", cateNo: 45, gender: ["women"], url: "/category/dresses/45/"},
+        {name: "ACCESSORIES", cateNo: 81, url: "/category/accessories/81/"},
+        {name: "本 TEXTURE", cateNo: 128, url: "/category/本-texture/128/"},
+      ],
+    },
+    notes: "brand_node id=5596. 2026-08-12 실측: 표준 목록은 0개, 공식 pretty URL 상품 카드는 전부 OUT OF STOCK.",
   },
   {
     key: "ordes",

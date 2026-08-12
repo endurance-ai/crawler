@@ -18,6 +18,26 @@ test("NOMANUAL의 공식 WOMAN baby tee는 아동복으로 오인하지 않는�
   assert.equal(patterns.some((pattern) => pattern.test("NO RELIGION HENLEY BABY TEE")), true)
 })
 
+test("TEXTURE SEOUL은 빈 표준 목록 대신 공식 pretty URL 카테고리를 수집한다", () => {
+  const texture = getSiteConfig("textureseoul")
+  assert.equal(texture?.category?.discovery, "manual")
+  assert.equal(texture?.selectors?.productName, "h3.project-excerpt-title-inner")
+  assert.equal(
+    texture?.selectors?.productPrice,
+    ".project-excerpt-tags > .project-excerpt-tags-inner:nth-of-type(2)",
+  )
+  assert.deepEqual(texture?.category?.categories?.map(({cateNo, gender, url}) => ({cateNo, gender, url})), [
+    {cateNo: 42, gender: undefined, url: "/category/outerwears/42/"},
+    {cateNo: 43, gender: undefined, url: "/category/top/43/"},
+    {cateNo: 132, gender: undefined, url: "/category/knitwears/132/"},
+    {cateNo: 44, gender: undefined, url: "/category/bottoms/44/"},
+    {cateNo: 45, gender: ["women"], url: "/category/dresses/45/"},
+    {cateNo: 81, gender: undefined, url: "/category/accessories/81/"},
+    {cateNo: 128, gender: undefined, url: "/category/本-texture/128/"},
+  ])
+  assert.equal(texture?.paginate, false)
+})
+
 test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한다", () => {
   const cacele = getSiteConfig("cacele")
   assert.deepEqual(cacele?.defaultGender, ["women"])
