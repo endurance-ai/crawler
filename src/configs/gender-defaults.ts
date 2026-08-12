@@ -37,6 +37,14 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  archthe: ["women"], // 공식 내비게이션이 SHOP WOMEN으로 의류 전 부서를 명시
+  // https://archthe.com/?country=KR
+  percentis: ["men"], // Rakuten Fashion Week 공식 분류: Men's / Ready To Wear
+  // https://rakutenfashionweektokyo.com/en/brands/detail/99is/
+  "en-2706": ["unisex"], // 공식 취급처가 TAW&TOE를 유니섹스 슈즈 전문 브랜드로 명시
+  // https://www.acrmtsm.jp/brands/175
+  "nomanual-shop": ["unisex"], // 공식 브랜드 취급처의 현재 스타일 분류가 unisex
+  // https://www.nugu.jp/director/nomanual
   // ── 2026-08-12 import=0 55개 공식몰 재검증 ────────────────────
   // 아래 값은 공식몰의 현재 전체 컬렉션/소개에서 여성 상품군을 명시하고,
   // 남성 부서가 없음을 함께 확인한 사이트만 기록한다. 여성 카테고리 하나가

@@ -95,6 +95,21 @@ function numberFlag(flags: Flags, key: string): number | null {
   return Number.isInteger(num) && num > 0 ? num : null
 }
 
+/** Preserve the actionable transport cause hidden behind Node's generic
+ * `TypeError: fetch failed` so a retry audit can distinguish DNS, TLS and
+ * timeout failures without reproducing every request by hand. */
+export function crawlErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  const cause = error.cause
+  if (!cause || typeof cause !== "object") return error.message
+  const detail = cause as {code?: unknown; message?: unknown}
+  const code = typeof detail.code === "string" ? detail.code.trim() : ""
+  const message = typeof detail.message === "string" ? detail.message.trim() : ""
+  if (code && !error.message.includes(code)) return `${error.message} (${code})`
+  if (message && message !== error.message) return `${error.message} (${message})`
+  return error.message
+}
+
 function cleanSearch(value: string): string {
   return value.replace(/[,%]/g, " ").trim().slice(0, 100)
 }
@@ -560,7 +575,7 @@ async function detectOneBrand(
       `#${brand.brand_node_id} ${brand.brand_name}: ${verdict} (${result.platform_key}) eligibility=${result.krEligibility?.status ?? "unchecked"}`,
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = crawlErrorMessage(err)
     const retryable = isRetryableEligibilityError(err)
     await upsertProductCrawlStatus(db, brand.brand_node_id, {
       last_error: message,

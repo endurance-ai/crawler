@@ -17,6 +17,13 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(getSiteConfig("twojeys")?.defaultGender, ["men"])
   assert.deepEqual(getSiteConfig("porterna")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("margesherwood")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("archthe")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("percentis")?.defaultGender, ["men"])
+  assert.equal(getSiteConfig("pottery")?.defaultGender, undefined)
+  for (const key of ["en-2706", "nomanual-shop"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])
+    assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true)
+  }
   const mosxe = getSiteConfig("mosxe")
   assert.deepEqual(mosxe?.defaultGender, ["women"])
   assert.deepEqual(mosxe?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [

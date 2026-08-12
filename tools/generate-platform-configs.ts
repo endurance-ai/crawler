@@ -94,6 +94,41 @@ const CAFE24_SELECTORS_BY_KEY: Partial<Record<string, SiteConfig["selectors"]>> 
 }
 
 const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
+  // Official navigation exposes separate WOMEN and MEN departments. Use leaf
+  // categories so aggregate/new/sale pages cannot erase the gender evidence.
+  dunststudio: [
+    {name: "Women Outerwear", cateNo: 29, gender: ["women"]},
+    {name: "Women Jumpers & Leather", cateNo: 755, gender: ["women"]},
+    {name: "Women Knitwear", cateNo: 30, gender: ["women"]},
+    {name: "Women Shirts & Blouses", cateNo: 32, gender: ["women"]},
+    {name: "Women Sweatshirts", cateNo: 447, gender: ["women"]},
+    {name: "Women T-shirts", cateNo: 31, gender: ["women"]},
+    {name: "Women Dresses & Skirts", cateNo: 33, gender: ["women"]},
+    {name: "Women Pants", cateNo: 34, gender: ["women"]},
+    {name: "Women Bags", cateNo: 618, gender: ["women"]},
+    {name: "Women Accessories", cateNo: 36, gender: ["women"]},
+    {name: "Men Outerwear", cateNo: 38, gender: ["men"]},
+    {name: "Men Jumpers & Leather", cateNo: 759, gender: ["men"]},
+    {name: "Men Knitwear", cateNo: 303, gender: ["men"]},
+    {name: "Men Shirts", cateNo: 157, gender: ["men"]},
+    {name: "Men Sweatshirts", cateNo: 448, gender: ["men"]},
+    {name: "Men T-shirts", cateNo: 40, gender: ["men"]},
+    {name: "Men Pants", cateNo: 41, gender: ["men"]},
+    {name: "Men Bags", cateNo: 619, gender: ["men"]},
+    {name: "Men Accessories", cateNo: 43, gender: ["men"]},
+  ],
+  // The official shop labels this complete apparel branch "SHOP WOMEN".
+  // Homeware/editorial branches (OBJECT/CERAMIC/FURNITURE/etc.) are excluded.
+  archthe: [
+    {name: "Women Coats & Jackets", cateNo: 89, gender: ["women"]},
+    {name: "Women Knitwear & Jersey", cateNo: 90, gender: ["women"]},
+    {name: "Women Shirts & Blouses", cateNo: 107, gender: ["women"]},
+    {name: "Women Tops", cateNo: 92, gender: ["women"]},
+    {name: "Women Dresses", cateNo: 91, gender: ["women"]},
+    {name: "Women Trousers", cateNo: 93, gender: ["women"]},
+    {name: "Women Skirts", cateNo: 94, gender: ["women"]},
+    {name: "Women Accessories", cateNo: 95, gender: ["women"]},
+  ],
   // Verified storefront departments. Keep only the two gender-bearing source
   // categories instead of the many Cafe24 system/editorial category IDs.
   openyy: [
@@ -435,6 +470,11 @@ function buildEntrySource(
 }
 
 async function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log("usage: tsx tools/generate-platform-configs.ts")
+    console.log("Generates src/configs/platforms.generated.ts from eligible DB crawl rows.")
+    return
+  }
   const previousGenerated = await loadPreviousGenerated()
   const previousByKey = new Map(previousGenerated.map((config) => [config.key, config]))
   const existingHosts = new Set(MANUAL_PLATFORMS.map((p) => normalizeHost(p.baseUrl)))

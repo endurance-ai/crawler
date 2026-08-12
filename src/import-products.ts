@@ -1019,11 +1019,13 @@ async function main() {
     }
 
     console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
-    const deferred = qwenStats.unchanged + qwenStats.unavailable + qwenStats.failed
+    // `unchanged`는 Qwen 호출이 성공했지만 수정할 필드가 없었던 정상 결과다.
+    // 이를 deferred로 합치면 미처리처럼 보이므로 실제 미해결 오류만 별도 집계한다.
+    const unresolved = qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
     console.log(
       `   🤖 Qwen target=${qwenStats.targeted} success=${qwenStats.succeeded}` +
         ` unchanged=${qwenStats.unchanged} unavailable=${qwenStats.unavailable}` +
-        ` failed=${qwenStats.failed} deferred=${deferred}` +
+        ` failed=${qwenStats.failed} unresolved=${unresolved}` +
         ` schema_failed=${qwenStats.schemaFailed}` +
         ` race_skip=${qwenStats.raceSkipped}`,
     )

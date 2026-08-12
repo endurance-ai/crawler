@@ -3,6 +3,18 @@
 import {createClient} from "@supabase/supabase-js"
 
 const VERIFIED_HOMEPAGES = [
+  {brandId: 286, brandName: "Dunst", homepageUrl: "https://dunststudio.com", source: "https://dunststudio.com/", storefront: "KR", currency: "KRW"},
+  {brandId: 289, brandName: "Thug Club", homepageUrl: "https://en.thug-club.com", source: "https://en.thug-club.com/", storefront: "GLOBAL"},
+  {brandId: 382, brandName: "System", homepageUrl: "https://system1990.com", source: "https://system1990.com/", storefront: "GLOBAL"},
+  {brandId: 595, brandName: "We11done", homepageUrl: "https://www.we11-done.com", source: "https://www.we11-done.com/us/main/index.php", storefront: "GLOBAL"},
+  {brandId: 832, brandName: "OSOI", homepageUrl: "https://osoi.co.kr", source: "https://en.osoi.co.kr/store.html", storefront: "KR", currency: "KRW"},
+  {brandId: 1246, brandName: "Arch The", homepageUrl: "https://archthe.com", source: "https://archthe.com/?country=KR", storefront: "KR", currency: "KRW"},
+  {brandId: 1252, brandName: "99%IS-", homepageUrl: "https://www.99percentis.com", source: "https://www.99percentis.com/", storefront: "KR", currency: "KRW"},
+  {brandId: 1300, brandName: "MINJUKIM", homepageUrl: "https://www.minjukim.co", source: "https://www.minjukim.co/", storefront: "KR", currency: "KRW"},
+  {brandId: 1612, brandName: "NONFICTION", homepageUrl: "https://www.nonfiction.kr", source: "https://www.nonfiction.kr/", storefront: "KR", currency: "KRW"},
+  {brandId: 2706, brandName: "TAW&TOE", homepageUrl: "https://en.tawntoe.com", source: "https://en.tawntoe.com/on-line.html", storefront: "GLOBAL"},
+  {brandId: 3840, brandName: "NOMANUAL", homepageUrl: "https://www.nomanual-shop.com", source: "https://www.nomanual-shop.com/", storefront: "KR", currency: "KRW"},
+  {brandId: 3865, brandName: "POTTERY", homepageUrl: "https://www.ptry.co.kr", source: "https://www.ptry.co.kr/", storefront: "KR", currency: "KRW"},
   {brandId: 244, brandName: "OPEN YY", homepageUrl: "https://open-yy.com", source: "https://open-yy.com/", storefront: "KR", currency: "KRW"},
   {brandId: 5332, brandName: "HYOVASMI", homepageUrl: "https://hyovasmi.com", source: "https://hyovasmi.com/", storefront: "KR", currency: "KRW"},
   {

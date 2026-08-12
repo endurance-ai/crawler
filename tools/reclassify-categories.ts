@@ -30,6 +30,8 @@ import {classifyShopifyCategory} from "../src/lib/shopify-category-classifier"
 const args = process.argv.slice(2)
 const DRY = args.includes("--dry-run")
 const ONLY_INVALID = args.includes("--only-invalid")
+const ONLY_OTHER = args.includes("--only-other")
+const IN_STOCK_ONLY = args.includes("--in-stock-only")
 const LIMIT = Number((args.find((a) => a.startsWith("--limit=")) || "").split("=")[1] || (args.includes("--limit") ? args[args.indexOf("--limit") + 1] : "") || 0)
 const START_ID = (args.find((a) => a.startsWith("--start-id=")) || "").split("=")[1] || (args.includes("--start-id") ? args[args.indexOf("--start-id") + 1] : "")
 const PLATFORM_FILTER = (args.find((a) => a.startsWith("--platform=")) || "").split("=")[1]?.split(",").filter(Boolean) || null
@@ -46,9 +48,9 @@ const num = (v: any) => (typeof v === "number" ? v : v && typeof v.total === "nu
 const ClsSchema = z.object({
   items: z.array(z.object({i: z.number(), category: z.string(), subcategory: z.string().nullable()})),
 })
-const SYSTEM = `You classify fashion e-commerce products into a fixed taxonomy. For each item pick the best category (family) and a subcategory from that family's list (or null). Use the product name; the "hint" is a noisy legacy label (may be a sale banner, nav label, or another language) — use it only as a weak signal. Non-fashion / homeware / unclassifiable → category "other" with null subcategory. One entry per input index.\n\n${buildEnumReference()}`
+const SYSTEM = `You classify fashion e-commerce products into a fixed taxonomy. For each item pick the best category (family) and a subcategory from that family's list (or null). Use the product name, product URL slug, and tags together; the "hint" is a noisy legacy label (may be a sale banner, nav label, or another language) — use it only as a weak signal. Non-fashion / homeware / editorial lookbooks / unclassifiable → category "other" with null subcategory. One entry per input index.\n\n${buildEnumReference()}`
 
-async function classifyBatch(items: {i: number; name: string; hint: string; brand: string}[]): Promise<Record<number, {category: Category; subcategory: string | null}>> {
+async function classifyBatch(items: {i: number; name: string; hint: string; brand: string; url: string; tags: string[]}[]): Promise<Record<number, {category: Category; subcategory: string | null}>> {
   const out: Record<number, {category: Category; subcategory: string | null}> = {}
   try {
     const res = await generateQwenObject({
@@ -92,8 +94,12 @@ async function mapWithConcurrency<T>(tasks: (() => Promise<T>)[], n: number): Pr
 }
 
 async function main() {
+  if (ONLY_INVALID && ONLY_OTHER) {
+    throw new Error("--only-invalid and --only-other are mutually exclusive")
+  }
   console.log(
-    `reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · ${ONLY_INVALID ? "mode=only-invalid (guardrail)" : `limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`}` +
+    `reclassify start · ${DRY ? "DRY-RUN" : "LIVE"} · ${ONLY_INVALID ? "mode=only-invalid (guardrail)" : ONLY_OTHER ? "mode=only-other" : `limit=${LIMIT || "all"} · start-id=${START_ID || "(begin)"}`}` +
+      (IN_STOCK_ONLY ? " · in-stock-only" : "") +
       (PLATFORM_FILTER ? ` · platform=${PLATFORM_FILTER.join(",")}` : ""),
   )
   if (!DRY) {
@@ -109,13 +115,17 @@ async function main() {
   const samples: string[] = []
 
   for (;;) {
+    const pageLimit = LIMIT ? Math.min(PAGE, Math.max(0, LIMIT - processed)) : PAGE
+    if (pageLimit === 0) break
     // --only-invalid: no id cursor — each fixed row leaves the invalid set, so
     // re-querying the same filter naturally drains to empty. Safe to run after
     // every onboarding import regardless of DB size (only touches broken rows).
     let q = ONLY_INVALID
-      ? db.from("products").select("id,name,category,subcategory,brand").not("category", "in", `(${CATEGORIES.join(",")})`).limit(PAGE)
-      : db.from("products").select("id,name,category,subcategory,brand").order("id", {ascending: true}).limit(PAGE)
+      ? db.from("products").select("id,name,category,subcategory,brand,product_url,tags").not("category", "in", `(${CATEGORIES.join(",")})`).limit(pageLimit)
+      : db.from("products").select("id,name,category,subcategory,brand,product_url,tags").order("id", {ascending: true}).limit(pageLimit)
     if (!ONLY_INVALID && lastId) q = q.gt("id", lastId)
+    if (ONLY_OTHER) q = q.eq("category", "other")
+    if (IN_STOCK_ONLY) q = q.eq("in_stock", true)
     if (PLATFORM_FILTER) q = q.in("platform", PLATFORM_FILTER)
     const {data, error} = await q
     if (error) {
@@ -129,15 +139,22 @@ async function main() {
     //    precision on clear tokens (sweater→knitwear, sunglasses→eyewear,
     //    hoodie→tops) which the cheap LLM routes inconsistently.
     const preds: Record<string, {category: Category; subcategory: string | null}> = {}
-    const llmRows: {id: string; name: string; hint: string; brand: string}[] = []
+    const llmRows: {id: string; name: string; hint: string; brand: string; url: string; tags: string[]}[] = []
     let detCount = 0
     for (const r of data) {
-      const d = classifyShopifyCategory("", r.name || "", [])
+      const tags = Array.isArray(r.tags) ? r.tags.filter((tag): tag is string => typeof tag === "string") : []
+      // Rows already classified as `other` include genuine homeware, beauty,
+      // books and editorial entries. The deterministic Shopify classifier is
+      // deliberately fashion-biased and can turn those into false positives
+      // (for example perfume -> accessories, book -> shoes). Let Qwen retain
+      // `other` explicitly in this repair mode.
+      const d = ONLY_OTHER ? {category: null, subcategory: null} :
+        classifyShopifyCategory(r.product_url || "", r.name || "", tags)
       if (d.category && isValidCategory(d.category)) {
         preds[r.id] = {category: d.category as Category, subcategory: d.subcategory && isValidSubcategory(d.subcategory, d.category as Category) ? d.subcategory : null}
         detCount++
       } else {
-        llmRows.push({id: r.id, name: r.name || "", hint: r.category || "", brand: r.brand || ""})
+        llmRows.push({id: r.id, name: r.name || "", hint: r.category || "", brand: r.brand || "", url: r.product_url || "", tags})
       }
     }
 
@@ -146,7 +163,7 @@ async function main() {
     for (let s = 0; s < llmRows.length; s += BATCH) {
       const slice = llmRows.slice(s, s + BATCH)
       batchTasks.push(async () => {
-        const items = slice.map((r, k) => ({i: k, name: r.name, hint: r.hint, brand: r.brand}))
+        const items = slice.map((r, k) => ({i: k, name: r.name, hint: r.hint, brand: r.brand, url: r.url, tags: r.tags}))
         const res = await classifyBatch(items)
         for (let k = 0; k < slice.length; k++) {
           const p = res[k]
@@ -192,7 +209,7 @@ async function main() {
     if (LIMIT && processed >= LIMIT) break
     if (data.length < PAGE) break
     // ONLY_INVALID + DRY never shrinks the result set (no writes) — one pass is enough.
-    if (ONLY_INVALID && DRY) break
+    if ((ONLY_INVALID || ONLY_OTHER) && DRY) break
   }
 
   console.log(`\n=== DONE ${DRY ? "(DRY-RUN, no writes)" : "(LIVE)"} ===`)

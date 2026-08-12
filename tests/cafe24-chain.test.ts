@@ -10,6 +10,7 @@ import {
   extractCafe24DetailFallbacks,
   inferCafe24Currency,
   isGenericCafe24ProductName,
+  isNoisyCafe24CategoryName,
   parseCafe24LabeledPrice,
   parseCafe24PriceCandidate,
   parseCafe24PriceCandidates,
@@ -17,6 +18,13 @@ import {
   runFirstUsefulCafe24Step,
 } from "../src/lib/cafe24-chain"
 import type {Product} from "../src/lib/types"
+
+test("Cafe24 editorial archive and collection categories are not product feeds", () => {
+  for (const name of ["ARCHIVE", "Archives", "COLLECTION", "Collections", "EDITORIAL"]) {
+    assert.equal(isNoisyCafe24CategoryName(name), true, name)
+  }
+  assert.equal(isNoisyCafe24CategoryName("NEW COLLECTION DRESSES"), false)
+})
 
 test("Cafe24 generic unisex category remains a fallback below product URL/text evidence", () => {
   assert.equal(cafe24CategoryGenderSource(["unisex"]), "config_default")

@@ -555,12 +555,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "포터리",
     type: "cafe24",
     baseUrl: "https://www.ptry.co.kr",
+    brand: "POTTERY",
     paginate: true,
     maxPages: 300,
+    crawlDetails: true,
     category: { discovery: "auto" },
-    defaultGender: ["unisex"],
-    disabled: true,
-    notes: "컨템포러리 캐주얼. 커스텀 셀렉터 필요 (기본 셀렉터로 상품 못 찾음). 5~30만원대",
+    notes: "현재 상품명에 남성/여성/[유니섹스]가 혼재하므로 사이트 기본 성별 금지. 상품명 근거만 사용.",
   },
   {
     key: "beslow",
@@ -2867,6 +2867,8 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "enlowool", // 공식 소개에서 진주·혼합 소재를 genderless products로 명시
   "iyso", // 공식 KLOGG 설명: gender와 무관하게 everyone을 위해 제작
   "maziuntitled", // 공식 가방 설명에 남녀 모두에게 어울리는 크기로 명시
+  "en-2706", // 공식 취급처가 유니섹스 슈즈 전문 브랜드로 명시
+  "nomanual-shop", // 공식 브랜드 취급처의 현재 전개가 유니섹스
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
