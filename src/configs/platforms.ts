@@ -2950,6 +2950,8 @@ const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   "coldcultureworldwide",
   // 공식 상품 설명에 `男性着用モデル`/`女性着用モデル`과 착용 사이즈를 명시한다.
   "phingerin",
+  // 공식 상품 설명에 `Classic unisex fit`이 있는 상품만 제품 단위로 인식한다.
+  "ihnomuhnit",
 ])
 
 // generated 설정을 다시 만들더라도 유지돼야 하는, 공식몰 전체 상품군 기본값.

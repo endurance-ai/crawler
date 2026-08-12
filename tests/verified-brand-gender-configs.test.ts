@@ -165,6 +165,7 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(getSiteConfig("threetimes333")?.defaultGender, ["women"])
   assert.equal(getSiteConfig("opening-project")?.verifyStockFromDetail, true)
   assert.equal(getSiteConfig("phingerin")?.genderFromModelDescription, true)
+  assert.equal(getSiteConfig("ihnomuhnit")?.genderFromModelDescription, true)
   const openyy = getSiteConfig("openyy")
   assert.equal(openyy?.baseUrl, "https://open-yy.com")
   assert.equal(openyy?.selectors?.productName, ".title a")
