@@ -261,6 +261,10 @@ export function inferCafe24ListingStock(current: boolean, productName: string): 
 
 export function mergeCafe24DuplicateGender(existing: Product, incoming: Product): void {
   const genders = new Set([...(existing.gender ?? []), ...(incoming.gender ?? [])])
+  // 같은 fallback 값의 중복 수집은 새 상품 근거가 아니다.
+  // 특히 config_default=unisex를 engine으로 승격하면 importer가 더 강한
+  // `(WOMAN)`/`(MEN)` 상품명 근거를 적용하지 못한다.
+  if (genders.size <= 1) return
   if (genders.has("unisex") || (genders.has("men") && genders.has("women"))) {
     existing.gender = ["unisex"]
     existing.genderSource = "engine"

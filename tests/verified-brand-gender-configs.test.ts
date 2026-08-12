@@ -13,6 +13,11 @@ test("LYJEL SERVICE는 공식 MEN/WOMEN 카테고리 근거를 상품별로 유�
   ])
 })
 
+test("NOMANUAL의 공식 WOMAN baby tee는 아동복으로 오인하지 않는다", () => {
+  const patterns = getSiteConfig("nomanual-shop")?.genderTextPatterns?.women ?? []
+  assert.equal(patterns.some((pattern) => pattern.test("NO RELIGION HENLEY BABY TEE")), true)
+})
+
 test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한다", () => {
   const cacele = getSiteConfig("cacele")
   assert.deepEqual(cacele?.defaultGender, ["women"])

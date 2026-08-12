@@ -3068,6 +3068,9 @@ const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTe
   // 각 링크도 공식몰에서 별도 HER/HIM 상세로 제공된다.
   // https://a82.co.kr/collection/list.html?cate_no=47
   a82: {women: [/\bHER\b/i], men: [/\bHIM\b/i]},
+  // NOMANUAL 공식 상세 페이지가 이 상품군을 `MODEL WOMAN`으로 명시한다.
+  // 범용 `baby` 아동복 방어 로직에서 여성 근거가 누락되지 않게 한다.
+  "nomanual-shop": {women: [/\bBABY\s+TEE\b/i]},
 }
 
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([

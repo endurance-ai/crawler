@@ -88,6 +88,19 @@ test("cafe24: 같은 상품이 공식 Man/Woman 부서에 모두 있으면 공�
   assert.equal(existing.genderSource, "engine")
 })
 
+test("cafe24: 동일한 unisex 기본값 중복은 engine 근거로 승격하지 않는다", () => {
+  const product = (): Product => ({
+    brand: "NOMANUAL", name: "T-SHIRT (WOMAN)", category: "all", gender: ["unisex"],
+    genderSource: "config_default", price: 1000, originalPrice: 1000, salePrice: null,
+    priceFormatted: "₩1,000", imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://example.com/product/1", inStock: true, platform: "nomanual-shop",
+  })
+  const existing = product()
+  mergeCafe24DuplicateGender(existing, product())
+  assert.deepEqual(existing.gender, ["unisex"])
+  assert.equal(existing.genderSource, "config_default")
+})
+
 test("cafe24: 범용 Shop보다 뒤에서 발견한 구체 상품 카테고리를 보존한다", () => {
   const product = (category: string, subcategory: string | null = null): Product => ({
     brand: "LOWOOL", name: "Sang", category, subcategory, gender: ["unisex"],
