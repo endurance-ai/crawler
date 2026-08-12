@@ -20,6 +20,9 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(getSiteConfig("archthe")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("percentis")?.defaultGender, ["men"])
   assert.equal(getSiteConfig("pottery")?.defaultGender, undefined)
+  assert.equal(getSiteConfig("pottery")?.selectors?.productItem, "div.product__item")
+  assert.ok(getSiteConfig("pottery")?.category?.categories?.some((category) => category.cateNo === 747 && category.gender?.[0] === "men"))
+  assert.ok(getSiteConfig("pottery")?.category?.categories?.some((category) => category.cateNo === 1022 && category.gender?.[0] === "women"))
   for (const key of ["en-2706", "nomanual-shop"]) {
     assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])
     assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true)

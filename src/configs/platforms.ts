@@ -559,7 +559,40 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
-    category: { discovery: "auto" },
+    selectors: {
+      // POTTERY cards are divs. The generic `.xans-product li` fallback sees
+      // material/color/origin/size spec rows as separate products.
+      productItem: "div.product__item",
+      productName: ".en-name > li:not(.displaynone):first-child .add-desc span",
+      productPrice: ".figcaption > .price > div:first-child",
+      productImage: ".figure img",
+      productLink: '.figure a[href*="product_no="]',
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        // Official men's navigation.
+        {name: "Men Knitwear", cateNo: 747, gender: ["men"]},
+        {name: "Men Tailoring", cateNo: 789, gender: ["men"]},
+        {name: "Men Outerwear", cateNo: 745, gender: ["men"]},
+        {name: "Men Shirts", cateNo: 944, gender: ["men"]},
+        {name: "Men Tops", cateNo: 746, gender: ["men"]},
+        {name: "Men Bottoms", cateNo: 748, gender: ["men"]},
+        {name: "Men Denim", cateNo: 749, gender: ["men"]},
+        {name: "Men Accessories", cateNo: 750, gender: ["men"]},
+        // Official women's navigation. Products found in both departments
+        // become unisex through mergeCafe24DuplicateGender.
+        {name: "Women Knitwear", cateNo: 1022, gender: ["women"]},
+        {name: "Women Tailoring", cateNo: 1023, gender: ["women"]},
+        {name: "Women Outerwear", cateNo: 1024, gender: ["women"]},
+        {name: "Women Shirts", cateNo: 1025, gender: ["women"]},
+        {name: "Women Tops", cateNo: 1026, gender: ["women"]},
+        {name: "Women Dresses", cateNo: 1136, gender: ["women"]},
+        {name: "Women Skirts", cateNo: 1232, gender: ["women"]},
+        {name: "Women Bottoms", cateNo: 1027, gender: ["women"]},
+        {name: "Women Denim", cateNo: 1028, gender: ["women"]},
+      ],
+    },
     notes: "현재 상품명에 남성/여성/[유니섹스]가 혼재하므로 사이트 기본 성별 금지. 상품명 근거만 사용.",
   },
   {
