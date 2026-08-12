@@ -1823,7 +1823,22 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://lyjelservice.com",
     brand: "LYJEL SERVICE",
     paginate: true,
-    category: {discovery: "auto"},
+    maxPages: 300,
+    crawlDetails: true,
+    selectors: {
+      productItem: "li.mun-prdlist__item",
+      productName: ".mun-prdlist__name > span:not(.mun-prdlist__name-title)",
+      productPrice: ".mun-prdlist__sale",
+      productImage: ".mun-prdlist__img",
+      productLink: ".mun-prdlist__thumb-link",
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "all", cateNo: 63, gender: ["men"]},
+        {name: "all", cateNo: 70, gender: ["women"]},
+      ],
+    },
     notes: "3차 배치 draft — dry-run 필요",
   },
   {

@@ -672,7 +672,12 @@ async function collectProductsFromPage(
           // 채워 넣는다. displaynone도 아니고 CSS로도 안 숨겨진 "빈" 컨테이너는
           // 품절 신호가 아니라 항상 존재하는 뼈대일 뿐이다(재고 있어도 매칭되어
           // 전 상품이 품절 오판되는 사고 실측: kyod).
-          var hasNoContent = soldoutEl.children.length === 0 && (soldoutEl.textContent || "").trim() === ""
+          var soldoutImage = soldoutEl.matches("img") ? soldoutEl : soldoutEl.querySelector("img")
+          var soldoutImageEvidence = soldoutImage
+            ? ((soldoutImage.getAttribute("src") || "").trim() !== ""
+              || (soldoutImage.getAttribute("alt") || "").trim() !== "")
+            : false
+          var hasNoContent = (soldoutEl.textContent || "").trim() === "" && !soldoutImageEvidence
           inStock = hasDisplayNoneClass || isHiddenByCSS || hasNoContent
         } else {
           // 컨테이너 단위(span/div/p)로 순회하며 "그 요소 자신"의 visibility만

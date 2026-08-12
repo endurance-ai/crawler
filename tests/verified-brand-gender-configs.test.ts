@@ -3,6 +3,16 @@ import assert from "node:assert/strict"
 
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("LYJEL SERVICE는 공식 MEN/WOMEN 카테고리 근거를 상품별로 유지한다", () => {
+  const lyjel = getSiteConfig("lyjelservice")
+  assert.equal(lyjel?.defaultGender, undefined)
+  assert.equal(lyjel?.selectors?.productItem, "li.mun-prdlist__item")
+  assert.deepEqual(lyjel?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 63, gender: ["men"]},
+    {cateNo: 70, gender: ["women"]},
+  ])
+})
+
 test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한다", () => {
   const cacele = getSiteConfig("cacele")
   assert.deepEqual(cacele?.defaultGender, ["women"])
