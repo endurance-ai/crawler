@@ -38,6 +38,9 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   const cantonCollective = getSiteConfig("canton-collective")
   assert.equal(cantonCollective?.multiBrand, true)
   assert.deepEqual(cantonCollective?.defaultGender, ["women"])
+  assert.deepEqual(cantonCollective?.shopifyExcludedHandles, ["canton-collective-express"])
+  const cantonNoise = cantonCollective?.kidsGenderNoisePatterns ?? []
+  assert.equal(cantonNoise.reduce((text, pattern) => text.replace(pattern, " "), "Y2K Baby Tee Babydoll").trim(), "Y2K")
   assert.equal(cantonCollective?.sourceCurrency, "USD")
   for (const key of ["en-2706", "nomanual-shop"]) {
     assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])

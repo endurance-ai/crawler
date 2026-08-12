@@ -92,6 +92,16 @@ test("configured Shopify tags exclude products outside the supported taxonomy", 
   assert.deepEqual(products.map((product) => product.productUrl), ["https://example.com/products/adult"])
 })
 
+test("configured Shopify handles exclude non-merchandise records", () => {
+  const products = parseShopifyProducts(
+    {products: [shopifyProduct("jacket"), shopifyProduct("express-shipping")]},
+    "https://example.com",
+    "shop",
+    {excludedHandles: ["express-shipping"]},
+  )
+  assert.deepEqual(products.map((product) => product.productUrl), ["https://example.com/products/jacket"])
+})
+
 test("verified non-fashion Shopify defaults retain the canonical other category", () => {
   const products = parseShopifyProducts(
     {products: [{...shopifyProduct("skin-oil"), title: "Idan Oil", product_type: ""}]},

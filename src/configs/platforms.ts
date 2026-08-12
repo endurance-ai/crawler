@@ -47,6 +47,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://cantoncollective.com",
     multiBrand: true,
     defaultGender: ["women"],
+    kidsGenderNoisePatterns: [
+      /\bbaby[-\s]?tee\b/gi,
+      /\bbaby[-\s]?doll\b/gi,
+      /\bbabydoll\b/gi,
+    ],
+    shopifyExcludedHandles: ["canton-collective-express"],
     sourceCurrency: "USD",
     maxPages: 20,
     crawlDelay: 1000,

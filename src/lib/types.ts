@@ -199,6 +199,8 @@ export interface SiteConfig {
   shopifyGenderCollections?: {men?: string[]; women?: string[]; unisex?: string[]}
   /** Shopify tags that identify product families outside the supported adult taxonomy. */
   shopifyExcludedTags?: string[]
+  /** Exact Shopify product handles for non-merchandise records such as shipping add-ons. */
+  shopifyExcludedHandles?: string[]
   /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
   genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
   /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */

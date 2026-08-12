@@ -156,6 +156,8 @@ export interface ShopifyParseOptions {
   keepOutOfStock?: boolean
   /** Exact, case-insensitive Shopify tags to omit before product mapping. */
   excludedTags?: string[]
+  /** Exact Shopify handles to omit before product mapping. */
+  excludedHandles?: string[]
 }
 
 /**
@@ -195,8 +197,10 @@ export function parseShopifyProducts(
   if (!data.products || data.products.length === 0) return allProducts
 
   const excludedTags = new Set((options.excludedTags ?? []).map((tag) => tag.trim().toLowerCase()))
+  const excludedHandles = new Set(options.excludedHandles ?? [])
 
   for (const sp of data.products) {
+    if (excludedHandles.has(sp.handle)) continue
     if (excludedTags.size > 0 && sp.tags.some((tag) => excludedTags.has(tag.trim().toLowerCase()))) {
       continue
     }
@@ -505,6 +509,7 @@ export async function crawlShopify(
           genderByHandle,
           genderFromModelDescription: config.genderFromModelDescription,
           excludedTags: config.shopifyExcludedTags,
+          excludedHandles: config.shopifyExcludedHandles,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )
