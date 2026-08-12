@@ -2883,6 +2883,7 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "ceciletulkens", // 공식 브랜드·상품 설명이 남녀를 모두 명시
   "avvattev", // 공식 AW26이 남녀 룩을 하나의 워드로브로 제시
   "sansangear-5471", // 공식 TOJI 동일 SKU에 남녀 모델 사이즈를 함께 명시
+  "fandco", // 공식 상품 여러 건이 동일 헤드웨어를 him/her 모두에게 적합하다고 명시
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
@@ -2955,6 +2956,9 @@ const SITE_DEFAULT_CATEGORIES: Record<string, string> = {
   // 공식 About이 FANE을 가방 라인으로 명시한다. BRA/LOGE/LISSE/MIE는 가방 모델명이다.
   // https://www.faneofficiel.fr/pages/about
   faneofficiel: "bags",
+  // 공식몰 전체가 헤드웨어 상품군으로 구성된다.
+  // https://fandco.co.nz/collections/all-headwear
+  fandco: "headwear",
 }
 
 // 목록 템플릿이 모든 상품에 품절 아이콘을 렌더링하지만 상세 옵션에는 실제 재고가 있는 사이트.

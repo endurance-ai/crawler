@@ -130,6 +130,9 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://sansangear.com/en/products/breeze-basic-t-shirt
   faneofficiel: ["women"], // 공식 보도자료가 브랜드 가방이 여성을 대상으로 한다고 명시
   // https://www.faneofficiel.fr/pages/fane-in-the-press
+  fandco: ["unisex"], // 공식 상품 여러 건이 동일 헤드웨어를 him/her 모두에게 적합하다고 명시
+  // https://fandco.co.nz/products/heart-monogram-cap-wide-brim-5-panel-off-white-trucker
+  // https://fandco.co.nz/products/floral-patch-cap-short-brim-5-panel-brown
 
   // 공식 상품 설명에 남·여 모델 착용이 함께 나오고, 상품 자체에도 Unisex 명시.
   // https://bitethebullet.xyz/products/bite-the-bullet-tee
