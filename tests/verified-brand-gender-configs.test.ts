@@ -3,6 +3,23 @@ import assert from "node:assert/strict"
 
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("FEYRE는 공식 여성 SHOP 전체 목록을 수집한다", () => {
+  const feyre = getSiteConfig("feyre")
+  assert.equal(feyre?.disabled, undefined)
+  assert.deepEqual(feyre?.defaultGender, ["women"])
+  assert.equal(feyre?.trustedCategory, true)
+  assert.deepEqual(feyre?.category?.categories?.map(({cateNo}) => cateNo), [30, 31, 50, 29])
+})
+
+test("NOS COULEURS는 공식 남녀 모델 근거의 공용 All 목록을 수집한다", () => {
+  const nosCouleurs = getSiteConfig("noscouleurs")
+  assert.equal(nosCouleurs?.disabled, undefined)
+  assert.deepEqual(nosCouleurs?.defaultGender, ["unisex"])
+  assert.equal(nosCouleurs?.verifiedUnisexDefault, true)
+  assert.equal(nosCouleurs?.trustedCategory, true)
+  assert.deepEqual(nosCouleurs?.category?.categories?.map(({cateNo}) => cateNo), [24, 25, 27, 28])
+})
+
 test("KIJIKO는 공식 여성 카탈로그의 메인 상품 피드를 수집한다", () => {
   const kijiko = getSiteConfig("kijiko")
   assert.equal(kijiko?.disabled, undefined)

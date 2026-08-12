@@ -11,12 +11,36 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "noscouleurs",
+    name: "NOS COULEURS (노쿨러스)",
+    type: "cafe24",
+    baseUrl: "https://noscouleurs.com",
+    brand: "NOS COULEURS (노쿨러스)",
+    defaultGender: ["unisex"],
+    verifiedUnisexDefault: true,
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Outer", cateNo: 24, gender: ["unisex"]},
+        {name: "Tops", cateNo: 25, gender: ["unisex"]},
+        {name: "Bottoms", cateNo: 27, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 28, gender: ["unisex"]},
+      ],
+    },
+    notes: "brand_node id=5433. 공식 All=42 현행 목록과 상세의 여성·남성 모델별 착용 사이즈를 공용 근거로 검증.",
+  },
+  {
     key: "kijiko",
     name: "KIJIKO",
     type: "cafe24",
     baseUrl: "https://kijiko.co.kr",
     brand: "KIJIKO",
     defaultGender: ["women"],
+    trustedCategory: true,
     paginate: false,
     selectors: {
       productItem: 'li[id^="anchorBoxId_"]',
@@ -1707,10 +1731,28 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://feyre.co.kr",
     brand: "FEYRE",
+    defaultGender: ["women"],
+    trustedCategory: true,
     paginate: true,
-    category: {discovery: "auto"},
-    disabled: true,
-    notes: "BLOCKED — 표준 카테고리 없음, collection/lookbook 페이지에 개별 product_no 링크만 존재하고 그마저 극소수(2~3개). 상품 자체가 거의 없는 신생몰로 추정 — 우선순위 낮음.",
+    maxPages: 100,
+    crawlDetails: true,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      productName: ".mun-prdlist__name > span:not(.mun-prdlist__name-title)",
+      productPrice: '.mun-prdlist__spec-item[data-title="판매가"] > span:not(.title)',
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: ".mun-prdlist__thumb-link",
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Top", cateNo: 30, gender: ["women"]},
+        {name: "Bottom", cateNo: 31, gender: ["women"]},
+        {name: "Dress", cateNo: 50, gender: ["women"]},
+        {name: "Outer", cateNo: 29, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node id=5715. 공식몰 여성형 상품 설명과 커스텀 mun-prdlist 카드 DOM을 검증.",
   },
   {
     key: "demoshop",
