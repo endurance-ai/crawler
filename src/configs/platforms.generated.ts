@@ -4,8 +4,8 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-12T04:15:41.222Z.
- * Total: 473 (active 452 / disabled 21)
+ * transitions. Generated 2026-08-12T12:40:53.023Z.
+ * Total: 472 (active 452 / disabled 20)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -363,7 +363,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Men Accessories", cateNo: 43, gender: ["men"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=286, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=286, status=crawled, auto-generated",
   },
   {
     key: "xeniatelunts",
@@ -396,7 +396,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=311, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=311, status=imported, auto-generated",
   },
   {
     key: "shopready2wear",
@@ -451,7 +451,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "EUR",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=382, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=382, status=imported, auto-generated",
   },
   {
     key: "lvir",
@@ -700,7 +700,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=648, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=648, status=imported, auto-generated",
   },
   {
     key: "lemaire",
@@ -1291,7 +1291,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Women Accessories", cateNo: 95, gender: ["women"]},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=1246, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1246, status=imported, auto-generated",
   },
   {
     key: "uniformbridge",
@@ -1390,7 +1390,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat149", cateNo: 149},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=1252, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1252, status=imported, auto-generated",
   },
   {
     key: "umber-postpast",
@@ -1507,7 +1507,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1333, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1333, status=imported, auto-generated",
   },
   {
     key: "frankiesbikinis",
@@ -1628,7 +1628,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1472, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1472, status=imported, auto-generated",
   },
   {
     key: "simuero",
@@ -1661,7 +1661,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1574, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1574, status=imported, auto-generated",
   },
   {
     key: "fusalp",
@@ -1778,7 +1778,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1662, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1662, status=imported, auto-generated",
   },
   {
     key: "reveniomaker",
@@ -1808,7 +1808,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1704, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1704, status=imported, auto-generated",
   },
   {
     key: "abagavelli",
@@ -1819,7 +1819,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1706, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1706, status=imported, auto-generated",
   },
   {
     key: "birrot",
@@ -1997,7 +1997,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=1920, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=1920, status=imported, auto-generated",
   },
   {
     key: "lackofcolor",
@@ -2041,7 +2041,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=2030, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=2030, status=imported, auto-generated",
   },
   {
     key: "johannaortiz",
@@ -2605,7 +2605,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat30", cateNo: 30},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=2706, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=2706, status=imported, auto-generated",
   },
   {
     key: "universalworks",
@@ -2914,7 +2914,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
         {name: "Cat107", cateNo: 107},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=3840, status=tech_detected, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=3840, status=imported, auto-generated",
   },
   {
     key: "dandel",
@@ -4337,7 +4337,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=5240, status=qc_failed, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5240, status=blocked, auto-generated",
   },
   {
     key: "en-5241",
@@ -4440,7 +4440,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=5250, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5250, status=imported, auto-generated",
   },
   {
     key: "backalleydream",
@@ -5473,7 +5473,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=5320, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5320, status=imported, auto-generated",
   },
   {
     key: "fadingmarket",
@@ -5665,7 +5665,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=5332, status=qc_failed, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5332, status=blocked, auto-generated",
   },
   {
     key: "int-5336",
@@ -5954,6 +5954,24 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://summur-ahn.com",
     brand: "SUMMUR",
     notes: "generate-platform-configs.ts — brand_node_id=5360, status=tech_detected, auto-generated",
+  },
+  {
+    key: "gaussian-house",
+    name: "Gaussian House",
+    type: "cafe24",
+    baseUrl: "https://gaussianhouse.co.kr",
+    brand: "Gaussian House",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Cat43", cateNo: 43},
+      ],
+    },
+    disabled: true,
+    notes: "generate-platform-configs.ts — brand_node_id=5362, status=blocked, auto-generated",
   },
   {
     key: "en-5363",
@@ -6339,7 +6357,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=5390, status=qc_failed, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5390, status=blocked, auto-generated",
   },
   {
     key: "tipssy",
@@ -6517,24 +6535,6 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5399, status=imported, auto-generated",
-  },
-  {
-    key: "sideservice",
-    name: "SIDE",
-    type: "cafe24",
-    baseUrl: "https://sideservice.store",
-    brand: "SIDE",
-    paginate: true,
-    maxPages: 300,
-    crawlDetails: true,
-    category: {
-      discovery: "manual",
-      categories: [
-        {name: "ALL", cateNo: 1, url: "/shop/all.html"},
-      ],
-    },
-    disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=5400, status=qc_failed, auto-generated",
   },
   {
     key: "housemce",
@@ -6930,25 +6930,6 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5432, status=imported, auto-generated",
-  },
-  {
-    key: "noscouleurs",
-    name: "NOS COULEURS (노쿨러스)",
-    type: "cafe24",
-    baseUrl: "https://noscouleurs.com",
-    brand: "NOS COULEURS (노쿨러스)",
-    paginate: true,
-    maxPages: 300,
-    crawlDetails: true,
-    category: {
-      discovery: "manual",
-      categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
-      ],
-    },
-    disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=5433, status=qc_failed, auto-generated",
   },
   {
     key: "nouvmaree",
@@ -7443,7 +7424,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "generate-platform-configs.ts — brand_node_id=5471, status=crawled, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5471, status=imported, auto-generated",
   },
   {
     key: "dotdotdot",
@@ -7847,7 +7828,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=5496, status=qc_failed, auto-generated",
+    notes: "generate-platform-configs.ts — brand_node_id=5496, status=blocked, auto-generated",
   },
   {
     key: "guwolsibil",

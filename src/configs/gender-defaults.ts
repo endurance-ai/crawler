@@ -37,6 +37,9 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  sculptorpage: ["women"], // 공식 상세 전반이 Female Model 치수·착용 사이즈를 명시하고 여성 전용 의류를 판매
+  // https://sculptorpage.com/product/detail.html?cate_no=1033&product_no=10281
+  // https://sculptorpage.com/product/supima-banding-bra-top-white/7683/
   archthe: ["women"], // 공식 내비게이션이 SHOP WOMEN으로 의류 전 부서를 명시
   // https://archthe.com/?country=KR
   percentis: ["men"], // Rakuten Fashion Week 공식 분류: Men's / Ready To Wear

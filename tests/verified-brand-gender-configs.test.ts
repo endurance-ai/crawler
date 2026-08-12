@@ -296,6 +296,20 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(yuse?.category?.categories?.map((category) => category.gender), [
     ["women"], ["women"], ["women"], ["women"], ["women"], ["women"],
   ])
+  const sculptor = getSiteConfig("sculptorpage")
+  assert.deepEqual(sculptor?.defaultGender, ["women"])
+  assert.equal(sculptor?.trustedCategory, true)
+  assert.deepEqual(sculptor?.category?.categories, [{name: "All", cateNo: 1532, gender: ["women"]}])
+  const sundayCeremony = getSiteConfig("ensundayceremony")
+  assert.equal(sundayCeremony?.genderTextPatterns?.men?.[0]?.test("BASIC TEE (M)"), true)
+  assert.equal(sundayCeremony?.genderTextPatterns?.women?.[0]?.test("BASIC TEE (W)"), true)
+  assert.equal(sundayCeremony?.genderTextPatterns?.men?.[0]?.test("BASIC TEE"), false)
+  const fritt = getSiteConfig("fritt")
+  assert.deepEqual(fritt?.category?.categories, [{name: "그녀를 위한 기프트", cateNo: 156, gender: ["women"]}])
+  const jinochio = getSiteConfig("jinochio")
+  assert.equal(jinochio?.genderTextPatterns?.women?.[0]?.test("(w)All day top"), true)
+  assert.equal(jinochio?.genderTextPatterns?.unisex?.[0]?.test("(uni)Breeze pajamas"), true)
+  assert.equal(jinochio?.defaultGender, undefined)
   const orogee = getSiteConfig("orogee")
   assert.deepEqual(orogee?.defaultGender, ["women"])
   assert.deepEqual(orogee?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
