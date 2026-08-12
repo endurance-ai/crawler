@@ -3,6 +3,34 @@ import assert from "node:assert/strict"
 
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("KIJIKO는 공식 여성 카탈로그의 메인 상품 피드를 수집한다", () => {
+  const kijiko = getSiteConfig("kijiko")
+  assert.equal(kijiko?.disabled, undefined)
+  assert.deepEqual(kijiko?.defaultGender, ["women"])
+  assert.equal(kijiko?.selectors?.productName, 'img[id^="eListPrdImage"]')
+  assert.deepEqual(kijiko?.category?.categories, [
+    {name: "SHOP", cateNo: 1, gender: ["women"], url: "/"},
+  ])
+})
+
+test("ROYAL OAK은 공식 26HS 여성 카탈로그 범위를 유지한다", () => {
+  const royalOak = getSiteConfig("royaloakseoul")
+  assert.equal(royalOak?.disabled, undefined)
+  assert.deepEqual(royalOak?.defaultGender, ["women"])
+  assert.deepEqual(royalOak?.category?.categories?.map(({cateNo}) => cateNo), [24])
+  assert.equal(
+    royalOak?.kidsGenderNoisePatterns?.some((pattern) => "BABY WAVE SHORTS".replace(pattern, "").trim() === "SHORTS"),
+    true,
+  )
+})
+
+test("SIDE는 검증된 공식 전체 목록 설정으로 활성화한다", () => {
+  const side = getSiteConfig("sideservice")
+  assert.equal(side?.disabled, undefined)
+  assert.deepEqual(side?.category?.categories, [{name: "ALL", cateNo: 1, url: "/shop/all.html"}])
+  assert.equal(side?.crawlDetails, true)
+})
+
 test("LYJEL SERVICE는 공식 MEN/WOMEN 카테고리 근거를 상품별로 유지한다", () => {
   const lyjel = getSiteConfig("lyjelservice")
   assert.equal(lyjel?.defaultGender, undefined)

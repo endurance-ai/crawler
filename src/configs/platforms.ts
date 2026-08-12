@@ -11,6 +11,60 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "kijiko",
+    name: "KIJIKO",
+    type: "cafe24",
+    baseUrl: "https://kijiko.co.kr",
+    brand: "KIJIKO",
+    defaultGender: ["women"],
+    paginate: false,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      // 메인 위젯은 설명/가격 블록 없이 상품 이미지 alt에만 상품명을 둔다.
+      productName: 'img[id^="eListPrdImage"]',
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: 'a[href*="/product/"]',
+    },
+    category: {
+      discovery: "manual",
+      categories: [{name: "SHOP", cateNo: 1, gender: ["women"], url: "/"}],
+    },
+    notes: "brand_node id=5620. 공식몰 여성 카탈로그 메뉴(TOP/SKIRT/DRESS/OUTER/BOTTOM)와 메인 상품 피드 검증.",
+  },
+  {
+    key: "royaloakseoul",
+    name: "ROYAL OAK",
+    type: "cafe24",
+    baseUrl: "https://royaloakseoul.com",
+    brand: "ROYAL OAK",
+    defaultGender: ["women"],
+    kidsGenderNoisePatterns: [/\bbaby[-\s]+wave\b/gi],
+    paginate: true,
+    maxPages: 100,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "All", cateNo: 24},
+      ],
+    },
+    notes: "brand_node id=5691. 공식 All 카탈로그(비키니/보디수트/스커트/드레스)와 상세의 여성 한국 사이즈 44/55 표기를 검증.",
+  },
+  {
+    key: "sideservice",
+    name: "SIDE",
+    type: "cafe24",
+    baseUrl: "https://sideservice.store",
+    brand: "SIDE",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "ALL", cateNo: 1, url: "/shop/all.html"}],
+    },
+    notes: "brand_node id=5400. 공식 전체 목록과 상세 재수집으로 활성 상품·가격·성별 근거 검증.",
+  },
+  {
     key: "cacele",
     name: "CACELE",
     type: "cafe24",
