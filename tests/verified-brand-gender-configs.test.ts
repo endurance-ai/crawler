@@ -4,6 +4,16 @@ import assert from "node:assert/strict"
 import {getSiteConfig} from "../src/configs/platforms"
 
 test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한다", () => {
+  const cacele = getSiteConfig("cacele")
+  assert.deepEqual(cacele?.defaultGender, ["women"])
+  assert.equal(cacele?.selectors?.productItem, 'li[id^="anchorBoxId_"]')
+  assert.deepEqual(cacele?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 52, gender: ["women"]},
+    {cateNo: 53, gender: ["women"]},
+    {cateNo: 54, gender: ["women"]},
+    {cateNo: 55, gender: ["women"]},
+    {cateNo: 56, gender: ["women"]},
+  ])
   const blank03 = getSiteConfig("blank03")
   assert.deepEqual(blank03?.defaultGender, ["women"])
   assert.deepEqual(

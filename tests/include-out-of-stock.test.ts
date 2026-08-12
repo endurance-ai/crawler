@@ -22,6 +22,7 @@ import {
   cafe24ManualCategoryUrl,
   cafe24ProductIdentityKey,
   inferCafe24DetailStock,
+  inferCafe24ListingStock,
   mergeCafe24DuplicateCategory,
   mergeCafe24DuplicateGender,
   shouldKeepOutOfStock,
@@ -39,6 +40,13 @@ test("cafe24: custom shop page can be used as a manual category URL", () => {
     cafe24ManualCategoryUrl("https://example.com", {cateNo: 24}),
     "https://example.com/product/list.html?cate_no=24",
   )
+})
+
+test("cafe24: product-name sold-out evidence overrides an empty badge placeholder", () => {
+  assert.equal(inferCafe24ListingStock(true, "[SOLD OUT] Layered T-Shirt"), false)
+  assert.equal(inferCafe24ListingStock(true, "Out of stock Knit"), false)
+  assert.equal(inferCafe24ListingStock(true, "품절 Wool Coat"), false)
+  assert.equal(inferCafe24ListingStock(true, "Layered T-Shirt"), true)
 })
 
 test("cafe24: 멀티브랜드 편집샵은 config.brand를 상품 브랜드로 고정하지 않는다", () => {

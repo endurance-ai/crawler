@@ -248,6 +248,17 @@ export function inferCafe24DetailStock(evidence: Cafe24DetailStockEvidence): boo
   return null
 }
 
+/**
+ * Listing themes sometimes render an empty `soldout_status` image while putting the
+ * actual stock state in the product name. An explicit label is stronger evidence
+ * than an empty/hidden badge placeholder.
+ */
+export function inferCafe24ListingStock(current: boolean, productName: string): boolean {
+  return /(?:\bsold\s*out\b|\bout\s*of\s*stock\b|\uD488\uC808)/i.test(productName)
+    ? false
+    : current
+}
+
 export function mergeCafe24DuplicateGender(existing: Product, incoming: Product): void {
   const genders = new Set([...(existing.gender ?? []), ...(incoming.gender ?? [])])
   if (genders.has("unisex") || (genders.has("men") && genders.has("women"))) {
@@ -826,7 +837,10 @@ async function collectProductsFromPage(
 
   const products = (evalResult.products || []) as Array<Record<string, unknown>>
   for (const p of products) {
-    if (typeof p.name === "string") p.name = cleanCafe24ProductName(p.name)
+    if (typeof p.name === "string") {
+      p.inStock = inferCafe24ListingStock(p.inStock !== false, p.name)
+      p.name = cleanCafe24ProductName(p.name)
+    }
   }
 
   return products as unknown as Product[]

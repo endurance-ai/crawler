@@ -11,6 +11,35 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "cacele",
+    name: "CACELE",
+    type: "cafe24",
+    baseUrl: "https://ca-cele.com",
+    brand: "CACELE",
+    defaultGender: ["women"],
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      productName: ".product-info .product-text.mb-2 span",
+      productPrice: ".product-info .cacele-format-currency",
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: 'a[href*="/product/"]',
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "OUTERWEAR", cateNo: 52, gender: ["women"]},
+        {name: "all", cateNo: 53, gender: ["women"]},
+        {name: "BOTTOM", cateNo: 54, gender: ["women"]},
+        {name: "DRESS", cateNo: 55, gender: ["women"]},
+        {name: "ACC", cateNo: 56, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node id=5687. Official About identifies CACELE as a women's clothing brand.",
+  },
+  {
     key: "liha",
     name: "LIHA",
     type: "shopify",
