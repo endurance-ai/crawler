@@ -102,6 +102,12 @@ export function classifyShopifyCategory(
   // combined signal for subcategory and fallback category matching
   const combined = `${titleLower} ${tagsText}`
 
+  // A verified non-fashion storefront may intentionally opt into the
+  // canonical catch-all so QC/Qwen can preserve and normalize its products.
+  if (typeLower === "other") {
+    return {category: "other", subcategory: undefined}
+  }
+
   // 1. Try product_type (skip noise values)
   let category: Category | undefined
   if (typeLower && !NOISE_TYPES.has(typeLower)) {

@@ -154,6 +154,8 @@ export interface ShopifyParseOptions {
    * 전이를 관측한다.
    */
   keepOutOfStock?: boolean
+  /** Exact, case-insensitive Shopify tags to omit before product mapping. */
+  excludedTags?: string[]
 }
 
 /**
@@ -192,7 +194,12 @@ export function parseShopifyProducts(
 
   if (!data.products || data.products.length === 0) return allProducts
 
+  const excludedTags = new Set((options.excludedTags ?? []).map((tag) => tag.trim().toLowerCase()))
+
   for (const sp of data.products) {
+    if (excludedTags.size > 0 && sp.tags.some((tag) => excludedTags.has(tag.trim().toLowerCase()))) {
+      continue
+    }
     // 룩북/기프트카드/통합 상품 제외 (실상품 아님, sentinel 가격값 들어감)
     const titleLower = sp.title.toLowerCase()
     const typeLower = (sp.product_type || "").toLowerCase()
@@ -497,6 +504,7 @@ export async function crawlShopify(
           genderDepartmentTagPrefixes: config.genderDepartmentTagPrefixes,
           genderByHandle,
           genderFromModelDescription: config.genderFromModelDescription,
+          excludedTags: config.shopifyExcludedTags,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )

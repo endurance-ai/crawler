@@ -23,6 +23,22 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.equal(getSiteConfig("pottery")?.selectors?.productItem, "div.product__item")
   assert.ok(getSiteConfig("pottery")?.category?.categories?.some((category) => category.cateNo === 747 && category.gender?.[0] === "men"))
   assert.ok(getSiteConfig("pottery")?.category?.categories?.some((category) => category.cateNo === 1022 && category.gender?.[0] === "women"))
+  const liha = getSiteConfig("liha")
+  assert.deepEqual(liha?.defaultGender, ["unisex"])
+  assert.equal(liha?.verifiedUnisexDefault, true)
+  assert.equal(liha?.defaultCategory, "other")
+  assert.equal(liha?.sourceCurrency, "GBP")
+  const tatras = getSiteConfig("tatras-official")
+  assert.deepEqual(tatras?.shopifyGenderCollections, {
+    men: ["all-products-men"],
+    women: ["all-products-women"],
+  })
+  assert.equal(tatras?.sourceCurrency, "EUR")
+  assert.deepEqual(tatras?.shopifyExcludedTags, ["KIDS"])
+  const cantonCollective = getSiteConfig("canton-collective")
+  assert.equal(cantonCollective?.multiBrand, true)
+  assert.deepEqual(cantonCollective?.defaultGender, ["women"])
+  assert.equal(cantonCollective?.sourceCurrency, "USD")
   for (const key of ["en-2706", "nomanual-shop"]) {
     assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])
     assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true)

@@ -79,3 +79,25 @@ test("men/women 양쪽 공식 부서 소속은 unisex, 명시적 unisex도 우�
   })
   assert.deepEqual(errors, [])
 })
+
+test("configured Shopify tags exclude products outside the supported taxonomy", () => {
+  const adult = shopifyProduct("adult")
+  const kids = {...shopifyProduct("kids"), tags: ["SALE", "KIDS"]}
+  const products = parseShopifyProducts(
+    {products: [adult, kids]},
+    "https://example.com",
+    "adult-site",
+    {excludedTags: ["kids"]},
+  )
+  assert.deepEqual(products.map((product) => product.productUrl), ["https://example.com/products/adult"])
+})
+
+test("verified non-fashion Shopify defaults retain the canonical other category", () => {
+  const products = parseShopifyProducts(
+    {products: [{...shopifyProduct("skin-oil"), title: "Idan Oil", product_type: ""}]},
+    "https://example.com",
+    "beauty-site",
+    {defaultCategory: "other"},
+  )
+  assert.equal(products[0]?.category, "other")
+})

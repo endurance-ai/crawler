@@ -10,6 +10,48 @@ import {SITE_GENDER_DEFAULTS} from "./gender-defaults"
 import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
+  {
+    key: "liha",
+    name: "LIHA",
+    type: "shopify",
+    baseUrl: "https://lihabeauty.com",
+    brand: "LIHA",
+    defaultGender: ["unisex"],
+    verifiedUnisexDefault: true,
+    defaultCategory: "other",
+    sourceCurrency: "GBP",
+    maxPages: 20,
+    crawlDelay: 1000,
+    notes: "brand_node id=4877. Official LIHA journal states all products are designed for all genders; cart.js reports GBP.",
+  },
+  {
+    key: "tatras-official",
+    name: "TATRAS",
+    type: "shopify",
+    baseUrl: "https://tatras-official.com",
+    brand: "TATRAS",
+    shopifyGenderCollections: {
+      men: ["all-products-men"],
+      women: ["all-products-women"],
+    },
+    shopifyExcludedTags: ["KIDS"],
+    sourceCurrency: "EUR",
+    maxPages: 20,
+    crawlDelay: 1000,
+    notes: "brand_node id=5703. Official All Products MEN/WOMEN Shopify collections provide product-level gender evidence; cart.js reports EUR.",
+  },
+  {
+    key: "canton-collective",
+    name: "Canton Collective",
+    type: "shopify",
+    baseUrl: "https://cantoncollective.com",
+    multiBrand: true,
+    defaultGender: ["women"],
+    sourceCurrency: "USD",
+    maxPages: 20,
+    crawlDelay: 1000,
+    notes: "brand_node id=5611. Official storefront identifies itself as a women's fashion multi-brand curation platform; preserve Shopify vendor as product brand. cart.js reports USD.",
+  },
   // ─── Manual 설정 완료 (카테고리 구조 깔끔) ─────────
 
   {
