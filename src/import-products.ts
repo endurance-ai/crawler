@@ -4,6 +4,7 @@
  * 사용법:
  *   npx dotenv -e .env.local -- npx tsx scripts/import-products.ts                  # data/ 내 전체
  *   npx dotenv -e .env.local -- npx tsx scripts/import-products.ts --site=obscura   # 특정 플랫폼만
+ *   --trusted-category  상세 DOM/LLM 등 신뢰 출처의 canonical category를 이름 규칙보다 우선
  */
 
 import * as fs from "fs"
@@ -20,6 +21,7 @@ import {getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {inferVerifiedSiteGenderFromName, SITE_GENDER_DEFAULTS} from "./configs/gender-defaults"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {mergeProductImages} from "./lib/product-images"
+import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
 import {
   canUsePlatformBrandFallback,
   resolveProductBrandNodeIdFromMaps,
@@ -563,6 +565,7 @@ async function main() {
   // --in-stock-only: 품절(in_stock=false) 상품을 적재에서 제외.
   // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
   const inStockOnly = process.argv.includes("--in-stock-only")
+  const trustedCategory = process.argv.includes("--trusted-category")
 
   // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
   const dryRun = process.argv.includes("--dry-run")
@@ -765,7 +768,7 @@ async function main() {
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
     const qcRaw = applyProductQcGate(rawWithGender, platform, {
-      trustedCategory: config?.type === "shopify" || config?.trustedCategory === true,
+      trustedCategory: trustedCategory || config?.type === "shopify" || config?.trustedCategory === true,
       kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
       verifiedUnisexDefault: config?.verifiedUnisexDefault,
     })
@@ -820,7 +823,10 @@ async function main() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
       const brand = resolveProductBrand(p.brand, config)
-      const productUrl = (p.productUrl as string) || ""
+      const rawProductUrl = (p.productUrl as string) || ""
+      const productUrl = config?.type === "cafe24"
+        ? canonicalizeCafe24ProductUrl(rawProductUrl)
+        : rawProductUrl
       const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
 
       // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
@@ -844,7 +850,7 @@ async function main() {
       // --in-stock-only: 품절 상품 적재 제외
       if (inStockOnly && p.inStock === false) return null
       // product_no 추출
-      const pnoMatch = productUrl.match(/product_no=(\d+)/)
+      const pnoMatch = productUrl.match(/product_no=(\d+)/) ?? productUrl.match(/\/product\/[^/]+\/(\d+)(?:\/|$)/)
       const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
 
       const sourceCurrency = (p.sourceCurrency as string | undefined) ?? "KRW"

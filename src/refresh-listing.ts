@@ -180,7 +180,10 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
         })
         // 확장자 글롭에서 교체 — 그 방식은 `.js` 추적 스크립트를 못 막아 페이지당
         // 고유 호스트명 17개 중 16개가 그대로 조회됐다 (request-blocking.ts 헤더).
-        await installRequestBlocking(context)
+        // Cafe24 테마는 모든 상품 카드에 soldout 배지를 렌더한 뒤 재고 상품에서는
+        // CSS로 숨기기도 한다(toomuch 실측). stylesheet를 막으면 computed display가
+        // 기본값으로 돌아가 전 상품을 품절로 오판하므로 목록 갱신에서는 CSS를 허용한다.
+        await installRequestBlocking(context, {allowStylesheets: true})
         const page = await context.newPage()
         return await crawlCafe24(page, listingConfig, undefined, undefined, {
           listingOnly: true,

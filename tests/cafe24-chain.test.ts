@@ -5,7 +5,10 @@ import {
   applyCafe24DetailFallbacks,
   assessCafe24ProductQuality,
   cafe24CategoryGenderSource,
+  canonicalizeCafe24ProductUrl,
   cleanCafe24ProductName,
+  dedupeCafe24ProductsByIdentity,
+  filterCafe24ProductsForCategory,
   filterCafe24ProductsWithUsablePrice,
   extractCafe24DetailFallbacks,
   inferCafe24Currency,
@@ -50,6 +53,60 @@ test("Cafe24 category chain parses pretty category URLs and rejects product deta
       "Example Shirt",
     ),
     null,
+  )
+})
+
+test("Cafe24 category validation removes global widgets and rejects stale category pages", () => {
+  const global = product({
+    name: "Global recommendation",
+    productUrl: "https://shop.test/product/global/100/category/1/display/6/",
+  })
+  const categoryProduct = product({
+    name: "Category product",
+    productUrl: "https://shop.test/product/category-product/200/category/24/display/1/",
+  })
+
+  assert.deepEqual(filterCafe24ProductsForCategory([global, categoryProduct], 24), [categoryProduct])
+  assert.deepEqual(filterCafe24ProductsForCategory([global], 24), [])
+})
+
+test("Cafe24 category validation preserves themes whose product URLs carry no category", () => {
+  const queryProduct = product({
+    productUrl: "https://shop.test/product/detail.html?product_no=200",
+  })
+  assert.deepEqual(filterCafe24ProductsForCategory([queryProduct], 24), [queryProduct])
+})
+
+test("Cafe24 products dedupe by product_no across category-specific URLs", () => {
+  const first = product({
+    productUrl: "https://shop.test/product/same/200/category/24/display/1/",
+  })
+  const duplicate = product({
+    productUrl: "https://shop.test/product/same/200/category/193/display/1/",
+  })
+  const other = product({
+    productUrl: "https://shop.test/product/other/201/category/24/display/1/",
+  })
+
+  const merged: Array<[Product, Product]> = []
+  assert.deepEqual(
+    dedupeCafe24ProductsByIdentity(
+      [first, duplicate, other],
+      (existing, incoming) => merged.push([existing, incoming]),
+    ),
+    [first, other],
+  )
+  assert.deepEqual(merged, [[first, duplicate]])
+})
+
+test("Cafe24 canonical product URL is stable across category and tracking changes", () => {
+  assert.equal(
+    canonicalizeCafe24ProductUrl("https://shop.test/product/same/200/category/24/display/1/?icid=widget"),
+    "https://shop.test/product/detail.html?product_no=200",
+  )
+  assert.equal(
+    canonicalizeCafe24ProductUrl("https://shop.test/product/detail.html?product_no=200&cate_no=24&display_group=1"),
+    "https://shop.test/product/detail.html?product_no=200",
   )
 })
 

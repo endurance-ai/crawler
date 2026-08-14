@@ -122,6 +122,8 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   )
 
   assert.deepEqual(getSiteConfig("heretic")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("toomuch")?.defaultGender, ["women"])
+  assert.equal(getSiteConfig("toomuch")?.kidsGenderNoisePatterns?.length, 1)
   assert.deepEqual(getSiteConfig("twojeys")?.defaultGender, ["men"])
   assert.deepEqual(getSiteConfig("porterna")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("margesherwood")?.defaultGender, ["women"])

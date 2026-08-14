@@ -3132,6 +3132,8 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
 const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 여성용 슬림핏 티셔츠의 상품형 이름. 실제 아동 라인은 없다.
+  toomuch: [/\bbaby[-\s]?(?:t|tee|t[-\s]?shirt)\b/gi],
   // 공식 여성 컬렉션의 성인 XXS-2XL 상품에서 쓰는 색상명이다.
   // `baby pink`의 baby만으로 아동복으로 분류하면 여성 기본값이 막힌다.
   stapleandhue: [

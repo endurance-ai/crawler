@@ -290,6 +290,7 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // "men's jewelry brand"로 반복 정의. Shopify 상품 태그에는 성별 신호가
   // 없으므로 상품 단위 추론 대신 검증된 브랜드 타깃을 최하위 기본값으로 쓴다.
   twojeys: ["men"],
+  toomuch: ["women"], // 여성 의류/드레스/란제리/스윔웨어 카탈로그, 남성 라인 없음
   rense: ["women"], // OUTWEAR/TOPS/BOTTOMS/DRESS/ACC
   treemingbird: ["women"], // DRESSES/SKIRTS/SWIMWEAR + Halter Neck Backless Knit Top
   yahnsisi: ["women"], // Tops/Knits/Basics/Bottoms/Dresses + Lazy Summer Dress

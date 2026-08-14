@@ -23,6 +23,8 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
   tops: [
     [/\bhoodies?\b|\bzip[\s-]ups?\b/, "hoodie"],
     [/\bsweatshirts?\b/, "sweatshirt"],
+    [/\bbodysuits?\b|\bleotards?\b/, "bodysuit"],
+    [/\basymmetric(?:al)?\b/, "asymmetric-top"],
     [/\bcamisoles?\b|\bslip\s+tops?\b/, "camisole"],
     [/\bcrop[\s-]?tops?\b|\bcropped\s+tops?\b/, "crop-top"],
     [/\btank[\s-]?tops?\b|\btanks?\b|\bsleeveless\b/, "tank-top"],
@@ -33,6 +35,8 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     [/\bshirts?\b/, "shirt"],
   ],
   knitwear: [
+    // Before the "sweater" rule on purpose — "sweater vest" contains "sweater".
+    [/\bvests?\b|\bsweater\s+vests?\b/, "sweater-vest"],
     [/\bturtlenecks?\b|\bmock[\s-]necks?\b|\broll[\s-]necks?\b/, "turtleneck"],
     [/\bcardigans?\b/, "cardigan"],
     [/\bpullovers?\b|\bcrewnecks?\b|\bcrew[\s-]necks?\b/, "pullover"],
@@ -46,7 +50,9 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     // split them, mirroring dresses' \bmini[\s-]?dresses?\b below.
     [/\b(?:mini|midi|maxi)?[\s-]?skirts?\b/, "skirt"],
     [/\bleggings?\b/, "leggings"],
-    [/\bsweatpants?\b|\bfleece\s+pants?\b/, "sweatpants"],
+    // "sweat pants" (spaced) used to fall through to null; now the generic
+    // "pants" rule below would swallow it, so the separator is modeled here.
+    [/\bsweat[\s-]?pants?\b|\bfleece\s+pants?\b/, "sweatpants"],
     [/\bjoggers?\b|\btrack\s+pants?\b/, "joggers"],
     [/\bcargos?\b/, "cargo-pants"],
     [/\bwide[\s-](?:pants?|legs?|trousers)\b|\bpalazzos?\b/, "wide-pants"],
@@ -54,6 +60,10 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     [/\bchinos?\b|\bkhaki\s+pants?\b/, "chinos"],
     [/\bjeans?\b|\bdenim\s+pants?\b/, "jeans"],
     [/\btrousers?\b|\bdress\s+pants?\b|\bformal\s+pants?\b|\bslacks?\b/, "trousers"],
+    // Generic catch-all — must stay last so every cut above wins first.
+    // Do not match "bottoms": it is the broad category label, not evidence
+    // that the product is specifically a pair of pants.
+    [/\bpants?\b/, "pants"],
   ],
   dresses: [
     [/\bshirt[\s-]dresses?\b/, "shirt-dress"],
@@ -65,18 +75,43 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     [/\bmidi[\s-]?dresses?\b|\bmidis?\b/, "midi-dress"],
     [/\bmaxi[\s-]?dresses?\b|\bmaxis?\b/, "maxi-dress"],
   ],
+  // Order is priority — first match wins. Every rule added by the 2026-08-10
+  // jacket split sits *before* the generic type it refines (varsity before
+  // bomber, biker/suede/shearling before leather-jacket, quilted after
+  // down-jacket), and the bare `jacket` catch-all is last on purpose: a name
+  // with no style cue stays generic rather than being guessed into a subtype.
   outerwear: [
     [/\bovercoats?\b|\bwool\s+coats?\b|\btopcoats?\b|\btop\s+coats?\b/, "overcoat"],
     [/\btrenche?s?\b/, "trench-coat"],
+    [/\banoraks?\b/, "anorak"],
     [/\bparkas?\b/, "parka"],
+    [/\bvarsity\b|\blettermans?\b|\bbaseball\s+jackets?\b/, "varsity-jacket"],
     [/\bbombers?\b|ma-?1\b/, "bomber"],
     [/\bblazers?\b/, "blazer"],
     [/\bvests?\b|\bgilets?\b/, "vest"],
+    [/\bbikers?\b|\bmotorcycle\b|\bmoto\s+jackets?\b|\bperfectos?\b/, "biker-jacket"],
+    [/\bshearlings?\b/, "shearling-jacket"],
+    [/\bsuede\b/, "suede-jacket"],
     [/\bleather\s+(?:jackets?|coats?)\b/, "leather-jacket"],
     [/\bdenim\s+jackets?\b|\bjean\s+jackets?\b|\btruckers?\b/, "denim-jacket"],
-    [/\bdown\s+(?:jackets?|coats?|puffers?)\b|\bpuffers?\b|\bpadded\s+jackets?\b|\bquilted\s+jackets?\b/, "down-jacket"],
+    [/\bchore\s+(?:jackets?|coats?)\b/, "chore-jacket"],
+    [/\bharringtons?\b/, "harrington"],
+    [/\bcoach\s+jackets?\b/, "coach-jacket"],
+    [/\btrack\s+(?:jackets?|tops?)\b/, "track-jacket"],
+    [/\bfield\s+jackets?\b|\bm-?65\b/, "field-jacket"],
+    [/\bshackets?\b|\bshirt[\s-]jackets?\b|\bovershirts?\b/, "shirt-jacket"],
+    // "quilted" only reaches its own bucket when the name carries no explicit
+    // down/puffer/padded cue — a "quilted down jacket" stays down-jacket, which
+    // is how every already-imported row was classified.
+    [/\bdown\s+(?:jackets?|coats?|puffers?)\b|\bpuffers?\b|\bpadded\s+jackets?\b/, "down-jacket"],
+    [/\bquilted\b/, "quilted-jacket"],
     [/\bwindbreakers?\b|\bwind\s+jackets?\b|\bshell\s+jackets?\b/, "windbreaker"],
+    [/\b(?:faux[\s-])?furs?\b/, "fur-jacket"],
     [/\bfleece\b|\bpolar\b|\bsherpas?\b/, "fleece"],
+    // Fabric, not silhouette — only reached once every cut above has missed,
+    // so a wool bomber stays a bomber and a wool coat stays an overcoat.
+    [/\bwool\b/, "wool-jacket"],
+    [/\bjackets?\b/, "jacket"],
   ],
   underwear: [
     [/\bbras?\b|\bbralettes?\b/, "bra"],
@@ -94,6 +129,7 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
   ],
   shoes: [
     [/\brunning\b|\btrails?\b|\brunners?\b/, "running-shoes"],
+    [/\bflip[\s-]?flops?\b|\bthong\s+sandals?\b/, "flip-flops"],
     [/\bsandals?\b/, "sandals"],
     [/\bslides?\b/, "slides"],
     [/\bmules?\b|\bclogs?\b/, "mules"],
@@ -106,6 +142,7 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     [/\bsneakers?\b|\btrainers?\b/, "sneakers"],
   ],
   bags: [
+    [/\bcamera\s*bags?\b/, "camera-bag"],
     [/\bbackpacks?\b|\brucksacks?\b/, "backpack"],
     [/\bbelt[\s-]bags?\b|\bfann(?:y|ies)\b|\bbum\s+bags?\b|\bwaist\s+bags?\b/, "belt-bag"],
     [/\bmessengers?\b|\bsatchels?\b/, "messenger"],
@@ -114,8 +151,13 @@ export const SUBCATEGORY_BY_CATEGORY: Record<Category, SubcategoryMap> = {
     [/\bcrossbod(?:y|ies)\b|\bcross[\s-]bod(?:y|ies)\b|\bshoulder\s+straps?\b/, "crossbody"],
     [/\bshoulder[\s-]bags?\b/, "shoulder-bag"],
     [/\btotes?\b/, "tote"],
+    [/\bhobos?\b/, "hobo-bag"],
+    // Size and generic shape come last — a "mini crossbody" is a crossbody.
+    [/\bmini[\s-]?bags?\b/, "mini-bag"],
+    [/\bhandbags?\b/, "handbag"],
   ],
   accessories: [
+    [/\bphone\s*cases?\b|\biphone\s+cases?\b/, "phone-case"],
     [/\bwatch(?:es)?\b/, "watch"],
     [/\bscarf\b|\bscarves\b|\bmufflers?\b/, "scarf"],
     [/\bbelts?\b/, "belt"],

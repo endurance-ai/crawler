@@ -580,6 +580,44 @@ per-site color 전략, QC `COLOR_RULES` 를 전부 제거했다.
   전량 재크롤 전에 소수 사이트로 수율을 먼저 재라. 끝내 미확인인 행은
   `sql/runbooks/2026-08-05-delete-gender-unresolved.sql` 로 삭제한다.
 
+### subcategory 어휘: 추가만 한다 (2026-08-10 jacket 세분화)
+
+`SUBCATEGORIES`(`src/lib/enums/product-enums.ts`)는 category/subcategory 의 정본
+어휘이고, `src/lib/subcategory-classifier.ts` 가 유일한 판정기다 — QC 게이트
+(write-path), shopify 분류기, `repair:product-subcategory`(백필), Qwen 프롬프트
+(`buildSubcategoryReference`)가 전부 여기서 갈라져 나온다. **판정 정규식을 다른
+곳에 새로 쓰지 말 것** (gender 의 `GENDER_RULES` 와 같은 규율).
+
+- **기존 토큰은 철자도 의미도 바꾸지 않는다.** 어휘 변경은 항상 추가(additive)다.
+  기존 토큰을 이름만 바꾸면 이미 적재된 수만 행이 하루아침에 noncanonical 이
+  되어 QC 게이트에 drop 되고, 검색 필터가 조용히 비어버린다. 되돌리기는
+  "추가분을 다시 지우는 것"으로 성립해야 하며, 그 전제가 기존 토큰 불변이다.
+- **단서가 없으면 generic 값에 남긴다.** outerwear `jacket`, bottoms `pants` 는
+  오분류 방지용 상위값이다 — 이름·설명에 스타일 단서가 없는 상품을 세부 타입으로
+  추측하느니 generic 으로 두는 편이 검색 품질에 낫다. jacket 세분화 실측에서도
+  28%가 여기 남았다. 두 값 모두 각 카테고리 규칙 배열의 **맨 끝**에 있어야 한다.
+- **판정 순서가 곧 우선순위다** (`matchSubcategory` 는 첫 매치를 쓴다). 새 규칙은
+  자기가 세분화하는 상위 타입보다 **앞에** 넣는다: varsity → bomber 앞,
+  biker/suede/shearling → leather-jacket 앞, knitwear vest → sweater 앞
+  ("sweater vest" 가 sweater 로 새지 않게). 반대로 `quilted` 는 down-jacket
+  **뒤**다 — "quilted down jacket" 은 down-jacket 으로 남아야 기존 행과 판정이
+  일치한다.
+- **카테고리가 틀린 행을 어휘로 덮지 말 것.** `outerwear/sweatshirts`,
+  `outerwear/hoodies` 는 subcategory 문제가 아니라 category 오분류다. outerwear
+  어휘에 sweatshirt 를 넣으면 틀린 category 가 정상처럼 보이게 된다 — drop 이 맞다.
+- **스타일 묘사어·비의류는 어휘에 넣지 않는다** (`asymmetric tops`,
+  `phone cases`, `spatz`). 값이 없는 것이 틀린 값보다 낫다.
+- 이미 적재된 행의 표기 정규화(`blazers`→`blazer`, `mufflers`→`scarf`,
+  `high heel`→`heels`, `mini`→`mini-dress` …)는 `pnpm repair:product-subcategory`
+  (`--plan` → 육안 검토 → `--apply`)가 담당한다. 이 스크립트는 UPDATE 만 하고
+  before 값 일치 가드 + drift 검사 + `.progress.json` 재개를 갖추고 있어 재실행이
+  멱등이다. **어휘를 늘린 뒤에는 계획을 새로 생성해야 한다** — 판정이 바뀌면
+  기존 계획은 drift 로 거부된다.
+- 남은 모호함: `skirt`(mini/midi/maxi 를 의도적으로 하나로 접음)와 `shorts`
+  (데님/치노/보드숏 혼재)는 dresses 가 길이별로 쪼개져 있는 것과 비대칭이다.
+  쪼갤지 여부는 검색 UX 결정이지 크롤러 버그가 아니다 — 쪼개기로 하면 위의
+  additive 규율대로 `skirt` 를 남긴 채 `mini-skirt` 등을 **추가**한다.
+
 ### 크롤 금지 사이트
 
 - **29cm** — 2026-08-03 전면 제거. ToS 제11조 제2항 9호가 '크롤러'를 명시적으로

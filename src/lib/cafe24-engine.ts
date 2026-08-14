@@ -26,8 +26,10 @@ import {
   assessCafe24ProductQuality,
   cleanCafe24ProductName,
   cafe24CategoryGenderSource,
+  dedupeCafe24ProductsByIdentity,
   dedupeAndFilterCafe24Categories,
   extractCafe24DetailFallbacks,
+  filterCafe24ProductsForCategory,
   filterCafe24ProductsWithUsablePrice,
   parseCafe24CategoryHref,
   runFirstUsefulCafe24Step,
@@ -397,12 +399,14 @@ async function discoverCategories(
   // Cafe24는 JS 렌더링이 필요한 경우가 많음
   await page.waitForTimeout(2000)
 
-  const selectors = [
-    config.category?.discoverySelector || 'a[href*="cate_no="]',
-    'a[href*="/category/"]',
-    'a[href*="/product/list.html"]',
-    'a[href*="cate_no="], a[href*="/category/"], a[href*="/product/list.html"]',
-  ]
+  // query형과 pretty URL형을 처음부터 함께 본다. 먼저 2개 이상 나온 전략에서
+  // 멈추는 기존 체인에 각각을 따로 넣으면 query 링크가 충분한 사이트에서
+  // `/category/shop/24/` 같은 canonical SHOP 링크를 영구히 놓친다(toomuch).
+  const combinedSelector =
+    'a[href*="cate_no="], a[href*="/category/"], a[href*="/product/list.html"]'
+  const selectors = config.category?.discoverySelector
+    ? [config.category.discoverySelector, combinedSelector]
+    : [combinedSelector]
 
   const extractBySelector = async (selector: string): Promise<Cafe24CategoryCandidate[]> => {
     const links = await withTimeout(
@@ -901,7 +905,7 @@ async function crawlCategory(
       if (listingOnly) await waitForCafe24ListReady(page)
       else await page.waitForTimeout(3000) // 상세/온보딩 경로의 기존 대기 보존
 
-      const products = await collectProductsFromPage(
+      const collected = await collectProductsFromPage(
         page,
         config,
         category.name,
@@ -909,6 +913,7 @@ async function crawlCategory(
         cafe24BrandOverride(config),
         timing
       )
+      const products = filterCafe24ProductsForCategory(collected, category.cateNo)
 
       if (products.length === 0) break // 빈 페이지면 중단
 
@@ -1057,21 +1062,13 @@ export async function crawlCafe24(
     await new Promise((r) => setTimeout(r, delay))
   }
 
-  // 중복 제거 + 품절 제외 (productUrl 기준). listingOnly(갱신)와
+  // 중복 제거 + 품절 제외. Cafe24는 같은 상품을 여러 카테고리 URL로 노출하므로
+  // URL 전체가 아니라 product_no identity로 합친다. listingOnly(갱신)와
   // includeOutOfStock(재수집)에서는 품절도 남긴다.
-  const byUrl = new Map<string, Product>()
-  for (const product of allProducts) {
-    if (!product.productUrl) continue
-    const identityKey = cafe24ProductIdentityKey(product.productUrl)
-    const existing = byUrl.get(identityKey)
-    if (existing) {
-      mergeCafe24DuplicateGender(existing, product)
-      mergeCafe24DuplicateCategory(existing, product)
-      continue
-    }
-    byUrl.set(identityKey, product)
-  }
-  const dedupedAll = [...byUrl.values()]
+  const dedupedAll = dedupeCafe24ProductsByIdentity(allProducts, (existing, product) => {
+    mergeCafe24DuplicateGender(existing, product)
+    mergeCafe24DuplicateCategory(existing, product)
+  })
   const dedupedProducts = (config.verifyStockFromDetail || shouldKeepOutOfStock(options))
     ? dedupedAll
     : dedupedAll.filter((p) => p.inStock)
