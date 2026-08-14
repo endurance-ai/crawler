@@ -29,7 +29,7 @@ paste into the live files. That paste step is the deliberate human gate.
 |---|---|
 | `src/lib/parsers/detail/selector-registry.ts` | `DETAIL_REGISTRY`: per-site selectors + wait recipe + strategy id. All Cafe24-family sites collapsed here (REQ-CRAWLER-003). |
 | `src/lib/parsers/field-extractors/strategies.ts` | `STRATEGIES`: the per-strategy extraction algorithms the registry-driven parser dispatches into. |
-| `src/lib/parsers/field-extractors/` | Shared extraction primitives (`color`, `description`, `material`, `productCode`) — the single source of extraction logic. |
+| `src/lib/parsers/field-extractors/` | Shared extraction primitives (`material`, `productCode`) — the single source of extraction logic. Color and description extraction were removed in favor of VLM-derived `product_features`. |
 | `src/lib/parsers/detail/registry-detail-parser.ts` | The ONE `IDetailParser` impl. `getDetailParser(key)` returns site-keyed subclasses of it. |
 | `src/lib/parsers/detail/index.ts` | `getDetailParser()` routing + registry-backed shims (the named `*DetailParser` classes). |
 | `src/lib/parsers/parser-strategy.ts` | `Parser<I,O>` strategy interface + `ParserRegistry` DI container + `defaultParserRegistry` (REQ-CRAWLER-004 extension point). |
@@ -98,9 +98,10 @@ npm run typecheck # exit 0 (the new stub + wiring must typecheck)
 - The validation gate (`src/lib/core/product-validator.ts`, REQ-CRAWLER-001)
   freezes the **current** output shape. A new platform must emit products
   that pass `ProductSchema` unchanged — it does not introduce new fields.
-  Note (2026-06): `category` and `color` are now **mandatory** (`z.string().min(1)`
-  + DB `NOT NULL`, migration 091). Products missing either are dropped at the
-  gate (`validation_reject`), not loaded. See
+  `category` is **mandatory** (`z.string().min(1)` + DB `NOT NULL`, migration
+  091). Products missing it are dropped at the gate (`validation_reject`), not
+  loaded. Color is not part of crawler output; VLM-derived
+  `product_features.feature_metadata.primary_color` is the single source. See
   [`onboard-new-brand.md`](./onboard-new-brand.md) for the full
   crawl → import → embed pipeline and what each step must verify.
 - Behavior preservation is HARD: a new platform adds a new code path; it
