@@ -25,6 +25,8 @@
  * Usage:
  *   npx dotenv -e .env.local -- tsx tools/select-onboard-batch.ts --limit=5 --out=path.json
  *   npx dotenv -e .env.local -- tsx tools/select-onboard-batch.ts --limit=20 --out=path.json
+ *   npx dotenv -e .env.local -- tsx tools/select-onboard-batch.ts --country=KR --brand-ids=1,2,3 --out=path.json
+ *   npx dotenv -e .env.local -- tsx tools/select-onboard-batch.ts --platform-keys=brand-a,brand-b --out=path.json
  */
 import * as fs from "fs"
 import {createProductCollectionClient} from "../src/lib/product-collection"
@@ -39,6 +41,15 @@ function flag(name: string, fallback?: string): string | undefined {
 
 async function main() {
   const limit = Number(flag("limit", "5"))
+  const country = flag("country")?.trim().toUpperCase()
+  const brandIds = (flag("brand-ids") ?? "")
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isInteger(value) && value > 0)
+  const platformKeys = (flag("platform-keys") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
   const outPath = flag("out")
   if (!outPath) throw new Error("--out=<path.json> is required")
 
@@ -46,7 +57,7 @@ async function main() {
   // 뽑는다 (10배, 최소 50) — 이 뷰는 소량이라 과다조회 비용이 무시할 만한 수준이다.
   const fetchSize = Math.max(limit * 10, 50)
   const db = createProductCollectionClient()
-  const {data, error} = await db
+  let query = db
     .from("product_crawl_brands")
     .select("brand_node_id,brand_name,platform_key,platform_type,homepage_url,status,status_updated_at,kr_eligibility_status")
     .in("status", ["tech_detected", "qc_failed"])
@@ -63,6 +74,11 @@ async function main() {
     .in("kr_eligibility_status", ["eligible_origin", "eligible_storefront"])
     .order("status_updated_at", {ascending: false, nullsFirst: false})
     .limit(fetchSize)
+  if (country) query = query.eq("wiki->>origin_country", country)
+  if (brandIds.length > 0) query = query.in("brand_node_id", brandIds)
+  if (platformKeys.length > 0) query = query.in("platform_key", platformKeys)
+
+  const {data, error} = await query
   if (error) throw new Error(`select failed: ${error.message}`)
 
   const rows = data ?? []

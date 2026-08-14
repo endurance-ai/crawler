@@ -119,7 +119,7 @@ interface ClassifyResponse {
   error?: string
 }
 
-// ─── Token bucket (analyze-products.ts 패턴) ─────────
+// ─── Token bucket ───────────────────────────────────
 
 const tokenBucket = {
   interval: 3000,
@@ -244,7 +244,7 @@ async function callClassify(
         return {response: json, httpStatus, attempts}
       }
 
-      // 429 또는 vlm_failed (502, OpenAI 429 마스킹) → retry
+      // 429 또는 vlm_failed(상위 모델 서비스 오류를 502로 래핑) → retry
       const errStr = json.error ?? ""
       const is429 =
         httpStatus === 429 ||

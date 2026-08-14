@@ -381,12 +381,38 @@ export async function probeKrMarketEligibility(input: {
   homepageHtml: string
   platformType: string
   originCountry: string | null
+  verifiedStorefront?: string | null
+  verifiedCurrency?: string | null
+  verifiedSources?: unknown
   fetchImpl?: FetchLike
   checkedAt?: string
 }): Promise<KrEligibilityAssessment> {
   const checkedAt = input.checkedAt ?? new Date().toISOString()
   if (input.originCountry?.toUpperCase() === "KR") {
     return assessKrMarketProbes([], input.originCountry, checkedAt)
+  }
+  // Homepage verification is a separate, human-reviewed stage. Preserve its
+  // explicit KR storefront + KRW evidence instead of demanding a redundant
+  // /kr locale path from a native Korean shop (for example oscitare.com).
+  if (
+    input.verifiedStorefront?.toUpperCase() === "KR" &&
+    input.verifiedCurrency?.toUpperCase() === "KRW"
+  ) {
+    return {
+      status: "eligible_storefront",
+      localizationStatus: "supported",
+      shippingStatus: "unknown",
+      priceCurrency: "KRW",
+      storefrontUrl: input.homepageUrl,
+      checkedAt,
+      nextCheckAt: null,
+      evidence: {
+        rule: "verified_homepage_storefront",
+        storefront: "KR",
+        currency: "KRW",
+        sources: Array.isArray(input.verifiedSources) ? input.verifiedSources : [],
+      },
+    }
   }
   const fetchImpl = input.fetchImpl ?? fetch
   const discovered = discoverKrStorefrontUrls(input.homepageUrl, input.homepageHtml)

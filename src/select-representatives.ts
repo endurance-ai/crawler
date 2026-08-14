@@ -100,7 +100,7 @@ interface BrandRow {
 
 // ─── 이미지 URL 유효성 ───────────────────────────────
 
-// OpenAI / LiteLLM 이 외부 fetch 시도 시 403 반환하는 CDN 도메인 블랙리스트.
+// 모델 서비스가 외부 fetch를 시도할 때 403을 반환하는 CDN 도메인 블랙리스트.
 // brand-VLM 호출 시 5장 묶음 중 1장만 invalid 해도 전체 400 fail 되므로
 // rep 후보 단계에서 미리 제외. 추가 차단 도메인 발견 시 본 배열에 append.
 const BLOCKED_IMAGE_DOMAINS = [
@@ -110,7 +110,7 @@ const BLOCKED_IMAGE_DOMAINS = [
 function isUsableImage(url: string | null): boolean {
   if (!url) return false
   if (!url.startsWith("http")) return false
-  // analyze-products.ts 와 동일한 필터 — icon/logo/badge 류 배제
+  // 대표 이미지 필터 — icon/logo/badge 류 배제
   if (/\/(icon|logo|badge)_/.test(url)) return false
   // CDN 외부 fetch 차단 도메인 배제 (brand-VLM 5장 묶음 fail 회피)
   for (const blocked of BLOCKED_IMAGE_DOMAINS) {

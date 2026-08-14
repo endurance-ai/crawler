@@ -5,11 +5,48 @@ import {
   cleanGenderScope,
   hasGenderToken,
   inferDualDepartmentFromTags,
+  inferGenderFromDepartmentTagPrefixes,
+  inferGenderFromModelDescription,
   inferGenderFromText,
   inferGenderFromUrl,
   isKidsText,
   resolveProductGenderWithSource,
 } from "../src/lib/product-gender"
+
+test("사이트별 구조화 부서 태그 prefix는 단일/양쪽 성별을 구분한다", () => {
+  const prefixes = {men: ["M_", "man_product"], women: ["W_", "woman_product"]}
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["M_ACCESSORIES"], prefixes), "men")
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["W_TOPS"], prefixes), "women")
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["M_JEWELRY", "W_JEWELRY"], prefixes), "unisex")
+  assert.equal(inferGenderFromDepartmentTagPrefixes(["modelview"], prefixes), null)
+})
+
+test("사이트 고유 HER/HIM 표기는 해당 사이트 설정에서만 성별 근거가 된다", () => {
+  const patterns = {women: [/\bHER\b/i], men: [/\bHIM\b/i]}
+  assert.deepEqual(
+    resolveProductGenderWithSource([], {name: "INNERPASSION VOL.01 HER"}, "engine", {genderTextPatterns: patterns}),
+    {gender: ["women"], source: "text"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource([], {name: "INNERPASSION VOL.01 HIM"}, "engine", {genderTextPatterns: patterns}),
+    {gender: ["men"], source: "text"},
+  )
+  assert.deepEqual(resolveProductGenderWithSource([], {name: "A gift for her"}).gender, [])
+})
+
+test("명시적 모델 라벨은 한쪽/양쪽 착용을 구분하고 일반 문장은 무시한다", () => {
+  assert.equal(inferGenderFromModelDescription("Male (184cm): L"), "men")
+  assert.equal(inferGenderFromModelDescription("Female: (173cm): S"), "women")
+  assert.equal(inferGenderFromModelDescription("Classic unisex fit with a straight cut"), "unisex")
+  assert.equal(inferGenderFromModelDescription("Male (184cm): L - Female (177cm): S"), "unisex")
+  assert.equal(inferGenderFromModelDescription("男性着用モデルは 187cm Lサイズを着用しています。"), "men")
+  assert.equal(inferGenderFromModelDescription("女性着用モデルは 175cm Lサイズを着用しています。"), "women")
+  assert.equal(
+    inferGenderFromModelDescription("男性着用モデルは 187cm Lサイズ。女性着用モデルは 175cm Lサイズ。"),
+    "unisex",
+  )
+  assert.equal(inferGenderFromModelDescription("A feminine fit for all models"), null)
+})
 
 // ─── 회귀: unisex 세탁 ────────────────────────────────────────────────────
 //
@@ -142,6 +179,28 @@ test("config_default 는 상품 단위 근거가 전혀 없을 때 쓰인다", (
 
 test("config_default unisex 는 미확정을 공용으로 세탁하지 않는다", () => {
   const r = resolveProductGenderWithSource(["unisex"], {name: "Signature Wool Coat"}, "config_default")
+  assert.deepEqual(r.gender, [])
+  assert.equal(r.source, null)
+})
+
+test("공식 검증된 사이트만 config_default unisex를 허용한다", () => {
+  const r = resolveProductGenderWithSource(
+    ["unisex"],
+    {name: "Signature Wool Coat"},
+    "config_default",
+    {verifiedUnisexDefault: true},
+  )
+  assert.deepEqual(r.gender, ["unisex"])
+  assert.equal(r.source, "config_default")
+})
+
+test("공식 검증된 unisex 기본값도 kids에는 적용하지 않는다", () => {
+  const r = resolveProductGenderWithSource(
+    ["unisex"],
+    {name: "Kids Puffer Jacket"},
+    "config_default",
+    {verifiedUnisexDefault: true},
+  )
   assert.deepEqual(r.gender, [])
   assert.equal(r.source, null)
 })

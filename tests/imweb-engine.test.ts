@@ -53,6 +53,17 @@ test("no sale: salePrice null, originalPrice mirrors price", () => {
   assert.equal(p.originalPrice, 262400)
 })
 
+test("uses a verified site default category when the imweb list has no category label", () => {
+  const p = parseImwebListItem(
+    item(),
+    {...CONFIG, defaultCategory: "bottoms", defaultSubcategory: "jeans"},
+    "",
+  )
+  assert.ok(p)
+  assert.equal(p.category, "bottoms")
+  assert.equal(p.subcategory, "jeans")
+})
+
 test("brand does NOT fall back to config.name when config.brand empty (platform-as-brand 오염 방지)", () => {
   const p = parseImwebListItem(item(), {...CONFIG, brand: undefined}, "")
   assert.ok(p)

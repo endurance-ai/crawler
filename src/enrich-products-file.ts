@@ -61,6 +61,7 @@ import {
   writeProductsFile,
 } from "./lib/enrich-file"
 import {enrichProductWithLlm, type LlmTokenUsage} from "./lib/llm-product-enrichment"
+import {qwenNormalizationInputHash} from "./lib/product-qwen-normalization"
 import type {Product, SiteConfig} from "./lib/types"
 
 const USER_AGENT =
@@ -186,11 +187,6 @@ async function main(): Promise<void> {
   // 아래 enrichOne 은 호이스팅되는 함수 선언이라 위 가드의 좁히기가 적용되지
   // 않는다 — 좁혀진 값을 const 로 한 번 붙잡아 둔다.
   const config: SiteConfig = found
-  if (!process.env.OPENAI_API_KEY) {
-    console.error("❌ OPENAI_API_KEY 가 필요합니다")
-    process.exit(1)
-  }
-
   const products = loadProducts(flags.file)
   const alreadyEnriched = products.filter((product) => product.llmEnrichedAt).length
   const targets = selectEnrichTargets(products, {force: flags.force, limit: flags.limit})
@@ -292,6 +288,14 @@ async function main(): Promise<void> {
             ...finalProduct,
             llmEnrichedAt: new Date().toISOString(),
             llmModel: result.model,
+            llmInputHash: qwenNormalizationInputHash({
+              productUrl: finalProduct.productUrl,
+              name: finalProduct.name,
+              brand: finalProduct.brand,
+              category: finalProduct.category,
+              subcategory: finalProduct.subcategory ?? null,
+              tags: finalProduct.tags,
+            }),
           }
           totals.enriched += 1
           totals.usage.input_tokens += result.usage.input_tokens

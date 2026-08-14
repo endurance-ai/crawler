@@ -32,6 +32,7 @@ if (summary) {
     id: brand.id,
     brand_name: brand.brand_name,
     source_platforms: brand.source_platforms,
+    gender_scope: brand.gender_scope,
     origin_country: (brand.wiki as Record<string, unknown> | null)?.origin_country,
     instagram_url: (brand.wiki as Record<string, unknown> | null)?.instagram_url,
     instagram_handle: (brand.wiki as Record<string, unknown> | null)?.instagram_handle,

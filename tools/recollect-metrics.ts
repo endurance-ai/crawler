@@ -22,6 +22,7 @@ import * as path from "node:path"
 import {createClient, type SupabaseClient} from "@supabase/supabase-js"
 
 import {readProductsFile} from "../src/lib/enrich-file"
+import {isValidCategory, isValidSubcategory} from "../src/lib/enums/product-enums"
 import {
   computeRecollectMetrics,
   evaluateGate,
@@ -70,6 +71,10 @@ function parseFlags(): Flags {
  * id 를 실어 보낼 뿐 판정에 쓰지는 않으므로 파일 모드에서는 임의값이면 충분하다.
  */
 function productToMetricsRow(product: Product, index: number): MetricsRow {
+  const category = isValidCategory(product.category) ? product.category : "other"
+  const subcategory = product.subcategory && isValidSubcategory(product.subcategory, category)
+    ? product.subcategory
+    : null
   return {
     id: index,
     product_url: product.productUrl,
@@ -77,8 +82,10 @@ function productToMetricsRow(product: Product, index: number): MetricsRow {
     brand: product.brand ?? null,
     brand_node_id: null,
     name: product.name ?? null,
-    category: product.category ?? null,
-    subcategory: product.subcategory ?? null,
+    // Mirror import-products' safe initial row. Qwen is intentionally applied
+    // only after this canonical row has been persisted.
+    category,
+    subcategory,
     tags: product.tags ?? null,
     images: product.images ?? null,
     image_url: product.imageUrl ?? null,

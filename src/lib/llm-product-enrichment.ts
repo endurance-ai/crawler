@@ -1,10 +1,10 @@
-import {openai} from "@ai-sdk/openai"
 import {Output, wrapLanguageModel} from "ai"
 import LLMScraper from "llm-scraper"
 import type {Page} from "playwright"
 import {z} from "zod"
 
 import {CATEGORIES, buildSubcategoryReference} from "./enums/product-enums"
+import {runWithQwen} from "./qwen-client"
 import type {Product, SiteConfig} from "./types"
 
 export interface LlmTokenUsage {
@@ -75,14 +75,6 @@ function normalizeUsage(value: unknown): LlmTokenUsage {
   return {input_tokens: input, output_tokens: output, total_tokens: total}
 }
 
-function estimateCost(usage: LlmTokenUsage): number | null {
-  const inputRate = Number(process.env.LLM_SCRAPER_INPUT_USD_PER_1M)
-  const outputRate = Number(process.env.LLM_SCRAPER_OUTPUT_USD_PER_1M)
-  if (!Number.isFinite(inputRate) || !Number.isFinite(outputRate)) return null
-  return (usage.input_tokens / 1_000_000) * inputRate +
-    (usage.output_tokens / 1_000_000) * outputRate
-}
-
 function normalizedHost(raw: string): string {
   const host = new URL(raw).hostname.toLowerCase()
   return host.startsWith("www.") ? host.slice(4) : host
@@ -145,52 +137,51 @@ export async function enrichProductWithLlm(
   config: SiteConfig,
   options: EnrichOptions = {},
 ): Promise<LlmProductEnrichment> {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is required")
   assertSameSource(product.productUrl, config)
-  const model = process.env.LLM_SCRAPER_MODEL || "gpt-5.4-nano"
-  const usage: LlmTokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
-  const wrapped = wrapLanguageModel({
-    model: openai(model),
-    middleware: {
-      specificationVersion: "v3",
-      wrapGenerate: async ({doGenerate}) => {
-        const result = await doGenerate()
-        const current = normalizeUsage(result.usage)
-        usage.input_tokens += current.input_tokens
-        usage.output_tokens += current.output_tokens
-        usage.total_tokens += current.total_tokens
-        return result
-      },
-    },
-  })
 
   if (options.navigate !== false) {
     await page.goto(product.productUrl, {waitUntil: "domcontentloaded", timeout: 60_000})
   }
   await page.waitForTimeout(options.waitMs ?? 800)
   const context = await compactContext(page)
-  const scraper = new LLMScraper(wrapped)
-  // Reasoning models (gpt-5.x, o1/o3, ...) reject the `temperature` sampling
-  // param outright — the AI SDK only warns and ignores it, but the warning
-  // fires on every single call and pollutes batch logs.
-  const isReasoningModel = /^(?:gpt-5|o1|o3)/.test(model)
-  const result = await scraper.run(page, Output.object({schema: EnrichmentSchema}), {
-    format: "custom",
-    formatFunction: async () =>
-      JSON.stringify({
-        name: product.name,
-        brand: product.brand,
-        tags: product.tags ?? [],
-        page: context,
-      }),
-    system: SYSTEM,
-    ...(isReasoningModel ? {} : {temperature: 0}),
+  const result = await runWithQwen(async ({model, abortSignal}) => {
+    const usage: LlmTokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
+    const wrapped = wrapLanguageModel({
+      model,
+      middleware: {
+        specificationVersion: "v3",
+        wrapGenerate: async ({doGenerate}) => {
+          const generated = await doGenerate()
+          const current = normalizeUsage(generated.usage)
+          usage.input_tokens += current.input_tokens
+          usage.output_tokens += current.output_tokens
+          usage.total_tokens += current.total_tokens
+          return generated
+        },
+      },
+    })
+    const scraper = new LLMScraper(wrapped)
+    const generated = await scraper.run(page, Output.object({schema: EnrichmentSchema}), {
+      format: "custom",
+      formatFunction: async () =>
+        JSON.stringify({
+          name: product.name,
+          brand: product.brand,
+          tags: product.tags ?? [],
+          page: context,
+        }),
+      system: SYSTEM,
+      temperature: 0,
+      maxRetries: 0,
+      abortSignal,
+    })
+    return {parsed: EnrichmentSchema.parse(generated.data), usage}
   })
-  const parsed = EnrichmentSchema.parse(result.data)
+  const parsed = result.value.parsed
   const enriched: Product = {
     ...product,
     category: parsed.category,
     subcategory: clean(parsed.subcategory) ?? undefined,
   }
-  return {product: enriched, model, usage, costUsd: estimateCost(usage)}
+  return {product: enriched, model: result.model, usage: result.value.usage, costUsd: null}
 }

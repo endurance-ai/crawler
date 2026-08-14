@@ -1,7 +1,4 @@
 # 배치 5 (10,142개) — zara 단독.
-# 10,142번의 상세 페이지 방문은 크롤 자체보다 훨씬 많은 트래픽이라 봇 차단 위험이 크다.
-# 권장 시작값:
-#   --enrich-args "--concurrency=1 --sleep-ms=2000"
-# 그래도 차단되면 --enrich-args "--no-visit-page" 로 폴백.
+# 파일 선보강은 하지 않는다. canonical row를 먼저 적재한 뒤 local Qwen이 보강한다.
 zara-kr
 zara-us

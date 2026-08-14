@@ -782,7 +782,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
   }
 }
 
-async function writeProductsFile(outDir: string, platform: string, rawProducts: Product[]) {
+async function writeProductsFile(outDir: string, platform: string, rawProducts: Product[], recordQc = true) {
   if (rawProducts.length === 0) return
 
   // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
@@ -792,7 +792,11 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
   // exact legacy behavior (all products written, no gate).
   const config = getSiteConfig(platform)
   const qcProducts = applyProductQcGate(rawProducts, platform, {
+    trustedCategory: config?.type === "shopify" || config?.trustedCategory === true,
     kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+    verifiedUnisexDefault: config?.verifiedUnisexDefault,
+    genderTextPatterns: config?.genderTextPatterns,
+    recordReport: recordQc,
   })
   const products = applyValidationGate(qcProducts, platform)
   if (products.length === 0) return
@@ -812,7 +816,7 @@ async function saveResult(outDir: string, result: CrawlResult) {
 // 유실된 사고). crawlCafe24()가 아직 반환하기 전에 호출되므로 saveResultAndTrim
 // 의 "사이트 완료 시 products 비움" 불변식과는 무관 — 별개의 중간 저장일 뿐이다.
 async function saveCheckpoint(outDir: string, platform: string, products: Product[]) {
-  await writeProductsFile(outDir, platform, products)
+  await writeProductsFile(outDir, platform, products, false)
 }
 
 // 재시작 스킵: 이전 실행(체크포인트든 정상 완료든)의 결과 파일이 있으면

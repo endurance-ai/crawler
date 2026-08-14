@@ -7,7 +7,12 @@
 
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
-import {inferGenderFromText} from "./product-gender"
+import {
+  inferGenderFromDepartmentTagPrefixes,
+  inferGenderFromModelDescription,
+  inferGenderFromText,
+  type ProductGender,
+} from "./product-gender"
 import {normalizeObservedPricing} from "./product-pricing"
 import {classifyShopifyCategory} from "./shopify-category-classifier"
 // SPEC-PLATFORM-EXPANSION-002 REQ-005: FX table lifted to ./fx for shared
@@ -35,7 +40,14 @@ const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/
 async function fetchWithBackoff(url: string, init: RequestInit): Promise<Response> {
   const MAX_RETRIES = 3
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const res = await fetch(url, init)
+    // 일부 Shopify/Cloudflare endpoint는 연결만 잡고 응답 body를 끝내지 않아
+    // 사이트 하나가 전체 다중 브랜드 배치를 영구 정지시킨다. 개별 요청을
+    // 30초로 제한하고 호출자가 해당 사이트 오류를 기록한 뒤 다음으로 간다.
+    const timeoutSignal = AbortSignal.timeout(30_000)
+    const signal = init.signal
+      ? AbortSignal.any([init.signal, timeoutSignal])
+      : timeoutSignal
+    const res = await fetch(url, {...init, signal})
     if (res.status !== 429 && res.status !== 503) return res
     if (attempt === MAX_RETRIES - 1) return res
     const retryAfter = res.headers.get("Retry-After")
@@ -128,12 +140,24 @@ export interface ShopifyParseOptions {
   brandFallback?: string
   /** Site-wide default gender seed (`config.defaultGender`). */
   defaultGender?: string[]
+  /** 공식몰 전체가 단일 상품군일 때 사용하는 사이트 단위 기본 카테고리. */
+  defaultCategory?: SiteConfig["defaultCategory"]
+  /** 사이트별 구조화 성별 부서 태그 prefix. */
+  genderDepartmentTagPrefixes?: SiteConfig["genderDepartmentTagPrefixes"]
+  /** 공식 Shopify 성별 컬렉션에서 확인한 product handle별 성별. */
+  genderByHandle?: Record<string, ProductGender>
+  /** 상품 설명의 명시적 Male:/Female: 모델 라벨을 사용한다. */
+  genderFromModelDescription?: boolean
   /**
    * 품절 상품을 결과에 남긴다 (갱신 전용). 기본 false — 일반 크롤 출력은 종전과
    * 바이트 동일하다(골든 마스터 불변식). 갱신 경로만 true 로 켜서 "재고→품절"
    * 전이를 관측한다.
    */
   keepOutOfStock?: boolean
+  /** Exact, case-insensitive Shopify tags to omit before product mapping. */
+  excludedTags?: string[]
+  /** Exact Shopify handles to omit before product mapping. */
+  excludedHandles?: string[]
 }
 
 /**
@@ -172,12 +196,23 @@ export function parseShopifyProducts(
 
   if (!data.products || data.products.length === 0) return allProducts
 
+  const excludedTags = new Set((options.excludedTags ?? []).map((tag) => tag.trim().toLowerCase()))
+  const excludedHandles = new Set(options.excludedHandles ?? [])
+
   for (const sp of data.products) {
+    if (excludedHandles.has(sp.handle)) continue
+    if (excludedTags.size > 0 && sp.tags.some((tag) => excludedTags.has(tag.trim().toLowerCase()))) {
+      continue
+    }
     // 룩북/기프트카드/통합 상품 제외 (실상품 아님, sentinel 가격값 들어감)
     const titleLower = sp.title.toLowerCase()
     const typeLower = (sp.product_type || "").toLowerCase()
     if (
       titleLower.startsWith("lookbook") ||
+      titleLower.endsWith("gift card") ||
+      titleLower === "return protection" ||
+      titleLower === "shipping protection" ||
+      titleLower === "package protection" ||
       typeLower === "lookbook" ||
       typeLower === "gift card" ||
       typeLower === "gift-card" ||
@@ -214,6 +249,10 @@ export function parseShopifyProducts(
     )
     const chosen = (saleVariants.length > 0 ? saleVariants : validVariants)
       .sort((a, b) => a.price - b.price)[0]
+    // 가격이 없는 engraving/consultation 같은 서비스 add-on은 판매 상품이
+    // 아니다. unknown 관측으로 남기면 import의 플랫폼 단위 가격 안전장치가
+    // 정상 상품 전체를 막으므로 크롤 단계에서 제외한다.
+    if (!chosen) continue
     const pricing = chosen
       ? normalizeObservedPricing({
           currentPrice: chosen.price,
@@ -271,16 +310,21 @@ export function parseShopifyProducts(
     // inferGenderFromText 는 `\b(men|mens|...)\b` 워드 바운더리를 쓰므로
     // "womens" 를 men 으로 읽지 않고, 남녀가 진짜로 함께 잡히면 null(모호)을
     // 돌려준다 — 추측 대신 미확인이 이 프로젝트의 규율이다.
-    const inferredFromTags = inferGenderFromText(sp.tags.join(" "))
-    const genderFromTags = inferredFromTags !== null
-    const gender: string[] = genderFromTags ? [inferredFromTags] : [...(options.defaultGender || [])]
+    const inferredGender = options.genderByHandle?.[sp.handle] ?? inferGenderFromDepartmentTagPrefixes(
+      sp.tags,
+      options.genderDepartmentTagPrefixes,
+    ) ?? (options.genderFromModelDescription
+      ? inferGenderFromModelDescription(sp.body_html)
+      : null) ?? inferGenderFromText(sp.tags.join(" "))
+    const genderFromEvidence = inferredGender !== null
+    const gender: string[] = genderFromEvidence ? [inferredGender] : [...(options.defaultGender || [])]
 
     allProducts.push({
       brand: options.brandOverride || sp.vendor || options.brandFallback || "",
       gender,
-      genderSource: genderFromTags ? ("engine" as const) : ("config_default" as const),
+      genderSource: genderFromEvidence ? ("engine" as const) : ("config_default" as const),
       name: sp.title,
-      ...classifyShopifyCategory(sp.product_type || "", sp.title, sp.tags),
+      ...classifyShopifyCategory(options.defaultCategory || sp.product_type || "", sp.title, sp.tags),
       ...pricing,
       priceFormatted,
       imageUrl,
@@ -314,6 +358,84 @@ export interface CrawlShopifyOptions {
   includeOutOfStock?: boolean
 }
 
+/**
+ * 공식 성별 컬렉션 소속 상품 handle을 읽는다. 같은 상품이 men/women 양쪽
+ * 공식 부서에 있으면 양쪽에서 판다는 적극적 근거이므로 unisex로 결의한다.
+ * 명시적 unisex 컬렉션은 가장 직접적인 근거로 우선한다.
+ */
+export async function fetchShopifyGenderByHandle(
+  config: SiteConfig,
+  country: string,
+  localizationCookie: string,
+  errors: string[] = [],
+): Promise<Record<string, ProductGender>> {
+  const configured = config.shopifyGenderCollections
+  if (!configured) return {}
+
+  const memberships = new Map<string, Set<ProductGender>>()
+  const entries = (Object.entries(configured) as Array<[ProductGender, string[] | undefined]>)
+    .flatMap(([gender, handles]) => (handles ?? []).map((handle) => ({gender, handle})))
+
+  for (const {gender, handle} of entries) {
+    if (!SAFE_HANDLE.test(handle)) {
+      errors.push(`gender collection ${handle}: unsafe handle`)
+      continue
+    }
+    for (let page = 1; page <= (config.maxPages || 20); page++) {
+      try {
+        const url = `${config.baseUrl}/collections/${handle}/products.json?page=${page}&limit=250&country=${encodeURIComponent(country)}`
+        const res = await fetchWithBackoff(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            Accept: "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+            Referer: config.baseUrl + "/",
+            Cookie: localizationCookie,
+          },
+        })
+        if (!res.ok) {
+          errors.push(`gender collection ${handle}: HTTP ${res.status} on page ${page}`)
+          break
+        }
+        const data = await res.json() as ShopifyResponse
+        if (!data.products || data.products.length === 0) break
+        for (const product of data.products) {
+          if (!product.handle || !SAFE_HANDLE.test(product.handle)) continue
+          const set = memberships.get(product.handle) ?? new Set<ProductGender>()
+          set.add(gender)
+          memberships.set(product.handle, set)
+        }
+        if (data.products.length < 250) break
+      } catch (err) {
+        errors.push(`gender collection ${handle} page ${page}: ${err}`)
+        break
+      }
+    }
+  }
+
+  const result: Record<string, ProductGender> = {}
+  for (const [handle, genders] of memberships) {
+    if (genders.has("unisex") || (genders.has("men") && genders.has("women"))) {
+      result[handle] = "unisex"
+    } else if (genders.has("men")) {
+      result[handle] = "men"
+    } else if (genders.has("women")) {
+      result[handle] = "women"
+    }
+  }
+  return result
+}
+
+/**
+ * Shopify Markets localization must be explicit in the feed URL. Some stores
+ * ignore the localization cookie for `/products.json`, which can make a KRW
+ * config ingest the default-market JPY/USD amount as if it were KRW.
+ */
+export function buildShopifyProductsUrl(baseUrl: string, page: number, country: string): string {
+  const separator = baseUrl.includes("?") ? "&" : "?"
+  return `${baseUrl}/products.json${separator}page=${page}&limit=250&country=${encodeURIComponent(country)}`
+}
+
 export async function crawlShopify(
   config: SiteConfig,
   options: CrawlShopifyOptions = {},
@@ -326,6 +448,7 @@ export async function crawlShopify(
   const currency = config.sourceCurrency || "KRW"
   const country = CURRENCY_TO_COUNTRY[currency]
   const localizationCookie = `localization=${country}`
+  const genderByHandle = await fetchShopifyGenderByHandle(config, country, localizationCookie, errors)
 
   console.log(`\n${"─".repeat(50)}`)
   console.log(`🏪 ${config.name} (${config.baseUrl}) [Shopify]`)
@@ -333,7 +456,7 @@ export async function crawlShopify(
 
   for (let page = 1; page <= maxPages; page++) {
     try {
-      const url = `${config.baseUrl}/products.json?page=${page}&limit=250`
+      const url = buildShopifyProductsUrl(config.baseUrl, page, country)
       // Full Chrome-131 header set — node fetch's default header set
       // (UA + Accept only) was being fingerprinted as bot by Cloudflare
       // even though curl with same UA + Cookie returned 200. Adding the
@@ -381,6 +504,12 @@ export async function crawlShopify(
           // 유지하며, 빈 vendor를 플랫폼명으로 채우지 않는다.
           brandOverride: config.multiBrand ? undefined : config.brand,
           defaultGender: config.defaultGender,
+          defaultCategory: config.defaultCategory,
+          genderDepartmentTagPrefixes: config.genderDepartmentTagPrefixes,
+          genderByHandle,
+          genderFromModelDescription: config.genderFromModelDescription,
+          excludedTags: config.shopifyExcludedTags,
+          excludedHandles: config.shopifyExcludedHandles,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )

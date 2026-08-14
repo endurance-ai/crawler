@@ -86,7 +86,7 @@ function toNumber(value: number | string | undefined): number | null {
  */
 export function parseImwebListItem(
   item: ImwebListItem,
-  config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender" | "sourceCurrency">,
+  config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender" | "defaultCategory" | "defaultSubcategory" | "sourceCurrency">,
   category: string,
 ): Product | null {
   const props = item.properties
@@ -127,7 +127,8 @@ export function parseImwebListItem(
     gender: [...(config.defaultGender ?? [])],
     genderSource: "config_default" as const,
     name,
-    category,
+    category: category || config.defaultCategory || "",
+    subcategory: config.defaultSubcategory,
     ...pricing,
     priceFormatted: sourceCurrency === "KRW"
       ? `₩${pricing.price!.toLocaleString("ko-KR")}`

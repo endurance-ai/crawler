@@ -26,15 +26,15 @@
 #   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
 #                          variant to crawl AND the one onboard-classify.ts reads
 #                          back out of products.jsonl (kept in lockstep — see
-#                          ONBOARD_VARIANT below). hybrid = llm-scraper re-visits
-#                          each detail page a second time for category/subcategory/
-#                          color/description/gender; existing = deterministic only.
+#                          ONBOARD_VARIANT below). hybrid = Qwen fills category/
+#                          subcategory only; existing = deterministic only. Cafe24
+#                          classifies inline on the already-open detail page, while
+#                          Shopify's hybrid page load is its only detail visit.
 #
-# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (QC + LLM
-# category/subcategory classify + color recovery, reading the same variant back
-# via ONBOARD_VARIANT) -> import-products.ts (upsert) -> reclassify-categories.ts
-# --only-invalid (guardrail: fixes any row that still has a non-canonical
-# category, regardless of cause — cheap, always safe to run).
+# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (deterministic QC
+# and category/color recovery, reading the same variant back via ONBOARD_VARIANT)
+# -> import-products.ts (safe upsert, then best-effort local Qwen normalization)
+# -> reclassify-categories.ts --only-invalid (canonical taxonomy guardrail).
 #
 # Resumable: if out-root/chunk-N/products.jsonl already exists, crawl is skipped
 # for that chunk (so a killed run can restart with the same --start).
@@ -89,7 +89,8 @@ if [ "$ENGINE" = "lightpanda" ] && [ ! -x "bin/lightpanda" ]; then
   exit 1
 fi
 
-PNPM="corepack pnpm@10.33.2 exec dotenv -e .env.local --"
+ENV_FILE="${CRAWLER_ENV_FILE:-.env.local}"
+PNPM="corepack pnpm@10.33.2 exec dotenv -e $ENV_FILE --"
 TMP_DIR="$OUT_ROOT/_chunks"
 TALLY="$OUT_ROOT/onboard-tally.csv"
 
@@ -156,10 +157,13 @@ for c in $(seq "$START" "$END"); do
   NET=$((AFTER - BEFORE))
 
   # Guardrail: fix any row left with a non-canonical category, regardless of
-  # cause (stale cache upsert, LLM output drift, etc). Idempotent and cheap —
+  # cause (stale cache upsert, Qwen output drift, etc). Idempotent and cheap —
   # only touches rows actually out of taxonomy.
   GUARD_LOG="$OUT_ROOT/guardrail-chunk-$c.log"
-  $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1 || true
+  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1; then
+    echo "chunk $c guardrail failed; Qwen/tunnel or DB error — $GUARD_LOG" >&2
+    exit 2
+  fi
   INVALID_FOUND=$(grep -oE "processed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
   INVALID_FIXED=$(grep -oE "changed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
 

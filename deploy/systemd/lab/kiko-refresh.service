@@ -29,7 +29,6 @@ WorkingDirectory=/home/kjk/kiko-crawler
 # 래퍼의 `corepack pnpm` 이 command not found 로 죽는다 (실측 2026-07-31).
 Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/kjk
-Environment=LLM_SCRAPER_MODEL=gpt-5.4-nano
 # env 는 .env / .env.local 을 npm 스크립트의 dotenv 가 읽는다 — EnvironmentFile 불필요.
 ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=8
 # 예산 480분 + wrapper 오버헤드 여유

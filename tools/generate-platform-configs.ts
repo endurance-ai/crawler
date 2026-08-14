@@ -56,6 +56,21 @@ const DISABLED_KEYS = new Set<string>([
   // 24(outer)/25(tops)/27(bottoms)/28(acc)/42(all)/47(remix)/59(best) — detect
   // 시점 이후 카테고리 번호가 바뀐 것으로 추정. cateNo 재탐지 필요.
   "noscouleurs",
+  // 2026-08-11: official KR and international storefronts both expose only
+  // the region selector and no current product_no entries.
+  "intl-5332", // HYOVASMI
+  // 2026-08-11: multi-brand secondhand select shop; product pages expose no
+  // item-level gender evidence and titles are often only the designer name.
+  "kamadeva",
+  // 2026-08-11: official storefront has no gender navigation or item-level
+  // gender evidence; 17/19 current products remain unresolved (2 name-only).
+  "sideservice",
+  // 2026-08-11: official retailer records show a mix of men/unisex products,
+  // while the source storefront exposes no item-level gender field (0/10 POC).
+  "wellmadecom",
+  // 2026-08-11: bags/caps-only catalogue with no explicit gender evidence;
+  // accessory-only is not sufficient evidence for a blanket unisex default.
+  "thepaze",
 ])
 
 const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCurrency"]>> = {
@@ -64,6 +79,171 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
   "en-3887": "USD",
   // Sienne English Cafe24 storefront declares SHOP_CURRENCY_INFO currency_code=USD.
   "en-4821": "USD",
+}
+
+const CAFE24_BASE_URL_BY_KEY: Partial<Record<string, string>> = {
+  // The former .shop host no longer has DNS; the KR storefront is live here.
+  sideservice: "https://sideservice.store",
+}
+
+const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
+
+const CAFE24_SELECTORS_BY_KEY: Partial<Record<string, SiteConfig["selectors"]>> = {
+  // The theme's generic heading selector resolves to a navigation label.
+  openyy: {productName: ".title a"},
+}
+
+const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
+  // Official navigation exposes separate WOMEN and MEN departments. Use leaf
+  // categories so aggregate/new/sale pages cannot erase the gender evidence.
+  dunststudio: [
+    {name: "Women Outerwear", cateNo: 29, gender: ["women"]},
+    {name: "Women Jumpers & Leather", cateNo: 755, gender: ["women"]},
+    {name: "Women Knitwear", cateNo: 30, gender: ["women"]},
+    {name: "Women Shirts & Blouses", cateNo: 32, gender: ["women"]},
+    {name: "Women Sweatshirts", cateNo: 447, gender: ["women"]},
+    {name: "Women T-shirts", cateNo: 31, gender: ["women"]},
+    {name: "Women Dresses & Skirts", cateNo: 33, gender: ["women"]},
+    {name: "Women Pants", cateNo: 34, gender: ["women"]},
+    {name: "Women Bags", cateNo: 618, gender: ["women"]},
+    {name: "Women Accessories", cateNo: 36, gender: ["women"]},
+    {name: "Men Outerwear", cateNo: 38, gender: ["men"]},
+    {name: "Men Jumpers & Leather", cateNo: 759, gender: ["men"]},
+    {name: "Men Knitwear", cateNo: 303, gender: ["men"]},
+    {name: "Men Shirts", cateNo: 157, gender: ["men"]},
+    {name: "Men Sweatshirts", cateNo: 448, gender: ["men"]},
+    {name: "Men T-shirts", cateNo: 40, gender: ["men"]},
+    {name: "Men Pants", cateNo: 41, gender: ["men"]},
+    {name: "Men Bags", cateNo: 619, gender: ["men"]},
+    {name: "Men Accessories", cateNo: 43, gender: ["men"]},
+  ],
+  // The official shop labels this complete apparel branch "SHOP WOMEN".
+  // Homeware/editorial branches (OBJECT/CERAMIC/FURNITURE/etc.) are excluded.
+  archthe: [
+    {name: "Women Coats & Jackets", cateNo: 89, gender: ["women"]},
+    {name: "Women Knitwear & Jersey", cateNo: 90, gender: ["women"]},
+    {name: "Women Shirts & Blouses", cateNo: 107, gender: ["women"]},
+    {name: "Women Tops", cateNo: 92, gender: ["women"]},
+    {name: "Women Dresses", cateNo: 91, gender: ["women"]},
+    {name: "Women Trousers", cateNo: 93, gender: ["women"]},
+    {name: "Women Skirts", cateNo: 94, gender: ["women"]},
+    {name: "Women Accessories", cateNo: 95, gender: ["women"]},
+  ],
+  // Verified storefront departments. Keep only the two gender-bearing source
+  // categories instead of the many Cafe24 system/editorial category IDs.
+  openyy: [
+    {name: "UNISEX", cateNo: 215, gender: ["unisex"]},
+    {name: "WOMENS", cateNo: 214, gender: ["women"]},
+  ],
+  "opening-project": [
+    {name: "Man", cateNo: 137, gender: ["men"]},
+    {name: "Woman", cateNo: 138, gender: ["women"]},
+    {name: "EASTPAK X OPENING PROJECT", cateNo: 157},
+    {name: "Best", cateNo: 205},
+    {name: "New", cateNo: 59},
+    {name: "All", cateNo: 23},
+  ],
+  "intl-5332": [
+    {name: "BODY PARTS", cateNo: 24},
+    {name: "OBJECT", cateNo: 25},
+    {name: "SALE", cateNo: 56},
+    {name: "HYOVASMI", cateNo: 62},
+    {name: "HYOVASMI MINI", cateNo: 63},
+  ],
+  orogee: [
+    {name: "Let's Swim", cateNo: 24, gender: ["women"]},
+    {name: "Sea Wear", cateNo: 44, gender: ["women"]},
+    {name: "Beach Acc", cateNo: 25, gender: ["women"]},
+    {name: "All", cateNo: 42, gender: ["women"]},
+  ],
+  kamadeva: [
+    {name: "All Items", cateNo: 24},
+    {name: "Outerwear", cateNo: 25},
+    {name: "Tops", cateNo: 26},
+    {name: "Bottoms", cateNo: 27},
+    {name: "Bag & Shoes", cateNo: 28},
+    {name: "Accessories", cateNo: 42},
+    {name: "Etc", cateNo: 43},
+  ],
+  // This theme returns 404 for /product/list.html and exposes the catalogue
+  // through custom shop pages instead.
+  sideservice: [{name: "ALL", cateNo: 1, url: "/shop/all.html"}],
+  // Current official navigation's complete catalogue. The prior 9/13 and
+  // lookbook 273/237 detections are non-product Cafe24 system categories.
+  wellmadecom: [{name: "ALL", cateNo: 24}],
+  thepaze: [{name: "All", cateNo: 23}],
+  // Official NEW catalogue contains the complete current range. The prior
+  // 9/13/1 detections are Cafe24 system/navigation categories, not products.
+  mosxe: [{name: "NEW", cateNo: 52}],
+  // Official Shop navigation. Exclude Cafe24 system categories and the
+  // aggregate All/Best views so code-only product names retain their family.
+  "butter-ring": [
+    {name: "Ring", cateNo: 30, gender: ["women"]},
+    {name: "Necklace", cateNo: 31, gender: ["women"]},
+    {name: "Bracelet", cateNo: 42, gender: ["women"]},
+    {name: "Earring", cateNo: 43, gender: ["women"]},
+    {name: "Goods", cateNo: 63, gender: ["women"]},
+  ],
+  // Official Shop navigation. The homepage detector only sees Cafe24 system
+  // categories 29/42; the real product families are nested under Shop.
+  oscitare: [
+    {name: "outer", cateNo: 44},
+    {name: "top", cateNo: 45},
+    {name: "bottom", cateNo: 46},
+    {name: "acc", cateNo: 47},
+  ],
+  // Current official Shop navigation. Use the five product-family leaves;
+  // All/New/Season Off are aggregate views and would duplicate products.
+  churchillromper: [
+    {name: "아우터", cateNo: 54},
+    {name: "니트", cateNo: 77},
+    {name: "상의", cateNo: 55},
+    {name: "하의", cateNo: 56},
+    {name: "악세서리", cateNo: 57},
+  ],
+  // The official store separates the main menswear catalogue from Women.
+  // Aggregate Sale is omitted because it mixes and duplicates both ranges.
+  wouldbe: [
+    {name: "Shop", cateNo: 42, gender: ["men"]},
+    {name: "Women", cateNo: 83, gender: ["women"]},
+  ],
+  // bants.co.kr is also a multi-brand retailer. Only the BANTS brand
+  // department is in scope; ITEM categories contain HOUSTON/WHEELROBE/etc.
+  bants: [{name: "BANTS", cateNo: 54, gender: ["men"]}],
+  // Official Products navigation. Use leaf collections so every item retains
+  // its product family; the final ALL category catches non-shoe accessories.
+  iyso: [
+    {name: "Shoes", cateNo: 289, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 62, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 317, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 312, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 248, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 249, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 91, gender: ["unisex"]},
+    {name: "Socks", cateNo: 292, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 246, gender: ["unisex"]},
+  ],
+}
+
+const IMWEB_CATEGORY_URLS_BY_KEY: Partial<Record<string, string[]>> = {
+  // The Home page navigation is script-rendered too late for generic discovery,
+  // while the official store page exposes the complete current catalogue.
+  kibata: ["https://www.kibata.kr/Online-Store/"],
+  publicfigure: ["https://publicfigure.kr/shop"],
+}
+
+const IMWEB_DEFAULT_CATEGORY_BY_KEY: Partial<Record<string, string>> = {
+  // The current official catalogue is exclusively adult denim/sashiko pants.
+  kibata: "bottoms",
+  // The shop is a mixed apparel catalogue without category labels in its
+  // Imweb item JSON. Product-name inference refines known families; truly
+  // ambiguous items remain in the canonical catch-all instead of dropping.
+  publicfigure: "other",
+}
+
+const IMWEB_DEFAULT_SUBCATEGORY_BY_KEY: Partial<Record<string, string>> = {
+  // Official detail pages identify the collection as 5-pocket denim jeans.
+  kibata: "jeans",
 }
 
 interface CandidateRow {
@@ -200,7 +380,7 @@ function buildEntrySource(
     row.kr_eligibility_status === "eligible_storefront" && row.kr_storefront_url
       ? row.kr_storefront_url.replace(/\/$/, "")
       : null
-  const baseUrl = verifiedKrStorefront ?? `https://${host}`
+  const baseUrl = CAFE24_BASE_URL_BY_KEY[row.platform_key] ?? verifiedKrStorefront ?? `https://${host}`
   const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
   const disabled =
     DISABLED_KEYS.has(row.platform_key) ||
@@ -216,6 +396,12 @@ function buildEntrySource(
   const cafe24SourceCurrency = row.platform_type === "cafe24"
     ? CAFE24_SOURCE_CURRENCY_BY_KEY[row.platform_key]
     : undefined
+  const cafe24Categories = row.platform_type === "cafe24"
+    ? CAFE24_CATEGORIES_BY_KEY[row.platform_key]
+    : undefined
+  const cafe24Selectors = row.platform_type === "cafe24"
+    ? CAFE24_SELECTORS_BY_KEY[row.platform_key]
+    : undefined
   const lines: string[] = []
   lines.push("  {")
   lines.push(`    key: ${JSON.stringify(row.platform_key)},`)
@@ -230,17 +416,26 @@ function buildEntrySource(
   // (실측: etce 1,604건 — brand 필드 미설정 상태로 생성된 게 원인).
   lines.push(`    brand: ${JSON.stringify(row.brand_name)},`)
   if (row.platform_type === "cafe24") {
+    if (CAFE24_MULTI_BRAND_KEYS.has(row.platform_key)) lines.push("    multiBrand: true,")
     if (cafe24SourceCurrency) lines.push(`    sourceCurrency: ${JSON.stringify(cafe24SourceCurrency)},`)
     lines.push("    paginate: true,")
     lines.push("    maxPages: 300,")
     lines.push("    crawlDetails: true,")
-    if (row.category_discovery === "manual" && row.categories.length > 0) {
+    if (cafe24Selectors) lines.push(`    selectors: ${JSON.stringify(cafe24Selectors)},`)
+    if (cafe24Categories?.length || (row.category_discovery === "manual" && row.categories.length > 0)) {
       lines.push("    category: {")
       lines.push('      discovery: "manual",')
       lines.push("      categories: [")
-      for (const c of row.categories) {
+      const categories: NonNullable<NonNullable<SiteConfig["category"]>["categories"]> =
+        cafe24Categories ?? row.categories.map((c) => ({
+          name: `Cat${c.cateNo}`,
+          cateNo: c.cateNo,
+        }))
+      for (const c of categories) {
+        const url = c.url ? `, url: ${JSON.stringify(c.url)}` : ""
+        const gender = c.gender?.length ? `, gender: ${JSON.stringify(c.gender)}` : ""
         lines.push(
-          `        {name: ${JSON.stringify(`Cat${c.cateNo}`)}, cateNo: ${c.cateNo}},`,
+          `        {name: ${JSON.stringify(c.name)}, cateNo: ${c.cateNo}${gender}${url}},`,
         )
       }
       lines.push("      ],")
@@ -252,6 +447,13 @@ function buildEntrySource(
     lines.push(`    sourceCurrency: ${JSON.stringify(row.kr_price_currency === "KRW" ? "KRW" : (shopifyCurrencyResult?.currency ?? "KRW"))},`)
     lines.push("    maxPages: 300,")
     lines.push("    crawlDelay: 1500,")
+  } else if (row.platform_type === "imweb") {
+    const categoryUrls = IMWEB_CATEGORY_URLS_BY_KEY[row.platform_key]
+    if (categoryUrls?.length) lines.push(`    categoryUrls: ${JSON.stringify(categoryUrls)},`)
+    const defaultCategory = IMWEB_DEFAULT_CATEGORY_BY_KEY[row.platform_key]
+    if (defaultCategory) lines.push(`    defaultCategory: ${JSON.stringify(defaultCategory)},`)
+    const defaultSubcategory = IMWEB_DEFAULT_SUBCATEGORY_BY_KEY[row.platform_key]
+    if (defaultSubcategory) lines.push(`    defaultSubcategory: ${JSON.stringify(defaultSubcategory)},`)
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected
@@ -268,6 +470,11 @@ function buildEntrySource(
 }
 
 async function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    console.log("usage: tsx tools/generate-platform-configs.ts")
+    console.log("Generates src/configs/platforms.generated.ts from eligible DB crawl rows.")
+    return
+  }
   const previousGenerated = await loadPreviousGenerated()
   const previousByKey = new Map(previousGenerated.map((config) => [config.key, config]))
   const existingHosts = new Set(MANUAL_PLATFORMS.map((p) => normalizeHost(p.baseUrl)))

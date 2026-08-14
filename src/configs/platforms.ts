@@ -10,8 +10,258 @@ import {SITE_GENDER_DEFAULTS} from "./gender-defaults"
 import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
+  {
+    key: "jinochio",
+    name: "jinochio",
+    type: "cafe24",
+    baseUrl: "https://jinochio.com",
+    brand: "jinochio",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    genderTextPatterns: {
+      women: [/\(w\)/i],
+      unisex: [/\(uni\)/i],
+    },
+    category: {
+      discovery: "manual",
+      categories: [{name: "New 홈웨어", cateNo: 176}],
+    },
+    notes: "brand_node id=5472. 침구는 제외하고 공식 신상품 홈웨어에서 상품명 (w)/(uni) 표기가 있는 패션 상품만 보존.",
+  },
+  {
+    key: "fritt",
+    name: "FRITT (프릿)",
+    type: "cafe24",
+    baseUrl: "https://fritt.co.kr",
+    brand: "FRITT (프릿)",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    genderTextPatterns: {
+      men: [/남자\s*모델/i],
+      women: [/여자\s*모델/i],
+    },
+    category: {
+      discovery: "manual",
+      categories: [{name: "그녀를 위한 기프트", cateNo: 156, gender: ["women"]}],
+    },
+    notes: "brand_node id=5348. 공식몰의 '그녀를 위한 기프트' 카테고리만 여성 근거로 사용하며, 커플 주얼리 등 다른 상품은 브랜드 단위로 추정하지 않음.",
+  },
+  {
+    key: "ensundayceremony",
+    name: "SUNDAY CEREMONY",
+    type: "cafe24",
+    baseUrl: "https://en.sunday-ceremony.com",
+    brand: "SUNDAY CEREMONY",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    genderTextPatterns: {
+      men: [/\(M\)(?:\s|$)/i],
+      women: [/\(W\)(?:\s|$)/i],
+    },
+    category: {
+      discovery: "manual",
+      categories: [{name: "All", cateNo: 29}],
+    },
+    notes: "brand_node id=5561. 공식 All 상품명의 (M)/(W) 성별 표기를 상품 단위로 보존하며 무표기 액세서리는 추정하지 않음.",
+  },
+  {
+    key: "sculptorpage",
+    name: "SCULPTOR",
+    type: "cafe24",
+    baseUrl: "https://sculptorpage.com",
+    brand: "SCULPTOR",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "All", cateNo: 1532, gender: ["women"]}],
+    },
+    notes: "brand_node id=834. 공식 상세 전반의 Female Model 치수·착용 사이즈와 여성 전용 의류를 검증; 1532가 전체 상품 목록.",
+  },
+  {
+    key: "noscouleurs",
+    name: "NOS COULEURS (노쿨러스)",
+    type: "cafe24",
+    baseUrl: "https://noscouleurs.com",
+    brand: "NOS COULEURS (노쿨러스)",
+    defaultGender: ["unisex"],
+    verifiedUnisexDefault: true,
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Outer", cateNo: 24, gender: ["unisex"]},
+        {name: "Tops", cateNo: 25, gender: ["unisex"]},
+        {name: "Bottoms", cateNo: 27, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 28, gender: ["unisex"]},
+      ],
+    },
+    notes: "brand_node id=5433. 공식 All=42 현행 목록과 상세의 여성·남성 모델별 착용 사이즈를 공용 근거로 검증.",
+  },
+  {
+    key: "kijiko",
+    name: "KIJIKO",
+    type: "cafe24",
+    baseUrl: "https://kijiko.co.kr",
+    brand: "KIJIKO",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: false,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      // 메인 위젯은 설명/가격 블록 없이 상품 이미지 alt에만 상품명을 둔다.
+      productName: 'img[id^="eListPrdImage"]',
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: 'a[href*="/product/"]',
+    },
+    category: {
+      discovery: "manual",
+      categories: [{name: "SHOP", cateNo: 1, gender: ["women"], url: "/"}],
+    },
+    notes: "brand_node id=5620. 공식몰 여성 카탈로그 메뉴(TOP/SKIRT/DRESS/OUTER/BOTTOM)와 메인 상품 피드 검증.",
+  },
+  {
+    key: "royaloakseoul",
+    name: "ROYAL OAK",
+    type: "cafe24",
+    baseUrl: "https://royaloakseoul.com",
+    brand: "ROYAL OAK",
+    defaultGender: ["women"],
+    kidsGenderNoisePatterns: [/\bbaby[-\s]+wave\b/gi],
+    paginate: true,
+    maxPages: 100,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "All", cateNo: 24},
+      ],
+    },
+    notes: "brand_node id=5691. 공식 All 카탈로그(비키니/보디수트/스커트/드레스)와 상세의 여성 한국 사이즈 44/55 표기를 검증.",
+  },
+  {
+    key: "sideservice",
+    name: "SIDE",
+    type: "cafe24",
+    baseUrl: "https://sideservice.store",
+    brand: "SIDE",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "ALL", cateNo: 1, url: "/shop/all.html"}],
+    },
+    notes: "brand_node id=5400. 공식 전체 목록과 상세 재수집으로 활성 상품·가격·성별 근거 검증.",
+  },
+  {
+    key: "cacele",
+    name: "CACELE",
+    type: "cafe24",
+    baseUrl: "https://ca-cele.com",
+    brand: "CACELE",
+    defaultGender: ["women"],
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      productName: ".product-info .product-text.mb-2 span",
+      productPrice: ".product-info .cacele-format-currency",
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: 'a[href*="/product/"]',
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "OUTERWEAR", cateNo: 52, gender: ["women"]},
+        {name: "all", cateNo: 53, gender: ["women"]},
+        {name: "BOTTOM", cateNo: 54, gender: ["women"]},
+        {name: "DRESS", cateNo: 55, gender: ["women"]},
+        {name: "ACC", cateNo: 56, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node id=5687. Official About identifies CACELE as a women's clothing brand.",
+  },
+  {
+    key: "liha",
+    name: "LIHA",
+    type: "shopify",
+    baseUrl: "https://lihabeauty.com",
+    brand: "LIHA",
+    defaultGender: ["unisex"],
+    verifiedUnisexDefault: true,
+    defaultCategory: "other",
+    sourceCurrency: "GBP",
+    maxPages: 20,
+    crawlDelay: 1000,
+    notes: "brand_node id=4877. Official LIHA journal states all products are designed for all genders; cart.js reports GBP.",
+  },
+  {
+    key: "tatras-official",
+    name: "TATRAS",
+    type: "shopify",
+    baseUrl: "https://tatras-official.com",
+    brand: "TATRAS",
+    shopifyGenderCollections: {
+      men: ["all-products-men"],
+      women: ["all-products-women"],
+    },
+    shopifyExcludedTags: ["KIDS"],
+    sourceCurrency: "EUR",
+    maxPages: 20,
+    crawlDelay: 1000,
+    notes: "brand_node id=5703. Official All Products MEN/WOMEN Shopify collections provide product-level gender evidence; cart.js reports EUR.",
+  },
+  {
+    key: "canton-collective",
+    name: "Canton Collective",
+    type: "shopify",
+    baseUrl: "https://cantoncollective.com",
+    multiBrand: true,
+    defaultGender: ["women"],
+    kidsGenderNoisePatterns: [
+      /\bbaby[-\s]?tee\b/gi,
+      /\bbaby[-\s]?doll\b/gi,
+      /\bbabydoll\b/gi,
+    ],
+    shopifyExcludedHandles: ["canton-collective-express"],
+    sourceCurrency: "USD",
+    maxPages: 20,
+    crawlDelay: 1000,
+    notes: "brand_node id=5611. Official storefront identifies itself as a women's fashion multi-brand curation platform; preserve Shopify vendor as product brand. cart.js reports USD.",
+  },
   // ─── Manual 설정 완료 (카테고리 구조 깔끔) ─────────
 
+  {
+    key: "bmuettestore",
+    name: "BMUET(TE)",
+    type: "cafe24",
+    baseUrl: "https://bmuettestore.com",
+    brand: "BMUET(TE)",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "WOMEN", cateNo: 112, gender: ["women"]},
+        {name: "MEN", cateNo: 113, gender: ["men"]},
+      ],
+    },
+    notes: "Official storefront gender departments verified: WOMEN /category/women/112, MEN /category/men/113.",
+  },
   {
     key: "shopamomento",
     name: "샵아모멘토",
@@ -537,12 +787,45 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "포터리",
     type: "cafe24",
     baseUrl: "https://www.ptry.co.kr",
+    brand: "POTTERY",
     paginate: true,
     maxPages: 300,
-    category: { discovery: "auto" },
-    defaultGender: ["unisex"],
-    disabled: true,
-    notes: "컨템포러리 캐주얼. 커스텀 셀렉터 필요 (기본 셀렉터로 상품 못 찾음). 5~30만원대",
+    crawlDetails: true,
+    selectors: {
+      // POTTERY cards are divs. The generic `.xans-product li` fallback sees
+      // material/color/origin/size spec rows as separate products.
+      productItem: "div.product__item",
+      productName: ".en-name > li:not(.displaynone):first-child .add-desc span",
+      productPrice: ".figcaption > .price > div:first-child",
+      productImage: ".figure img",
+      productLink: '.figure a[href*="product_no="]',
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        // Official men's navigation.
+        {name: "Men Knitwear", cateNo: 747, gender: ["men"]},
+        {name: "Men Tailoring", cateNo: 789, gender: ["men"]},
+        {name: "Men Outerwear", cateNo: 745, gender: ["men"]},
+        {name: "Men Shirts", cateNo: 944, gender: ["men"]},
+        {name: "Men Tops", cateNo: 746, gender: ["men"]},
+        {name: "Men Bottoms", cateNo: 748, gender: ["men"]},
+        {name: "Men Denim", cateNo: 749, gender: ["men"]},
+        {name: "Men Accessories", cateNo: 750, gender: ["men"]},
+        // Official women's navigation. Products found in both departments
+        // become unisex through mergeCafe24DuplicateGender.
+        {name: "Women Knitwear", cateNo: 1022, gender: ["women"]},
+        {name: "Women Tailoring", cateNo: 1023, gender: ["women"]},
+        {name: "Women Outerwear", cateNo: 1024, gender: ["women"]},
+        {name: "Women Shirts", cateNo: 1025, gender: ["women"]},
+        {name: "Women Tops", cateNo: 1026, gender: ["women"]},
+        {name: "Women Dresses", cateNo: 1136, gender: ["women"]},
+        {name: "Women Skirts", cateNo: 1232, gender: ["women"]},
+        {name: "Women Bottoms", cateNo: 1027, gender: ["women"]},
+        {name: "Women Denim", cateNo: 1028, gender: ["women"]},
+      ],
+    },
+    notes: "현재 상품명에 남성/여성/[유니섹스]가 혼재하므로 사이트 기본 성별 금지. 상품명 근거만 사용.",
   },
   {
     key: "beslow",
@@ -1277,19 +1560,22 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
-    defaultGender: ["unisex"],
+    verifyStockFromDetail: true,
+    // 공식 ABOUT: "여성 디자이너 브랜드" (2026-08-11 확인).
+    // https://yuse.co.kr/shopinfo/company.html
+    defaultGender: ["women"],
     category: {
       discovery: "manual",
       categories: [
-        {name: "Top", cateNo: 290, gender: ["unisex"]},
-        {name: "Knitwear", cateNo: 59, gender: ["unisex"]},
-        {name: "Outer", cateNo: 47, gender: ["unisex"]},
-        {name: "Bottom", cateNo: 291, gender: ["unisex"]},
-        {name: "Dress", cateNo: 28, gender: ["unisex"]},
-        {name: "Accessories", cateNo: 43, gender: ["unisex"]},
+        {name: "Top", cateNo: 290, gender: ["women"]},
+        {name: "Knitwear", cateNo: 59, gender: ["women"]},
+        {name: "Outer", cateNo: 47, gender: ["women"]},
+        {name: "Bottom", cateNo: 291, gender: ["women"]},
+        {name: "Dress", cateNo: 28, gender: ["women"]},
+        {name: "Accessories", cateNo: 43, gender: ["women"]},
       ],
     },
-    notes: "brand_nodes id=258, gender_scope=unisex. 홈 nav 확인: NEW/BEST/REFURB/SAMPLE SALE 등 컬렉션성 cate_no는 타입 카테고리와 중복이라 제외.",
+    notes: "공식 ABOUT의 여성 디자이너 브랜드 근거로 women. NEW/BEST/REFURB/SAMPLE SALE 등 컬렉션성 cate_no는 타입 카테고리와 중복이라 제외.",
   },
   {
     key: "ojos",
@@ -1522,10 +1808,28 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://feyre.co.kr",
     brand: "FEYRE",
+    defaultGender: ["women"],
+    trustedCategory: true,
     paginate: true,
-    category: {discovery: "auto"},
-    disabled: true,
-    notes: "BLOCKED — 표준 카테고리 없음, collection/lookbook 페이지에 개별 product_no 링크만 존재하고 그마저 극소수(2~3개). 상품 자체가 거의 없는 신생몰로 추정 — 우선순위 낮음.",
+    maxPages: 100,
+    crawlDetails: true,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      productName: ".mun-prdlist__name > span:not(.mun-prdlist__name-title)",
+      productPrice: '.mun-prdlist__spec-item[data-title="판매가"] > span:not(.title)',
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: ".mun-prdlist__thumb-link",
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Top", cateNo: 30, gender: ["women"]},
+        {name: "Bottom", cateNo: 31, gender: ["women"]},
+        {name: "Dress", cateNo: 50, gender: ["women"]},
+        {name: "Outer", cateNo: 29, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node id=5715. 공식몰 여성형 상품 설명과 커스텀 mun-prdlist 카드 DOM을 검증.",
   },
   {
     key: "demoshop",
@@ -1648,9 +1952,22 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://en.lowool.com",
     brand: "LOWOOL",
+    sourceCurrency: "USD",
     paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    crawlDetails: true,
+    trustedCategory: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Necklace", cateNo: 102},
+        {name: "Bracelet", cateNo: 104},
+        {name: "Earrings", cateNo: 113},
+        {name: "Ring", cateNo: 99},
+        {name: "Exclusive", cateNo: 87},
+        {name: "Shop", cateNo: 61},
+      ],
+    },
+    notes: "공식 영문몰: genderless products, USD. 상품형 하위 메뉴만 수집하고 Press/Lookbook/Offline 제외.",
   },
   {
     key: "rollingstudios",
@@ -1679,7 +1996,22 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://lyjelservice.com",
     brand: "LYJEL SERVICE",
     paginate: true,
-    category: {discovery: "auto"},
+    maxPages: 300,
+    crawlDetails: true,
+    selectors: {
+      productItem: "li.mun-prdlist__item",
+      productName: ".mun-prdlist__name > span:not(.mun-prdlist__name-title)",
+      productPrice: ".mun-prdlist__sale",
+      productImage: ".mun-prdlist__img",
+      productLink: ".mun-prdlist__thumb-link",
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "all", cateNo: 63, gender: ["men"]},
+        {name: "all", cateNo: 70, gender: ["women"]},
+      ],
+    },
     notes: "3차 배치 draft — dry-run 필요",
   },
   {
@@ -1956,9 +2288,29 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://texture-seoul.co.kr",
     brand: "TEXTURE SEOUL",
-    paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    paginate: false,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId_"]',
+      productName: "h3.project-excerpt-title-inner",
+      productPrice: ".project-excerpt-tags > .project-excerpt-tags-inner:nth-of-type(2)",
+      productImage: 'img[id^="eListPrdImage"]',
+      productLink: 'a[href*="/product/"]',
+    },
+    category: {
+      discovery: "manual",
+      // 이 테마는 표준 product/list.html?cate_no=N을 비워 두고 공식 pretty URL에만
+      // 상품 카드를 렌더링한다. sitemap의 상위 판매 카테고리를 직접 사용한다.
+      categories: [
+        {name: "OUTERWEARS", cateNo: 42, url: "/category/outerwears/42/"},
+        {name: "TOP", cateNo: 43, url: "/category/top/43/"},
+        {name: "KNITWEARS", cateNo: 132, url: "/category/knitwears/132/"},
+        {name: "BOTTOMS", cateNo: 44, url: "/category/bottoms/44/"},
+        {name: "DRESSES", cateNo: 45, gender: ["women"], url: "/category/dresses/45/"},
+        {name: "ACCESSORIES", cateNo: 81, url: "/category/accessories/81/"},
+        {name: "本 TEXTURE", cateNo: 128, url: "/category/本-texture/128/"},
+      ],
+    },
+    notes: "brand_node id=5596. 2026-08-12 실측: 표준 목록은 0개, 공식 pretty URL 상품 카드는 전부 OUT OF STOCK.",
   },
   {
     key: "ordes",
@@ -2153,8 +2505,16 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://en.seen-nees.com",
     brand: "SEEN NEES",
     paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    crawlDetails: true,
+    // 공식 홈의 현행 SHOP 상품 링크가 모두 cate_no=64에 연결된다. 자동 탐색은
+    // LOOKBOOK/COLLABORATION 등 14개 메뉴를 상품 카테고리로 오인해 가격 없는
+    // 과거·품절 행을 반복 수집하므로 현재 판매 카테고리만 고정한다.
+    // https://en.seen-nees.com/category/shop/64/
+    category: {
+      discovery: "manual",
+      categories: [{name: "Shop", cateNo: 64, gender: ["women"]}],
+    },
+    notes: "공식 현행 SHOP cate_no=64 고정. 상세 가격 관측 필수.",
   },
   {
     key: "aftrsmmr",
@@ -2162,16 +2522,6 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://aftrsmmr.com",
     brand: "애프터썸머",
-    paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
-  },
-  {
-    key: "ensundayceremony",
-    name: "SUNDAY CEREMONY",
-    type: "cafe24",
-    baseUrl: "https://en.sunday-ceremony.com",
-    brand: "SUNDAY CEREMONY",
     paginate: true,
     category: {discovery: "auto"},
     notes: "3차 배치 draft — dry-run 필요",
@@ -2748,9 +3098,198 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     brand: "HAUSOU",
     notes: "imweb 파일럿 — brand_node_id=5484, detect platform_family=imweb",
   },
+  {
+    key: "maziuntitled",
+    name: "MAZI UNTITLED",
+    type: "cafe24",
+    baseUrl: "https://maziuntitled.com",
+    brand: "MAZI UNTITLED",
+    defaultGender: ["unisex"],
+    verifiedUnisexDefault: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    trustedCategory: true,
+    verifyStockFromDetail: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Bags", cateNo: 101, gender: ["unisex"]},
+        {name: "Bags", cateNo: 102, gender: ["unisex"]},
+        {name: "Bags", cateNo: 104, gender: ["unisex"]},
+        {name: "Bags", cateNo: 105, gender: ["unisex"]},
+        {name: "Bags", cateNo: 106, gender: ["unisex"]},
+        {name: "Bags", cateNo: 107, gender: ["unisex"]},
+        {name: "Accessories", cateNo: 109, gender: ["unisex"]},
+      ],
+    },
+    notes: "brand_node_id=5840. Official bag catalogue; product descriptions explicitly state suitability for both men and women.",
+  },
 ]
 
 export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]
+
+// AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
+// generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
+const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 공식 여성 컬렉션의 성인 XXS-2XL 상품에서 쓰는 색상명이다.
+  // `baby pink`의 baby만으로 아동복으로 분류하면 여성 기본값이 막힌다.
+  stapleandhue: [
+    /\bbaby[-\s]+pink\b/gi,
+  ],
+  // 공식 성인 XS-XL 의류에 쓰인 색상명이라 아동복 신호에서 제외한다.
+  // https://carnebollente.com/products/burn-baby-burn-baby-blue
+  "carnebollente-1704": [
+    /\bbaby\b/gi,
+  ],
+  // MARGE SHERWOOD 성인 여성 상품의 색상/Peanuts 협업명. 실제 아동 라인이 아니다.
+  margesherwood: [
+    /baby[-\s]?pink/gi,
+    /\bsummer[-\s]girls\b/gi,
+    /\bgirls[-\s]club\b/gi,
+  ],
+  // Cold Culture 성인 상품의 색상명/그래픽명. 실제 아동 라인은 아니다.
+  coldcultureworldwide: [
+    /\bbaby[-\s]+(?:blue|pink)\b/gi,
+    /\b(?:good|top)[-\s]+boy\b/gi,
+  ],
+  // 모두 공식 성인 사이즈(XS-XXL)와 남녀 모델로 확인한 상품/컬렉션명이다.
+  // 범용 baby/boy/kids 제거는 실제 아동복을 통과시키므로 확인된 조합만 좁게 제거한다.
+  scuffers: [
+    /\bscff[-\s]+baby\b/gi,
+    /\bbaby[-\s]+tee\b/gi,
+    /\bboys?[-\s]+or[-\s]+girls?\b/gi,
+    /\bboys?[-\s]+(?:green|grey)[-\s]+striped[-\s]+t[-\s]?shirt\b/gi,
+    /\bkids?[-\s]+(?:orange|purple|green)[-\s]+t[-\s]?shirt\b/gi,
+  ],
+  // threetimes 공식 여성 라인의 상품명이다. baby shower/boo는 컬렉션명이고,
+  // boy short는 여성 속옷 실루엣명이므로 kids 가드에서만 제거한다.
+  threetimes333: [
+    /\bbaby[-\s]+(?:shower|boo)\b/gi,
+    /\bboy[-\s]+short\b/gi,
+  ],
+  // 공식 남성 브랜드의 성인 FREE 사이즈 캡에 쓰인 그래픽/상품명이다.
+  // 실제 옵션도 BLACK-FREE 단일 성인 액세서리로 확인했다.
+  churchillromper: [
+    /\bkids[-\s]+vintage[-\s]+5[-\s]+panel[-\s]+cap\b/gi,
+  ],
+}
+
+// defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
+// 성별 메뉴가 없다는 사실만으로는 여기에 추가하지 않는다.
+const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
+  "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
+  "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
+  "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
+  "scuffers", // 일반 상품 상세에 남녀 모델을 함께 명시하고 별도 Just Women 라인을 운영
+  "enlowool", // 공식 소개에서 진주·혼합 소재를 genderless products로 명시
+  "iyso", // 공식 KLOGG 설명: gender와 무관하게 everyone을 위해 제작
+  "maziuntitled", // 공식 가방 설명에 남녀 모두에게 어울리는 크기로 명시
+  "en-2706", // 공식 취급처가 유니섹스 슈즈 전문 브랜드로 명시
+  "nomanual-shop", // 공식 브랜드 취급처의 현재 전개가 유니섹스
+  "carnebollente-1704", // 공식 상품 설명의 Unisex 및 남녀 모델 착용 근거
+  "ceciletulkens", // 공식 브랜드·상품 설명이 남녀를 모두 명시
+  "avvattev", // 공식 AW26이 남녀 룩을 하나의 워드로브로 제시
+  "sansangear-5471", // 공식 TOJI 동일 SKU에 남녀 모델 사이즈를 함께 명시
+  "fandco", // 공식 상품 여러 건이 동일 헤드웨어를 him/her 모두에게 적합하다고 명시
+  "luvz", // 공식 발라클라바 상세가 One size, unisex로 명시
+  "worthwhilemovement", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "eriist", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "gimcontext", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "conichiwabonjour", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "sagega", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "tape00", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+])
+
+const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
+  // 공식 Shopify 태그: M_ACCESSORIES / W_ACCESSORIES, man_product / woman_product.
+  "nude-project": {men: ["M_", "man_product"], women: ["W_", "woman_product"]},
+  // 공식 Woman 컬렉션의 태그: woman, women, womanpants, womantees, ea#woman 등.
+  coldcultureworldwide: {men: ["MEN"], women: ["woman", "women", "ea#woman"]},
+  // woman/women/mujer/hombre는 공용 성별 사전이 처리한다. 사이트 전용 규칙은
+  // 아동복이 아니라 실제 공용 컬렉션명으로 확인된 태그에만 한정한다.
+  scuffers: {
+    men: [],
+    women: [],
+    unisex: ["BOYS OR GIRLS DROP"],
+  },
+}
+
+// `/products.json`에 컬렉션 소속이 빠지는 Shopify 혼성몰용 공식 근거.
+// 상품 handle이 아래 공식 부서 컬렉션에 속할 때만 engine 성별을 부여한다.
+const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["shopifyGenderCollections"]>> = {
+  // https://www.amiparis.com/collections/women-view-all
+  // https://www.amiparis.com/collections/men-view-all
+  // https://www.amiparis.com/collections/unisex-ami-must-haves
+  "amiparis-689": {
+    women: ["women-view-all"],
+    men: ["men-view-all"],
+    unisex: ["unisex-ami-must-haves", "denim-unisexe"],
+  },
+  // https://www.camielfortgens.com/collections/shop-men
+  // https://www.camielfortgens.com/collections/shop-women
+  camielfortgens: {men: ["shop-men"], women: ["shop-women"]},
+  // 현재 공식 시즌이 MAN/WOMAN으로 분리되어 있다.
+  // https://haikure.com/collections/fw-26-man
+  // https://haikure.com/collections/pre-fw-26-woman
+  haikure: {
+    men: ["fw-26-man", "ss-26-man"],
+    women: ["pre-fw-26-woman", "pre-ss-26-woman"],
+  },
+  // https://ophyeyewear.com/collections/man
+  // https://ophyeyewear.com/collections/woman
+  // https://ophyeyewear.com/collections/unisex
+  ophyeyewear: {men: ["man"], women: ["woman"], unisex: ["unisex"]},
+  // 공식 Rick Owens/DRKSHDW 라인별 남녀 컬렉션.
+  // https://www.rickowens.eu/collections/men-rick-owens
+  // https://www.rickowens.eu/collections/rick-owens-women
+  "rickowens-1997": {
+    men: ["men-rick-owens", "men-drkshdw", "men-fw26-tower"],
+    women: ["rick-owens-women", "line-drk-women", "all-fw25"],
+  },
+  // 여성 카탈로그 안의 명시적 공용 예외. 나머지는 검증된 women 기본값.
+  // https://charoruiz.com/collections/unisex
+  charoruiz: {unisex: ["unisex"]},
+}
+
+const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTextPatterns"]>> = {
+  // 공식 메인 컬렉션의 두 상품명이 INNERPASSION VOL.01 HER / HIM이고,
+  // 각 링크도 공식몰에서 별도 HER/HIM 상세로 제공된다.
+  // https://a82.co.kr/collection/list.html?cate_no=47
+  a82: {women: [/\bHER\b/i], men: [/\bHIM\b/i]},
+  // NOMANUAL 공식 상세 페이지가 이 상품군을 `MODEL WOMAN`으로 명시한다.
+  // 범용 `baby` 아동복 방어 로직에서 여성 근거가 누락되지 않게 한다.
+  "nomanual-shop": {women: [/\bBABY\s+TEE\b/i]},
+}
+
+const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
+  // 공식 상품 설명에 Male (키): 사이즈 / Female (키): 사이즈 형식이 일관되게 존재한다.
+  "coldcultureworldwide",
+  // 공식 상품 설명에 `男性着用モデル`/`女性着用モデル`과 착용 사이즈를 명시한다.
+  "phingerin",
+  // 공식 상품 설명에 `Classic unisex fit`이 있는 상품만 제품 단위로 인식한다.
+  "ihnomuhnit",
+])
+
+// generated 설정을 다시 만들더라도 유지돼야 하는, 공식몰 전체 상품군 기본값.
+const SITE_DEFAULT_CATEGORIES: Record<string, string> = {
+  // 공식 About이 FANE을 가방 라인으로 명시한다. BRA/LOGE/LISSE/MIE는 가방 모델명이다.
+  // https://www.faneofficiel.fr/pages/about
+  faneofficiel: "bags",
+  // 공식몰 전체가 헤드웨어 상품군으로 구성된다.
+  // https://fandco.co.nz/collections/all-headwear
+  fandco: "headwear",
+  // 공식몰 전체가 발라클라바 단일 상품군이다.
+  // https://www.luvz.ch/collections/all
+  luvz: "headwear",
+}
+
+// 목록 템플릿이 모든 상품에 품절 아이콘을 렌더링하지만 상세 옵션에는 실제 재고가 있는 사이트.
+const SITE_CAFE24_DETAIL_STOCK_SITES = new Set([
+  "opening-project",
+  // Listing cards do not reliably expose sold-out state; product options do.
+  "wouldbe",
+])
 
 /** key로 사이트 설정 조회 */
 export function getSiteConfig(key: string): SiteConfig | undefined {
@@ -2760,9 +3299,40 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   // 사람이 검증한 보강 맵에서 채운다 — platforms.generated.ts 는
   // AUTO-GENERATED 라 여기에 값을 넣을 수 없기 때문이다.
   // 근거 규칙은 src/configs/gender-defaults.ts 헤더 참조.
-  if (config.defaultGender && config.defaultGender.length > 0) return config
-  const fallback = SITE_GENDER_DEFAULTS[key]
-  return fallback ? {...config, defaultGender: fallback} : config
+  const fallback = config.defaultGender && config.defaultGender.length > 0
+    ? config.defaultGender
+    : SITE_GENDER_DEFAULTS[key]
+  const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
+  const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
+  const genderDepartmentTagPrefixes = SITE_GENDER_DEPARTMENT_TAG_PREFIXES[key] ?? config.genderDepartmentTagPrefixes
+  const shopifyGenderCollections = SITE_SHOPIFY_GENDER_COLLECTIONS[key] ?? config.shopifyGenderCollections
+  const genderTextPatterns = SITE_GENDER_TEXT_PATTERNS[key] ?? config.genderTextPatterns
+  const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
+  const defaultCategory = SITE_DEFAULT_CATEGORIES[key] ?? config.defaultCategory
+  const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
+  if (
+    fallback === config.defaultGender
+    && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
+    && verifiedUnisexDefault === config.verifiedUnisexDefault
+    && genderDepartmentTagPrefixes === config.genderDepartmentTagPrefixes
+    && shopifyGenderCollections === config.shopifyGenderCollections
+    && genderTextPatterns === config.genderTextPatterns
+    && genderFromModelDescription === config.genderFromModelDescription
+    && defaultCategory === config.defaultCategory
+    && verifyStockFromDetail === config.verifyStockFromDetail
+  ) return config
+  return {
+    ...config,
+    ...(fallback ? {defaultGender: fallback} : {}),
+    ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
+    ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
+    ...(genderDepartmentTagPrefixes ? {genderDepartmentTagPrefixes} : {}),
+    ...(shopifyGenderCollections ? {shopifyGenderCollections} : {}),
+    ...(genderTextPatterns ? {genderTextPatterns} : {}),
+    ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
+    ...(defaultCategory ? {defaultCategory} : {}),
+    ...(verifyStockFromDetail ? {verifyStockFromDetail: true} : {}),
+  }
 }
 
 /** 활성화된 사이트만 반환 */

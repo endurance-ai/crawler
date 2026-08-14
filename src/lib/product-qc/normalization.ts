@@ -53,6 +53,12 @@ export interface ProductQcOptions {
   trustedCategory?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
+  /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
+  verifiedUnisexDefault?: boolean
+  /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
+  genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
+  /** Do not duplicate QC stats/events when writing repeated crawl checkpoints. */
+  recordReport?: boolean
 }
 
 export interface ProductQcResult<T extends ProductQcInput = ProductQcInput> {
@@ -78,7 +84,7 @@ const qcReport = new Map<string, ProductQcStats>()
 const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?: string[]}> = [
   {
     category: "outerwear",
-    patterns: [/\b(coat|jacket|blazer|parka|anorak|windbreaker|bomber|trench|overcoat|outerwear)\b/i],
+    patterns: [/\b(coat|jacket|blazer|parka|anorak|windbreaker|bomber|trench|overcoat|happi|outerwear)\b/i],
     contains: ["\uc544\uc6b0\ud130", "\ucf54\ud2b8", "\uc7ac\ud0b7", "\uc790\ucf13", "\ube14\ub808\uc774\uc800", "\ud30c\uce74", "\uc810\ud37c", "\uc57c\uc0c1"],
   },
   {
@@ -88,8 +94,8 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "tops",
-    patterns: [/\b(t[-\s]?shirt|tee|shirt|blouse|polo|hoodie|sweatshirt|tank[-\s]?top|crop[-\s]?top|henley|camisole)\b/i],
-    contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1"],
+    patterns: [/\b(t[-\s]?shirts?|tees?|shirts?|blouses?|polos?|hoodies?|sweatshirts?|tanks?|tank[-\s]?tops?|crop[-\s]?tops?|henleys?|camisoles?|sleeveless|long[-\s]?sleeves?)\b/i],
+    contains: ["\uc0c1\uc758", "\ud2f0\uc154\uce20", "\uc154\uce20", "\ube14\ub77c\uc6b0\uc2a4", "\ud6c4\ub4dc", "\ub9e8\ud22c\ub9e8", "\ub098\uc2dc", "\ud0f1\ud06c\ud0d1", "\ubc18\ud314", "\ub871\uc2ac\ub9ac\ube0c", "\ub871 \uc2ac\ub9ac\ube0c", "\uc2ac\ub9ac\ube0c\ub9ac\uc2a4", "\ud640\ud130\ub125"],
   },
   {
     category: "bottoms",
@@ -98,7 +104,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
     // 다만 그 때문에 "Short Sleeve"(반팔=tops)가 bottoms 로 잡히는 오탐이 생겼다.
     // 부정 전방탐색으로 그 한 갈래만 뺀다 — "Short Sleeve Shorts" 는 뒤쪽
     // "Shorts" 에서 여전히 매치된다.
-    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|skirt|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
+    patterns: [/\b(pants?|trousers?|jeans|denim|shorts?(?![ -]?sleeve)|trunks?|skirts?|skorts?|joggers?|leggings|chinos?|culottes|sweatpants|cargo)\b/i],
     contains: ["\ud558\uc758", "\ud32c\uce20", "\ubc14\uc9c0", "\ub370\ub2d8", "\uc9c4", "\uc1fc\uce20", "\uc2a4\ucee4\ud2b8", "\uce58\ub9c8", "\uc2ac\ub799\uc2a4", "\uc870\uac70"],
   },
   {
@@ -123,7 +129,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "jewelry",
-    patterns: [/\b(necklace|bracelet|ring|earrings?|jewelry|jewellery|pendant|anklet)\b/i],
+    patterns: [/\b(necklace|bracelet|ring|earrings?|jewelry|jewellery|pendants?|pendents?|anklet|piercings?)\b/i],
     contains: ["\ubaa9\uac78\uc774", "\ud314\ucc0c", "\ubc18\uc9c0", "\uadc0\uac78\uc774", "\uc8fc\uc5bc\ub9ac", "\uc96c\uc5bc\ub9ac", "\ud39c\ub358\ud2b8"],
   },
   {
@@ -133,7 +139,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "accessories",
-    patterns: [/\b(scarf|belt|watch|tie(?![-\s]?dye)|gloves|socks|wallet|muffler)\b/i],
+    patterns: [/\b(scarf|belt|watch|tie(?![-\s]?dye)|gloves|socks|wallet|muffler|fragrance|perfume)\b/i],
     contains: ["\uc2a4\uce74\ud504", "\ubca8\ud2b8", "\uc2dc\uacc4", "\ub125\ud0c0\uc774", "\uc7a5\uac11", "\uc591\ub9d0", "\uc9c0\uac11", "\uba38\ud50c\ub7ec"],
   },
   {
@@ -143,7 +149,7 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
   },
   {
     category: "swimwear",
-    patterns: [/\b(swimsuit|bikini|swimwear|trunks|rashguard)\b/i],
+    patterns: [/\b(swimsuit|bikini|swimwear|(?:swim|swimming|bathing)[-\s]+trunks?|rashguard)\b/i],
     contains: ["\uc218\uc601\ubcf5", "\ube44\ud0a4\ub2c8", "\ub798\uc2dc\uac00\ub4dc", "\uc2a4\uc714"],
   },
   {
@@ -152,6 +158,126 @@ const CATEGORY_ALIASES: Array<{category: Category; patterns: RegExp[]; contains?
     contains: ["\ud2b8\ub808\uc774\ub2dd", "\uc6b4\ub3d9\ubcf5", "\uc694\uac00", "\uc561\ud2f0\ube0c\uc6e8\uc5b4", "\uc2a4\ud3ec\uce20"],
   },
 ]
+
+// Compound product names can match multiple broad aliases (for example,
+// "Shirt Jacket" matches both tops and outerwear). Resolve only the phrases
+// whose merchandising family is sufficiently explicit before the generic
+// single-match gate below.
+const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}> = [
+  {
+    category: "swimwear",
+    patterns: [
+      /\b(?:swimming|swim)\s+caps?\b/i,
+      /\b(?:swim|swimming|bathing)[-\s]+trunks?\b/i,
+    ],
+  },
+  {
+    category: "knitwear",
+    patterns: [
+      /\b(shrug|cowichan)\b/i,
+      /\bknit(?:ted)?\b.*\b(top|sleeveless|hoodie|jacket|vest)\b/i,
+      /\b(top|sleeveless|hoodie|jacket|vest)\b.*\bknit(?:ted)?\b/i,
+    ],
+  },
+  {
+    category: "dresses",
+    patterns: [/\b(top|shirt|hoodie)\s+dress\b/i],
+  },
+  {
+    category: "outerwear",
+    patterns: [
+      /\bhappi\b/i,
+      /\b(jackets?|coats?|bombers?|puffers?|vests?)\b/i,
+      /\bjersey[-\s]?jacket\b/i,
+      /\bshirt[-\s]?jacket\b/i,
+      /\bblouson\b/i,
+      /\btrucker\b/i,
+      /\binsulated\s+vest\b/i,
+      /\b(short\s+)?down\s+jacket\b/i,
+      /\b(fuzzy|hood(?:ed)?)\s+jumper\b/i,
+      /\bbolero\b/i,
+    ],
+  },
+  {
+    category: "bags",
+    patterns: [
+      /\beastpak\s*[x×]\b/i,
+      /\b(rucksack|pouch|xpack|pak['’]?r|hobo)\b/i,
+      /\b(wallet|belt)\s+bag\b/i,
+      /\bpillow\s+handle(?:\s+mini)?\b/i,
+      /\b(?:swim\s+)?knit\s+bags?\b/i,
+    ],
+  },
+  {
+    category: "bottoms",
+    patterns: [
+      /\b(sweatpants?|jeans?|bootcut|tights?)\b/i,
+      /^(?!.*\b(?:swim|swimming|bathing)\b).*\btrunks?\b/i,
+    ],
+  },
+  {
+    category: "tops",
+    patterns: [
+      /\bjersey\b/i,
+      /\blong[-\s]?sleeve\b/i,
+      /\bhood(?:ed)?\s+zip[-\s]?up\b/i,
+      /\b(tops?|shirts?|sleeveless)\b/i,
+      /\bwool\s+base\b/i,
+    ],
+  },
+  {
+    category: "shoes",
+    patterns: [/\b(short\s+boots?|trainers?|flip[-\s]?flops?|mary\s+jane)\b/i],
+  },
+  {
+    category: "headwear",
+    patterns: [
+      /\btie[-\s]?down\s+cap\b/i,
+      /\b(?:shell\s+)?knit\s+(?:cowboy\s+)?(?:bucket\s+)?(?:hat|cap|beanie)s?\b/i,
+      // Product titles commonly end the noun with "Cap - Color". Giving that
+      // terminal noun priority avoids Denim/Watch fabric-detail ambiguity.
+      /\bcaps?\s*(?:[-–—]|$)/i,
+    ],
+  },
+  {
+    category: "jewelry",
+    patterns: [/\b(necklace|bracelet|rings?|earrings?|earcuffs?|bangles?)\b/i],
+  },
+  {
+    category: "accessories",
+    patterns: [
+      // A terminal "Tie - Color" is the product noun, not knitwear material.
+      /\bties?(?![-\s]?dye)\s*(?:[-–—]|$)/i,
+      /\bhair[-\s]?(pin|band)\b/i,
+      /\bhood(?:ie|ed)?\s+scarf\b/i,
+      /\b(?:arm|leg|mitten)\s+warmers?\b/i,
+      /\bkeychains?\b/i,
+      /\bkeyrings?\b/i,
+      /\bscrunchies?\b/i,
+      /\bhair\s*-?\s*(?:clips?|pins?|sticks?|ties?|bands?|brush(?:es)?|acc(?:essories)?)\b/i,
+      /\b(?:hand|button)\s+mirrors?\b/i,
+      /\bgripp?\s*-?\s*toks?\b/i,
+      /\biphone\s+(?:jelly\s+)?cases?\b/i,
+      /\bkey\s+r+i+n+g+s?\b/i,
+    ],
+  },
+  {
+    category: "underwear",
+    patterns: [/\bbralettes?\b/i],
+  },
+  {
+    category: "dresses",
+    patterns: [/\b(dotty|hoody)suit\b/i],
+  },
+]
+
+function inferPriorityCategoryFromText(text: string): Category | null {
+  const normalized = normalizeForMatch(text)
+  for (const entry of CATEGORY_PRIORITY_ALIASES) {
+    if (entry.patterns.some((pattern) => pattern.test(text) || pattern.test(normalized))) return entry.category
+  }
+  return null
+}
 
 // Raw category string \u2192 family. Includes legacy capitalized DB values
 // (Outer/Top/\u2026 lowercased by normalizeForMatch) so values passing through QC are
@@ -218,6 +344,17 @@ const CATEGORY_COMPAT: Record<string, Category> = {
   jewelry: "jewelry",
   jewellery: "jewelry",
   necklace: "jewelry",
+  necklaces: "jewelry",
+  bracelet: "jewelry",
+  bracelets: "jewelry",
+  ring: "jewelry",
+  rings: "jewelry",
+  earring: "jewelry",
+  earrings: "jewelry",
+  earcuff: "jewelry",
+  earcuffs: "jewelry",
+  bangle: "jewelry",
+  bangles: "jewelry",
   headwear: "headwear",
   hat: "headwear",
   cap: "headwear",
@@ -228,6 +365,8 @@ const CATEGORY_COMPAT: Record<string, Category> = {
   swimwear: "swimwear",
   swimsuit: "swimwear",
   bikini: "swimwear",
+  "let's swim": "swimwear",
+  "lets swim": "swimwear",
   activewear: "activewear",
   sportswear: "activewear",
   // passthrough
@@ -270,8 +409,10 @@ function currentCategoryCompat(raw: string): Category | null {
   return CATEGORY_COMPAT[normalized] ?? null
 }
 
-function inferCategoryFromText(text: string): Category | null {
+export function inferCategoryFromText(text: string): Category | null {
   if (!text.trim()) return null
+  const priority = inferPriorityCategoryFromText(text)
+  if (priority) return priority
   const matches = CATEGORY_ALIASES.filter((entry) => matchesAny(text, entry.patterns, entry.contains)).map((entry) => entry.category)
   const unique = [...new Set(matches)]
   return unique.length === 1 ? unique[0] : null
@@ -288,6 +429,7 @@ function normalizeCategoryField(
 } {
   const raw = typeof product.category === "string" ? product.category.trim() : ""
   const inferred = inferCategoryFromText(product.name)
+  const priorityInferred = inferPriorityCategoryFromText(product.name)
 
   if (!raw) {
     if (inferred) return {value: inferred, reason: "category_missing_text_fallback", confidence: 0.84, needsReview: false}
@@ -300,6 +442,19 @@ function normalizeCategoryField(
   // null(NOT NULL 에 걸려 적재 제외)로 떨어뜨린다.
   const current = currentCategoryCompat(raw)
   if (current) {
+    // `other` is a fallback rather than a trusted taxonomy decision. When a
+    // later pass finds explicit product-name evidence, promote it directly.
+    if (current === "other" && inferred) {
+      return {value: inferred, reason: "category_other_text_fallback", confidence: 0.8, needsReview: false}
+    }
+    // A brief listed in an explicit swim category is a bikini/swim bottom,
+    // not underwear. Keep the stronger official taxonomy evidence.
+    if (current === "swimwear" && inferred === "underwear") {
+      return {value: current, reason: current === raw ? null : "category_canonicalized", confidence: 0.9, needsReview: false}
+    }
+    if (priorityInferred && current !== priorityInferred && !trustedCategory) {
+      return {value: priorityInferred, reason: "category_priority_text_override", confidence: 0.9, needsReview: false}
+    }
     // ② 이름 기반 번복. 신뢰 출처에서는 건너뛴다 — 구제할 원본이 아니다.
     // 아래 두 text_fallback 은 남긴다: 값이 **없을 때** 채우는 것이라 번복이 아니다.
     if (inferred && current !== inferred && !trustedCategory) {
@@ -309,7 +464,9 @@ function normalizeCategoryField(
   }
 
   if (inferred) return {value: inferred, reason: "category_noise_text_fallback", confidence: 0.8, needsReview: false}
-  return {value: null, reason: "category_noncanonical_dropped", confidence: 0, needsReview: true}
+  // 상품 적재는 Qwen 가용성에 종속되지 않는다. 결정론적으로 분류할 수 없는
+  // 값은 canonical `other` 로 먼저 저장하고 후속 Qwen 정규화가 조건부 PATCH한다.
+  return {value: "other", reason: "category_unresolved_other_fallback", confidence: 0.2, needsReview: false}
 }
 
 // subcategory is optional (unlike category — no NOT NULL constraint, no
@@ -321,7 +478,14 @@ function normalizeSubcategoryField(
   product: ProductQcInput,
   canonicalCategory: Category | null,
 ): {value: string | null; reason: string | null; confidence: number} {
-  const resolved = resolveSubcategory(product.subcategory, canonicalCategory, product.name)
+  // Preserve an official narrow category label (for example Ring/Necklace)
+  // as evidence after its broad category has been canonicalized to jewelry.
+  // Code-only product names otherwise lose all subcategory information.
+  const resolved = resolveSubcategory(
+    product.subcategory,
+    canonicalCategory,
+    `${product.name} ${product.category ?? ""}`,
+  )
 
   switch (resolved.reason) {
     case null:
@@ -382,7 +546,11 @@ function normalizeGenderField(product: ProductQcInput, options: ProductQcOptions
       productUrl: product.productUrl,
     },
     (product.genderSource as GenderSource | undefined) ?? "engine",
-    {kidsGenderNoisePatterns: options.kidsGenderNoisePatterns},
+    {
+      kidsGenderNoisePatterns: options.kidsGenderNoisePatterns,
+      verifiedUnisexDefault: options.verifiedUnisexDefault,
+      genderTextPatterns: options.genderTextPatterns,
+    },
   )
 
   const normalized = [...new Set(raw.map((g) => normalizeGenderToken(String(g)) ?? normalizeForMatch(String(g))).filter(Boolean))]
@@ -492,19 +660,21 @@ export function applyProductQcGate<T extends ProductQcInput>(
   const accepted: T[] = []
   for (const product of products) {
     const result = normalizeProductTextFields(product, options)
-    record(site, result)
+    if (options.recordReport !== false) record(site, result)
 
     if (result.action === "review" || result.action === "reject") {
       const firstReason = result.reasons[0] ?? "product_qc_uncertain"
-      emit({
-        kind: "product_qc_review",
-        site,
-        sku: skuOf(product),
-        action: result.action,
-        reason: firstReason,
-        confidence: result.confidence,
-        changes: result.changes,
-      })
+      if (options.recordReport !== false) {
+        emit({
+          kind: "product_qc_review",
+          site,
+          sku: skuOf(product),
+          action: result.action,
+          reason: firstReason,
+          confidence: result.confidence,
+          changes: result.changes,
+        })
+      }
       continue
     }
 
