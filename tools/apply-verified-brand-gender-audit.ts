@@ -16,6 +16,7 @@ const OFFICIAL_MIXED_IDS = new Set([
 ])
 
 const OFFICIAL_SCOPE_UPDATES: Update[] = [
+  {brandId: 258, after: "women", reason: "official_about_womens_designer_brand", sources: ["https://yuse.co.kr/shopinfo/company.html"]},
   {brandId: 945, after: "unisex", reason: "official_parent_site_cross_gender_product_line", sources: ["https://www.maisonmargiela.com/ko-kr/"]},
   {brandId: 1292, after: "unisex", reason: "official_parent_site_cross_gender_product_line", sources: ["https://www.maisonmargiela.com/ko-kr/"]},
   {brandId: 1863, after: "unisex", reason: "official_parent_site_men_women", sources: ["https://www.loewe.com/int/en/home"]},
@@ -33,6 +34,11 @@ const OFFICIAL_SCOPE_UPDATES: Update[] = [
 ]
 
 const apply = process.argv.includes("--apply")
+const brandIdArg = process.argv.find((arg) => arg.startsWith("--brand-id="))
+const selectedBrandId = brandIdArg ? Number(brandIdArg.split("=")[1]) : undefined
+if (selectedBrandId !== undefined && !Number.isInteger(selectedBrandId)) {
+  throw new Error("--brand-id must be an integer")
+}
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
 if (!dbUrl || !dbToken) throw new Error("DB_URL and DB_TOKEN are required")
@@ -65,11 +71,14 @@ for (const brandId of OFFICIAL_MIXED_IDS) {
 }
 for (const update of OFFICIAL_SCOPE_UPDATES) updates.set(update.brandId, update)
 
-const planned = [...updates.values()].map((update) => {
-  const brand = brands.find((item) => item.id === update.brandId)
-  if (!brand) throw new Error(`brand not found: ${update.brandId}`)
-  return {brand, update}
-}).filter(({brand, update}) => JSON.stringify(brand.gender_scope) !== JSON.stringify([update.after]))
+const planned = [...updates.values()]
+  .filter((update) => selectedBrandId === undefined || update.brandId === selectedBrandId)
+  .map((update) => {
+    const brand = brands.find((item) => item.id === update.brandId)
+    if (!brand) throw new Error(`brand not found: ${update.brandId}`)
+    return {brand, update}
+  })
+  .filter(({brand, update}) => JSON.stringify(brand.gender_scope) !== JSON.stringify([update.after]))
 
 console.log(JSON.stringify({mode: apply ? "apply" : "dry-run", changes: planned.length}, null, 2))
 for (const {brand, update} of planned) {

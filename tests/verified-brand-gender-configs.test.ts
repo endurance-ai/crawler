@@ -1,9 +1,117 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 
+import {
+  inferVerifiedSiteGenderFromName,
+  SITE_GENDER_DEFAULTS,
+} from "../src/configs/gender-defaults"
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
+  assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.soonsuofficial, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS["afb-afb-afb"], ["men"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.twentyoneaugust, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.findoubt, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.jabberwocky, ["men"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.sirena, ["women"])
+  assert.equal(inferVerifiedSiteGenderFromName("afb-afb-afb", "WMS POLO DRESS"), "women")
+  assert.equal(inferVerifiedSiteGenderFromName("afb-afb-afb", "TECH SKULLCAP"), null)
+  assert.equal(inferVerifiedSiteGenderFromName("whateverwewant", "W'S ZIP KNIT"), "women")
+})
+
+test("FEYRE는 공식 여성 SHOP 전체 목록을 수집한다", () => {
+  const feyre = getSiteConfig("feyre")
+  assert.equal(feyre?.disabled, undefined)
+  assert.deepEqual(feyre?.defaultGender, ["women"])
+  assert.equal(feyre?.trustedCategory, true)
+  assert.deepEqual(feyre?.category?.categories?.map(({cateNo}) => cateNo), [30, 31, 50, 29])
+})
+
+test("NOS COULEURS는 공식 남녀 모델 근거의 공용 All 목록을 수집한다", () => {
+  const nosCouleurs = getSiteConfig("noscouleurs")
+  assert.equal(nosCouleurs?.disabled, undefined)
+  assert.deepEqual(nosCouleurs?.defaultGender, ["unisex"])
+  assert.equal(nosCouleurs?.verifiedUnisexDefault, true)
+  assert.equal(nosCouleurs?.trustedCategory, true)
+  assert.deepEqual(nosCouleurs?.category?.categories?.map(({cateNo}) => cateNo), [24, 25, 27, 28])
+})
+
+test("KIJIKO는 공식 여성 카탈로그의 메인 상품 피드를 수집한다", () => {
+  const kijiko = getSiteConfig("kijiko")
+  assert.equal(kijiko?.disabled, undefined)
+  assert.deepEqual(kijiko?.defaultGender, ["women"])
+  assert.equal(kijiko?.selectors?.productName, 'img[id^="eListPrdImage"]')
+  assert.deepEqual(kijiko?.category?.categories, [
+    {name: "SHOP", cateNo: 1, gender: ["women"], url: "/"},
+  ])
+})
+
+test("ROYAL OAK은 공식 26HS 여성 카탈로그 범위를 유지한다", () => {
+  const royalOak = getSiteConfig("royaloakseoul")
+  assert.equal(royalOak?.disabled, undefined)
+  assert.deepEqual(royalOak?.defaultGender, ["women"])
+  assert.deepEqual(royalOak?.category?.categories?.map(({cateNo}) => cateNo), [24])
+  assert.equal(
+    royalOak?.kidsGenderNoisePatterns?.some((pattern) => "BABY WAVE SHORTS".replace(pattern, "").trim() === "SHORTS"),
+    true,
+  )
+})
+
+test("SIDE는 검증된 공식 전체 목록 설정으로 활성화한다", () => {
+  const side = getSiteConfig("sideservice")
+  assert.equal(side?.disabled, undefined)
+  assert.deepEqual(side?.category?.categories, [{name: "ALL", cateNo: 1, url: "/shop/all.html"}])
+  assert.equal(side?.crawlDetails, true)
+})
+
+test("LYJEL SERVICE는 공식 MEN/WOMEN 카테고리 근거를 상품별로 유지한다", () => {
+  const lyjel = getSiteConfig("lyjelservice")
+  assert.equal(lyjel?.defaultGender, undefined)
+  assert.equal(lyjel?.selectors?.productItem, "li.mun-prdlist__item")
+  assert.deepEqual(lyjel?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 63, gender: ["men"]},
+    {cateNo: 70, gender: ["women"]},
+  ])
+})
+
+test("NOMANUAL의 공식 WOMAN baby tee는 아동복으로 오인하지 않는다", () => {
+  const patterns = getSiteConfig("nomanual-shop")?.genderTextPatterns?.women ?? []
+  assert.equal(patterns.some((pattern) => pattern.test("NO RELIGION HENLEY BABY TEE")), true)
+})
+
+test("TEXTURE SEOUL은 빈 표준 목록 대신 공식 pretty URL 카테고리를 수집한다", () => {
+  const texture = getSiteConfig("textureseoul")
+  assert.equal(texture?.category?.discovery, "manual")
+  assert.equal(texture?.selectors?.productName, "h3.project-excerpt-title-inner")
+  assert.equal(
+    texture?.selectors?.productPrice,
+    ".project-excerpt-tags > .project-excerpt-tags-inner:nth-of-type(2)",
+  )
+  assert.deepEqual(texture?.category?.categories?.map(({cateNo, gender, url}) => ({cateNo, gender, url})), [
+    {cateNo: 42, gender: undefined, url: "/category/outerwears/42/"},
+    {cateNo: 43, gender: undefined, url: "/category/top/43/"},
+    {cateNo: 132, gender: undefined, url: "/category/knitwears/132/"},
+    {cateNo: 44, gender: undefined, url: "/category/bottoms/44/"},
+    {cateNo: 45, gender: ["women"], url: "/category/dresses/45/"},
+    {cateNo: 81, gender: undefined, url: "/category/accessories/81/"},
+    {cateNo: 128, gender: undefined, url: "/category/本-texture/128/"},
+  ])
+  assert.equal(texture?.paginate, false)
+})
+
 test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한다", () => {
+  const cacele = getSiteConfig("cacele")
+  assert.deepEqual(cacele?.defaultGender, ["women"])
+  assert.equal(cacele?.selectors?.productItem, 'li[id^="anchorBoxId_"]')
+  assert.deepEqual(cacele?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 52, gender: ["women"]},
+    {cateNo: 53, gender: ["women"]},
+    {cateNo: 54, gender: ["women"]},
+    {cateNo: 55, gender: ["women"]},
+    {cateNo: 56, gender: ["women"]},
+  ])
   const blank03 = getSiteConfig("blank03")
   assert.deepEqual(blank03?.defaultGender, ["women"])
   assert.deepEqual(
@@ -17,6 +125,251 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(getSiteConfig("toomuch")?.defaultGender, ["women"])
   assert.equal(getSiteConfig("toomuch")?.kidsGenderNoisePatterns?.length, 1)
   assert.deepEqual(getSiteConfig("twojeys")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("porterna")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("margesherwood")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("archthe")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("percentis")?.defaultGender, ["men"])
+  assert.equal(getSiteConfig("pottery")?.defaultGender, undefined)
+  assert.equal(getSiteConfig("pottery")?.selectors?.productItem, "div.product__item")
+  assert.ok(getSiteConfig("pottery")?.category?.categories?.some((category) => category.cateNo === 747 && category.gender?.[0] === "men"))
+  assert.ok(getSiteConfig("pottery")?.category?.categories?.some((category) => category.cateNo === 1022 && category.gender?.[0] === "women"))
+  const liha = getSiteConfig("liha")
+  assert.deepEqual(liha?.defaultGender, ["unisex"])
+  assert.equal(liha?.verifiedUnisexDefault, true)
+  assert.equal(liha?.defaultCategory, "other")
+  assert.equal(liha?.sourceCurrency, "GBP")
+  const tatras = getSiteConfig("tatras-official")
+  assert.deepEqual(tatras?.shopifyGenderCollections, {
+    men: ["all-products-men"],
+    women: ["all-products-women"],
+  })
+  assert.equal(tatras?.sourceCurrency, "EUR")
+  assert.deepEqual(tatras?.shopifyExcludedTags, ["KIDS"])
+  const cantonCollective = getSiteConfig("canton-collective")
+  assert.equal(cantonCollective?.multiBrand, true)
+  assert.deepEqual(cantonCollective?.defaultGender, ["women"])
+  assert.deepEqual(cantonCollective?.shopifyExcludedHandles, ["canton-collective-express"])
+  const cantonNoise = cantonCollective?.kidsGenderNoisePatterns ?? []
+  assert.equal(cantonNoise.reduce((text, pattern) => text.replace(pattern, " "), "Y2K Baby Tee Babydoll").trim(), "Y2K")
+  assert.equal(cantonCollective?.sourceCurrency, "USD")
+  for (const key of ["en-2706", "nomanual-shop"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])
+    assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true)
+  }
+  for (const key of ["pommedor", "sineadodwyer-1472", "stapleandhue"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["women"])
+  }
+  const stapleAndHue = getSiteConfig("stapleandhue")
+  const stapleAndHueNoise = stapleAndHue?.kidsGenderNoisePatterns ?? []
+  assert.equal(
+    stapleAndHueNoise.reduce((text, pattern) => text.replace(pattern, " "), "Baby Pink Pointelle Dress").trim(),
+    "Pointelle Dress",
+  )
+  const carneBollente = getSiteConfig("carnebollente-1704")
+  assert.deepEqual(carneBollente?.defaultGender, ["unisex"])
+  assert.equal(carneBollente?.verifiedUnisexDefault, true)
+  assert.equal(
+    (carneBollente?.kidsGenderNoisePatterns ?? [])
+      .reduce((text, pattern) => text.replace(pattern, " "), "Burn Baby Burn Baby Blue").trim(),
+    "Burn   Burn   Blue",
+  )
+  assert.deepEqual(getSiteConfig("abagavelli")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("ceciletulkens")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("ceciletulkens")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("avvattev")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("avvattev")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("sansangear-5471")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("sansangear-5471")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("faneofficiel")?.defaultGender, ["women"])
+  assert.equal(getSiteConfig("faneofficiel")?.defaultCategory, "bags")
+  assert.deepEqual(getSiteConfig("fandco")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("fandco")?.verifiedUnisexDefault, true)
+  assert.equal(getSiteConfig("fandco")?.defaultCategory, "headwear")
+  assert.deepEqual(getSiteConfig("luvz")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("luvz")?.verifiedUnisexDefault, true)
+  assert.equal(getSiteConfig("luvz")?.defaultCategory, "headwear")
+  const mosxe = getSiteConfig("mosxe")
+  assert.deepEqual(mosxe?.defaultGender, ["women"])
+  assert.deepEqual(mosxe?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
+    {name: "NEW", cateNo: 52},
+  ])
+  const butterRing = getSiteConfig("butter-ring")
+  assert.deepEqual(butterRing?.defaultGender, ["women"])
+  assert.deepEqual(butterRing?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Ring", cateNo: 30, gender: ["women"]},
+    {name: "Necklace", cateNo: 31, gender: ["women"]},
+    {name: "Bracelet", cateNo: 42, gender: ["women"]},
+    {name: "Earring", cateNo: 43, gender: ["women"]},
+    {name: "Goods", cateNo: 63, gender: ["women"]},
+  ])
+  const oscitare = getSiteConfig("oscitare")
+  assert.deepEqual(oscitare?.defaultGender, ["men"])
+  assert.deepEqual(oscitare?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
+    {name: "outer", cateNo: 44},
+    {name: "top", cateNo: 45},
+    {name: "bottom", cateNo: 46},
+    {name: "acc", cateNo: 47},
+  ])
+  const churchillromper = getSiteConfig("churchillromper")
+  assert.deepEqual(churchillromper?.defaultGender, ["men"])
+  assert.deepEqual(churchillromper?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})), [
+    {name: "아우터", cateNo: 54},
+    {name: "니트", cateNo: 77},
+    {name: "상의", cateNo: 55},
+    {name: "하의", cateNo: 56},
+    {name: "악세서리", cateNo: 57},
+  ])
+  const kibata = getSiteConfig("kibata")
+  assert.deepEqual(kibata?.defaultGender, ["men"])
+  assert.deepEqual(kibata?.categoryUrls, ["https://www.kibata.kr/Online-Store/"])
+  assert.equal(kibata?.defaultCategory, "bottoms")
+  assert.equal(kibata?.defaultSubcategory, "jeans")
+  const publicfigure = getSiteConfig("publicfigure")
+  assert.deepEqual(publicfigure?.defaultGender, ["men"])
+  assert.deepEqual(publicfigure?.categoryUrls, ["https://publicfigure.kr/shop"])
+  assert.equal(publicfigure?.defaultCategory, "other")
+  const wouldbe = getSiteConfig("wouldbe")
+  assert.equal(wouldbe?.defaultGender, undefined)
+  assert.deepEqual(wouldbe?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Shop", cateNo: 42, gender: ["men"]},
+    {name: "Women", cateNo: 83, gender: ["women"]},
+  ])
+  assert.equal(wouldbe?.verifyStockFromDetail, true)
+  const bants = getSiteConfig("bants")
+  assert.deepEqual(bants?.defaultGender, ["men"])
+  assert.deepEqual(bants?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "BANTS", cateNo: 54, gender: ["men"]},
+  ])
+  const iyso = getSiteConfig("iyso")
+  assert.deepEqual(iyso?.defaultGender, ["unisex"])
+  assert.equal(iyso?.verifiedUnisexDefault, true)
+  assert.deepEqual(iyso?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Shoes", cateNo: 289, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 62, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 317, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 312, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 248, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 249, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 91, gender: ["unisex"]},
+    {name: "Socks", cateNo: 292, gender: ["unisex"]},
+    {name: "Shoes", cateNo: 246, gender: ["unisex"]},
+  ])
+  assert.deepEqual(getSiteConfig("refomed")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("omotodenim")?.defaultGender, ["men"])
+  const mazi = getSiteConfig("maziuntitled")
+  assert.deepEqual(mazi?.defaultGender, ["unisex"])
+  assert.equal(mazi?.verifiedUnisexDefault, true)
+  assert.equal(mazi?.verifyStockFromDetail, true)
+  assert.equal(mazi?.trustedCategory, true)
+  assert.deepEqual(mazi?.category?.categories?.map(({name, cateNo, gender}) => ({name, cateNo, gender})), [
+    {name: "Bags", cateNo: 101, gender: ["unisex"]},
+    {name: "Bags", cateNo: 102, gender: ["unisex"]},
+    {name: "Bags", cateNo: 104, gender: ["unisex"]},
+    {name: "Bags", cateNo: 105, gender: ["unisex"]},
+    {name: "Bags", cateNo: 106, gender: ["unisex"]},
+    {name: "Bags", cateNo: 107, gender: ["unisex"]},
+    {name: "Accessories", cateNo: 109, gender: ["unisex"]},
+  ])
+  const biteTheBullet = getSiteConfig("brand")
+  assert.deepEqual(biteTheBullet?.defaultGender, ["unisex"])
+  assert.equal(biteTheBullet?.verifiedUnisexDefault, true)
+  const reaven = getSiteConfig("reaven")
+  assert.deepEqual(reaven?.defaultGender, ["unisex"])
+  assert.equal(reaven?.verifiedUnisexDefault, true)
+  const vicinity = getSiteConfig("vicinityclo")
+  assert.deepEqual(vicinity?.defaultGender, ["unisex"])
+  assert.equal(vicinity?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("nude-project")?.genderDepartmentTagPrefixes, {
+    men: ["M_", "man_product"],
+    women: ["W_", "woman_product"],
+  })
+  const coldCulture = getSiteConfig("coldcultureworldwide")
+  assert.deepEqual(coldCulture?.defaultGender, ["men"])
+  assert.deepEqual(coldCulture?.genderDepartmentTagPrefixes, {
+    men: ["MEN"],
+    women: ["woman", "women", "ea#woman"],
+  })
+  assert.equal(coldCulture?.genderFromModelDescription, true)
+  const scuffers = getSiteConfig("scuffers")
+  assert.deepEqual(scuffers?.defaultGender, ["unisex"])
+  assert.equal(scuffers?.verifiedUnisexDefault, true)
+  assert.deepEqual(scuffers?.genderDepartmentTagPrefixes?.unisex, ["BOYS OR GIRLS DROP"])
+  assert.deepEqual(getSiteConfig("threetimes333")?.defaultGender, ["women"])
+  assert.equal(getSiteConfig("opening-project")?.verifyStockFromDetail, true)
+  assert.equal(getSiteConfig("phingerin")?.genderFromModelDescription, true)
+  assert.equal(getSiteConfig("ihnomuhnit")?.genderFromModelDescription, true)
+  const openyy = getSiteConfig("openyy")
+  assert.equal(openyy?.baseUrl, "https://open-yy.com")
+  assert.equal(openyy?.selectors?.productName, ".title a")
+  assert.deepEqual(openyy?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 215, gender: ["unisex"]},
+    {cateNo: 214, gender: ["women"]},
+  ])
+  const lowool = getSiteConfig("enlowool")
+  assert.equal(lowool?.sourceCurrency, "USD")
+  assert.deepEqual(lowool?.defaultGender, ["unisex"])
+  assert.equal(lowool?.verifiedUnisexDefault, true)
+  assert.equal(lowool?.trustedCategory, true)
+  const yuse = getSiteConfig("yuse")
+  assert.deepEqual(yuse?.defaultGender, ["women"])
+  assert.equal(yuse?.verifyStockFromDetail, true)
+  assert.deepEqual(yuse?.category?.categories?.map((category) => category.gender), [
+    ["women"], ["women"], ["women"], ["women"], ["women"], ["women"],
+  ])
+  const sculptor = getSiteConfig("sculptorpage")
+  assert.deepEqual(sculptor?.defaultGender, ["women"])
+  assert.equal(sculptor?.trustedCategory, true)
+  assert.deepEqual(sculptor?.category?.categories, [{name: "All", cateNo: 1532, gender: ["women"]}])
+  const sundayCeremony = getSiteConfig("ensundayceremony")
+  assert.equal(sundayCeremony?.genderTextPatterns?.men?.[0]?.test("BASIC TEE (M)"), true)
+  assert.equal(sundayCeremony?.genderTextPatterns?.women?.[0]?.test("BASIC TEE (W)"), true)
+  assert.equal(sundayCeremony?.genderTextPatterns?.men?.[0]?.test("BASIC TEE"), false)
+  const fritt = getSiteConfig("fritt")
+  assert.deepEqual(fritt?.category?.categories, [{name: "그녀를 위한 기프트", cateNo: 156, gender: ["women"]}])
+  const jinochio = getSiteConfig("jinochio")
+  assert.equal(jinochio?.genderTextPatterns?.women?.[0]?.test("(w)All day top"), true)
+  assert.equal(jinochio?.genderTextPatterns?.unisex?.[0]?.test("(uni)Breeze pajamas"), true)
+  assert.equal(jinochio?.defaultGender, undefined)
+  const orogee = getSiteConfig("orogee")
+  assert.deepEqual(orogee?.defaultGender, ["women"])
+  assert.deepEqual(orogee?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 24, gender: ["women"]},
+    {cateNo: 44, gender: ["women"]},
+    {cateNo: 25, gender: ["women"]},
+    {cateNo: 42, gender: ["women"]},
+  ])
+  const threetimesNoise = getSiteConfig("threetimes333")?.kidsGenderNoisePatterns ?? []
+  for (const verifiedWomenProduct of [
+    "Baby shower swim bolero",
+    "Baby boo cardigan",
+    "tht Seamless boy short",
+    "Organic milky boy short",
+  ]) {
+    assert.equal(
+      threetimesNoise.reduce((text, pattern) => text.replace(pattern, " "), verifiedWomenProduct).trim(),
+      verifiedWomenProduct.replace(/baby (?:shower|boo)|boy short/gi, " ").trim(),
+    )
+  }
+  const scuffersNoise = scuffers?.kidsGenderNoisePatterns ?? []
+  for (const verifiedAdultLabel of [
+    "SCFF Baby",
+    "baby tee",
+    "Boys or Girls",
+    "Boy Green Striped T-Shirt",
+    "Kids Purple T-Shirt",
+  ]) {
+    assert.equal(
+      scuffersNoise.reduce((text, pattern) => text.replace(pattern, " "), verifiedAdultLabel).trim(),
+      "",
+    )
+  }
+  const coldCultureNoise = coldCulture?.kidsGenderNoisePatterns ?? []
+  assert.equal(
+    coldCultureNoise.reduce((text, pattern) => text.replace(pattern, " "), "baby blue good boy top boy").trim(),
+    "",
+  )
+  const margeNoise = getSiteConfig("margesherwood")?.kidsGenderNoisePatterns ?? []
+  assert.equal(margeNoise.reduce((text, pattern) => text.replace(pattern, " "), "babypinklight summer girls girls club").trim(), "light")
   assert.equal(getSiteConfig("singularisca")?.brand, "singularisca")
   assert.deepEqual(getSiteConfig("singularisca")?.defaultGender, ["men"])
 })

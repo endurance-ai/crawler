@@ -72,3 +72,13 @@ test("신규상품 payload는 gender와 gender_source를 함께 싣는다", () =
   assert.deepEqual(row.gender, ["men"])
   assert.equal(row.gender_source, "engine")
 })
+
+test("미분류 카테고리는 Qwen 호출 전에 other/null로 적재한다", () => {
+  const row = productToCandidateDbRow(
+    {...product, category: "SALE", subcategory: "unknown navigation"},
+    config,
+    11,
+  )
+  assert.equal(row.category, "other")
+  assert.equal(row.subcategory, null)
+})

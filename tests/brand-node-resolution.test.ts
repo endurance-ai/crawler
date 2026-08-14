@@ -37,3 +37,18 @@ test("single-brand platforms retain their platform-level fallback", () => {
   )
   assert.equal(canUsePlatformBrandFallback("single-brand-shop", retailers), true)
 })
+
+test("single-brand platforms prefer their platform mapping over a duplicate exact brand name", () => {
+  const duplicateBrandIds = new Map([["opening project", 2503]])
+  const crawlPlatformIds = new Map([["opening-project", 2563]])
+  assert.equal(
+    resolveProductBrandNodeIdFromMaps(
+      "Opening Project",
+      "opening-project",
+      duplicateBrandIds,
+      crawlPlatformIds,
+      retailers,
+    ),
+    2563,
+  )
+})

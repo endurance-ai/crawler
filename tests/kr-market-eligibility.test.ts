@@ -7,6 +7,7 @@ import {
   extractActualOfferCurrencies,
   extractLocalizationCountryCodes,
   isRetryableEligibilityError,
+  probeKrMarketEligibility,
   type KrPriceProbe,
 } from "../src/lib/kr-market-eligibility"
 
@@ -110,4 +111,24 @@ test("일반 상품 페이지 fallback은 Product Offer의 양수 가격과 ISO 
     extractActualOfferCurrencies('<meta property="product:price:currency" content="KRW">'),
     [],
   )
+})
+
+test("검증된 KR 공식몰과 KRW 근거는 별도 locale URL 없이도 온보딩 대상으로 유지한다", async () => {
+  const result = await probeKrMarketEligibility({
+    homepageUrl: "https://oscitare.com",
+    homepageHtml: "<html></html>",
+    platformType: "cafe24",
+    originCountry: null,
+    verifiedStorefront: "KR",
+    verifiedCurrency: "KRW",
+    verifiedSources: ["https://oscitare.com/shopinfo/company.html"],
+    checkedAt,
+    fetchImpl: async () => {
+      throw new Error("verified evidence should short-circuit network probes")
+    },
+  })
+  assert.equal(result.status, "eligible_storefront")
+  assert.equal(result.priceCurrency, "KRW")
+  assert.equal(result.storefrontUrl, "https://oscitare.com")
+  assert.deepEqual(result.evidence.sources, ["https://oscitare.com/shopinfo/company.html"])
 })

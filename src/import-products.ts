@@ -18,6 +18,7 @@ import {isConfirmedPricing, toDbPriceFields} from "./lib/product-pricing"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
+import {inferVerifiedSiteGenderFromName, SITE_GENDER_DEFAULTS} from "./configs/gender-defaults"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {mergeProductImages} from "./lib/product-images"
 import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
@@ -34,6 +35,35 @@ import {
 } from "./lib/brand-provenance"
 import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
 import {emit} from "./lib/core/observability"
+import {isValidCategory, isValidSubcategory, type Category} from "./lib/enums/product-enums"
+import {
+  buildQwenNormalizationPatch,
+  classifyProductWithQwen,
+  needsQwenNormalization,
+  qwenNormalizationInputHash,
+  type ProductNormalizationInput,
+} from "./lib/product-qwen-normalization"
+import {assertQwenReady, QwenDisabledError, QwenUnavailableError} from "./lib/qwen-client"
+
+if (process.argv.includes("--help") || process.argv.includes("-h")) {
+  console.log(`
+Crawler product import
+
+Usage:
+  tsx src/import-products.ts [--site=KEY] [--dry-run] [--no-new-brands] [--in-stock-only]
+
+Options:
+  --site=KEY        Import only data/KEY-products.json
+  --dry-run         Validate and report without writing to the database
+  --no-new-brands   Skip products whose brand_node mapping is missing
+  --in-stock-only   Import only products currently in stock
+  --allow-qwen-deferred
+                    Emergency escape hatch: allow DB writes without healthy
+                    Qwen endpoints. Automated jobs must not use this flag.
+  --help, -h        Show this help and exit
+`)
+  process.exit(0)
+}
 
 /**
  * 성별 출처 신뢰도 순위 (dedup merge 용).
@@ -115,9 +145,115 @@ interface CrawledProduct {
     source: "variant" | "api" | "listing" | "detail"
     version: 2
   }
+  llmEnrichedAt?: string
+  llmModel?: string
+  llmInputHash?: string
   // 리뷰 데이터
   reviewCount?: number
   reviews?: CrawledReview[]
+}
+
+interface QwenImportStats {
+  targeted: number
+  succeeded: number
+  unchanged: number
+  unavailable: number
+  failed: number
+  schemaFailed: number
+  raceSkipped: number
+}
+
+function emptyQwenImportStats(): QwenImportStats {
+  return {
+    targeted: 0,
+    succeeded: 0,
+    unchanged: 0,
+    unavailable: 0,
+    failed: 0,
+    schemaFailed: 0,
+    raceSkipped: 0,
+  }
+}
+
+function writeJsonCheckpoint(filePath: string, products: readonly CrawledProduct[]): void {
+  const tmp = `${filePath}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(products, null, 2), "utf-8")
+  fs.renameSync(tmp, filePath)
+}
+
+async function normalizePersistedRows(
+  rows: Array<{
+    product_url: string
+    name: string
+    brand: string
+    category: string
+    subcategory: string | null
+    tags: string[] | null
+    updated_at: string
+  }>,
+  fileProducts: CrawledProduct[],
+  stats: QwenImportStats,
+): Promise<boolean> {
+  let checkpointChanged = false
+  await Promise.all(rows.map(async (row) => {
+    const input: ProductNormalizationInput = {
+      productUrl: row.product_url,
+      name: row.name,
+      brand: row.brand,
+      category: row.category,
+      subcategory: row.subcategory,
+      tags: row.tags,
+    }
+    if (!needsQwenNormalization(input)) return
+    stats.targeted++
+
+    try {
+      const prediction = await classifyProductWithQwen(input)
+      const patch = buildQwenNormalizationPatch(input, prediction.value)
+      if (!patch) {
+        stats.unchanged++
+        return
+      }
+
+      const normalizedAt = new Date().toISOString()
+      const {data, error} = await db
+        .from("products")
+        .update({...patch, updated_at: normalizedAt})
+        .eq("product_url", row.product_url)
+        .eq("updated_at", row.updated_at)
+        .select("id")
+        .maybeSingle()
+      if (error) throw error
+      if (!data) {
+        stats.raceSkipped++
+        return
+      }
+
+      for (const product of fileProducts) {
+        if (product.productUrl !== row.product_url) continue
+        product.category = patch.category
+        product.subcategory = patch.subcategory ?? undefined
+        product.llmEnrichedAt = normalizedAt
+        product.llmModel = prediction.model
+        product.llmInputHash = qwenNormalizationInputHash({
+          ...input,
+          category: patch.category,
+          subcategory: patch.subcategory,
+        })
+        checkpointChanged = true
+      }
+      stats.succeeded++
+    } catch (error) {
+      if (error instanceof QwenDisabledError || error instanceof QwenUnavailableError) {
+        stats.unavailable++
+      } else if (/zod|schema|validation|object generated/i.test(error instanceof Error ? `${error.name}: ${error.message}` : String(error))) {
+        stats.schemaFailed++
+      } else {
+        stats.failed++
+      }
+    }
+  }))
+  return checkpointChanged
 }
 
 // ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
@@ -433,6 +569,7 @@ async function main() {
 
   // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
   const dryRun = process.argv.includes("--dry-run")
+  const allowQwenDeferred = process.argv.includes("--allow-qwen-deferred")
 
   // data/ 내 *-products.json 파일 찾기
   const files = fs.readdirSync(dataDir)
@@ -446,6 +583,19 @@ async function main() {
   if (files.length === 0) {
     console.error("❌ 적재할 파일 없음")
     process.exit(1)
+  }
+
+  // HARD operational gate: category/subcategory normalization is part of a
+  // production import. Verify every SSH-forwarded endpoint before the first DB
+  // mutation so an absent tunnel cannot silently become deferred=N.
+  if (!dryRun && !allowQwenDeferred) {
+    console.log("🤖 Qwen 사전 점검: 모든 엔드포인트와 모델 확인 중...")
+    const ready = await assertQwenReady()
+    console.log(
+      `   ✅ Qwen 준비 완료: ${ready.map(({endpoint, model}) => `${endpoint} (${model})`).join(", ")}\n`,
+    )
+  } else if (!dryRun) {
+    console.warn("⚠️  --allow-qwen-deferred 사용: Qwen 정규화 누락을 명시적으로 허용합니다.")
   }
 
   console.log(`📦 ${files.length}개 파일 적재 시작\n`)
@@ -529,6 +679,7 @@ async function main() {
   for (const file of files) {
     const platform = file.replace("-products.json", "")
     const config = getSiteConfig(platform)
+    const filePath = path.join(dataDir, file)
 
     const cached = fileCache.get(file)
     if (!cached) {
@@ -545,7 +696,12 @@ async function main() {
     // 브랜드 스코프 폴백은 복원하지 않았다 — 근거는 engine/url/text/
     // config_default 4단뿐이다 (src/lib/product-gender.ts 헤더 참조).
     const genderSourceCounts: Record<string, number> = {}
-    const siteDefaultGender = config?.defaultGender ?? []
+    // Direct/re-detected crawlers can produce a valid platform key before it is
+    // promoted into PLATFORMS. Keep the separately human-verified fallback map
+    // effective for those artifacts as well.
+    const siteDefaultGender = config?.defaultGender ?? SITE_GENDER_DEFAULTS[platform] ?? []
+    const verifiedUnisexDefault = config?.verifiedUnisexDefault
+      || SITE_GENDER_DEFAULTS[platform]?.includes("unisex")
     const rawWithGender: CrawledProduct[] = rawAll.map((p) => {
       const evidence = {
         name: p.name,
@@ -558,8 +714,27 @@ async function main() {
         p.gender,
         evidence,
         (p.genderSource as GenderSource | undefined) ?? "engine",
-        {kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns},
+        {
+          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+          verifiedUnisexDefault,
+          genderTextPatterns: config?.genderTextPatterns,
+        },
       )
+      // Some mixed storefronts encode the official department only in their
+      // product naming convention. Treat this as product-level text evidence,
+      // above the site default but below URL/engine evidence.
+      const verifiedNameGender = inferVerifiedSiteGenderFromName(platform, p.name)
+      if (
+        !resolved.conflict
+        && verifiedNameGender
+        && (resolved.gender.length === 0 || resolved.source === "config_default")
+      ) {
+        resolved = resolveProductGenderWithSource([verifiedNameGender], evidence, "text", {
+          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+          verifiedUnisexDefault,
+          genderTextPatterns: config?.genderTextPatterns,
+        })
+      }
       // 엔진이 사이트 기본값을 찍지 않은 캐시(구 크롤 JSON, 또는 기본값을
       // 소비하지 않는 엔진)를 위해 import 시점에도 같은 폴백을 적용한다.
       // config_default 는 어차피 최하위 rank 라 url/text 를 이기지 못하므로
@@ -567,6 +742,8 @@ async function main() {
       if (resolved.gender.length === 0 && !resolved.conflict && siteDefaultGender.length > 0) {
         resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default", {
           kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+          verifiedUnisexDefault,
+          genderTextPatterns: config?.genderTextPatterns,
         })
       }
       genderSourceCounts[resolved.source ?? "unresolved"] = (genderSourceCounts[resolved.source ?? "unresolved"] ?? 0) + 1
@@ -591,8 +768,9 @@ async function main() {
     // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
     // false) → exact legacy behavior (no gate, all products imported).
     const qcRaw = applyProductQcGate(rawWithGender, platform, {
+      trustedCategory: trustedCategory || config?.type === "shopify" || config?.trustedCategory === true,
       kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-      trustedCategory,
+      verifiedUnisexDefault: config?.verifiedUnisexDefault,
     })
     const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
     console.log(`📄 ${file} — ${raw.length}개 상품`)
@@ -685,10 +863,16 @@ async function main() {
         return null
       }
 
+      const category: Category = isValidCategory(p.category) ? p.category : "other"
+      const rawSubcategory = typeof p.subcategory === "string" ? p.subcategory.trim() : ""
+      const subcategory = rawSubcategory && isValidSubcategory(rawSubcategory, category)
+        ? rawSubcategory
+        : null
+
       return {
         brand,
         name: p.name as string,
-        category: p.category as string,
+        category,
         ...prices,
         product_no: productNo,
         image_url: p.imageUrl as string,
@@ -702,7 +886,7 @@ async function main() {
         // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
         crawled_at: p.crawledAt as string,
         // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
-        subcategory: p.subcategory || null,
+        subcategory,
         // Kept out of the products upsert below and merged atomically through
         // merge_product_images. A listing-only crawl must never erase richer
         // detail images collected by an earlier run.
@@ -818,6 +1002,7 @@ async function main() {
     const BATCH = 50
     let inserted = 0
     let errors = 0
+    const qwenStats = emptyQwenImportStats()
 
     for (let i = 0; i < deduped.length; i += BATCH) {
       const batch = deduped.slice(i, i + BATCH)
@@ -834,6 +1019,19 @@ async function main() {
         console.error(`   ❌ 배치 ${i}-${i + batch.length} 실패:`, error.message)
         errors++
       } else {
+        const qwenFailuresBefore =
+          qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
+        const checkpointChanged = await normalizePersistedRows(batch, rawAll, qwenStats)
+        if (checkpointChanged) writeJsonCheckpoint(filePath, rawAll)
+        const qwenFailuresAfter =
+          qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
+        if (!allowQwenDeferred && qwenFailuresAfter > qwenFailuresBefore) {
+          throw new Error(
+            `Qwen normalization failed during ${platform}; import stopped before false completion ` +
+              `(unavailable=${qwenStats.unavailable}, failed=${qwenStats.failed}, ` +
+              `schema_failed=${qwenStats.schemaFailed})`,
+          )
+        }
         const {error: imageError} = imageUpdates.length > 0
           ? await db.rpc("merge_product_images", {updates: imageUpdates})
           : {error: null}
@@ -848,6 +1046,16 @@ async function main() {
     }
 
     console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
+    // `unchanged`는 Qwen 호출이 성공했지만 수정할 필드가 없었던 정상 결과다.
+    // 이를 deferred로 합치면 미처리처럼 보이므로 실제 미해결 오류만 별도 집계한다.
+    const unresolved = qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
+    console.log(
+      `   🤖 Qwen target=${qwenStats.targeted} success=${qwenStats.succeeded}` +
+        ` unchanged=${qwenStats.unchanged} unavailable=${qwenStats.unavailable}` +
+        ` failed=${qwenStats.failed} unresolved=${unresolved}` +
+        ` schema_failed=${qwenStats.schemaFailed}` +
+        ` race_skip=${qwenStats.raceSkipped}`,
+    )
     // 단일브랜드 자사몰: 파일의 대표 브랜드명으로 brand_node 해석 폴백에 사용
     const dominantBrand =
       resolveProductBrand(rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand, config) || null
@@ -1006,4 +1214,7 @@ function printProductQcReport() {
   }
 }
 
-main().catch(console.error)
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error)
+  process.exitCode = 1
+})

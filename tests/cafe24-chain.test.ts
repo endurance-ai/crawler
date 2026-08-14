@@ -10,8 +10,10 @@ import {
   dedupeCafe24ProductsByIdentity,
   filterCafe24ProductsForCategory,
   filterCafe24ProductsWithUsablePrice,
+  extractCafe24DetailFallbacks,
   inferCafe24Currency,
   isGenericCafe24ProductName,
+  isNoisyCafe24CategoryName,
   parseCafe24LabeledPrice,
   parseCafe24PriceCandidate,
   parseCafe24PriceCandidates,
@@ -19,6 +21,13 @@ import {
   runFirstUsefulCafe24Step,
 } from "../src/lib/cafe24-chain"
 import type {Product} from "../src/lib/types"
+
+test("Cafe24 editorial archive and collection categories are not product feeds", () => {
+  for (const name of ["ARCHIVE", "Archives", "COLLECTION", "Collections", "EDITORIAL"]) {
+    assert.equal(isNoisyCafe24CategoryName(name), true, name)
+  }
+  assert.equal(isNoisyCafe24CategoryName("NEW COLLECTION DRESSES"), false)
+})
 
 test("Cafe24 generic unisex category remains a fallback below product URL/text evidence", () => {
   assert.equal(cafe24CategoryGenderSource(["unisex"]), "config_default")
@@ -79,7 +88,15 @@ test("Cafe24 products dedupe by product_no across category-specific URLs", () =>
     productUrl: "https://shop.test/product/other/201/category/24/display/1/",
   })
 
-  assert.deepEqual(dedupeCafe24ProductsByIdentity([first, duplicate, other]), [first, other])
+  const merged: Array<[Product, Product]> = []
+  assert.deepEqual(
+    dedupeCafe24ProductsByIdentity(
+      [first, duplicate, other],
+      (existing, incoming) => merged.push([existing, incoming]),
+    ),
+    [first, other],
+  )
+  assert.deepEqual(merged, [[first, duplicate]])
 })
 
 test("Cafe24 canonical product URL is stable across category and tracking changes", () => {
@@ -232,6 +249,69 @@ test("Cafe24 detail pricing replaces an unconfirmed listing price coherently", (
   assert.equal(item.sourcePrice, 70_000)
   assert.deepEqual(item.pricingObservation, {
     state: "sale",
+    source: "detail",
+    version: 2,
+  })
+})
+
+test("Cafe24 lower detail price preserves a higher listing price as the sale original", () => {
+  const item = product({
+    price: 195_000,
+    originalPrice: 195_000,
+    salePrice: null,
+    sourcePrice: 195_000,
+    pricingObservation: {state: "unknown", source: "listing", version: 2},
+  })
+
+  applyCafe24DetailFallbacks(item, {
+    name: null,
+    price: 97_500,
+    originalPrice: 97_500,
+    salePrice: null,
+    priceFormatted: "₩97,500",
+    sourceCurrency: "KRW",
+    sourcePrice: 97_500,
+    descriptionFirstLine: null,
+  })
+
+  assert.equal(item.price, 97_500)
+  assert.equal(item.originalPrice, 195_000)
+  assert.equal(item.salePrice, 97_500)
+  assert.deepEqual(item.pricingObservation, {
+    state: "sale",
+    source: "detail",
+    version: 2,
+  })
+})
+
+test("Cafe24 equal product and sale meta prices confirm a regular detail price", async () => {
+  const page = {
+    evaluate: async () => ({
+      names: ["BRICK_black plain"],
+      priceText: "price KRW 268,000",
+      metaPrice: "268000",
+      metaSalePrice: "268000",
+      metaCurrency: "KRW",
+      jsonLdPrice: "",
+      jsonLdCurrency: "",
+      scriptProductPrice: "268000",
+      scriptSalePrice: "",
+      detailPriceText: "",
+      descFirstLine: "",
+    }),
+  } as unknown as Parameters<typeof extractCafe24DetailFallbacks>[0]
+
+  const detail = await extractCafe24DetailFallbacks(page)
+  assert.equal(detail.price, 268_000)
+  assert.equal(detail.originalPrice, 268_000)
+  assert.equal(detail.salePrice, null)
+
+  const item = product({
+    pricingObservation: {state: "unknown", source: "listing", version: 2},
+  })
+  applyCafe24DetailFallbacks(item, detail)
+  assert.deepEqual(item.pricingObservation, {
+    state: "regular",
     source: "detail",
     version: 2,
   })

@@ -17,8 +17,115 @@ import {test} from "node:test"
 import * as assert from "node:assert/strict"
 
 import {parseShopifyProducts} from "../src/lib/shopify-engine"
-import {shouldKeepOutOfStock} from "../src/lib/cafe24-engine"
+import {
+  cafe24BrandOverride,
+  cafe24ManualCategoryUrl,
+  cafe24ProductIdentityKey,
+  inferCafe24DetailStock,
+  inferCafe24ListingStock,
+  mergeCafe24DuplicateCategory,
+  mergeCafe24DuplicateGender,
+  shouldKeepOutOfStock,
+} from "../src/lib/cafe24-engine"
+
+import type {Product} from "../src/lib/types"
 import fixture from "./fixtures/shopify-products.fixture.json" with {type: "json"}
+
+test("cafe24: custom shop page can be used as a manual category URL", () => {
+  assert.equal(
+    cafe24ManualCategoryUrl("https://sideservice.store", {cateNo: 1, url: "/shop/all.html"}),
+    "https://sideservice.store/shop/all.html",
+  )
+  assert.equal(
+    cafe24ManualCategoryUrl("https://example.com", {cateNo: 24}),
+    "https://example.com/product/list.html?cate_no=24",
+  )
+})
+
+test("cafe24: product-name sold-out evidence overrides an empty badge placeholder", () => {
+  assert.equal(inferCafe24ListingStock(true, "[SOLD OUT] Layered T-Shirt"), false)
+  assert.equal(inferCafe24ListingStock(true, "Out of stock Knit"), false)
+  assert.equal(inferCafe24ListingStock(true, "품절 Wool Coat"), false)
+  assert.equal(inferCafe24ListingStock(true, "Layered T-Shirt"), true)
+})
+
+test("cafe24: 멀티브랜드 편집샵은 config.brand를 상품 브랜드로 고정하지 않는다", () => {
+  assert.equal(cafe24BrandOverride({brand: "KAMADEVA", multiBrand: true}), undefined)
+  assert.equal(cafe24BrandOverride({brand: "LOWOOL", multiBrand: false}), "LOWOOL")
+})
+
+test("cafe24: 상세 옵션 중 판매 가능 재고가 하나라도 있으면 재고 있음으로 판정한다", () => {
+  assert.equal(inferCafe24DetailStock({
+    optionStockData: JSON.stringify({
+      sold: {is_display: "T", is_selling: "T", use_stock: true, stock_number: 0},
+      available: {is_display: "T", is_selling: "T", use_stock: true, stock_number: 34},
+    }),
+    buyVisible: false,
+    soldOutVisible: true,
+  }), true)
+})
+
+test("cafe24: 상세 옵션이 모두 품절이면 구매 버튼보다 옵션 재고를 우선한다", () => {
+  assert.equal(inferCafe24DetailStock({
+    optionStockData: {
+      sold: {is_display: "T", is_selling: "T", use_stock: "T", stock_number: 0},
+    },
+    buyVisible: true,
+    soldOutVisible: false,
+  }), false)
+})
+
+test("cafe24: 같은 상품이 공식 Man/Woman 부서에 모두 있으면 공용 근거로 병합한다", () => {
+  const product = (gender: string[]): Product => ({
+    brand: "Opening Project", name: "Shared Bag", category: "department", gender,
+    genderSource: "engine", price: 1000, originalPrice: 1000, salePrice: null,
+    priceFormatted: "₩1,000", imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://example.com/product/1", inStock: true, platform: "opening-project",
+  })
+  const existing = product(["men"])
+  mergeCafe24DuplicateGender(existing, product(["women"]))
+  assert.deepEqual(existing.gender, ["unisex"])
+  assert.equal(existing.genderSource, "engine")
+})
+
+test("cafe24: 동일한 unisex 기본값 중복은 engine 근거로 승격하지 않는다", () => {
+  const product = (): Product => ({
+    brand: "NOMANUAL", name: "T-SHIRT (WOMAN)", category: "all", gender: ["unisex"],
+    genderSource: "config_default", price: 1000, originalPrice: 1000, salePrice: null,
+    priceFormatted: "₩1,000", imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://example.com/product/1", inStock: true, platform: "nomanual-shop",
+  })
+  const existing = product()
+  mergeCafe24DuplicateGender(existing, product())
+  assert.deepEqual(existing.gender, ["unisex"])
+  assert.equal(existing.genderSource, "config_default")
+})
+
+test("cafe24: 범용 Shop보다 뒤에서 발견한 구체 상품 카테고리를 보존한다", () => {
+  const product = (category: string, subcategory: string | null = null): Product => ({
+    brand: "LOWOOL", name: "Sang", category, subcategory, gender: ["unisex"],
+    genderSource: "config_default", price: 100, originalPrice: 100, salePrice: null,
+    priceFormatted: "$100", imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://example.com/product/1", inStock: true, platform: "enlowool",
+  })
+  const existing = product("Shop")
+  mergeCafe24DuplicateCategory(existing, product("jewelry", "necklace"))
+  assert.equal(existing.category, "jewelry")
+  assert.equal(existing.subcategory, "necklace")
+
+  mergeCafe24DuplicateCategory(existing, product("other"))
+  assert.equal(existing.category, "jewelry")
+})
+
+test("cafe24: 카테고리 경로가 달라도 같은 상품번호는 하나의 상품으로 본다", () => {
+  const man = "https://opening-project.com/product/shared-bag/1368/category/137/display/1/"
+  const woman = "https://opening-project.com/product/shared-bag/1368/category/138/display/1/"
+  assert.equal(cafe24ProductIdentityKey(man), cafe24ProductIdentityKey(woman))
+  assert.equal(
+    cafe24ProductIdentityKey("https://example.com/product/detail.html?product_no=1368&cate_no=137"),
+    "example.com:product:1368",
+  )
+})
 
 const BASE_URL = "https://example-shop.com"
 const KEY = "example-shop"

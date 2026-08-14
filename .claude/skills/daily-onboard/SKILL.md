@@ -177,8 +177,12 @@ eligibility가 확인된**(`eligible_origin`/`eligible_storefront`) 것을 `stat
   Playwright가 Lightpanda의 부분 CDP 구현과 근본적으로 안 맞아 `page.goto`조차
   타임아웃난다(`.moai/plans/lightpanda-spike-report.md` 실측). `CRAWLER_CAFE24_ENGINE`
   env var를 건드리지 않으면 기본값(chromium)으로 동작한다.
-- **저사양 코어 환경**: 브랜드당 페이지 로드 2번(existing 상세크롤 + hybrid 재방문) +
-  LLM 호출 1번 구조라 브랜드 규모에 따라 느릴 수 있다. CPU가 지속적으로 높으면
+- **저사양 코어 환경**: 상품당 페이지 로드 1번 + Qwen 호출 1번 구조라 브랜드 규모에
+  따라 느릴 수 있다. hybrid 가 별도로 재방문하지는 않는다 — cafe24(chromium)는
+  `createInlineClassifier` 가 만든 `enrich` 를 `crawlCafe24` 의 `enrichDetailPage`
+  훅으로 넘겨 **크롤러가 이미 열어둔 상세 페이지에서** 분류하고, shopify 는
+  existing 이 `/products.json` 순수 fetch 라 상세 페이지를 아예 열지 않아
+  `runHybridVariant` 의 `page.goto` 가 유일한 방문이다. CPU가 지속적으로 높으면
   `tools/daily-onboard.sh`가 띄운 프로세스 트리를 찾아(`chrome-headless-shell.exe`,
   `node.exe` — `product-extraction-poc.ts`/`onboard-classify.ts` 커맨드라인으로 식별)
   종료해도 안전하다. 체크포인트(`data/<key>-products.json`)가 30개 상품마다 저장되므로

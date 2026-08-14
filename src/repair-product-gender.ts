@@ -132,9 +132,16 @@ const MULTI_GENDER_FILTER = "gender.cs.{men,women},gender.cs.{men,unisex},gender
 const SCOPES = ["null-gender", "multi-gender", "unisex", "source-null", "all"]
 
 /** 플랫폼 키 → 사람이 검증한 사이트 전역 기본 성별 (getSiteConfig 가 gender-defaults.ts 를 병합해 준다). */
-function siteDefaultFor(platform: string | null): string[] {
-  if (!platform) return []
-  return getSiteConfig(platform)?.defaultGender ?? []
+function siteDefaultFor(platform: string | null): {
+  siteDefaultGender: string[]
+  verifiedUnisexDefault: boolean
+} {
+  if (!platform) return {siteDefaultGender: [], verifiedUnisexDefault: false}
+  const config = getSiteConfig(platform)
+  return {
+    siteDefaultGender: config?.defaultGender ?? [],
+    verifiedUnisexDefault: config?.verifiedUnisexDefault === true,
+  }
 }
 
 async function* streamProducts(
@@ -255,7 +262,7 @@ async function writePlan(outputPath: string): Promise<void> {
 
   const decisions: GenderRepairDecision[] = []
   for await (const page of streamProducts(db, {scope, platform, brandNodeId, limit})) {
-    for (const row of page) decisions.push(classifyGenderRepair(row, {useDescription, siteDefaultGender: siteDefaultFor(row.platform)}))
+    for (const row of page) decisions.push(classifyGenderRepair(row, {useDescription, ...siteDefaultFor(row.platform)}))
     process.stdout.write(`\r   🔍 ${decisions.length}행 분류`)
   }
   console.log("")
@@ -372,7 +379,7 @@ async function applyPlan(planPath: string): Promise<void> {
     // 이미 다른 경로(재임포트 등)로 갱신되어 스코프에서 빠진 행 — 아래 .contains
     // 가드가 어차피 걸러내므로 drift 로 세지 않는다.
     if (!row) continue
-    const now = classifyGenderRepair(row, {useDescription: plan.use_description, siteDefaultGender: siteDefaultFor(row.platform)})
+    const now = classifyGenderRepair(row, {useDescription: plan.use_description, ...siteDefaultFor(row.platform)})
     if (JSON.stringify(now.after) !== expected.get(id)) drifted += 1
   }
   if (drifted > 0) {

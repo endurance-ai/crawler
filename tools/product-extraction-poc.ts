@@ -3,7 +3,6 @@
 import {promises as fs} from "fs"
 import * as path from "path"
 import {fileURLToPath} from "url"
-import {openai} from "@ai-sdk/openai"
 import {Output, wrapLanguageModel} from "ai"
 import LLMScraper from "llm-scraper"
 import {chromium, type Page} from "playwright"
@@ -13,7 +12,13 @@ import {crawlCafe24} from "../src/lib/cafe24-engine"
 import {crawlCafe24WithLightpanda} from "../src/lib/cafe24-lightpanda"
 import {cafe24DetailConcurrency, parseCafe24EngineMode} from "../src/lib/cafe24-engine-selection"
 import {crawlShopify} from "../src/lib/shopify-engine"
+import {CATEGORIES, buildSubcategoryReference, isValidCategory, isValidSubcategory} from "../src/lib/enums/product-enums"
 import {getDetailParser} from "../src/lib/parsers/detail"
+import {genderFieldsToPoc} from "../src/lib/onboard-gender-transport"
+import {pricingFieldsToPoc} from "../src/lib/onboard-pricing-transport"
+import {crawlerFieldsToPoc, type PocCrawlerMetadata} from "../src/lib/onboard-crawler-fields-transport"
+import {buildQwenNormalizationPatch} from "../src/lib/product-qwen-normalization"
+import {runWithQwen, type QwenAttemptContext} from "../src/lib/qwen-client"
 import type {CrawlResult, Product, SiteConfig} from "../src/lib/types"
 
 type Variant = "existing" | "firecrawl" | "llm-scraper" | "hybrid"
@@ -22,7 +27,7 @@ type ScrapeFormat = "markdown" | "html" | "raw_html"
 const DEFAULT_BRANDS = ["shopamomento", "pottery", "hamsaseyo", "rollingstudios", "becay"]
 const DEFAULT_VARIANTS: Variant[] = ["existing", "llm-scraper"]
 const DEFAULT_FORMAT: ScrapeFormat = "markdown"
-const DEFAULT_LLM_SCRAPER_MODEL = "gpt-5.4-nano"
+const DEFAULT_QWEN_MODEL = "qwen3-vl-30b-awq"
 const CRAWLER_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const REQUIRED_FIELDS = ["product_key", "name", "price", "currency", "image_url", "product_url", "in_stock"] as const
 // Graded separately: `existing` fills every REQUIRED_FIELD on 4/5 brands, so the
@@ -74,6 +79,11 @@ interface PocProduct {
   product_key: string
   name: string | null
   price: number | null
+  original_price?: number | null
+  sale_price?: number | null
+  source_price?: number | null
+  pricing_observation?: Product["pricingObservation"]
+  crawler_metadata?: PocCrawlerMetadata
   currency: string | null
   image_url: string | null
   images?: string[] | null
@@ -82,9 +92,10 @@ interface PocProduct {
   raw_category: string | null
   category: string | null
   subcategory: string | null
-  // llm-scraper / firecrawl 변종 전용 (전체 페이지 추출). existing/hybrid 는
-  // 2026-07-29 부터 gender 를 만들지 않는다 — VLM(product_features) 이관.
+  // 크롤러가 결의한 상품 단위 성별과 근거를 import까지 보존한다.
   gender?: string[] | null
+  gender_source?: string | null
+  tags?: string[] | null
   // llm-scraper / firecrawl 변종 전용 (전체 페이지 추출). existing/hybrid 는
   // 2026-07-29 부터 색상·설명을 만들지 않는다 — VLM(product_features) 이관.
   raw_color?: string | null
@@ -212,14 +223,15 @@ const EXTRACTION_SYSTEM = [
 // 2026-07-29 — color/description/gender 제거. color/gender 는 VLM
 // (product_features)이 단일 출처가 됐고 description 은 폐기됐다.
 const ClassificationSchema = z.object({
-  category: z.string().nullable().describe("Canonical category, one of: Outer, Top, Knitwear, Shirts, Bottom, Dress, Shoes, Bag, Accessories"),
-  subcategory: z.string().nullable().describe("Specific product type, e.g. hoodie, chino, blazer, ringer tee"),
+  category: z.enum(CATEGORIES),
+  subcategory: z.string().nullable(),
 })
 
 const CLASSIFY_SYSTEM = [
   "You classify one fashion product from the compact context provided (name, breadcrumb, metadata, description).",
   "Return only JSON matching the schema.",
-  "category MUST be one of the canonical names.",
+  `category MUST be one of: ${CATEGORIES.join(", ")}.`,
+  `subcategory MUST match the selected category or be null:\n${buildSubcategoryReference()}`,
 ].join(" ")
 
 function usage(): string {
@@ -243,21 +255,17 @@ Options:
 
 Required env for full default run:
   FIRECRAWL_API_KEY
-  OPENAI_API_KEY or ANTHROPIC_API_KEY
 
 Optional model env:
-  LLM_SCRAPER_MODEL            Default: ${DEFAULT_LLM_SCRAPER_MODEL}
+  QWEN_MODEL                   Default: ${DEFAULT_QWEN_MODEL}
 
 Optional cost env:
   FIRECRAWL_USD_PER_CREDIT
   LLM_SCRAPER_INPUT_USD_PER_1M
   LLM_SCRAPER_OUTPUT_USD_PER_1M
 
-Native llm-scraper:
-  If llm-scraper, ai, and the matching @ai-sdk provider are installed, the
-  llm-scraper variant uses them. Otherwise it falls back to direct
-  OpenAI/Anthropic structured extraction over the same Playwright page snapshot.
-  Set LLM_SCRAPER_REQUIRE_NATIVE=true to fail instead of falling back.
+Native llm-scraper uses the local Qwen OpenAI-compatible endpoints configured
+by QWEN_BASE_URLS. There is no paid-provider fallback.
 `
 }
 
@@ -428,6 +436,7 @@ async function crawlCafe24Chromium(
     page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
     const result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
       sampleLimit: limit,
+      detailConcurrency: cafe24DetailConcurrency(),
       // Chromium detail-crawl pages are real Playwright Pages under the hood
       // (createPlaywrightDetailPageFactory) even though crawlCafe24's own
       // Cafe24Page type is narrower — safe to cast only on this branch.
@@ -514,6 +523,8 @@ function existingProductToPoc(product: Product, config: SiteConfig, elapsedMs: n
     product_key: stableProductKey(config.key, productUrl || product.productUrl || product.name, config),
     name: cleanString(product.name),
     price: product.price,
+    ...pricingFieldsToPoc(product),
+    ...crawlerFieldsToPoc(product),
     currency,
     image_url: imageUrl,
     images: images.length > 0 ? images : null,
@@ -522,6 +533,7 @@ function existingProductToPoc(product: Product, config: SiteConfig, elapsedMs: n
     raw_category: cleanString(product.category),
     category: cleanString(product.category),
     subcategory: cleanString(product.subcategory),
+    ...genderFieldsToPoc(product),
     variant: "existing",
     brand_key: config.key,
     source_url: productUrl || product.productUrl || config.baseUrl,
@@ -756,12 +768,8 @@ async function runLlmScraperVariant(
   options: CliOptions,
   stats: RuntimeStats,
 ): Promise<PocProduct[]> {
-  const model = process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL
-  if (!process.env.OPENAI_API_KEY) {
-    stats.errors.push("OPENAI_API_KEY is required")
-    return []
-  }
-  stats.llmAdapter = `llm-scraper/${model}/${options.format}`
+  const model = process.env.QWEN_MODEL || DEFAULT_QWEN_MODEL
+  stats.llmAdapter = `llm-scraper/qwen/${model}/${options.format}`
 
   const browser = await chromium.launch({headless: true})
   const rows: PocProduct[] = []
@@ -778,14 +786,18 @@ async function runLlmScraperVariant(
       // Per-call usage sink: llm-scraper's run() returns only {data, url}, so the
       // only place token counts are observable is inside the model middleware.
       const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
-      const scraper = new LLMScraper(usageCapturingModel(model, usage))
       try {
         await page.goto(target.url, {waitUntil: "domcontentloaded", timeout: 60000})
         await page.waitForTimeout(1200)
-        const result = await scraper.run(page, Output.object({schema: NativeLlmProductSchema}), {
-          format: options.format,
-          system: EXTRACTION_SYSTEM,
-          temperature: 0,
+        const request = await runWithQwen(async ({model: languageModel, abortSignal}) => {
+          const scraper = new LLMScraper(usageCapturingModel(languageModel, usage))
+          return scraper.run(page, Output.object({schema: NativeLlmProductSchema}), {
+            format: options.format,
+            system: EXTRACTION_SYSTEM,
+            temperature: 0,
+            maxRetries: 0,
+            abortSignal,
+          })
         })
         stats.requests += 1
         addTokenUsage(stats.tokenUsage, usage)
@@ -794,7 +806,7 @@ async function runLlmScraperVariant(
           brandKey: config.key,
           config,
           sourceUrl: target.url,
-          extracted: result.data,
+          extracted: request.value.data,
           elapsedMs: Date.now() - started,
           estimatedCost: estimateLlmCost(usage),
           error: null,
@@ -833,9 +845,9 @@ async function runLlmScraperVariant(
  * `usage` is discarded (see llm-scraper/dist/models.js). Wrapping the model is the
  * only way to observe token counts, and without them every cost number is zero.
  */
-function usageCapturingModel(model: string, sink: TokenUsage) {
+function usageCapturingModel(model: QwenAttemptContext["model"], sink: TokenUsage) {
   return wrapLanguageModel({
-    model: openai(model),
+    model,
     middleware: {
       specificationVersion: "v3",
       wrapGenerate: async ({doGenerate}) => {
@@ -893,11 +905,29 @@ interface InlineEnrichResult {
   error: string | null
 }
 
+function safeClassificationPatch(
+  product: Product,
+  prediction: z.infer<typeof ClassificationSchema>,
+) {
+  return buildQwenNormalizationPatch(
+    {
+      productUrl: product.productUrl,
+      name: product.name,
+      brand: product.brand,
+      category: isValidCategory(product.category) ? product.category : "other",
+      subcategory: product.subcategory ?? null,
+      tags: product.tags,
+    },
+    prediction,
+  )
+}
+
 /**
  * Cafe24 + Chromium hybrid path: same LLM classification as runHybridVariant
  * below, but invoked as crawlCafe24's enrichDetailPage hook -- reusing the
  * detail page crawlCafe24 already has open instead of a second page.goto().
- * Mutates `product` in place (category/subcategory: LLM wins when present)
+ * Mutates `product` in place only when the Qwen patch is taxonomy-safe. An
+ * existing canonical category cannot be replaced by the model.
  * and records per-product usage/error in
  * `results` for the caller to build hybrid PocProduct rows from afterward.
  * SPEC: .moai/plans/velvet-toasting-star.md.
@@ -909,24 +939,30 @@ function createInlineClassifier(
   const results = new Map<string, InlineEnrichResult>()
   const enrich = async (page: Page, product: Product): Promise<void> => {
     const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
-    const scraper = new LLMScraper(usageCapturingModel(model, usage))
     try {
       const existingName = product.name ?? ""
-      const result = await scraper.run(page, Output.object({schema: ClassificationSchema}), {
-        format: "custom",
-        formatFunction: async (p: Page) => JSON.stringify({name: existingName, page: JSON.parse(await readCompactContext(p))}),
-        system: CLASSIFY_SYSTEM,
-        temperature: 0,
+      const request = await runWithQwen(async ({model: languageModel, abortSignal}) => {
+        const scraper = new LLMScraper(usageCapturingModel(languageModel, usage))
+        return scraper.run(page, Output.object({schema: ClassificationSchema}), {
+          format: "custom",
+          formatFunction: async (p: Page) => JSON.stringify({name: existingName, page: JSON.parse(await readCompactContext(p))}),
+          system: CLASSIFY_SYSTEM,
+          temperature: 0,
+          maxRetries: 0,
+          abortSignal,
+        })
       })
       stats.requests += 1
       addTokenUsage(stats.tokenUsage, usage)
-      const cls = ClassificationSchema.partial().safeParse(result.data)
-      const c = cls.success ? cls.data : {}
-      product.category = cleanString(c.category) ?? product.category
-      product.subcategory = cleanString(c.subcategory) ?? product.subcategory ?? undefined
+      const c = ClassificationSchema.parse(request.value.data)
+      const patch = safeClassificationPatch(product, c)
+      if (patch) {
+        product.category = patch.category
+        product.subcategory = patch.subcategory ?? undefined
+      }
       results.set(product.productUrl, {
         usage,
-        error: cls.success ? null : `schema_validation_failed: ${cls.error.message}`,
+        error: null,
       })
     } catch (err) {
       stats.requests += 1
@@ -955,12 +991,8 @@ async function runHybridVariant(
   options: CliOptions,
   stats: RuntimeStats,
 ): Promise<PocProduct[]> {
-  const model = process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL
-  if (!process.env.OPENAI_API_KEY) {
-    stats.errors.push("OPENAI_API_KEY is required")
-    return []
-  }
-  stats.llmAdapter = `hybrid/${model}/compact`
+  const model = process.env.QWEN_MODEL || DEFAULT_QWEN_MODEL
+  stats.llmAdapter = `hybrid/qwen/${model}/compact`
 
   const browser = await chromium.launch({headless: true})
   const rows: PocProduct[] = []
@@ -974,30 +1006,34 @@ async function runHybridVariant(
       const base = existingProductToPoc(product, config, 0)
       const started = Date.now()
       const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
-      const scraper = new LLMScraper(usageCapturingModel(model, usage))
       try {
         await page.goto(base.product_url ?? product.productUrl, {waitUntil: "domcontentloaded", timeout: 60000})
         await page.waitForTimeout(800)
         const existingName = base.name ?? ""
-        const result = await scraper.run(page, Output.object({schema: ClassificationSchema}), {
-          format: "custom",
-          formatFunction: async (p: Page) => JSON.stringify({name: existingName, page: JSON.parse(await readCompactContext(p))}),
-          system: CLASSIFY_SYSTEM,
-          temperature: 0,
+        const request = await runWithQwen(async ({model: languageModel, abortSignal}) => {
+          const scraper = new LLMScraper(usageCapturingModel(languageModel, usage))
+          return scraper.run(page, Output.object({schema: ClassificationSchema}), {
+            format: "custom",
+            formatFunction: async (p: Page) => JSON.stringify({name: existingName, page: JSON.parse(await readCompactContext(p))}),
+            system: CLASSIFY_SYSTEM,
+            temperature: 0,
+            maxRetries: 0,
+            abortSignal,
+          })
         })
         stats.requests += 1
         addTokenUsage(stats.tokenUsage, usage)
-        const cls = ClassificationSchema.partial().safeParse(result.data)
-        const c = cls.success ? cls.data : {}
+        const c = ClassificationSchema.parse(request.value.data)
+        const patch = safeClassificationPatch(product, c)
         rows.push({
           ...base,
           variant: "hybrid",
-          category: cleanString(c.category) ?? base.category,
-          subcategory: cleanString(c.subcategory) ?? base.subcategory,
+          category: patch ? patch.category : base.category,
+          subcategory: patch ? patch.subcategory : base.subcategory,
           confidence: null,
           elapsed_ms: Date.now() - started,
           estimated_cost: estimateLlmCost(usage),
-          error: cls.success ? null : `schema_validation_failed: ${cls.error.message}`,
+          error: null,
           audit: {source: "hybrid", model, format: "compact", usage},
         })
       } catch (err) {
@@ -1270,7 +1306,7 @@ function cleanString(value: unknown): string | null {
 }
 
 // Defense-in-depth against the LLM not following the "disqualify price/name
-// noise" instruction (observed on gpt-5.4-nano, 2026-07-22: it returned the
+// noise" instruction (observed on an earlier hosted model, 2026-07-22: it returned the
 // raw "<name> <season> ₩X ₩Y" text verbatim on every product in a 35-item
 // live test despite an explicit prompt rule against it). Rather than trust
 // the model's judgment blindly, reject descriptions that are obviously just
@@ -1356,11 +1392,10 @@ function firecrawlRowCost(): number | null {
   return Number.isFinite(rate) && rate >= 0 ? rate : null
 }
 
-function estimateLlmCost(usage: TokenUsage): number | null {
-  const inputRate = Number(process.env.LLM_SCRAPER_INPUT_USD_PER_1M)
-  const outputRate = Number(process.env.LLM_SCRAPER_OUTPUT_USD_PER_1M)
-  if (!Number.isFinite(inputRate) || !Number.isFinite(outputRate)) return null
-  return (usage.input_tokens / 1_000_000) * inputRate + (usage.output_tokens / 1_000_000) * outputRate
+function estimateLlmCost(_usage: TokenUsage): null {
+  // Qwen is self-hosted. Keep token usage for capacity planning, but do not
+  // apply stale hosted-provider rates from the environment.
+  return null
 }
 
 function addTokenUsage(target: TokenUsage, next: TokenUsage): void {
@@ -1703,7 +1738,7 @@ async function main(): Promise<void> {
   console.log(`POC run: ${options.runId}`)
   console.log(`Brands: ${options.brands.join(", ")}`)
   console.log(`Variants: ${options.variants.join(", ")}`)
-  console.log(`Format: ${options.format} | model: ${process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL}`)
+  console.log(`Format: ${options.format} | model: ${process.env.QWEN_MODEL || DEFAULT_QWEN_MODEL}`)
   console.log(`Output: ${runDir}`)
 
   for (const brandKey of options.brands) {
@@ -1731,16 +1766,12 @@ async function main(): Promise<void> {
     let inlineHybrid: {model: string; results: Map<string, InlineEnrichResult>} | undefined
     let enrichDetailPageFn: ((page: Page, product: Product) => Promise<void>) | undefined
     if (useInlineHybrid) {
-      const model = process.env.LLM_SCRAPER_MODEL || DEFAULT_LLM_SCRAPER_MODEL
-      if (!process.env.OPENAI_API_KEY) {
-        existingRuntime.errors.push("OPENAI_API_KEY is required for hybrid")
-      } else {
-        const hybridRuntime = getRuntime(stats, brandKey, "hybrid")
-        hybridRuntime.llmAdapter = `hybrid/${model}/compact-inline`
-        const classifier = createInlineClassifier(model, hybridRuntime)
-        enrichDetailPageFn = classifier.enrich
-        inlineHybrid = {model, results: classifier.results}
-      }
+      const model = process.env.QWEN_MODEL || DEFAULT_QWEN_MODEL
+      const hybridRuntime = getRuntime(stats, brandKey, "hybrid")
+      hybridRuntime.llmAdapter = `hybrid/qwen/${model}/compact-inline`
+      const classifier = createInlineClassifier(model, hybridRuntime)
+      enrichDetailPageFn = classifier.enrich
+      inlineHybrid = {model, results: classifier.results}
     }
 
     // 1. Wide pool from the existing crawler (its own list-page discovery).
@@ -1775,10 +1806,15 @@ async function main(): Promise<void> {
     // 4. Products the existing crawler found that are in the eval set. `existing` and
     //    `hybrid` both build on these (hybrid re-classifies them via the LLM).
     const evalIds = new Set(evalSet.map((e) => e.productId))
-    const matched = pool.filter((p) => {
-      const id = productIdOf(p.productUrl, config)
-      return id !== null && evalIds.has(id)
-    })
+    const matched: Product[] = []
+    const matchedIds = new Set<string>()
+    for (const product of pool) {
+      const id = productIdOf(product.productUrl, config)
+      if (id === null || !evalIds.has(id) || matchedIds.has(id)) continue
+      matchedIds.add(id)
+      matched.push(product)
+      if (matched.length >= options.limit) break
+    }
 
     if (options.variants.includes("existing")) {
       existingRuntime.selectedProductUrls = matched.length

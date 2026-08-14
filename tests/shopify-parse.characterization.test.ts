@@ -49,7 +49,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import {fileURLToPath} from "node:url"
 
-import {parseShopifyProducts} from "../src/lib/shopify-engine"
+import {buildShopifyProductsUrl, parseShopifyProducts} from "../src/lib/shopify-engine"
 import type {Product} from "../src/lib/types"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -72,6 +72,17 @@ const KRW_PARSE_OPTIONS = {
   brandFallback: "Example Store",
 }
 
+test("Shopify products URL explicitly requests the configured market", () => {
+  assert.equal(
+    buildShopifyProductsUrl("https://refomed.jp", 2, "KR"),
+    "https://refomed.jp/products.json?page=2&limit=250&country=KR",
+  )
+  assert.equal(
+    buildShopifyProductsUrl("https://example.com/en-kr", 1, "KR"),
+    "https://example.com/en-kr/products.json?page=1&limit=250&country=KR",
+  )
+})
+
 test("single-brand override ignores a conflicting Shopify vendor", () => {
   const fixture = loadFixture()
   const products = parseShopifyProducts(fixture, BASE_URL, KEY, {
@@ -80,6 +91,55 @@ test("single-brand override ignores a conflicting Shopify vendor", () => {
   })
   assert.ok(products.length > 0)
   assert.ok(products.every((product) => product.brand === "House Brand"))
+})
+
+test("Shopify 단일 상품군 기본값은 상품 모델명의 오탐보다 우선한다", () => {
+  const products = parseShopifyProducts({products: [{
+    id: 1,
+    title: "BRA - LATTE SPAZZOLATO LEATHER",
+    handle: "bra-latte",
+    vendor: "FANE",
+    product_type: "",
+    body_html: "A leather bag.",
+    tags: [],
+    variants: [{id: 1, title: "Default", price: "100", available: true, sku: "BRA"}],
+    images: [],
+  }]}, BASE_URL, KEY, {...KRW_PARSE_OPTIONS, defaultCategory: "bags"})
+
+  assert.equal(products[0]?.category, "bags")
+})
+
+test("shopify 모델 설명 성별은 opt-in이며 구조화 부서 태그가 우선한다", () => {
+  const base = {
+    id: 1,
+    vendor: "Cold Culture",
+    product_type: "Hoodie",
+    variants: [{id: 1, title: "S", price: "100", available: true, sku: "S"}],
+    images: [],
+  }
+  const products = parseShopifyProducts({products: [
+    {
+      ...base,
+      title: "Shared Hoodie",
+      handle: "shared-hoodie",
+      body_html: "Male (184cm): L - Female (177cm): S",
+      tags: [],
+    },
+    {
+      ...base,
+      id: 2,
+      title: "Woman Hoodie",
+      handle: "woman-hoodie",
+      body_html: "Male (184cm): L - Female (177cm): S",
+      tags: ["womanhoodies"],
+    },
+  ]}, BASE_URL, KEY, {
+    ...KRW_PARSE_OPTIONS,
+    genderFromModelDescription: true,
+    genderDepartmentTagPrefixes: {men: ["MEN"], women: ["woman"]},
+  })
+  assert.deepEqual(products.map((product) => product.gender), [["unisex"], ["women"]])
+  assert.deepEqual(products.map((product) => product.genderSource), ["engine", "engine"])
 })
 
 test("shopify는 구매 가능한 세일 옵션이 하나라도 있으면 가장 낮은 세일 옵션을 대표한다", () => {
@@ -271,6 +331,62 @@ test("shopify preserves every safe product image without a ten-image cap", () =>
 
   assert.equal(product.images?.length, 12)
   assert.deepEqual(product.images, expected.map((image) => image.src))
+})
+
+test("shopify site department tag can explicitly mark a unisex collection", () => {
+  const fixture = {
+    products: [{
+      id: 1,
+      title: "Boys or Girls Hoodie",
+      handle: "boys-or-girls-hoodie",
+      vendor: "Scuffers",
+      product_type: "Hoodie",
+      body_html: "",
+      tags: ["BOYS OR GIRLS DROP"],
+      options: [],
+      variants: [{id: 1, title: "S", price: "100", available: true, sku: "S"}],
+      images: [],
+    }],
+  }
+  const [product] = parseShopifyProducts(fixture, BASE_URL, KEY, {
+    ...KRW_PARSE_OPTIONS,
+    defaultGender: ["unisex"],
+    genderDepartmentTagPrefixes: {men: [], women: [], unisex: ["BOYS OR GIRLS DROP"]},
+  })
+  assert.deepEqual(product.gender, ["unisex"])
+  assert.equal(product.genderSource, "engine")
+})
+
+test("shopify excludes exact protection-service and title-only gift-card products", () => {
+  const fixture = {
+    products: [
+      {
+        id: 1,
+        title: "Return Protection",
+        handle: "reveni-return-protection-43",
+        vendor: "Reveni",
+        product_type: "",
+        body_html: "",
+        tags: [],
+        options: [],
+        variants: [{id: 1, title: "Default Title", price: "4000", available: true, sku: ""}],
+        images: [],
+      },
+      {
+        id: 2,
+        title: "threetimes gift card",
+        handle: "threetimes-gift-card",
+        vendor: "threetimes",
+        product_type: "",
+        body_html: "",
+        tags: [],
+        options: [],
+        variants: [{id: 2, title: "50000", price: "50000", available: true, sku: ""}],
+        images: [],
+      },
+    ],
+  }
+  assert.deepEqual(parseShopifyProducts(fixture, BASE_URL, KEY, KRW_PARSE_OPTIONS), [])
 })
 
 test("characterize: shopify skip-rules exclude lookbook/gift-card/Rise.ai/unsafe-handle", () => {

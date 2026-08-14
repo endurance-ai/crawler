@@ -95,11 +95,10 @@ tools/recollect-batch.sh --keys-file tools/recollect-batches/batch-1.txt \
 
 ## 파일럿에서 반드시 확인할 것
 
-1. `--no-visit-page` 없이 zara/uniqlo 의 `jsonLd`/`breadcrumb` 가 채워지는지
-   (SPA 렌더 타이밍). 비어 있으면 키별 `--enrich-args "--wait-ms=3000"`.
-2. zara 봇 차단율 — `--enrich-args "--concurrency=1 --sleep-ms=2000"` 로 시작해
-   차단이 계속되면 `--no-visit-page` 로 폴백.
-3. 보강 비용. `.env.local` 에 `LLM_SCRAPER_INPUT_USD_PER_1M` /
-   `LLM_SCRAPER_OUTPUT_USD_PER_1M` 를 넣어야 스크립트가 1000개당 단가를 출력한다.
-   실측 토큰(etcseoul): 상품당 in 2,577 / out 112.
+1. 두 local Qwen endpoint의 `/v1/models` health check가 통과하는지 확인한다.
+   `import-products.ts`도 DB 쓰기 전에 이를 강제하며, SSH 터널이 없으면 즉시 실패한다.
+2. import 로그의 Qwen `success/unchanged/unavailable/failed/schema_failed/race_skip`
+   카운터를 확인한다. `unavailable` 또는 `failed`가 있으면 완료가 아니다.
+   `unchanged`만 Qwen 응답 후 안전 정책에 따라 기존 공식 분류를 보존한 상태다.
+3. zara/uniqlo 크롤의 `jsonLd`/`breadcrumb`와 필수 결정론적 필드가 채워지는지 확인한다.
 4. 임베딩 무효화 비율. 20% 초과면 정규화가 CDN 패턴을 놓친 것이다.

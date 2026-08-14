@@ -7,6 +7,7 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 
 import type {Product} from "./types"
+import {qwenNormalizationInputHash} from "./product-qwen-normalization"
 
 /** 보강 대상 한 건 — 원본 배열에서의 위치를 들고 다녀야 제자리에 되쓸 수 있다. */
 export interface EnrichTarget {
@@ -25,7 +26,10 @@ export function selectEnrichTargets(
 ): EnrichTarget[] {
   const pending: EnrichTarget[] = []
   products.forEach((product, index) => {
-    if (options.force || !product.llmEnrichedAt) pending.push({product, index})
+    const inputHash = qwenNormalizationInputHash(product)
+    if (options.force || !product.llmEnrichedAt || product.llmInputHash !== inputHash) {
+      pending.push({product, index})
+    }
   })
   return options.limit && options.limit > 0 ? pending.slice(0, options.limit) : pending
 }

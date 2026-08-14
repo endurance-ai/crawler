@@ -22,6 +22,7 @@ import {
   writeProductsFile,
 } from "../src/lib/enrich-file"
 import type {Product} from "../src/lib/types"
+import {qwenNormalizationInputHash} from "../src/lib/product-qwen-normalization"
 
 function product(overrides: Partial<Product> = {}): Product {
   return {
@@ -41,10 +42,19 @@ function product(overrides: Partial<Product> = {}): Product {
   }
 }
 
+function enrichedProduct(overrides: Partial<Product> = {}): Product {
+  const value = product(overrides)
+  return {
+    ...value,
+    llmEnrichedAt: value.llmEnrichedAt ?? "2026-07-28T01:00:00.000Z",
+    llmInputHash: qwenNormalizationInputHash(value),
+  }
+}
+
 test("selectEnrichTargets: 이미 보강된 항목을 건너뛰고 원본 인덱스를 유지한다", () => {
   const products = [
     product({name: "a"}),
-    product({name: "b", llmEnrichedAt: "2026-07-28T01:00:00.000Z"}),
+    enrichedProduct({name: "b"}),
     product({name: "c"}),
   ]
   const targets = selectEnrichTargets(products)
@@ -58,15 +68,21 @@ test("selectEnrichTargets: 이미 보강된 항목을 건너뛰고 원본 인덱
 })
 
 test("selectEnrichTargets: --force 는 보강된 항목까지 다시 잡는다", () => {
-  const products = [product({llmEnrichedAt: "2026-07-28T01:00:00.000Z"}), product()]
+  const products = [enrichedProduct(), product()]
   assert.equal(selectEnrichTargets(products).length, 1)
   assert.equal(selectEnrichTargets(products, {force: true}).length, 2)
+})
+
+test("selectEnrichTargets: 입력이 바뀐 보강 항목은 다시 잡는다", () => {
+  const enriched = enrichedProduct({name: "before"})
+  const changed = {...enriched, name: "after"}
+  assert.deepEqual(selectEnrichTargets([changed]).map((target) => target.index), [0])
 })
 
 test("selectEnrichTargets: --limit 은 미보강분에만 적용된다", () => {
   // 이미 보강된 항목이 limit 을 잡아먹으면, 재개할 때마다 진도가 0이 된다.
   const products = [
-    product({name: "done", llmEnrichedAt: "2026-07-28T01:00:00.000Z"}),
+    enrichedProduct({name: "done"}),
     product({name: "a"}),
     product({name: "b"}),
   ]
@@ -88,7 +104,7 @@ test("isRetryable: 일시적 오류만 재시도한다", () => {
 
   for (const message of [
     "Invalid schema: category must be one of ...",
-    "OPENAI_API_KEY is required",
+    "QWEN_BASE_URLS is invalid",
     "401 Unauthorized",
   ]) {
     assert.equal(isRetryable(new Error(message)), false, `재시도하면 안 됨: ${message}`)

@@ -3,8 +3,10 @@ import * as assert from "node:assert/strict"
 
 import type {Product} from "../src/lib/types"
 import {
+  inferCategoryFromText,
   applyProductQcGate,
   normalizeProductTextFields,
+  getProductQcReport,
   resetProductQcReport,
 } from "../src/lib/product-qc/normalization"
 
@@ -91,6 +93,15 @@ test("trustedCategory keeps the subcategory cascade correct", () => {
   assert.equal(result.product.subcategory, "t-shirt")
 })
 
+test("trustedCategory keeps a verified jewelry category despite apparel words in the name", () => {
+  const result = normalizeProductTextFields(
+    product({name: "Denim Big Star", category: "Necklace", subcategory: undefined}),
+    {trustedCategory: true},
+  )
+  assert.equal(result.product.category, "jewelry")
+  assert.ok(!result.reasons.includes("category_text_conflict"))
+})
+
 test("QC folds non-canonical mappable category to canonical family (sweater -> knitwear)", () => {
   const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "sweater"}))
   assert.equal(result.product.category, "knitwear")
@@ -103,16 +114,141 @@ test("QC passes a canonical family through unchanged (knitwear stays knitwear)",
   assert.ok(!result.reasons.includes("category_canonicalized"))
 })
 
-test("QC holds non-canonical noise category for review (not loaded) when name gives no signal", () => {
+test("QC stores unresolved category as other so Qwen can normalize it after insert", () => {
   const result = normalizeProductTextFields(product({name: "Archive Piece 001", category: "~50%"}))
-  assert.equal(result.action, "review")
-  assert.ok(result.reasons.includes("category_noncanonical_dropped"))
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "other")
+  assert.ok(result.reasons.includes("category_unresolved_other_fallback"))
 })
 
 test("QC recovers canonical from name when category is noise (모두 보기 -> dresses)", () => {
   const result = normalizeProductTextFields(product({name: "Silk Mini Dress", category: "모두 보기"}))
   assert.equal(result.product.category, "dresses")
   assert.ok(result.reasons.includes("category_noise_text_fallback"))
+})
+
+test("QC resolves common Korean top names and skort deterministically", () => {
+  for (const name of ["피그먼트 반팔", "컨피던스 브이넥 롱 슬리브", "스터드 포인트 골지 홀터넥", "백 트위스트 슬리브리스"]) {
+    const result = normalizeProductTextFields(product({name, category: "other"}))
+    assert.equal(result.product.category, "tops", name)
+  }
+  const skort = normalizeProductTextFields(product({name: "SEQUIN MINI SKORT / CREAM", category: "other"}))
+  assert.equal(skort.product.category, "bottoms")
+})
+
+test("QC canonicalizes jewelry category labels even when the product name is abbreviated", () => {
+  for (const category of ["Necklace", "Bracelet", "Earrings", "Ring"]) {
+    const result = normalizeProductTextFields(product({name: "thorn B", category}))
+    assert.equal(result.product.category, "jewelry", category)
+  }
+})
+
+test("QC keeps briefs in an explicit official swim category as swimwear", () => {
+  const result = normalizeProductTextFields(product({name: "FIG PURPLE BRIEF", category: "Let's Swim"}))
+  assert.equal(result.product.category, "swimwear")
+  assert.ok(!result.reasons.includes("category_text_conflict"))
+})
+
+test("QC treats swimming caps as swimwear before the generic headwear rule", () => {
+  for (const name of ["SPELLING SWIMMING CAP", "MIML SWIM CAP"]) {
+    const result = normalizeProductTextFields(product({name, category: "Let's Swim"}))
+    assert.equal(result.product.category, "swimwear")
+    assert.ok(!result.reasons.includes("category_text_conflict"))
+  }
+})
+
+test("QC classifies underscore-suffixed apparel and accessories after text normalization", () => {
+  const cases: Array<[string, string]> = [
+    ["LACE TANK-BK", "tops"],
+    ["AMALFI SPORTY MOTO JERSEY_IVORY", "tops"],
+    ["THIRSTY CAMEL T-SHIRTS_DARK GREY", "tops"],
+    ["COTTON 160`S LOOSE SHIRTS_IVORY", "tops"],
+    ["SHELL KNIT COWBOY BUCKET HAT_NAVY", "headwear"],
+    ["Tangled Swim Knit Bag_Red", "bags"],
+    ["Tanning Knit Cap_Navy", "headwear"],
+    ["PUNTA PERDIZ SCRUNCHIE", "accessories"],
+  ]
+  for (const [name, expected] of cases) {
+    assert.equal(inferCategoryFromText(name), expected, name)
+  }
+})
+
+test("QC classifies plural shirts and underscore-suffixed tees through category and subcategory", () => {
+  const shirt = normalizeProductTextFields(product({name: "COTTON PAPER LOOSE SHIRTS_IVORY", category: "other"}))
+  assert.equal(shirt.product.category, "tops")
+  assert.equal(shirt.product.subcategory, "shirt")
+
+  const tee = normalizeProductTextFields(product({name: "SORONA COTTON S/S TEE_BLACK", category: "other"}))
+  assert.equal(tee.product.category, "tops")
+  assert.equal(tee.product.subcategory, "t-shirt")
+})
+
+test("QC keeps fashion trunks out of swimwear and recovers REFOMED product nouns", () => {
+  assert.equal(normalizeProductTextFields(product({name: 'REPT-064 | "KINCHAKU" WOOL TRUNKS', category: "other"})).product.category, "bottoms")
+  assert.equal(normalizeProductTextFields(product({name: "Classic Swim Trunks", category: "other"})).product.category, "swimwear")
+  assert.equal(normalizeProductTextFields(product({name: "RECU-YN01 | WOOL BASE", category: "other"})).product.category, "tops")
+  assert.equal(normalizeProductTextFields(product({name: 'REPF-003 | FRAGRANCE "NEXT MAN"', category: "other"})).product.category, "accessories")
+})
+
+test("QC resolves explicit compound product names before broad category aliases", () => {
+  const cases: Array<[string, string]> = [
+    ["W Biker Jersey Jacket", "outerwear"],
+    ["Oversized Shirt Jacket", "outerwear"],
+    ["EASTPAK x Opening Project DAY PAK'R", "bags"],
+    ["Double Knee Bermuda Sweatpant", "bottoms"],
+    ["Logo Football Jersey", "tops"],
+    ["Shirring Slim Long Sleeve", "tops"],
+    ["Ribbon Tie Down Cap", "headwear"],
+    ["BANTS Anchor Logo 8oz Denim Vintage Baseball Cap - Indigo", "headwear"],
+    ["BANTS HDR Cotton Double Roll Watch Cap - Navy", "headwear"],
+    ["BANTS HDR Silk Stripe Knit Tie - Navy x Blue", "accessories"],
+    ["W 2Way Hoodie Scarf", "accessories"],
+    ["BALLET SLOUCHY SHORT BOOTS", "shoes"],
+    ["METALLIC PILLOW HANDLE MINI", "bags"],
+    ["LEATHER MOTO HOBO MINI", "bags"],
+    ["CUT OUT LEG WARMERS", "accessories"],
+    ["YY CRINKLED BRALETTE", "underwear"],
+    ["ALPACA TURTLE SHRUG", "knitwear"],
+    ["SHIRRING WORK VEST", "outerwear"],
+    ["CORDUROY LOOSE BOOTCUT", "bottoms"],
+    ["DAWN GRAPHIC U-NECK TOP", "tops"],
+    ["COTTON OXFORD LOOSE SHIRTS_IVORY", "tops"],
+    ["PLEATED ZIP KNIT VEST", "knitwear"],
+    ["CONVERTIBLE HOOK TOP DRESS", "dresses"],
+    ["Pignose pearl belt necklace", "jewelry"],
+    ["White dew earcuff", "jewelry"],
+    ["Blue heart keyring", "accessories"],
+    ["Clear color hair clip (4color)", "accessories"],
+    ["White cat hair brush", "accessories"],
+    ["Minimal hand mirror (3color)", "accessories"],
+    ["Logo iphone jelly case", "accessories"],
+    ["Shearing bear gripp tok (3color)", "accessories"],
+    ["FLUFFY BEAR KEY RIING", "accessories"],
+    ["[925silver] Letter pendent", "jewelry"],
+    ["[925silver] Color cubic piercing (3color)", "jewelry"],
+  ]
+
+  for (const [name, expected] of cases) {
+    assert.equal(inferCategoryFromText(name), expected, name)
+  }
+})
+
+test("QC promotes fallback other when product-name evidence becomes available", () => {
+  const result = normalizeProductTextFields(product({name: "Oversized Shirt Jacket", category: "other"}))
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "outerwear")
+  assert.ok(result.reasons.includes("category_other_text_fallback"))
+})
+
+test("QC auto-fixes only explicit priority phrases when a previous category conflicts", () => {
+  const vest = normalizeProductTextFields(product({name: "CARGO POCKET FIELD VEST", category: "bottoms"}))
+  assert.equal(vest.action, "auto_fix")
+  assert.equal(vest.product.category, "outerwear")
+  assert.ok(vest.reasons.includes("category_priority_text_override"))
+
+  const knitVest = normalizeProductTextFields(product({name: "PLEATED ZIP KNIT VEST", category: "knitwear"}))
+  assert.equal(knitVest.product.category, "knitwear")
+  assert.ok(!knitVest.reasons.includes("category_priority_text_override"))
 })
 
 // ─── subcategory ───────────────────────────────────────────────────────────
@@ -144,11 +280,20 @@ test("QC infers subcategory from the product name when the field is missing", ()
   assert.ok(result.reasons.includes("subcategory_missing_text_fallback"))
 })
 
-test("QC nulls subcategory when category itself was dropped as non-canonical", () => {
+test("QC does not classify a hair tie as neckwear", () => {
+  const result = normalizeProductTextFields(
+    product({name: "Heart pattern hair tie (8color)", category: "NEW", subcategory: undefined}),
+  )
+  assert.equal(result.product.category, "accessories")
+  assert.equal(result.product.subcategory ?? null, null)
+})
+
+test("QC nulls subcategory when category falls back to other", () => {
   const result = normalizeProductTextFields(
     product({name: "Archive Piece 001", category: "~50%", subcategory: "skirt"}),
   )
-  assert.equal(result.action, "review")
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "other")
   assert.equal(result.product.subcategory, null)
   assert.ok(result.reasons.includes("subcategory_no_category"))
 })
@@ -157,6 +302,21 @@ test("QC resolves subcategory against the canonicalized category, not the raw al
   const result = normalizeProductTextFields(product({category: "sweater", name: "Wool Turtleneck", subcategory: null}))
   assert.equal(result.product.category, "knitwear")
   assert.equal(result.product.subcategory, "turtleneck")
+})
+
+test("QC preserves a narrow official category as subcategory evidence for code-only names", () => {
+  for (const [category, expected] of [
+    ["Ring", "ring"],
+    ["Necklace", "necklace"],
+    ["Bracelet", "bracelet"],
+    ["Earring", "earrings"],
+  ] as const) {
+    const result = normalizeProductTextFields(
+      product({name: "BR0077S", category, subcategory: undefined}),
+    )
+    assert.equal(result.product.category, "jewelry")
+    assert.equal(result.product.subcategory, expected)
+  }
 })
 
 
@@ -199,6 +359,21 @@ test("QC kids 가드는 사이트별 캠페인명 노이즈를 제거한 뒤 def
   assert.deepEqual(result.product.gender, ["men"])
 })
 
+test("QC kids 가드는 검증된 처칠롬퍼 성인 FREE 사이즈 캡 상품명을 제거한 뒤 defaultGender를 쓴다", () => {
+  const result = normalizeProductTextFields(
+    product({
+      name: "NEW KIDS - VINTAGE 5 PANEL CAP BLACK",
+      category: "headwear",
+      subcategory: "cap",
+      gender: ["men"],
+      genderSource: "config_default",
+    }),
+    {kidsGenderNoisePatterns: [/\bkids[-\s]+vintage[-\s]+5[-\s]+panel[-\s]+cap\b/gi]},
+  )
+  assert.equal(result.action, "keep")
+  assert.deepEqual(result.product.gender, ["men"])
+})
+
 test("QC tie-dye는 액세서리 tie로 오인하지 않는다", () => {
   const result = normalizeProductTextFields(product({name: "Tie-dye Zipper", category: "tops"}))
   assert.equal(result.product.category, "tops")
@@ -213,6 +388,17 @@ test("QC gate excludes gender-less products from the batch", () => {
   )
   assert.equal(kept.length, 1)
   assert.deepEqual(kept[0].gender, ["women"])
+})
+
+test("QC checkpoint mode normalizes without duplicating the final report", () => {
+  resetProductQcReport()
+  const input = [product({name: "Clear color hair clip", category: "NEW", subcategory: undefined})]
+  const checkpoint = applyProductQcGate(input, "checkpoint-shop", {recordReport: false})
+  assert.equal(checkpoint[0].category, "accessories")
+  assert.equal(getProductQcReport().has("checkpoint-shop"), false)
+
+  applyProductQcGate(input, "checkpoint-shop")
+  assert.equal(getProductQcReport().get("checkpoint-shop")?.total, 1)
 })
 
 test("QC does not launder an unresolvable gender into unisex", () => {
@@ -254,4 +440,24 @@ test("QC 가 gender 를 채우면 genderSource 도 함께 갱신한다", () => {
   )
   assert.deepEqual(result.product.gender, ["women"])
   assert.equal(result.product.genderSource, "url")
+})
+
+test("QC는 공식 검증된 config_default unisex를 보존한다", () => {
+  const result = normalizeProductTextFields(
+    product({
+      name: "Archive Piece 001",
+      category: "tops",
+      gender: ["unisex"],
+      genderSource: "config_default",
+    }),
+    {verifiedUnisexDefault: true},
+  )
+  assert.notEqual(result.action, "review")
+  assert.deepEqual(result.product.gender, ["unisex"])
+})
+
+test("BMUET Korean product names resolve before the import conflict gate", () => {
+  assert.equal(inferCategoryFromText("아플리케 로고 자수 티셔츠 화이트"), "tops")
+  assert.equal(inferCategoryFromText("깅엄 체크 라인 디테일 볼륨 스커트 블랙"), "bottoms")
+  assert.equal(inferCategoryFromText("도트 리본 디테일 미니 원피스"), "dresses")
 })

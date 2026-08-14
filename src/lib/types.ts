@@ -78,6 +78,8 @@ export interface Product {
   llmEnrichedAt?: string
   /** 보강에 사용된 모델 (배치 간 결과를 비교할 때 필요). */
   llmModel?: string
+  /** 보강 입력이 달라졌는지 판정하는 SHA-256 체크포인트. */
+  llmInputHash?: string
   // ── 리뷰 데이터 (Phase 3) ──
   reviewCount?: number
   reviews?: Array<{
@@ -134,7 +136,7 @@ export interface CategoryConfig {
    * manual일 때: 고정 카테고리 번호 목록
    * auto일 때: 카테고리 링크를 찾을 CSS 셀렉터 (기본: a[href*="cate_no="])
    */
-  categories?: { name: string; cateNo: number; gender?: string[] }[]
+  categories?: { name: string; cateNo: number; gender?: string[]; url?: string }[]
   /** auto 탐색 시 시작 URL (기본: baseUrl) */
   discoveryUrl?: string
   /** auto 탐색 시 카테고리 링크 셀렉터 */
@@ -176,12 +178,45 @@ export interface SiteConfig {
    * 상품이 전량 드랍되는 것을 막는 장치다.
    */
   defaultGender?: string[]
+  /**
+   * 공식 사이트에서 전 상품군의 남녀공용 범위를 확인한 경우에만 켠다.
+   * 일반적인 `defaultGender: ["unisex"]`는 미확인을 공용으로 세탁할 수 있어
+   * 결의 단계에서 버리지만, 이 플래그가 있으면 검증된 사이트 기본값으로 허용한다.
+   */
+  verifiedUnisexDefault?: boolean
+  /**
+   * Trust an explicitly verified site category over conflicting product-name
+   * heuristics. Canonical category folding still applies.
+   */
+  trustedCategory?: boolean
+  /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
+  genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
+  /**
+   * Shopify 공식 성별 컬렉션 handle. `/products.json`이 컬렉션 정보를 주지
+   * 않는 사이트에서 컬렉션별 products endpoint를 함께 읽어 상품 단위 성별
+   * 근거로 사용한다. 공식몰에서 직접 확인한 handle만 등록한다.
+   */
+  shopifyGenderCollections?: {men?: string[]; women?: string[]; unisex?: string[]}
+  /** Shopify tags that identify product families outside the supported adult taxonomy. */
+  shopifyExcludedTags?: string[]
+  /** Exact Shopify product handles for non-merchandise records such as shipping add-ons. */
+  shopifyExcludedHandles?: string[]
+  /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
+  genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
+  /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */
+  genderFromModelDescription?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** Cafe24 셀렉터 오버라이드 */
   selectors?: Cafe24Selectors
+  /** Cafe24 목록의 품절 표시가 부정확한 사이트에서 상세 옵션 재고로 최종 판정한다. */
+  verifyStockFromDetail?: boolean
   /** 카테고리 탐색 설정 */
   category?: CategoryConfig
+  /** 단일 상품군 스토어에서 목록이 카테고리명을 제공하지 않을 때 쓰는 검증된 기본 대분류. */
+  defaultCategory?: string
+  /** 단일 상품군 스토어에서 공식 상세로 검증한 기본 소분류. */
+  defaultSubcategory?: string
   /** 가격 파싱 정규식 (기본: /[\d,]+/ — KRW, ₩, 숫자만 등 다양한 포맷 대응) */
   pricePattern?: RegExp
   /** 가격 통화 접두사 (기본: ₩) */

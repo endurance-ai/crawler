@@ -2,7 +2,7 @@
 # 2026-06 코호트 재수집 드라이버 — 키 단위, 스테이지 마커 기반 재개.
 #
 # 옛 추출 로직(2026-06-22 전후)으로 만들어진 브랜드를 현재 로직으로 처음부터
-# 다시 수집한다. 경로는 crawl -> enrich -> (게이트) -> import -> guardrail 이며,
+# 다시 수집한다. 경로는 crawl -> (게이트) -> import+Qwen -> guardrail 이며,
 # 각 스테이지는 마커 파일로 재개된다.
 #
 # Usage:
@@ -15,10 +15,7 @@
 #   --run-id <name>       산출물 디렉터리 이름 (기본: recollect-YYYYMMDD-HHMM)
 #   --out-root <dir>      산출물 루트 (기본: data/recollect)
 #   --engine <name>       cafe24 엔진: chromium (기본) | lightpanda
-#   --concurrency <n>     보강 동시성 (기본 4)
-#   --enrich-args "<..>"  보강 스크립트에 그대로 넘길 추가 인자
-#                         (예: "--no-visit-page --sleep-ms=2000" — zara 용)
-#   --force-stage <a,b>   해당 스테이지 마커를 무시하고 재실행 (crawl,enrich,import,embed)
+#   --force-stage <a,b>   해당 스테이지 마커를 무시하고 재실행 (crawl,import,embed)
 #   --skip-embeddings     임베딩 스냅샷/무효화 스테이지 생략
 #   --apply-embeddings    임베딩 무효화를 실제로 적용 (기본은 dry-run)
 #   --dry-run             무엇을 할지만 출력
@@ -39,8 +36,6 @@ KEYS_FILE=""
 RUN_ID=""
 OUT_ROOT="data/recollect"
 ENGINE="chromium"
-CONCURRENCY=4
-ENRICH_ARGS=""
 FORCE_STAGE=""
 SKIP_EMBEDDINGS=0
 APPLY_EMBEDDINGS=0
@@ -53,8 +48,6 @@ while [ $# -gt 0 ]; do
     --run-id) RUN_ID="$2"; shift 2 ;;
     --out-root) OUT_ROOT="$2"; shift 2 ;;
     --engine) ENGINE="$2"; shift 2 ;;
-    --concurrency) CONCURRENCY="$2"; shift 2 ;;
-    --enrich-args) ENRICH_ARGS="$2"; shift 2 ;;
     --force-stage) FORCE_STAGE="$2"; shift 2 ;;
     --skip-embeddings) SKIP_EMBEDDINGS=1; shift ;;
     --apply-embeddings) APPLY_EMBEDDINGS=1; shift ;;
@@ -77,7 +70,7 @@ TALLY="$RUN_DIR/tally.csv"
 PNPM="corepack pnpm exec dotenv -e .env -e .env.local --"
 
 mkdir -p "$RUN_DIR" data
-[ -f "$TALLY" ] || echo "key,before_rows,crawled_rows,enriched,import_ok,after_rows,color_noncanon_before,color_noncanon_after,result" > "$TALLY"
+[ -f "$TALLY" ] || echo "key,before_rows,crawled_rows,qwen_success,import_ok,after_rows,color_noncanon_before,color_noncanon_after,result" > "$TALLY"
 
 # 캠페인 도중 분류 로직이 바뀌면 배치 0과 배치 8의 결과를 비교할 수 없다.
 # 시작 시점 커밋을 남겨 두고, 나중에 결과를 볼 때 대조할 수 있게 한다.
@@ -105,12 +98,9 @@ read_metric() {
   node -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(j.metrics[process.argv[2]])}catch(e){console.log("")}' "$1" "$2"
 }
 
-# 크롤 산출 JSON 의 행 수 / 보강 완료 수.
+# 크롤 산출 JSON 의 행 수.
 count_rows() {
   node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).length)}catch(e){console.log(0)}' "$1"
-}
-count_enriched() {
-  node -e 'try{const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(a.filter(p=>p.llmEnrichedAt).length)}catch(e){console.log(0)}' "$1"
 }
 
 FAILED_KEYS=""
@@ -131,18 +121,18 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
   echo "═══════════ $KEY ═══════════"
 
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "dry-run: crawl -> enrich -> gate -> import -> guardrail -> verify -> embeddings"
+    log "dry-run: crawl -> gate -> import+Qwen -> guardrail -> verify -> embeddings"
     continue
   fi
 
   # ── 1. preflight: 기준 지표 + 이미지 스냅샷 + 옛 산출물 격리 ──
   if [ ! -f "$BEFORE_JSON" ]; then
-    log "1/8 preflight — 기준 지표"
+    log "1/7 preflight — 기준 지표"
     $PNPM tsx tools/recollect-metrics.ts --platform="$KEY" --out="$BEFORE_JSON" > "$KEY_DIR/before.log" 2>&1 || {
       log "  ✖ 기준 지표 실패 — $KEY_DIR/before.log"; FAILED_KEYS="$FAILED_KEYS $KEY"; continue; }
     tail -14 "$KEY_DIR/before.log"
   else
-    log "1/8 preflight — 기준 지표 재사용"
+    log "1/7 preflight — 기준 지표 재사용"
   fi
 
   if [ "$SKIP_EMBEDDINGS" -eq 0 ] && [ ! -f "$IMAGES_BEFORE" ]; then
@@ -161,19 +151,19 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
 
   # ── 2. crawl ──
   if have "$KEY_DIR/crawl.done" crawl; then
-    log "2/8 crawl — 스킵 (마커 존재)"
+    log "2/7 crawl — 스킵 (마커 존재)"
   else
-    log "2/8 crawl — pnpm crawl --site=$KEY --detail --include-out-of-stock"
+    log "2/7 crawl — pnpm crawl --site=$KEY --detail --include-out-of-stock"
     CRAWL_START=$(date +%s)
     # CRAWLER_QC_NORMALIZATION_ENABLED=false: 크롤 시점의 규칙 기반 QC 게이트를
     # 끈다. 단일 카테고리 config(category.gender=["men"] 같은)를 쓰는 사이트는
     # 상품명이 순수 스타일 코드("101","137CS")뿐이라 카테고리 텍스트 매칭이
     # 안 되고, 크롤 시점 게이트가 "category_noncanonical_dropped" 로 전량
-    # 걸러버린다 — LLM 보강이 손쓸 기회조차 없이 파일이 통째로 안 써진다
+    # 걸러버린다 — import 후 Qwen 보강이 손쓸 기회조차 없이 파일이 통째로 안 써진다
     # (2026-07-28 배치 1 실측: bastong 4823개 전량 드롭). import-products.ts
     # 가 :541-542 에서 같은 게이트를 독립적으로 다시 돌리므로(이번엔 env var
-    # 없이, 기본 활성 상태), 보강이 category 를 canonical enum 값으로 채운
-    # 뒤 거기서 제대로 검증된다. gender 는 이 플래그와 무관하게 항상 켜져
+    # 없이, 기본 활성 상태), 비canonical category를 먼저 other로 안전하게
+    # 저장한 뒤 Qwen이 조건부 보강한다. gender 는 이 플래그와 무관하게 항상 켜져
     # 있는 별도 스키마 검증(gender: min(1))이 계속 막으므로 세탁 위험 없음.
     CRAWLER_CAFE24_ENGINE="$ENGINE" CRAWLER_QC_NORMALIZATION_ENABLED=false $PNPM tsx src/crawl.ts \
       --site="$KEY" --detail --include-out-of-stock > "$KEY_DIR/crawl.log" 2>&1
@@ -198,27 +188,9 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
   CRAWLED_ROWS=$(count_rows "$PRODUCTS_FILE")
   log "  크롤 $CRAWLED_ROWS행"
 
-  # ── 4. enrich ──
-  if have "$KEY_DIR/enrich.done" enrich; then
-    log "3/8 enrich — 스킵 (마커 존재)"
-  else
-    log "3/8 enrich — LLM 보강 (concurrency=$CONCURRENCY)"
-    # shellcheck disable=SC2086 -- ENRICH_ARGS 는 의도적으로 단어 분리한다
-    $PNPM tsx src/enrich-products-file.ts \
-      --file="$PRODUCTS_FILE" --site="$KEY" --concurrency="$CONCURRENCY" $ENRICH_ARGS \
-      > "$KEY_DIR/enrich.log" 2>&1
-    if [ $? -ne 0 ]; then
-      log "  ✖ enrich 실패 — $KEY_DIR/enrich.log (재실행하면 llmEnrichedAt 부터 이어서 돈다)"
-      FAILED_KEYS="$FAILED_KEYS $KEY"; continue
-    fi
-    tail -3 "$KEY_DIR/enrich.log"
-    touch "$KEY_DIR/enrich.done"
-  fi
-  ENRICHED=$(count_enriched "$PRODUCTS_FILE")
-
-  # ── 5. gate-enrich: import 직전 차단 게이트 ──
+  # ── 4. gate: import 직전 차단 게이트 ──
   # 여기를 넘기면 upsert 는 되돌릴 수 없다.
-  log "4/8 gate — import 전 차단 게이트"
+  log "3/7 gate — import 전 차단 게이트"
   $PNPM tsx tools/recollect-metrics.ts \
     --file="$PRODUCTS_FILE" --site="$KEY" --before="$BEFORE_JSON" --out="$KEY_DIR/gate.json" \
     > "$KEY_DIR/gate.log" 2>&1
@@ -232,15 +204,15 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
     FAILED_KEYS="$FAILED_KEYS $KEY"; continue
   fi
 
-  # ── 6. import ──
+  # ── 5. import + post-persist Qwen ──
   # --in-stock-only 를 쓰지 않는다: --include-out-of-stock 으로 품절을 일부러
   #   가져왔는데 여기서 걸러내면 방금 만든 구멍을 그대로 재생산한다.
   # --no-new-brands 도 쓰지 않는다: 코호트의 brand_nodes 커버리지 99.9%는 6/22
   #   import 가 이 플래그 없이 만든 결과라, 빼는 쪽이 원래 동작이다.
   if have "$KEY_DIR/import.done" import; then
-    log "5/8 import — 스킵 (마커 존재)"
+    log "4/7 import+Qwen — 스킵 (마커 존재)"
   else
-    log "5/8 import — pnpm import:products --site=$KEY"
+    log "4/7 import+Qwen — pnpm import:products --site=$KEY"
     $PNPM tsx src/import-products.ts --site="$KEY" > "$KEY_DIR/import.log" 2>&1
     if [ $? -ne 0 ]; then
       log "  ✖ import 실패 — $KEY_DIR/import.log"
@@ -250,19 +222,24 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
   fi
   IMPORT_OK=$(grep -oE "[0-9]+개 성공" "$KEY_DIR/import.log" | grep -oE "[0-9]+" | tail -1)
   IMPORT_OK=${IMPORT_OK:-0}
+  QWEN_SUCCESS=$(grep -oE "Qwen target=[0-9]+ success=[0-9]+" "$KEY_DIR/import.log" | grep -oE "success=[0-9]+" | grep -oE "[0-9]+" | tail -1)
+  QWEN_SUCCESS=${QWEN_SUCCESS:-0}
   log "  적재 ${IMPORT_OK}건"
 
-  # ── 7. gate-import: QC 통과율 붕괴는 캠페인 전체 중단 신호 ──
+  # ── 6. gate-import: QC 통과율 붕괴는 캠페인 전체 중단 신호 ──
   if grep -q "qc_failed로 기록" "$KEY_DIR/import.log"; then
     log "  🛑 QC 통과율이 MIN_QC_PASS_RATE 미만 — 공유 회귀 의심, 캠페인 전체 중단"
     FAILED_KEYS="$FAILED_KEYS $KEY"; STOP_CAMPAIGN=1; continue
   fi
 
-  # ── 8. guardrail + verify ──
-  log "6/8 guardrail — 비canonical category 정리"
-  $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$KEY_DIR/guardrail.log" 2>&1 || true
+  # ── 7. guardrail + verify ──
+  log "5/7 guardrail — 비canonical category 정리"
+  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$KEY_DIR/guardrail.log" 2>&1; then
+    log "  ❌ guardrail 실패(Qwen/SSH tunnel 또는 DB 오류) — 완료 마커를 만들지 않음"
+    FAILED_KEYS="$FAILED_KEYS $KEY"; continue
+  fi
 
-  log "7/8 verify — 사후 지표"
+  log "6/7 verify — 사후 지표"
   $PNPM tsx tools/recollect-metrics.ts \
     --platform="$KEY" --before="$BEFORE_JSON" --untouched-since="$BATCH_START" --out="$AFTER_JSON" \
     > "$KEY_DIR/after.log" 2>&1
@@ -270,12 +247,12 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
   $PNPM tsx tools/check-onboard-anomalies.ts --platforms="$KEY" > "$KEY_DIR/anomalies.log" 2>&1 || {
     log "  ⚠️  이상치 리포트가 발견 사항을 보고했다 — $KEY_DIR/anomalies.log"; }
 
-  # ── 9. 임베딩 무효화 ──
+  # ── 8. 임베딩 무효화 ──
   if [ "$SKIP_EMBEDDINGS" -eq 0 ]; then
     if have "$KEY_DIR/embed.done" embed; then
-      log "8/8 embeddings — 스킵 (마커 존재)"
+      log "7/7 embeddings — 스킵 (마커 존재)"
     else
-      log "8/8 embeddings — 대표 이미지 변경분 무효화"
+      log "7/7 embeddings — 대표 이미지 변경분 무효화"
       APPLY_FLAG=""
       [ "$APPLY_EMBEDDINGS" -eq 1 ] && APPLY_FLAG="--apply"
       # shellcheck disable=SC2086
@@ -299,7 +276,7 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
   AFTER_ROWS=$(read_metric "$AFTER_JSON" rows)
   CB=$(read_metric "$BEFORE_JSON" colorNonCanonical)
   CA=$(read_metric "$AFTER_JSON" colorNonCanonical)
-  echo "$KEY,$BEFORE_ROWS,$CRAWLED_ROWS,$ENRICHED,$IMPORT_OK,$AFTER_ROWS,$CB,$CA,ok" >> "$TALLY"
+  echo "$KEY,$BEFORE_ROWS,$CRAWLED_ROWS,$QWEN_SUCCESS,$IMPORT_OK,$AFTER_ROWS,$CB,$CA,ok" >> "$TALLY"
   log "✅ $KEY 완료 — 비canonical color $CB → $CA"
 done
 

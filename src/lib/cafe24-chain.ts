@@ -122,15 +122,22 @@ function cafe24ProductIdentityKey(productUrl: string): string | null {
 }
 
 /** 같은 Cafe24 상품이 여러 category URL로 노출돼도 한 행만 남긴다. */
-export function dedupeCafe24ProductsByIdentity(products: Product[]): Product[] {
-  const seen = new Set<string>()
-  return products.filter((product) => {
-    if (!product.productUrl) return false
+export function dedupeCafe24ProductsByIdentity(
+  products: Product[],
+  onDuplicate?: (existing: Product, incoming: Product) => void,
+): Product[] {
+  const byIdentity = new Map<string, Product>()
+  for (const product of products) {
+    if (!product.productUrl) continue
     const key = cafe24ProductIdentityKey(product.productUrl) ?? product.productUrl
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+    const existing = byIdentity.get(key)
+    if (existing) {
+      onDuplicate?.(existing, product)
+      continue
+    }
+    byIdentity.set(key, product)
+  }
+  return [...byIdentity.values()]
 }
 
 /**
@@ -209,6 +216,11 @@ export function isNoisyCafe24CategoryName(name: string, ignorePatterns: string[]
     "events",
     "lookbook",
     "look book",
+    "archive",
+    "archives",
+    "collection",
+    "collections",
+    "editorial",
     "styling",
     "campaign",
     "view more",
@@ -435,17 +447,24 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency) ??
     labeledSale ??
     pairedLow
-  const regularCandidates = [
+  const explicitRegularCandidates = [
     labeledOriginal,
     parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency),
     parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency),
     parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency),
+  ].filter((value): value is number => value !== null)
+  const regularCandidates = [
+    ...explicitRegularCandidates,
     pairedHigh,
     parseCafe24PriceCandidate(raw.priceText, sourceCurrency),
     parseCafe24PriceCandidate(raw.detailPriceText, sourceCurrency),
   ].filter((value): value is number => value !== null)
   const basePrice = saleCandidate !== null
-    ? (regularCandidates.find((value) => value > saleCandidate) ?? null)
+    ? (
+        regularCandidates.find((value) => value > saleCandidate)
+        ?? explicitRegularCandidates.find((value) => value === saleCandidate)
+        ?? null
+      )
     : (regularCandidates[0] ?? null)
   const salePrice = saleCandidate !== null && basePrice !== null && saleCandidate > 0 && saleCandidate < basePrice
     ? saleCandidate
@@ -601,11 +620,20 @@ export function applyCafe24DetailFallbacks(
   }
 
   if (detailFallbacks.price !== null) {
+    const listingRegularPrice = Math.max(
+      product.originalPrice ?? 0,
+      product.price ?? 0,
+    ) || null
+    const detailRevealsListingSale =
+      detailFallbacks.salePrice === null &&
+      listingRegularPrice !== null &&
+      detailFallbacks.price > 0 &&
+      detailFallbacks.price < listingRegularPrice
     const pricing = normalizeObservedPricing({
       currentPrice: detailFallbacks.price,
-      originalPrice: detailFallbacks.originalPrice,
-      salePrice: detailFallbacks.salePrice,
-      state: detailFallbacks.salePrice !== null ? "sale" : "regular",
+      originalPrice: detailRevealsListingSale ? listingRegularPrice : detailFallbacks.originalPrice,
+      salePrice: detailRevealsListingSale ? detailFallbacks.price : detailFallbacks.salePrice,
+      state: detailFallbacks.salePrice !== null || detailRevealsListingSale ? "sale" : "regular",
       source: "detail",
     })
     product.price = pricing.price
