@@ -1,7 +1,25 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 
+import {
+  inferVerifiedSiteGenderFromName,
+  SITE_GENDER_DEFAULTS,
+} from "../src/configs/gender-defaults"
 import {getSiteConfig} from "../src/configs/platforms"
+
+test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
+  assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.soonsuofficial, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS["afb-afb-afb"], ["men"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.twentyoneaugust, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.findoubt, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.jabberwocky, ["men"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.sirena, ["women"])
+  assert.equal(inferVerifiedSiteGenderFromName("afb-afb-afb", "WMS POLO DRESS"), "women")
+  assert.equal(inferVerifiedSiteGenderFromName("afb-afb-afb", "TECH SKULLCAP"), null)
+  assert.equal(inferVerifiedSiteGenderFromName("whateverwewant", "W'S ZIP KNIT"), "women")
+})
 
 test("FEYRE는 공식 여성 SHOP 전체 목록을 수집한다", () => {
   const feyre = getSiteConfig("feyre")

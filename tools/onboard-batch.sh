@@ -26,9 +26,10 @@
 #   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
 #                          variant to crawl AND the one onboard-classify.ts reads
 #                          back out of products.jsonl (kept in lockstep — see
-#                          ONBOARD_VARIANT below). hybrid = llm-scraper re-visits
-#                          each detail page a second time for category/subcategory/
-#                          color/description/gender; existing = deterministic only.
+#                          ONBOARD_VARIANT below). hybrid = Qwen fills category/
+#                          subcategory only; existing = deterministic only. Cafe24
+#                          classifies inline on the already-open detail page, while
+#                          Shopify's hybrid page load is its only detail visit.
 #
 # Each chunk: crawl (--variants, detail) -> onboard-classify.ts (deterministic QC
 # and category/color recovery, reading the same variant back via ONBOARD_VARIANT)

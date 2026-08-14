@@ -187,6 +187,7 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
           // 가격을 리스트에 안 띄우는 상점 대응 — 가격이 빠진 상품만 상세를 본다.
           // 건강한 상점은 방문 0회다. shopify/imweb 는 JSON/API 에서 가격이 나오므로 대상 아님.
           recoverMissingPriceFromDetail: true,
+          detailConcurrency: 4,
         })
       } finally {
         await browser.close()

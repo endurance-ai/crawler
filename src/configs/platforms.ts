@@ -3193,6 +3193,12 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "sansangear-5471", // 공식 TOJI 동일 SKU에 남녀 모델 사이즈를 함께 명시
   "fandco", // 공식 상품 여러 건이 동일 헤드웨어를 him/her 모두에게 적합하다고 명시
   "luvz", // 공식 발라클라바 상세가 One size, unisex로 명시
+  "worthwhilemovement", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "eriist", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "gimcontext", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "conichiwabonjour", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "sagega", // 공식 카탈로그가 남녀공용 라인으로 전개됨
+  "tape00", // 공식 카탈로그가 남녀공용 라인으로 전개됨
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {

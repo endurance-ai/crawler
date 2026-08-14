@@ -37,6 +37,52 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // ── 2026-08-13~14 신규 한국몰 공식 카탈로그 검증 ──────────────
+  girlsgirls: ["women"],
+  hannui: ["women"],
+  whateverwewant: ["men"],
+  yiyae: ["men"],
+  noregret: ["women"],
+  roompauline: ["women"],
+  "s-sil": ["women"],
+  towtowarchive: ["women"],
+  gochagocha: ["women"],
+  pacosply: ["women"],
+  piarche: ["women"],
+  shopattends: ["women"],
+  fanyoung: ["women"],
+  "hata-official": ["women"],
+  odna: ["women"],
+  kindred: ["women"],
+  yileeonline: ["women"],
+  s2asuras2: ["women"],
+  lyex2: ["women"],
+  "emostanceclub-global": ["men"],
+  "our-nation": ["men"],
+  personalobject: ["men"],
+  nghtysvg: ["men"],
+  twentyoneaugust: ["women"],
+  tangojae: ["women"],
+  worthwhilemovement: ["unisex"],
+  eriist: ["unisex"],
+  picea: ["women"],
+  findoubt: ["women"],
+  jabberwocky: ["men"],
+  sirena: ["women"],
+  gimcontext: ["unisex"],
+  conichiwabonjour: ["unisex"],
+  sagega: ["unisex"],
+  tape00: ["unisex"],
+  hyxia: ["women"],
+  moraehouse: ["women"],
+  en3ai: ["women"],
+  twodul: ["women"],
+  yinandyang: ["women"],
+  moroa: ["women"],
+  crushagain: ["women"],
+  "afb-afb-afb": ["men"], // WMS 여성 라인은 상품명으로 분리되고 나머지 본선은 MENS 근거 확인
+  amiment: ["women"], // Dress/Skirt/Swimwear 공식 카탈로그, 남성 라인 없음
+  soonsuofficial: ["women"], // Dresses/Skirts/Swimwear 공식 카탈로그, 남성 라인 없음
   sculptorpage: ["women"], // 공식 상세 전반이 Female Model 치수·착용 사이즈를 명시하고 여성 전용 의류를 판매
   // https://sculptorpage.com/product/detail.html?cate_no=1033&product_no=10281
   // https://sculptorpage.com/product/supima-banding-bra-top-white/7683/
@@ -337,4 +383,19 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //   ── 판정 불가 (카테고리는 여성형이나 명시 없음) ──
   //     oheshio        OUTERWEAR/TOP/BOTTOMS/DRESS/BAG/ACC
   //     nuuanu         Shop/Lookbook/About 뿐
+}
+
+/** 혼성 사이트에서 공식 상품명 표기가 제공하는 상품 단위 성별 근거. */
+export function inferVerifiedSiteGenderFromName(
+  site: string,
+  name: unknown,
+): ProductGender | null {
+  if (typeof name !== "string") return null
+  if (site === "afb-afb-afb" && /^WMS\b/i.test(name.trim())) return "women"
+  if (
+    site === "whateverwewant" &&
+    (/(?:^|\W)(?:WOMAN|WOMEN|W'S)(?:\W|$)/i.test(name) || /^W(?:\s|[-_])/i.test(name.trim()))
+  ) return "women"
+  if (site === "yiyae" && /(?:^|\W)W'S(?:\W|$)/i.test(name)) return "women"
+  return null
 }

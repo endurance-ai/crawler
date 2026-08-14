@@ -17,6 +17,7 @@ import {isConfirmedPricing, toDbPriceFields} from "./lib/product-pricing"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
+import {inferVerifiedSiteGenderFromName, SITE_GENDER_DEFAULTS} from "./configs/gender-defaults"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {mergeProductImages} from "./lib/product-images"
 import {
@@ -692,7 +693,12 @@ async function main() {
     // 브랜드 스코프 폴백은 복원하지 않았다 — 근거는 engine/url/text/
     // config_default 4단뿐이다 (src/lib/product-gender.ts 헤더 참조).
     const genderSourceCounts: Record<string, number> = {}
-    const siteDefaultGender = config?.defaultGender ?? []
+    // Direct/re-detected crawlers can produce a valid platform key before it is
+    // promoted into PLATFORMS. Keep the separately human-verified fallback map
+    // effective for those artifacts as well.
+    const siteDefaultGender = config?.defaultGender ?? SITE_GENDER_DEFAULTS[platform] ?? []
+    const verifiedUnisexDefault = config?.verifiedUnisexDefault
+      || SITE_GENDER_DEFAULTS[platform]?.includes("unisex")
     const rawWithGender: CrawledProduct[] = rawAll.map((p) => {
       const evidence = {
         name: p.name,
@@ -707,10 +713,25 @@ async function main() {
         (p.genderSource as GenderSource | undefined) ?? "engine",
         {
           kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-          verifiedUnisexDefault: config?.verifiedUnisexDefault,
+          verifiedUnisexDefault,
           genderTextPatterns: config?.genderTextPatterns,
         },
       )
+      // Some mixed storefronts encode the official department only in their
+      // product naming convention. Treat this as product-level text evidence,
+      // above the site default but below URL/engine evidence.
+      const verifiedNameGender = inferVerifiedSiteGenderFromName(platform, p.name)
+      if (
+        !resolved.conflict
+        && verifiedNameGender
+        && (resolved.gender.length === 0 || resolved.source === "config_default")
+      ) {
+        resolved = resolveProductGenderWithSource([verifiedNameGender], evidence, "text", {
+          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+          verifiedUnisexDefault,
+          genderTextPatterns: config?.genderTextPatterns,
+        })
+      }
       // 엔진이 사이트 기본값을 찍지 않은 캐시(구 크롤 JSON, 또는 기본값을
       // 소비하지 않는 엔진)를 위해 import 시점에도 같은 폴백을 적용한다.
       // config_default 는 어차피 최하위 rank 라 url/text 를 이기지 못하므로
@@ -718,7 +739,7 @@ async function main() {
       if (resolved.gender.length === 0 && !resolved.conflict && siteDefaultGender.length > 0) {
         resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default", {
           kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-          verifiedUnisexDefault: config?.verifiedUnisexDefault,
+          verifiedUnisexDefault,
           genderTextPatterns: config?.genderTextPatterns,
         })
       }
