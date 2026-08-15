@@ -7,6 +7,52 @@ import {
 } from "../src/configs/gender-defaults"
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("2026-08 Korean/KRW batch keeps the verified live feeds and gender evidence", () => {
+  const expectedDefaults: Record<string, string[] | undefined> = {
+    auber: ["women"],
+    hormoneapparel: undefined,
+    casacenido: ["men"],
+    surfaceedition: ["men"],
+    "global-5264": ["unisex"],
+    nieeh: ["women"],
+    venecy: ["women"],
+    ko: ["women"],
+    verbless: ["men"],
+    rrace: ["women"],
+    hoopoe: ["women"],
+    "intl-5270": ["men"],
+    bnfrom: ["women"],
+    misekiseoul: undefined,
+  }
+  for (const [key, expected] of Object.entries(expectedDefaults)) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, expected, key)
+  }
+
+  assert.equal(getSiteConfig("global-5264")?.type, "cafe24")
+  assert.equal(getSiteConfig("global-5264")?.verifiedUnisexDefault, true)
+  assert.equal(getSiteConfig("ko")?.baseUrl, "https://shop.s-e-o.co.kr")
+  assert.equal(getSiteConfig("intl-5270")?.baseUrl, "https://curatedparade.com")
+  assert.equal(getSiteConfig("rrace")?.baseUrl, "https://www.rrace.co.kr")
+  assert.equal(getSiteConfig("nieeh")?.selectors?.productName, ".pName")
+  assert.equal(getSiteConfig("verbless")?.selectors?.productName, ".overflow_txt")
+  assert.equal(getSiteConfig("hoopoe")?.selectors?.productItem, ".product-item-wrap > .product-item")
+  assert.equal(
+    getSiteConfig("auber")?.kidsGenderNoisePatterns?.some((pattern) => "Baby Pink".replace(pattern, "").trim() === ""),
+    true,
+  )
+  assert.equal(
+    getSiteConfig("ko")?.kidsGenderNoisePatterns?.some((pattern) => "BABY HENLEY TOP".replace(pattern, "").trim() === ""),
+    true,
+  )
+  assert.deepEqual(
+    getSiteConfig("misekiseoul")?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})),
+    [
+      {cateNo: 98, gender: ["women"]},
+      {cateNo: 80, gender: ["men"]},
+    ],
+  )
+})
+
 test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
   assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])
