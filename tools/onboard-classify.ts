@@ -74,7 +74,20 @@ async function main() {
   const seen = new Set<string>(); const uniq = rows.filter((r: any) => { const k = `${r.brand_key}|${r.product_url || r.name}`; if (seen.has(k)) return false; seen.add(k); return true })
   const byBrand: Record<string, any[]> = {}; for (const r of uniq) (byBrand[r.brand_key] ||= []).push(r)
   let fail = 0, anom = 0; const passBrands: string[] = []
-  for (const c of configs) { const rs = byBrand[c.key] || []; if (rs.length === 0 || rs.filter((r) => !has(r.price)).length / rs.length >= 0.99) { fail++; continue } if (isAnomaly(rs)) { anom++; continue } passBrands.push(c.key) }
+  for (const c of configs) {
+    const rs = byBrand[c.key] || []
+    if (rs.length === 0 || rs.filter((r) => !has(r.price)).length / rs.length >= 0.99) {
+      fail++
+      continue
+    }
+    const verifiedShortModelNames = c.trustedCategory === true
+      && ["eyewear", "shoes"].includes(c.defaultCategory)
+    if (isAnomaly(rs) && !verifiedShortModelNames) {
+      anom++
+      continue
+    }
+    passBrands.push(c.key)
+  }
   const pass = uniq.filter((r) => passBrands.includes(r.brand_key) && has(r.name))
   console.log(`crawled ${Object.keys(byBrand).length}/${configs.length} · FAIL ${fail} · anomaly ${anom} · PASS ${passBrands.length} · SKU ${pass.length}`)
   // hybrid rows already carry an LLM-derived `category` (from runHybridVariant) —

@@ -418,4 +418,27 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.equal(margeNoise.reduce((text, pattern) => text.replace(pattern, " "), "babypinklight summer girls girls club").trim(), "light")
   assert.equal(getSiteConfig("singularisca")?.brand, "singularisca")
   assert.deepEqual(getSiteConfig("singularisca")?.defaultGender, ["men"])
+
+  for (const key of ["bohemseo", "naats", "osoi", "maisoncreme", "slyisis", "leface"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["women"], key)
+  }
+  for (const key of ["jichoi", "shop2", "ignota", "sleeqsteel", "lemok"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"], key)
+    assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true, key)
+  }
+  assert.deepEqual(getSiteConfig("thomasmore")?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 111, gender: ["men"]},
+    {cateNo: 98, gender: ["women"]},
+    {cateNo: 101, gender: ["kids"]},
+  ])
+  assert.deepEqual(getSiteConfig("saint-james-3903")?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 176, gender: ["women"]},
+    {cateNo: 170, gender: ["men"]},
+    {cateNo: 200, gender: ["kids"]},
+  ])
+  assert.equal(getSiteConfig("sleeqsteel")?.defaultCategory, "eyewear")
+  assert.equal(getSiteConfig("lemok")?.defaultCategory, "eyewear")
+  for (const key of ["foruseoul", "hoyeon", "nonfiction", "tune", "theopenproduct", "global-5331"]) {
+    assert.equal(getSiteConfig(key)?.disabled, true, key)
+  }
 })
