@@ -33,6 +33,27 @@ test("classify_shopify_specific_type_shirts_to_tops", () => {
   assert.equal(subcategory, "shirt")
 })
 
+test("short sleeve is a top phrase, while an explicit Shorts noun stays bottoms", () => {
+  assert.deepEqual(classifyShopifyCategory("All Items", "AUBER Short Sleeve - White", []), {
+    category: "tops",
+    subcategory: undefined,
+  })
+  assert.equal(
+    classifyShopifyCategory("", "Punched Runner Short Sleeve T-shirt", []).category,
+    "tops",
+  )
+  assert.equal(
+    classifyShopifyCategory("", "Short Sleeve Shorts", []).category,
+    "bottoms",
+  )
+})
+
+test("fleece material does not override an explicit bottoms product noun", () => {
+  assert.equal(classifyShopifyCategory("All Items", "Foldable Fleece Skirt - Brown", []).category, "bottoms")
+  assert.equal(classifyShopifyCategory("", "Warm Fleece Jogger", []).category, "bottoms")
+  assert.equal(classifyShopifyCategory("", "Fleece Jacket", []).category, "outerwear")
+})
+
 test("classify_shopify_sweater_type_to_knitwear", () => {
   const {category, subcategory} = classifyShopifyCategory("Sweaters", "Cashmere Sweater", [])
   assert.equal(category, "knitwear")

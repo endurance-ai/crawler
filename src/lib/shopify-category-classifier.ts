@@ -99,8 +99,13 @@ export function classifyShopifyCategory(
   const typeLower = normalizeSeparators(productType.trim())
   const titleLower = normalizeSeparators(title)
   const tagsText = tags.map((t) => normalizeSeparators(t)).join(" ")
+  // `short sleeve` describes sleeve length; it is not the bottoms noun
+  // `short(s)`. Strip only that compound before category/subcategory matching.
+  // An explicit trailing noun still wins: "Short Sleeve Shorts" -> bottoms.
+  const hasShortSleeve = /\bshort[-\s]?sleeved?\b/.test(titleLower)
+  const titleCategoryText = titleLower.replace(/\bshort[-\s]?sleeved?\b/g, " ")
   // combined signal for subcategory and fallback category matching
-  const combined = `${titleLower} ${tagsText}`
+  const combined = `${titleCategoryText} ${tagsText}`
 
   // A verified non-fashion storefront may intentionally opt into the
   // canonical catch-all so QC/Qwen can preserve and normalize its products.
@@ -137,7 +142,16 @@ export function classifyShopifyCategory(
     // such as "Icon Chain Beanie", where Chain is only a design modifier.
     else if (/\bchain$/.test(titleLower.trim())) category = "jewelry"
     else if (/\bwool\s+base\b/.test(titleLower)) category = "tops"
-    else category = matchCategory(titleLower)
+    // Fleece is also a fabric adjective. When the title has an explicit
+    // bottoms noun, do not let the broad outerwear `fleece` token win.
+    else if (
+      /\bfleece\b/.test(titleCategoryText)
+      && /\b(?:pants?|trousers?|shorts?|skirts?|joggers?|leggings?|bottoms?)\b/.test(titleCategoryText)
+    ) category = "bottoms"
+    else category = matchCategory(titleCategoryText)
+    // A sleeve is necessarily part of an upper-body garment. Use this only
+    // when no more specific noun survived the compound removal above.
+    if (!category && hasShortSleeve) category = "tops"
   }
 
   if (!category) {
