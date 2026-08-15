@@ -441,4 +441,9 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   for (const key of ["foruseoul", "hoyeon", "nonfiction", "tune", "theopenproduct", "global-5331"]) {
     assert.equal(getSiteConfig(key)?.disabled, true, key)
   }
+  const amun = getSiteConfig("amunofficial")
+  assert.equal(amun?.disabled, undefined)
+  assert.deepEqual(amun?.defaultGender, ["women"])
+  assert.equal(amun?.defaultCategory, "swimwear")
+  assert.deepEqual(amun?.category?.categories, [{name: "SHOP AMUN", cateNo: 130, gender: ["women"]}])
 })

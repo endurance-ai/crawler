@@ -2859,14 +2859,19 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     key: "amunofficial",
     name: "AMUN",
     type: "cafe24",
-    baseUrl: "https://amunofficial.kr",
+    baseUrl: "https://amunofficial.kr/main.html",
     brand: "AMUN",
-    disabled: true,
-    notes:
-      "BLOCKED — brand_node id=5763. homepage_url(amunofficial.kr)이 실제 cafe24 " +
-      "몰이 아니라 다른 도메인(amuu.cafe24.com/shop2,3,4)으로 링크만 거는 랜딩 페이지 " +
-      "— 카테고리 0개 검출. brand_nodes.wiki.homepage_url을 실제 몰 도메인으로 " +
-      "정정하거나 shop2/3/4 중 어느 것이 정식몰인지 확인 후 활성화.",
+    defaultGender: ["women"],
+    defaultCategory: "swimwear",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "SHOP AMUN", cateNo: 130, gender: ["women"]}],
+    },
+    notes: "brand_node id=5763. The KR landing page routes to /main.html; official navigation exposes SHOP AMUN 130. Verified women swimwear catalogue.",
   },
   // ─── 커스텀 브랜드 파일럿: imweb (2026-07-16) ─────────────────
   // detection.platform_family=imweb 재분류(brand-crawl detect fingerprint 확장)
