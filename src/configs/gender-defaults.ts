@@ -42,6 +42,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://omirad.com/pages/about-omirad
   "james-coward": ["men"], // Official stockist Neighbour lists the complete label under James Coward Mens and describes its menswear basis.
   // https://www.shopneighbour.com/collections/james-coward-mens
+  rodo: ["women"], // Official About says the bags and shoes are created to enhance the femininity of every woman.
+  // https://rodo.it/en/pages/about-rodo
   areyou: ["women"], // Dresses throughout the official catalogue; detail pages consistently publish a female model's bust/waist/hips.
   // https://areyou.kr/category/shop/48/
   // https://areyou.kr/product/detail.html?product_no=821

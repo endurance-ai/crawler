@@ -56,6 +56,11 @@ test("2026-08 Korean/KRW batch keeps the verified live feeds and gender evidence
 test("inactive Korean/KRW batch keeps official gender departments and defaults", () => {
   assert.deepEqual(getSiteConfig("omirad")?.defaultGender, ["men"])
   assert.deepEqual(getSiteConfig("james-coward")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("rodo")?.defaultGender, ["women"])
+  assert.equal(getSiteConfig("rodo")?.shopifyCategoryTextPatterns?.bags?.some((pattern) => pattern.test("Borse a mano")), true)
+  assert.equal(getSiteConfig("rodo")?.shopifyCategoryTextPatterns?.shoes?.some((pattern) => pattern.test("Sandali")), true)
+  assert.equal(getSiteConfig("maisoncreme")?.selectors?.productName, ".mc-p-name")
+  assert.equal(getSiteConfig("maisoncreme")?.selectors?.productPrice, ".mc-p-price")
   const omiradNoise = getSiteConfig("omirad")?.kidsGenderNoisePatterns ?? []
   for (const value of ["omirad-divine-baby-graphic-tee", "retro-spice-girl-pearl-hoodie"]) {
     assert.doesNotMatch(omiradNoise.reduce((text, pattern) => text.replace(pattern, " "), value), /\b(?:baby|girl)\b/)

@@ -93,6 +93,52 @@ test("single-brand override ignores a conflicting Shopify vendor", () => {
   assert.ok(products.every((product) => product.brand === "House Brand"))
 })
 
+test("Shopify product handles may safely contain underscores", () => {
+  const products = parseShopifyProducts({products: [{
+    id: 1,
+    title: "Small Willow Paris",
+    handle: "borse-a-mano_b8525828127_minibag-pelle-midollino",
+    vendor: "Rodo",
+    product_type: "Borse a mano",
+    body_html: "",
+    tags: [],
+    variants: [{id: 1, title: "Default", price: "2023000", available: true, sku: ""}],
+    images: [],
+  }, {
+    id: 2,
+    title: "Tube Plus Clutch",
+    handle: "_b085470401231_clutch_raso-tube-plus-clutch",
+    vendor: "Rodo",
+    product_type: "Clutch",
+    body_html: "",
+    tags: [],
+    variants: [{id: 2, title: "Default", price: "794000", available: true, sku: ""}],
+    images: [],
+  }]}, "https://rodo.it", "rodo", KRW_PARSE_OPTIONS)
+
+  assert.equal(products[0]?.productUrl, "https://rodo.it/products/borse-a-mano_b8525828127_minibag-pelle-midollino")
+  assert.equal(products[1]?.productUrl, "https://rodo.it/products/_b085470401231_clutch_raso-tube-plus-clutch")
+})
+
+test("site-local category vocabulary may resolve Shopify product_type", () => {
+  const [product] = parseShopifyProducts({products: [{
+    id: 1,
+    title: "Small Willow Paris",
+    handle: "small-willow-paris",
+    vendor: "Rodo",
+    product_type: "Borse a mano",
+    body_html: "",
+    tags: [],
+    variants: [{id: 1, title: "Default", price: "2023000", available: true, sku: ""}],
+    images: [],
+  }]}, "https://rodo.it", "rodo", {
+    ...KRW_PARSE_OPTIONS,
+    categoryTextPatterns: {bags: [/\b(?:borsa|borse)\b/i]},
+  })
+
+  assert.equal(product?.category, "bags")
+})
+
 test("Shopify 단일 상품군 기본값은 상품 모델명의 오탐보다 우선한다", () => {
   const products = parseShopifyProducts({products: [{
     id: 1,

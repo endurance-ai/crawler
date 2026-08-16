@@ -3630,8 +3630,15 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    selectors: {
+      productItem: 'li[id^="anchorBoxId"]',
+      productName: ".mc-p-name",
+      productPrice: ".mc-p-price",
+      productImage: ".mc-p-img img",
+      productLink: "a.mc-p",
+    },
     category: {discovery: "manual", categories: [{name: "ALL", cateNo: 42, gender: ["women"]}]},
-    notes: "brand_node_id=5269. Corrected to the live ALL category for the verified women catalogue.",
+    notes: "brand_node_id=5269. Corrected to the live ALL category and the August 2026 custom mc-p list theme for the verified women catalogue.",
   },
   {
     key: "slyisis",
@@ -3999,6 +4006,12 @@ const SITE_SHOPIFY_CATEGORY_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig
     bags: [/\b(?:pochette|borsa|borse)\b/i],
     jewelry: [/\b(?:collana|collane|orecchino|orecchini|monoorecchino|spilla|spille|bracciale|bracciali)\b/i],
     accessories: [/\b(?:cintura|cinture)\b/i],
+  },
+  rodo: {
+    bags: [/\b(?:borsa|borse)\b/i],
+    shoes: [/\b(?:sandali|slingbacks?|ballerine|pumps?)\b/i],
+    jewelry: [/\borecchino\b/i],
+    accessories: [/\b(?:portachiave|cerchietto)\b/i],
   },
 }
 

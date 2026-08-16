@@ -26,8 +26,10 @@ import {classifyShopifyCategory} from "./shopify-category-classifier"
 // double-conversion when import-products.ts converts a value that
 // was already converted by the engine.
 
-// Shopify handle은 kebab-case 영숫자로만 구성 (spec) — path injection 방지
-const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/
+// Most Shopify handles are kebab-case, but live stores such as Rodo also use
+// underscores. Keep path separators/escapes blocked while admitting the
+// characters Shopify serves as valid product paths.
+const SAFE_HANDLE = /^[a-z0-9_][a-z0-9_-]*$/
 
 /**
  * Fetch with exponential backoff on HTTP 429 (rate-limited) and 503.
@@ -327,7 +329,7 @@ export function parseShopifyProducts(
       sp.tags,
     )
     if (!classifiedCategory.category && options.categoryTextPatterns) {
-      const categoryText = `${sp.title} ${sp.tags.join(" ")}`
+      const categoryText = `${sp.product_type || ""} ${sp.title} ${sp.tags.join(" ")}`
       for (const [categoryName, patterns] of Object.entries(options.categoryTextPatterns)) {
         if (patterns.some((pattern) => pattern.test(categoryText))) {
           classifiedCategory.category = categoryName
