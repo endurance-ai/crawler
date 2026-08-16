@@ -27,6 +27,11 @@ import {chromium, type Browser} from "playwright"
 import type {Product} from "./lib/types"
 import {IMAGE_SELECTION_VERSION} from "./lib/product-image-selection"
 import {
+  isProductImageUtilityAsset,
+  mergeProductImages,
+  normalizeProductImageUrl,
+} from "./lib/product-images"
+import {
   LocalProductImageSelector,
   type ProductImageSelectionResult,
 } from "./lib/select-product-image"
@@ -192,6 +197,43 @@ function productFromDb(row: DbProductRow): Product {
             selectedAt: row.image_selected_at,
           }
         : undefined,
+  }
+}
+
+function dbRowHasUtilityAsset(row: DbProductRow): boolean {
+  return [row.image_url, row.source_image_url, ...(row.images ?? [])].some((url) =>
+    isProductImageUtilityAsset(url, row.product_url),
+  )
+}
+
+function manifestHasUtilityAsset(row: SelectionManifestRow): boolean {
+  return [row.after_url, row.source_image_url, ...row.images].some((url) =>
+    isProductImageUtilityAsset(url, row.product_url),
+  )
+}
+
+function utilityCleanupManifest(row: DbProductRow): SelectionManifestRow {
+  const afterUrl = normalizeProductImageUrl(row.image_url, row.product_url)
+  if (!afterUrl) throw new Error(`utility cleanup requires a valid representative: ${row.id}`)
+  const images = mergeProductImages(afterUrl, row.product_url, row.images)
+  const sourceImageUrl = normalizeProductImageUrl(row.source_image_url, row.product_url) ?? afterUrl
+  const kind = row.image_selection_kind === "model" || row.image_selection_kind === "product"
+    ? row.image_selection_kind
+    : "fallback"
+  return {
+    id: row.id,
+    product_url: row.product_url,
+    platform: row.platform,
+    before_url: afterUrl,
+    after_url: afterUrl,
+    source_image_url: sourceImageUrl,
+    images,
+    kind,
+    score: Math.max(0, Math.min(100, row.image_selection_score ?? 0)),
+    version: "utility-cleanup-v1",
+    candidate_count: images.length,
+    selected_at: new Date().toISOString(),
+    errors: [],
   }
 }
 
@@ -412,15 +454,32 @@ async function runDbMode(flags: Flags, selector: LocalProductImageSelector, rend
     if (error) throw new Error(`failed to fetch products: ${error.message}`)
     const rows = (data ?? []) as unknown as DbProductRow[]
     if (rows.length === 0) break
-    const remaining = rows.slice(0, limit - processed)
-    const products = remaining.map(productFromDb)
+    const candidates = flags["utility-only"] === true
+      ? rows.filter(dbRowHasUtilityAsset)
+      : rows
+    const remaining = candidates.slice(0, limit - processed)
+    if (remaining.length === 0) {
+      offset += rows.length
+      if (rows.length < pageSize) break
+      continue
+    }
+    const cleanupRows = flags["utility-only"] === true
+      ? remaining.filter((row) => !isProductImageUtilityAsset(row.image_url, row.product_url))
+      : []
+    const selectionRows = flags["utility-only"] === true
+      ? remaining.filter((row) => isProductImageUtilityAsset(row.image_url, row.product_url))
+      : remaining
+    const products = selectionRows.map(productFromDb)
     const result = await processProducts(products, selector, renderer, flags, (done, total) => {
       process.stdout.write(`\r🖼️  DB ${label}: ${processed + done}/${Math.min(limit, processed + total)}`)
     })
-    const manifests = result.rows.map((row) => {
-      const dbRow = remaining.find((item) => item.product_url === row.product_url)
-      return {...row, ...(dbRow ? {id: dbRow.id} : {})}
-    })
+    const manifests = [
+      ...cleanupRows.map(utilityCleanupManifest),
+      ...result.rows.map((row) => {
+        const dbRow = selectionRows.find((item) => item.product_url === row.product_url)
+        return {...row, ...(dbRow ? {id: dbRow.id} : {})}
+      }),
+    ]
     if (manifests.length > 0) {
       await fsp.appendFile(
         `${reportBase}.jsonl`,
@@ -445,17 +504,25 @@ async function runDbMode(flags: Flags, selector: LocalProductImageSelector, rend
         byPlatform.set(manifest.platform, group)
       }
       for (const [platform, group] of byPlatform) {
-        const hardFailures = group.filter(
+        const applicable = flags["utility-only"] === true
+          ? group.filter((row) => !manifestHasUtilityAsset(row))
+          : group
+        const rejected = group.length - applicable.length
+        if (rejected > 0) {
+          console.warn(`\n⚠️  ${platform}: utility asset가 남은 ${rejected}건은 DB 반영에서 제외합니다.`)
+        }
+        if (applicable.length === 0) continue
+        const hardFailures = applicable.filter(
           (row) => row.kind === "fallback" && row.errors.length > 0,
         ).length
-        if (hardFailures / group.length > 0.2) {
+        if (hardFailures / applicable.length > 0.2) {
           console.warn(
-            `\n⚠️  ${platform}: 이미지 처리 실패율 ${((hardFailures / group.length) * 100).toFixed(1)}% > 20% — 이 배치는 DB 반영하지 않습니다.`,
+            `\n⚠️  ${platform}: 이미지 처리 실패율 ${((hardFailures / applicable.length) * 100).toFixed(1)}% > 20% — 이 배치는 DB 반영하지 않습니다.`,
           )
           continue
         }
-        for (let i = 0; i < group.length; i += APPLY_BATCH) {
-          const selections = group.slice(i, i + APPLY_BATCH)
+        for (let i = 0; i < applicable.length; i += APPLY_BATCH) {
+          const selections = applicable.slice(i, i + APPLY_BATCH)
           const {data: applied, error: applyError} = await db.rpc(
             "apply_product_image_selections",
             {selections},
@@ -563,12 +630,14 @@ Product representative-image selection (macOS 15+ / Apple Vision)
   pnpm select:product-images --site=<key> [--limit=N] [--dry-run] [--force]
   pnpm select:product-images --from-db --site=<key> [--apply] [--limit=N]
   pnpm select:product-images --from-db --all [--apply] [--limit=N]
+  pnpm select:product-images --from-db --all --utility-only [--apply] [--force]
   pnpm select:product-images --site=<key> --rollback=<manifest.jsonl>
   pnpm select:product-images --from-db --apply --rollback=<manifest.jsonl>
 
 Options:
   --no-detail             analyze existing imageUrl/images only
   --no-browser-fallback   use static detail HTML only
+  --utility-only          process only rows containing known UI/icon assets
   --concurrency=N         product concurrency, default 2 and maximum 4
 `)
     return

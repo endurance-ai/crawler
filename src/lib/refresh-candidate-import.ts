@@ -1,27 +1,31 @@
 import {resolveProductBrand} from "./brand-provenance"
 import {isValidCategory, isValidSubcategory, type Category} from "./enums/product-enums"
+import {sanitizeProductImageFields} from "./product-images"
 import {toDbPriceFields} from "./product-pricing"
 import type {Product, SiteConfig} from "./types"
 
 export const REFRESH_FALLBACK_IMAGE_VERSION = "refresh-fallback-v1"
 
 export function withFallbackImageSelection(product: Product): Product {
-  if (product.imageSelection?.version) return product
-  const images = [
-    product.imageUrl,
-    ...(product.images ?? []),
-  ].filter((url, index, rows) => Boolean(url) && rows.indexOf(url) === index)
-  if (images.length === 0) throw new Error("candidate has no image")
+  const sanitized = sanitizeProductImageFields({
+    productUrl: product.productUrl,
+    imageUrl: product.imageUrl,
+    sourceImageUrl: product.sourceImageUrl,
+    images: product.images,
+  })
+  if (!sanitized) throw new Error("candidate has no usable product image")
+  const representativeChanged = sanitized.imageUrl !== product.imageUrl
+  const existingSelection = product.imageSelection?.version && !representativeChanged
+    ? {...product.imageSelection, candidateCount: sanitized.images.length}
+    : null
   return {
     ...product,
-    sourceImageUrl: product.sourceImageUrl || product.imageUrl,
-    imageUrl: images[0],
-    images,
-    imageSelection: {
+    ...sanitized,
+    imageSelection: existingSelection ?? {
       kind: "fallback",
       score: 0,
       version: REFRESH_FALLBACK_IMAGE_VERSION,
-      candidateCount: images.length,
+      candidateCount: sanitized.images.length,
       selectedAt: new Date().toISOString(),
     },
   }

@@ -20,7 +20,7 @@ import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normaliza
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {inferVerifiedSiteGenderFromName, SITE_GENDER_DEFAULTS} from "./configs/gender-defaults"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
-import {mergeProductImages} from "./lib/product-images"
+import {sanitizeProductImageFields} from "./lib/product-images"
 import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
 import {
   canUsePlatformBrandFallback,
@@ -819,6 +819,7 @@ async function main() {
 
     let priceSkipped = 0
     let genderSkipped = 0
+    let imageSkipped = 0
     const priceSkipSamples: string[] = []
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = raw.map((p: any) => {
@@ -869,14 +870,25 @@ async function main() {
         ? rawSubcategory
         : null
 
+      const sanitizedImages = sanitizeProductImageFields({
+        productUrl,
+        imageUrl: p.imageUrl as string | undefined,
+        sourceImageUrl: p.sourceImageUrl as string | undefined,
+        images: p.images as string[] | undefined,
+      })
+      if (!sanitizedImages) {
+        imageSkipped += 1
+        return null
+      }
+
       return {
         brand,
         name: p.name as string,
         category,
         ...prices,
         product_no: productNo,
-        image_url: p.imageUrl as string,
-        source_image_url: (p.sourceImageUrl as string | undefined) || (p.imageUrl as string),
+        image_url: sanitizedImages.imageUrl,
+        source_image_url: sanitizedImages.sourceImageUrl,
         product_url: productUrl,
         in_stock: p.inStock as boolean,
         platform: (p.platform as string) || platform,
@@ -890,7 +902,7 @@ async function main() {
         // Kept out of the products upsert below and merged atomically through
         // merge_product_images. A listing-only crawl must never erase richer
         // detail images collected by an earlier run.
-        images: mergeProductImages(p.imageUrl, productUrl, p.images),
+        images: sanitizedImages.images,
         size_info: p.sizeInfo?.slice(0, 2000) || null,
         tags: p.tags?.slice(0, 50) || null,
         product_code: p.productCode?.slice(0, 100) || null,
@@ -905,6 +917,9 @@ async function main() {
     }
     if (genderSkipped > 0) {
       console.log(`   ⚠️  ${genderSkipped} product(s) skipped — gender unresolved`)
+    }
+    if (imageSkipped > 0) {
+      console.log(`   ⚠️  ${imageSkipped} product(s) skipped — no usable product image`)
     }
 
     // Dedup by product_url — Postgres rejects ON CONFLICT batches that

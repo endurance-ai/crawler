@@ -4,8 +4,10 @@ import * as assert from "node:assert/strict"
 import {
   collectProductImagesFromHtml,
   extractShopifyProductImages,
+  isProductImageUtilityAsset,
   mergeProductImages,
   normalizeProductImageUrl,
+  sanitizeProductImageFields,
 } from "../src/lib/product-images"
 
 test("mergeProductImages keeps representative first and deduplicates normalized URLs", () => {
@@ -27,10 +29,52 @@ test("mergeProductImages keeps representative first and deduplicates normalized 
 test("normalizeProductImageUrl rejects utility, template, and non-image assets", () => {
   const page = "https://shop.example.com/products/1"
   assert.equal(normalizeProductImageUrl("/web/upload/icon_badge.png", page), null)
+  assert.equal(
+    normalizeProductImageUrl(
+      "https://img.echosting.cafe24.com/skin/base_ko_KR/common/ico_tip_title.gif",
+      page,
+    ),
+    null,
+  )
+  assert.equal(
+    normalizeProductImageUrl(
+      "https://img.echosting.cafe24.com/design/skin/admin/ko_KR/ico_product_point.gif",
+      page,
+    ),
+    null,
+  )
   assert.equal(normalizeProductImageUrl("/images/size-guide.jpg", page), null)
   assert.equal(normalizeProductImageUrl("${imageUrl}", page), null)
   assert.equal(normalizeProductImageUrl("javascript:alert(1)", page), null)
   assert.equal(normalizeProductImageUrl("/assets/product?id=1", page), "https://shop.example.com/assets/product?id=1")
+  assert.equal(
+    normalizeProductImageUrl("/products/block-logo-tee-black.jpg", page),
+    "https://shop.example.com/products/block-logo-tee-black.jpg",
+  )
+})
+
+test("isProductImageUtilityAsset distinguishes UI assets from product names", () => {
+  const page = "https://shop.example.com/products/1"
+  assert.equal(isProductImageUtilityAsset("/common/ico_tip_title.gif", page), true)
+  assert.equal(isProductImageUtilityAsset("/images/button_other_04.png", page), true)
+  assert.equal(isProductImageUtilityAsset("/products/block-logo-tee-black.jpg", page), false)
+})
+
+test("sanitizeProductImageFields promotes a real candidate over a utility representative", () => {
+  const utility = "https://img.echosting.cafe24.com/skin/base_ko_KR/common/ico_tip_title.gif"
+  assert.deepEqual(
+    sanitizeProductImageFields({
+      productUrl: "https://shop.example.com/products/1",
+      imageUrl: utility,
+      sourceImageUrl: utility,
+      images: [utility, "/images/product.jpg"],
+    }),
+    {
+      imageUrl: "https://shop.example.com/images/product.jpg",
+      sourceImageUrl: "https://shop.example.com/images/product.jpg",
+      images: ["https://shop.example.com/images/product.jpg"],
+    },
+  )
 })
 
 test("collectProductImagesFromHtml uses structured and product-hinted images only", () => {

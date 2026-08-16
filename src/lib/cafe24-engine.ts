@@ -20,6 +20,7 @@ import type {IReviewParser} from "./parsers/review"
 import {
   collectProductImagesFromPage,
   PRODUCT_IMAGE_COLLECTION_VERSION,
+  PRODUCT_IMAGE_UTILITY_ASSET_PATTERN,
 } from "./product-images"
 import {
   applyCafe24DetailFallbacks,
@@ -509,6 +510,7 @@ async function collectProductsFromPage(
     pricePatternStr: config.pricePattern?.source || null,
     brandPrefixPatternStr: config.brandFromNamePrefix ? BRAND_NAME_PREFIX_PATTERN : null,
     sourceCurrency: config.sourceCurrency || "KRW",
+    imageUtilityAssetPattern: PRODUCT_IMAGE_UTILITY_ASSET_PATTERN,
   }
 
   // NOTE: page.evaluate 블록 안에서는 var 사용 — tsx의 __name 변환이 let/const 선언을 브라우저에서 ReferenceError로 유발
@@ -641,17 +643,25 @@ async function collectProductsFromPage(
 
         // 이미지: 아이콘/로고가 아닌 실제 상품 이미지 찾기
         var imageUrl = ""
+        var imageUtilityAssetRe = new RegExp(args.imageUtilityAssetPattern, "i")
         for (var ik = 0; ik < args.imageSelectors.length; ik++) {
           var imgCandidates = el.querySelectorAll(args.imageSelectors[ik])
           for (var im = 0; im < imgCandidates.length; im++) {
-            var imgSrc = (imgCandidates[im].getAttribute("src") || imgCandidates[im].getAttribute("data-original") || imgCandidates[im].getAttribute("data-src") || imgCandidates[im].getAttribute("data-lazy-src") || "")
-            // 아이콘/로고/배지 파일 건너뛰기
-            if (imgSrc.match(/\/(icon_|logo_|badge_|btn_|blank\.|spacer\.)/i)) continue
             // 너무 작은 이미지 건너뛰기 (width/height 속성 기준)
             var imgW = parseInt(imgCandidates[im].getAttribute("width") || "0", 10)
             var imgH = parseInt(imgCandidates[im].getAttribute("height") || "0", 10)
             if ((imgW > 0 && imgW < 50) || (imgH > 0 && imgH < 50)) continue
-            if (imgSrc) { imageUrl = imgSrc; break }
+            // lazy-load 원본을 src placeholder보다 먼저 보고, 각 URL을 공통
+            // utility 필터로 검사한다. Cafe24 기본 스킨의 ico_tip_title.gif,
+            // ico_product_point.gif가 상품 대표 이미지로 들어오는 사고를 막는다.
+            var imageAttrs = ["data-original", "data-src", "data-lazy-src", "src"]
+            for (var ia = 0; ia < imageAttrs.length; ia++) {
+              var imgSrc = imgCandidates[im].getAttribute(imageAttrs[ia]) || ""
+              if (!imgSrc || imageUtilityAssetRe.test(imgSrc)) continue
+              imageUrl = imgSrc
+              break
+            }
+            if (imageUrl) break
           }
           if (imageUrl) break
         }

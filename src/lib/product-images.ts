@@ -2,8 +2,9 @@ import {extractStructuredProduct} from "./parsers/structured-data"
 
 export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v1"
 
-const UTILITY_ASSET_RE =
-  /(?:^|[/_.-])(icon|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver|size(?:[-_ ]?(?:chart|guide))?|guide)(?:[/_.-]|$)/i
+export const PRODUCT_IMAGE_UTILITY_ASSET_PATTERN =
+  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$))`
+const UTILITY_ASSET_RE = new RegExp(PRODUCT_IMAGE_UTILITY_ASSET_PATTERN, "i")
 const NON_IMAGE_EXT_RE = /\.(?:css|html?|js|json|pdf|svg|woff2?)(?:$|[?#])/i
 const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
 
@@ -24,6 +25,15 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&gt;/gi, ">")
 }
 
+export function isProductImageUtilityAsset(raw: unknown, pageUrl: string): boolean {
+  if (typeof raw !== "string" || !raw.trim()) return false
+  try {
+    return UTILITY_ASSET_RE.test(new URL(decodeHtmlEntities(raw.trim()), pageUrl).pathname)
+  } catch {
+    return false
+  }
+}
+
 export function normalizeProductImageUrl(raw: unknown, pageUrl: string): string | null {
   if (typeof raw !== "string") return null
   const cleaned = decodeHtmlEntities(raw.trim())
@@ -40,7 +50,7 @@ export function normalizeProductImageUrl(raw: unknown, pageUrl: string): string 
     const url = new URL(cleaned, pageUrl)
     if (url.protocol !== "https:" && url.protocol !== "http:") return null
     url.hash = ""
-    if (UTILITY_ASSET_RE.test(url.pathname) || NON_IMAGE_EXT_RE.test(url.toString())) return null
+    if (isProductImageUtilityAsset(url.toString(), pageUrl) || NON_IMAGE_EXT_RE.test(url.toString())) return null
     return url.toString()
   } catch {
     return null
@@ -64,6 +74,27 @@ export function mergeProductImages(
   add(representative)
   for (const group of groups) for (const value of group ?? []) add(value)
   return images
+}
+
+export function sanitizeProductImageFields(input: {
+  productUrl: string
+  imageUrl?: string | null
+  sourceImageUrl?: string | null
+  images?: ReadonlyArray<string | null | undefined> | null
+}): {imageUrl: string; sourceImageUrl: string; images: string[]} | null {
+  const images = mergeProductImages(
+    input.imageUrl,
+    input.productUrl,
+    input.images,
+    [input.sourceImageUrl],
+  )
+  const imageUrl = images[0]
+  if (!imageUrl) return null
+  return {
+    imageUrl,
+    sourceImageUrl: normalizeProductImageUrl(input.sourceImageUrl, input.productUrl) ?? imageUrl,
+    images,
+  }
 }
 
 function attr(tag: string, name: string): string | null {
