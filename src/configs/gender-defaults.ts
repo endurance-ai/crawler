@@ -80,6 +80,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // engine=unisex 값은 상품 성별 근거가 아니다.
   innir: ["women"],
   odlyworkshop: ["women"],
+  // 공식 현행 카탈로그가 여성 의류로 구성되고 별도 남성 부서가 없다.
+  chiyagistore: ["women"],
   hyxia: ["women"],
   moraehouse: ["women"],
   en3ai: ["women"],
@@ -413,5 +415,6 @@ export function inferVerifiedSiteGenderFromName(
   if (site === "yiyae" && /(?:^|\W)W'S(?:\W|$)/i.test(name)) return "women"
   if (site === "blackpurple" && /Deux[- ]Eyelet Long Handle Bag/i.test(name)) return "women"
   if (site === "mmmcorp" && /Cotton Check Pattern/i.test(name)) return "women"
+  if (site === "swallowlounge" && /Inside Out Tote S/i.test(name)) return "women"
   return null
 }

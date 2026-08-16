@@ -66,6 +66,20 @@ test("여성 자사몰과 혼성 브랜드의 검증된 여성 상품 예외를 
   assert.equal(inferVerifiedSiteGenderFromName("mmmcorp", "Basic Logo T-Shirt"), null)
 })
 
+test("추가 여성 브랜드와 혼성 편집샵의 상품 단위 성별 근거를 보존한다", () => {
+  assert.deepEqual(getSiteConfig("ballew")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("chiyagistore")?.defaultGender, ["women"])
+
+  const swallowLounge = getSiteConfig("swallowlounge")
+  assert.equal(swallowLounge?.defaultGender, undefined)
+  assert.ok(swallowLounge?.category?.categories?.every((category) => category.gender === undefined))
+  assert.equal(
+    inferVerifiedSiteGenderFromName("swallowlounge", "Inside Out Tote S / CERATO BRIGHT"),
+    "women",
+  )
+  assert.equal(inferVerifiedSiteGenderFromName("swallowlounge", "ITTI MARY SACOCHE"), null)
+})
+
 test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
   assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])

@@ -743,12 +743,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     maxPages: 300,
     crawlDetails: true,
     // "모두 보기"(1152)에 전 브랜드 상품이 포함됨. 브랜드별 서브카테고리(1153+)는 중복이므로 제외.
+    // 혼성 편집샵의 전체 목록은 상품 성별 근거가 아니므로 gender/defaultGender를 두지 않는다.
     category: {
       discovery: "manual",
-      categories: [{ name: "모두 보기", cateNo: 1152, gender: ["unisex"] }],
+      categories: [{ name: "모두 보기", cateNo: 1152 }],
     },
-    defaultGender: ["unisex"],
-    notes: "성수동 편집샵. Crepuscule, Toga, Blurhms, Aton 등 50+ 브랜드. 10~50만원대",
+    notes: "성수동 혼성 편집샵. 전체 목록에는 상품 단위 성별 근거가 필요함. 10~50만원대",
   },
   {
     key: "takeastreet",
@@ -2645,11 +2645,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://ballew.nyc",
     brand: "Ballew",
-    defaultGender: ["unisex"],
+    defaultGender: ["women"],
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "brand_node id=5724. meta.json currency=USD. /products.json 정상.",
+    notes: "brand_node id=5724. 공식 현행 카탈로그는 여성 제품군. meta.json currency=USD.",
   },
   {
     key: "becay",
