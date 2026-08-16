@@ -37,6 +37,12 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // ── 2026-08-16 low-coverage Shopify official-site review ────────
+  baserange: ["women"], // Official About describes the label as an underwear line for women that evolved into its current broader collection.
+  // https://baserange.com/pages/about
+  khaite: ["women"], // Official About explicitly calls the house's output womenswear and accessories; the shop labels its full RTW collection Women's Designer Ready-to-Wear.
+  // https://khaite.com/pages/about
+  // https://khaite.com/collections/ready-to-wear
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
   omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
   // https://omirad.com/pages/about-omirad

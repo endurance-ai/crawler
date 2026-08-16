@@ -11,6 +11,52 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "aieul",
+    name: "Aieul",
+    type: "cafe24",
+    baseUrl: "https://aieul.co",
+    brand: "Aieul",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "OUTER", cateNo: 90, gender: ["men"], url: "/category/outers/90/"},
+        {name: "TOP", cateNo: 91, gender: ["men"], url: "/category/tops/91/"},
+        {name: "BOTTOM", cateNo: 92, gender: ["men"], url: "/category/bottoms/92/"},
+        {name: "ACCESSORIES", cateNo: 93, gender: ["men"], url: "/category/accessories/93/"},
+        {name: "OUTER", cateNo: 95, gender: ["women"], url: "/category/outers/95/"},
+        {name: "TOP", cateNo: 96, gender: ["women"], url: "/category/tops/96/"},
+        {name: "BOTTOM", cateNo: 97, gender: ["women"], url: "/category/bottoms/97/"},
+        {name: "ACCESSORIES", cateNo: 98, gender: ["women"], url: "/category/accessories/98/"},
+      ],
+    },
+    notes: "brand_node id=2133. Official navigation separates MEN=88 and WOMEN=94; crawl their eight leaf departments so category and gender remain direct storefront evidence without duplicate VIEW ALL feeds.",
+  },
+  {
+    key: "aniv",
+    name: "ANIV (어니브)",
+    type: "cafe24",
+    baseUrl: "https://aniv.kr",
+    brand: "ANIV (어니브)",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "OUTER", cateNo: 28, url: "/category/outer/28/"},
+        {name: "TOP", cateNo: 25, url: "/category/top/25/"},
+        {name: "BOTTOM", cateNo: 27, url: "/category/bottom/27/"},
+        {name: "ACCESSORIES", cateNo: 23, url: "/category/acc/23/"},
+      ],
+    },
+    notes: "brand_node id=5298. Official product navigation is OUTER=28, TOP=25, BOTTOM=27, ACC=23. Keep only explicit product-level [UNISEX] evidence; the brand itself has no verified gender default.",
+  },
+  {
     key: "kyod",
     name: "KYOD",
     type: "cafe24",
@@ -2415,6 +2461,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://texture-seoul.co.kr",
     brand: "TEXTURE SEOUL",
+    trustedCategory: true,
     paginate: false,
     selectors: {
       productItem: 'li[id^="anchorBoxId_"]',

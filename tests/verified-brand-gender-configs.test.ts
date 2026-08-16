@@ -99,6 +99,10 @@ test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보�
   assert.deepEqual(SITE_GENDER_DEFAULTS.soonsuofficial, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS["afb-afb-afb"], ["men"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.twentyoneaugust, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.baserange, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.khaite, ["women"])
+  assert.deepEqual(getSiteConfig("baserange")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("khaite")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.findoubt, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.jabberwocky, ["men"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.sirena, ["women"])
@@ -169,6 +173,7 @@ test("NOMANUAL의 공식 WOMAN baby tee는 아동복으로 오인하지 않는�
 
 test("TEXTURE SEOUL은 빈 표준 목록 대신 공식 pretty URL 카테고리를 수집한다", () => {
   const texture = getSiteConfig("textureseoul")
+  assert.equal(texture?.trustedCategory, true)
   assert.equal(texture?.category?.discovery, "manual")
   assert.equal(texture?.selectors?.productName, "h3.project-excerpt-title-inner")
   assert.equal(
@@ -185,6 +190,34 @@ test("TEXTURE SEOUL은 빈 표준 목록 대신 공식 pretty URL 카테고리�
     {cateNo: 128, gender: undefined, url: "/category/本-texture/128/"},
   ])
   assert.equal(texture?.paginate, false)
+})
+
+test("Aieul은 공식 MEN/WOMEN 하위 메뉴에서 카테고리와 성별을 함께 보존한다", () => {
+  const aieul = getSiteConfig("aieul")
+  assert.equal(aieul?.trustedCategory, true)
+  assert.equal(aieul?.defaultGender, undefined)
+  assert.deepEqual(aieul?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 90, gender: ["men"]},
+    {cateNo: 91, gender: ["men"]},
+    {cateNo: 92, gender: ["men"]},
+    {cateNo: 93, gender: ["men"]},
+    {cateNo: 95, gender: ["women"]},
+    {cateNo: 96, gender: ["women"]},
+    {cateNo: 97, gender: ["women"]},
+    {cateNo: 98, gender: ["women"]},
+  ])
+})
+
+test("ANIV는 공식 상품 부서만 수집하고 성별은 상품의 명시적 표기만 사용한다", () => {
+  const aniv = getSiteConfig("aniv")
+  assert.equal(aniv?.trustedCategory, true)
+  assert.equal(aniv?.defaultGender, undefined)
+  assert.deepEqual(aniv?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 28, gender: undefined},
+    {cateNo: 25, gender: undefined},
+    {cateNo: 27, gender: undefined},
+    {cateNo: 23, gender: undefined},
+  ])
 })
 
 test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한다", () => {
