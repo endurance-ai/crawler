@@ -20,6 +20,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
+    cafe24CanonicalDetailGender: true,
+    genderTextPatterns: {unisex: [/^\[UN\]/i]},
     category: {
       discovery: "manual",
       categories: [
@@ -27,7 +29,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
         {name: "MEN", cateNo: 119, gender: ["men"]},
       ],
     },
-    notes: "brand_node id=5412. 공식 WOMEN/MEN 부서로 상품 성별을 분류하며 양쪽에 함께 노출되는 [UN] 상품은 Cafe24 product_no dedup에서 unisex로 병합한다.",
+    notes: "brand_node id=5412. WOMEN/MEN 목록 중복은 상세의 canonical 카테고리 계층으로 확정하며 [UN] 표기만 공용으로 처리한다.",
   },
   {
     key: "tape00",

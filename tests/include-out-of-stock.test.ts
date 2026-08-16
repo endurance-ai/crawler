@@ -18,7 +18,9 @@ import * as assert from "node:assert/strict"
 
 import {parseShopifyProducts} from "../src/lib/shopify-engine"
 import {
+  applyCafe24CanonicalDetailGender,
   cafe24BrandOverride,
+  canonicalCafe24ProductDetailUrl,
   cafe24ManualCategoryUrl,
   cafe24ProductIdentityKey,
   inferCafe24DetailStock,
@@ -86,6 +88,44 @@ test("cafe24: 같은 상품이 공식 Man/Woman 부서에 모두 있으면 공�
   mergeCafe24DuplicateGender(existing, product(["women"]))
   assert.deepEqual(existing.gender, ["unisex"])
   assert.equal(existing.genderSource, "engine")
+})
+
+test("cafe24: 상세 계층으로 재판정할 사이트는 남녀 목록 중복을 공용으로 단정하지 않는다", () => {
+  const product = (gender: string[]): Product => ({
+    brand: "ERER", name: "Cotton Stripe Jacket White", category: "department", gender,
+    genderSource: "engine", price: 1000, originalPrice: 1000, salePrice: null,
+    priceFormatted: "₩1,000", imageUrl: "https://example.com/image.jpg",
+    productUrl: "https://erer.kr/product/detail.html?product_no=443&cate_no=118",
+    inStock: true, platform: "erer",
+  })
+  const existing = product(["women"])
+  mergeCafe24DuplicateGender(existing, product(["men"]), "unresolved")
+  assert.deepEqual(existing.gender, [])
+  assert.equal(existing.genderSource, undefined)
+})
+
+test("cafe24: category 문맥을 제거한 상세 계층과 명시적 공용 표기를 우선한다", () => {
+  assert.equal(
+    canonicalCafe24ProductDetailUrl(
+      "https://erer.kr/product/cotton-stripe-jacket-white/443/category/119/display/1/",
+    ),
+    "https://erer.kr/product/detail.html?product_no=443",
+  )
+  const product: Product = {
+    brand: "ERER", name: "Cotton Stripe Jacket White", category: "WOMEN", gender: [],
+    price: 1000, originalPrice: 1000, salePrice: null, priceFormatted: "₩1,000",
+    imageUrl: "https://example.com/image.jpg", productUrl: "https://erer.kr/product/443",
+    inStock: true, platform: "erer",
+  }
+  const patterns = {unisex: [/^\[UN\]/i]}
+  applyCafe24CanonicalDetailGender(product, ["SHOP", "WOMEN", "OUTER"], patterns)
+  assert.deepEqual(product.gender, ["women"])
+  assert.equal(product.genderSource, "engine")
+
+  product.name = "[UN] Basic Logo T-Shirt"
+  applyCafe24CanonicalDetailGender(product, ["SHOP", "WOMEN", "TOP"], patterns)
+  assert.deepEqual(product.gender, ["unisex"])
+  assert.equal(product.genderSource, "text")
 })
 
 test("cafe24: 동일한 unisex 기본값 중복은 engine 근거로 승격하지 않는다", () => {

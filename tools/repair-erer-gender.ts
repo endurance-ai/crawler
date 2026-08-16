@@ -1,9 +1,10 @@
 #!/usr/bin/env npx tsx
 /**
- * Repair ERER products from the official WOMEN/MEN department membership.
- * Products exposed in both departments are explicitly unisex. Dry-run by
- * default; pass --apply to write. Products absent from the current official
- * departments are reported and left unchanged.
+ * Repair every ERER row from the category-parameter-free product detail.
+ * The WOMEN and MEN listing pages overlap, so listing overlap is not evidence
+ * of unisex. An explicit [UN] name is unisex; otherwise the canonical detail
+ * hierarchy decides WOMEN/MEN. The separate top-level ACC department is shared.
+ * Dry-run by default; pass --apply to write.
  */
 import {createClient} from "@supabase/supabase-js"
 
@@ -21,15 +22,22 @@ type BrandRow = {
   gender_scope: unknown
   wiki: Record<string, unknown> | null
 }
+type CanonicalEvidence = {
+  productNo: string
+  gender: Gender | null
+  categories: string[]
+}
+type Decision = {
+  product: ProductRow
+  productNo: string
+  after: Gender
+  categories: string[]
+}
 
 const BRAND_ID = 5412
 const BRAND_NAME = "ERER (에르에르)"
 const BASE_URL = "https://erer.kr"
-const DEPARTMENTS = {
-  women: 118,
-  men: 119,
-} as const
-const REQUESTED_WOMEN_PRODUCT_NOS = new Set(["975", "976", "977", "978", "979", "980"])
+const SHARED_ACC_CATEGORIES = new Set([120, 131, 132, 133, 134, 137])
 const apply = process.argv.includes("--apply")
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
@@ -40,60 +48,56 @@ function productNo(productUrl: string): string | null {
   try {
     const url = new URL(productUrl)
     return url.searchParams.get("product_no")
-      ?? url.pathname.match(/^\/product\/[^/]+\/(\d+)(?:\/|$)/i)?.[1]
+      ?? url.pathname.match(/\/product\/(?:[^/]+\/)?(\d+)(?:\/|$)/i)?.[1]
       ?? null
   } catch {
     return null
   }
 }
 
-function categoryProductNos(html: string, cateNo: number): Set<string> {
-  const numbers = new Set<string>()
-  const query = new RegExp(`product_no=(\\d+)&(?:amp;)?cate_no=${cateNo}(?:&|&amp;|["'])`, "gi")
-  for (const match of html.matchAll(query)) numbers.add(match[1])
-  const pretty = new RegExp(`/product/[^"']+/(\\d+)/category/${cateNo}/display/\\d+`, "gi")
-  for (const match of html.matchAll(pretty)) numbers.add(match[1])
-  return numbers
+function categoryNo(productUrl: string): number | null {
+  try {
+    const url = new URL(productUrl)
+    const value = url.searchParams.get("cate_no")
+      ?? url.pathname.match(/\/category\/(\d+)(?:\/|$)/i)?.[1]
+    return value ? Number(value) : null
+  } catch {
+    return null
+  }
 }
 
-function lastPage(html: string, cateNo: number): number {
-  let last = 1
-  const pattern = new RegExp(`(?:\\?|&)cate_no=${cateNo}(?:&|&amp;)page=(\\d+)|[?&]page=(\\d+)[^"']*cate_no=${cateNo}`, "gi")
-  for (const match of html.matchAll(pattern)) last = Math.max(last, Number(match[1] ?? match[2] ?? 1))
-  const explicit = /page=(\d+)["'][^>]*class=["']last["']/gi
-  for (const match of html.matchAll(explicit)) last = Math.max(last, Number(match[1]))
-  return last
+function canonicalCategories(html: string): string[] {
+  const info = html.match(/"oCategoryInfo":(\{.*?\}),"aProductPurchaseInfo_/s)?.[1] ?? ""
+  return [...info.matchAll(/"category_name":"([^"]+)"/g)].map((match) => match[1].trim())
 }
 
-async function fetchDepartment(cateNo: number): Promise<Set<string>> {
-  const fetchPage = async (page: number): Promise<string> => {
-    const response = await fetch(`${BASE_URL}/product/list.html?cate_no=${cateNo}&page=${page}`, {
-      headers: {"User-Agent": "Mozilla/5.0 (compatible; kiko-gender-repair/1.0)"},
-      signal: AbortSignal.timeout(20_000),
-    })
-    if (!response.ok) throw new Error(`ERER category ${cateNo} page ${page}: HTTP ${response.status}`)
-    return response.text()
+async function fetchCanonicalEvidence(number: string, name: string): Promise<CanonicalEvidence> {
+  let response: Response | null = null
+  let lastError: unknown = null
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      response = await fetch(`${BASE_URL}/product/detail.html?product_no=${number}`, {
+        headers: {"User-Agent": "Mozilla/5.0 (compatible; kiko-gender-repair/2.0)"},
+        signal: AbortSignal.timeout(20_000),
+      })
+      break
+    } catch (error) {
+      lastError = error
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 400))
+    }
   }
-  const first = await fetchPage(1)
-  const pages = lastPage(first, cateNo)
-  const htmlPages = [first]
-  for (let page = 2; page <= pages; page += 1) htmlPages.push(await fetchPage(page))
-  const numbers = new Set<string>()
-  for (const html of htmlPages) {
-    for (const number of categoryProductNos(html, cateNo)) numbers.add(number)
+  if (!response) throw lastError
+  if (!response.ok) throw new Error(`ERER product_no=${number}: HTTP ${response.status}`)
+  const categories = canonicalCategories(await response.text())
+  const normalized = new Set(categories.map((category) => category.toUpperCase()))
+  let gender: Gender | null = null
+  if (/^\[UN\]/i.test(name.trim())) gender = "unisex"
+  else if (normalized.has("WOMEN") !== normalized.has("MEN")) {
+    gender = normalized.has("WOMEN") ? "women" : "men"
+  } else if (normalized.has("ACC")) {
+    gender = "unisex"
   }
-  if (numbers.size === 0) throw new Error(`ERER category ${cateNo}: no products found`)
-  return numbers
-}
-
-const [women, men] = await Promise.all([
-  fetchDepartment(DEPARTMENTS.women),
-  fetchDepartment(DEPARTMENTS.men),
-])
-for (const number of REQUESTED_WOMEN_PRODUCT_NOS) {
-  if (!women.has(number) || men.has(number)) {
-    throw new Error(`Henley department precondition failed: product_no=${number}`)
-  }
+  return {productNo: number, gender, categories}
 }
 
 const {data: brandData, error: brandError} = await db
@@ -120,34 +124,77 @@ for (let offset = 0; ; offset += 1000) {
   if (!data || data.length < 1000) break
 }
 
-const decisions: Array<{id: number; productNo: string; gender: Gender}> = []
-const unmatched: ProductRow[] = []
+const namesByProductNo = new Map<string, string>()
 for (const product of products) {
   const number = productNo(product.product_url)
-  if (!number) {
-    unmatched.push(product)
-    continue
+  if (number && !namesByProductNo.has(number)) namesByProductNo.set(number, product.name)
+}
+const evidence = new Map<string, CanonicalEvidence>()
+const entries = [...namesByProductNo]
+for (let index = 0; index < entries.length; index += 6) {
+  const batch = entries.slice(index, index + 6)
+  const results = await Promise.all(batch.map(([number, name]) => fetchCanonicalEvidence(number, name)))
+  for (const result of results) evidence.set(result.productNo, result)
+}
+for (const [number] of entries) {
+  const canonical = evidence.get(number)
+  if (canonical?.gender) continue
+  const categories = products
+    .filter((product) => productNo(product.product_url) === number)
+    .map((product) => categoryNo(product.product_url))
+  if (categories.length > 0 && categories.every((category) => category !== null && SHARED_ACC_CATEGORIES.has(category))) {
+    evidence.set(number, {productNo: number, gender: "unisex", categories: ["ACC (legacy URL)"]})
   }
-  const inWomen = women.has(number)
-  const inMen = men.has(number)
-  if (!inWomen && !inMen) {
-    unmatched.push(product)
-    continue
-  }
-  decisions.push({
-    id: product.id,
-    productNo: number,
-    gender: inWomen && inMen ? "unisex" : inWomen ? "women" : "men",
-  })
 }
 
+const decisions: Decision[] = []
+const unresolved: ProductRow[] = []
+for (const product of products) {
+  const number = productNo(product.product_url)
+  const canonical = number ? evidence.get(number) : undefined
+  if (!number || !canonical?.gender) {
+    unresolved.push(product)
+    continue
+  }
+  decisions.push({product, productNo: number, after: canonical.gender, categories: canonical.categories})
+}
+if (unresolved.length > 0) {
+  console.error(JSON.stringify({unresolved: unresolved.map(({id, name, product_url, gender, gender_source}) => ({
+    id, name, product_url, gender, gender_source,
+  }))}, null, 2))
+  throw new Error(`canonical gender unresolved for ${unresolved.length} rows: ${unresolved.slice(0, 20).map((row) => row.id).join(",")}`)
+}
+
+const changed = decisions.filter(
+  (decision) => JSON.stringify(decision.product.gender) !== JSON.stringify([decision.after])
+    || decision.product.gender_source !== "repair_url",
+)
+
 const counts: Record<Gender, number> = {men: 0, women: 0, unisex: 0}
-for (const decision of decisions) counts[decision.gender] += 1
+const changedCounts: Record<Gender, number> = {men: 0, women: 0, unisex: 0}
+for (const decision of decisions) counts[decision.after] += 1
+for (const decision of changed) changedCounts[decision.after] += 1
 console.log(JSON.stringify({
   mode: apply ? "apply" : "dry-run",
-  official: {women: women.size, men: men.size, overlap: [...women].filter((number) => men.has(number)).length},
   brand: {id: brand.id, before: brand.gender_scope, after: ["unisex"]},
-  database: {total: products.length, matched: decisions.length, unmatched: unmatched.length, counts},
+  database: {
+    total: products.length,
+    uniqueProducts: evidence.size,
+    resolved: decisions.length,
+    unresolved: unresolved.length,
+    counts,
+    changes: changed.length,
+    changedCounts,
+  },
+  changedWomen: changed
+    .filter((decision) => decision.after === "women")
+    .map(({product, productNo}) => ({
+      id: product.id,
+      name: product.name,
+      productNo,
+      before: product.gender,
+      beforeSource: product.gender_source,
+    })),
 }, null, 2))
 
 if (apply) {
@@ -158,10 +205,11 @@ if (apply) {
     gender_verified_at: verifiedAt,
     gender_confidence: 0.99,
     gender_sources: [
-      `${BASE_URL}/product/list.html?cate_no=${DEPARTMENTS.women}`,
-      `${BASE_URL}/product/list.html?cate_no=${DEPARTMENTS.men}`,
+      `${BASE_URL}/product/list.html?cate_no=118`,
+      `${BASE_URL}/product/list.html?cate_no=119`,
+      `${BASE_URL}/product/detail.html?product_no={product_no}`,
     ],
-    gender_verification_rule: "official_department_membership_with_overlap_as_unisex",
+    gender_verification_rule: "explicit_UN_else_category_parameter_free_detail_hierarchy",
   }
   const {data: updatedBrand, error: updateBrandError} = await db
     .from("brand_nodes")
@@ -174,9 +222,9 @@ if (apply) {
 
   let updatedProducts = 0
   for (const gender of ["women", "men", "unisex"] as const) {
-    const group = decisions.filter((decision) => decision.gender === gender)
+    const group = changed.filter((decision) => decision.after === gender)
     for (let index = 0; index < group.length; index += 100) {
-      const ids = group.slice(index, index + 100).map((decision) => decision.id)
+      const ids = group.slice(index, index + 100).map((decision) => decision.product.id)
       const {data: updated, error} = await db
         .from("products")
         .update({gender: [gender], gender_source: "repair_url", updated_at: verifiedAt})
@@ -193,11 +241,19 @@ if (apply) {
   console.log(`updated_brand=1 updated_products=${updatedProducts}`)
 }
 
-const {data: requested, error: requestedError} = await db
+const {data: verification, error: verificationError} = await db
   .from("products")
   .select("id,name,gender,gender_source,product_url")
   .eq("brand_node_id", BRAND_ID)
-  .like("name", "[2차 리오더] Henley%")
   .order("id")
-if (requestedError) throw requestedError
-console.log(JSON.stringify({requested}, null, 2))
+if (verificationError) throw verificationError
+const verificationMismatches = (verification ?? []).filter((row) => {
+  const number = productNo(row.product_url)
+  const expected = number ? evidence.get(number)?.gender : null
+  return expected && JSON.stringify(row.gender) !== JSON.stringify([expected])
+})
+console.log(JSON.stringify({verification: {
+  total: verification?.length ?? 0,
+  mismatches: verificationMismatches.length,
+  sample: verificationMismatches.slice(0, 20),
+}}, null, 2))

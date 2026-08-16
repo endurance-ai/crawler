@@ -36,7 +36,7 @@ import {
   runFirstUsefulCafe24Step,
   type Cafe24CategoryCandidate,
 } from "./cafe24-chain"
-import {inferGenderFromText} from "./product-gender"
+import {inferGenderFromSiteTextPatterns, inferGenderFromText} from "./product-gender"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
 // with this to prevent indefinite hangs when page JS is stuck or network stalls.
@@ -262,13 +262,27 @@ export function inferCafe24ListingStock(current: boolean, productName: string): 
     : current
 }
 
-export function mergeCafe24DuplicateGender(existing: Product, incoming: Product): void {
+export function mergeCafe24DuplicateGender(
+  existing: Product,
+  incoming: Product,
+  ambiguousDepartmentOverlap: "unisex" | "unresolved" = "unisex",
+): void {
   const genders = new Set([...(existing.gender ?? []), ...(incoming.gender ?? [])])
   // 같은 fallback 값의 중복 수집은 새 상품 근거가 아니다.
   // 특히 config_default=unisex를 engine으로 승격하면 importer가 더 강한
   // `(WOMAN)`/`(MEN)` 상품명 근거를 적용하지 못한다.
   if (genders.size <= 1) return
   if (genders.has("unisex") || (genders.has("men") && genders.has("women"))) {
+    if (
+      ambiguousDepartmentOverlap === "unresolved"
+      && !genders.has("unisex")
+      && genders.has("men")
+      && genders.has("women")
+    ) {
+      existing.gender = []
+      existing.genderSource = undefined
+      return
+    }
     existing.gender = ["unisex"]
     existing.genderSource = "engine"
     return
@@ -277,6 +291,40 @@ export function mergeCafe24DuplicateGender(existing: Product, incoming: Product)
     existing.gender = [...incoming.gender]
     existing.genderSource = incoming.genderSource
   }
+}
+
+export function canonicalCafe24ProductDetailUrl(productUrl: string): string {
+  try {
+    const url = new URL(productUrl)
+    const productNo = url.searchParams.get("product_no")
+      ?? url.pathname.match(/\/product\/(?:[^/]+\/)?(\d+)(?:\/|$)/)?.[1]
+    if (!productNo) return productUrl
+    url.pathname = "/product/detail.html"
+    url.search = new URLSearchParams({product_no: productNo}).toString()
+    url.hash = ""
+    return url.toString()
+  } catch {
+    return productUrl
+  }
+}
+
+export function applyCafe24CanonicalDetailGender(
+  product: Product,
+  categoryNames: string[] | undefined,
+  patterns: SiteConfig["genderTextPatterns"],
+): void {
+  const explicit = inferGenderFromSiteTextPatterns(product.name, patterns)
+  if (explicit) {
+    product.gender = [explicit]
+    product.genderSource = "text"
+    return
+  }
+  const normalized = new Set((categoryNames ?? []).map((name) => name.trim().toUpperCase()))
+  const women = normalized.has("WOMEN")
+  const men = normalized.has("MEN")
+  if (women === men) return
+  product.gender = [women ? "women" : "men"]
+  product.genderSource = "engine"
 }
 
 /** 멀티브랜드 편집샵에서는 config.brand를 상품 브랜드로 고정하지 않는다. */
@@ -1076,7 +1124,11 @@ export async function crawlCafe24(
   // URL 전체가 아니라 product_no identity로 합친다. listingOnly(갱신)와
   // includeOutOfStock(재수집)에서는 품절도 남긴다.
   const dedupedAll = dedupeCafe24ProductsByIdentity(allProducts, (existing, product) => {
-    mergeCafe24DuplicateGender(existing, product)
+    mergeCafe24DuplicateGender(
+      existing,
+      product,
+      config.cafe24CanonicalDetailGender ? "unresolved" : "unisex",
+    )
     mergeCafe24DuplicateCategory(existing, product)
   })
   const dedupedProducts = (config.verifyStockFromDetail || shouldKeepOutOfStock(options))
@@ -1123,7 +1175,12 @@ export async function crawlCafe24(
             // 상세크롤을 반복하지 않기 위함). 마커는 Product.detailFetchedAt 이다
             // (2026-07-29 이전에는 color 유무로 판정 → color 가 VLM 으로 이관되며 교체).
             const known = options.existingDetails?.get(product.productUrl)
-            if (known && product.detailFetchedAt && !config.verifyStockFromDetail) {
+            if (
+              known
+              && product.detailFetchedAt
+              && !config.verifyStockFromDetail
+              && !config.cafe24CanonicalDetailGender
+            ) {
               return {
                 product,
                 detail: known,
@@ -1135,8 +1192,11 @@ export async function crawlCafe24(
             const lease = externalDetailFactory ? await externalDetailFactory() : workerLeases[slot]!
             const pg = lease.page
             const collectDetail = async () => {
+              const detailUrl = config.cafe24CanonicalDetailGender
+                ? canonicalCafe24ProductDetailUrl(product.productUrl)
+                : product.productUrl
               const detail = await withTimeout(
-                detailParser.parse(pg, product.productUrl),
+                detailParser.parse(pg, detailUrl),
                 25_000,
                 `detail:${product.productUrl.slice(-50)}`
               )
@@ -1203,6 +1263,13 @@ export async function crawlCafe24(
           }
           if (detailFallbacks) {
             applyCafe24DetailFallbacks(product, detailFallbacks)
+            if (config.cafe24CanonicalDetailGender) {
+              applyCafe24CanonicalDetailGender(
+                product,
+                detailFallbacks.categoryNames,
+                config.genderTextPatterns,
+              )
+            }
           }
           if (detail?.material) product.material = detail.material
           if (detail?.productCode) product.productCode = detail.productCode
