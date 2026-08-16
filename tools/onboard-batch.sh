@@ -150,13 +150,28 @@ for c in $(seq "$START" "$END"); do
   ONBOARD_VARIANT="$VARIANTS" $PNPM tsx tools/onboard-classify.ts "$OUT_ROOT/chunk-$c" "$CHUNK_JSON" "$PASSKEYS_JSON" > "$OUT_ROOT/chunk-$c-finalize.log" 2>&1
   PASS=$(node -e 'try{console.log(require(require("path").resolve(process.argv[1])).length)}catch(e){console.log(0)}' "$PASSKEYS_JSON")
 
+  # DB write 전에 두 Qwen endpoint를 다시 확인한다. 긴 크롤 도중 SSH tunnel이
+  # 끊길 수 있으므로 배치 시작 시점이 아니라 각 chunk import 직전에 검사해야 한다.
+  QWEN_SMOKE_LOG="$OUT_ROOT/qwen-smoke-chunk-$c.log"
+  if ! $PNPM tsx tools/qwen-smoke.ts > "$QWEN_SMOKE_LOG" 2>&1; then
+    echo "chunk $c import blocked: Qwen preflight failed — $QWEN_SMOKE_LOG" >&2
+    exit 2
+  fi
+
   BEFORE=$(DB_COUNT)
   : > "$OUT_ROOT/import-chunk-$c.log"
   OK=0
   for KEY in $(node -e 'try{require(require("path").resolve(process.argv[1])).forEach(k=>console.log(k))}catch(e){}' "$PASSKEYS_JSON"); do
-    R=$($PNPM tsx src/import-products.ts --site="$KEY" $IMPORT_FLAGS 2>&1 | grep -oE "[0-9]+개 성공" | grep -oE "[0-9]+" | tail -1)
+    KEY_LOG="$OUT_ROOT/import-chunk-$c-$KEY.log"
+    if $PNPM tsx src/import-products.ts --site="$KEY" $IMPORT_FLAGS > "$KEY_LOG" 2>&1; then
+      IMPORT_STATUS=0
+    else
+      IMPORT_STATUS=$?
+      echo "chunk $c import failed for $KEY (exit=$IMPORT_STATUS) — continuing" >&2
+    fi
+    R=$(grep -oE "[0-9]+개 성공" "$KEY_LOG" | grep -oE "[0-9]+" | tail -1 || true)
     OK=$((OK + ${R:-0}))
-    echo "$KEY -> ${R:-0}" >> "$OUT_ROOT/import-chunk-$c.log"
+    echo "$KEY -> ${R:-0} (exit=$IMPORT_STATUS)" >> "$OUT_ROOT/import-chunk-$c.log"
   done
   AFTER=$(DB_COUNT)
   NET=$((AFTER - BEFORE))
