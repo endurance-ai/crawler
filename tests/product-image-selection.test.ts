@@ -3,6 +3,8 @@ import * as assert from "node:assert/strict"
 
 import {
   collectImageCandidatesFromHtml,
+  IMAGE_SELECTION_VERSION,
+  needsImageReselection,
   rankImageCandidates,
   type ImageCandidateAnalysis,
 } from "../src/lib/product-image-selection"
@@ -33,7 +35,7 @@ function candidate(
   }
 }
 
-test("collectImageCandidatesFromHtml merges structured data, srcset, and gallery images", () => {
+test("collectImageCandidatesFromHtml stops at authoritative structured product images", () => {
   const html = `
     <script type="application/ld+json">
       {
@@ -57,14 +59,11 @@ test("collectImageCandidatesFromHtml merges structured data, srcset, and gallery
     [
       "https://cdn.example.com/model.jpg",
       "https://cdn.example.com/product.jpg",
-      "https://shop.example.com/web/product/big/look.jpg",
-      "https://shop.example.com/web/product/medium/look.jpg",
-      "https://shop.example.com/web/product/small/thumb.jpg",
     ],
   )
 })
 
-test("collectImageCandidatesFromHtml keeps current image first without truncating candidates", () => {
+test("collectImageCandidatesFromHtml does not scan unowned page-wide images", () => {
   const tags = Array.from(
     {length: 14},
     (_, i) => `<img src="https://cdn.example.com/${i}.jpg">`,
@@ -76,8 +75,51 @@ test("collectImageCandidatesFromHtml keeps current image first without truncatin
     ["https://cdn.example.com/current.jpg"],
   )
 
-  assert.equal(result.length, 15)
-  assert.equal(result[0], "https://cdn.example.com/current.jpg")
+  assert.deepEqual(result, ["https://cdn.example.com/current.jpg"])
+})
+
+test("needsImageReselection refreshes a current selection when candidates grew", () => {
+  assert.equal(needsImageReselection({
+    productUrl: "https://shop.example.com/p/1",
+    imageUrl: "https://cdn.example.com/product.jpg",
+    images: [
+      "https://cdn.example.com/product.jpg",
+      "https://cdn.example.com/model.jpg",
+    ],
+    imageSelection: {
+      version: IMAGE_SELECTION_VERSION,
+      candidateCount: 1,
+    },
+  }), true)
+})
+
+test("needsImageReselection skips a current selection that saw every known candidate", () => {
+  assert.equal(needsImageReselection({
+    productUrl: "https://shop.example.com/p/1",
+    imageUrl: "https://cdn.example.com/product.jpg",
+    sourceImageUrl: "https://cdn.example.com/product.jpg",
+    images: [
+      "https://cdn.example.com/product.jpg",
+      "https://cdn.example.com/model.jpg",
+      "https://cdn.example.com/model.jpg",
+    ],
+    imageSelection: {
+      version: IMAGE_SELECTION_VERSION,
+      candidateCount: 2,
+    },
+  }), false)
+})
+
+test("needsImageReselection refreshes selections from an older version", () => {
+  assert.equal(needsImageReselection({
+    productUrl: "https://shop.example.com/p/1",
+    imageUrl: "https://cdn.example.com/product.jpg",
+    images: ["https://cdn.example.com/product.jpg"],
+    imageSelection: {
+      version: "mac-vision-v1",
+      candidateCount: 1,
+    },
+  }), true)
 })
 
 test("rankImageCandidates prefers an eligible prominent model shot", () => {

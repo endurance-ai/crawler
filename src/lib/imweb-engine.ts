@@ -242,7 +242,9 @@ async function enrichFromDetail(product: Product, delay: number): Promise<void> 
   const structured = extractStructuredProduct(html)
   const images = collectProductImagesFromHtml(html, product.productUrl, [
     product.imageUrl,
-    ...(product.images ?? []),
+    ...(product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
+      ? (product.images ?? [])
+      : []),
   ])
   if (images.length > 0) {
     product.images = images

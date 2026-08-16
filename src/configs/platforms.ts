@@ -11,6 +11,47 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "tape00",
+    name: "0Tape",
+    type: "cafe24",
+    baseUrl: "https://tape00.cafe24.com",
+    brand: "0Tape",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "ALL", cateNo: 56, gender: ["women"]}],
+    },
+    notes: "brand_node id=2149. 공식 현행 카탈로그의 스커트·여성 슬리브리스와 여성 모델 착용 근거로 women; 과거 8DIVISION 유래 unisex 기본값 폐기.",
+  },
+  {
+    key: "noirer",
+    name: "NOIRER",
+    type: "cafe24",
+    baseUrl: "https://noirer.com",
+    brand: "NOIRER",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "MEN", cateNo: 76, gender: ["men"]},
+        {name: "MEN NEW ARRIVALS", cateNo: 202, gender: ["men"]},
+        {name: "FINAL SALE MEN", cateNo: 321, gender: ["men"]},
+        // 현재 공식 PRE-ORDER 상품은 모두 NOIRER 남성 라인의 48/50/52 사이즈다.
+        {name: "MEN PRE-ORDER", cateNo: 341, gender: ["men"]},
+        {name: "WOMEN", cateNo: 180, gender: ["women"]},
+        {name: "FINAL SALE WOMEN", cateNo: 326, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node id=5230. 브랜드는 MEN/WOMEN 혼성(unisex)이나 상품은 공식 부서 카테고리별로 분류한다.",
+  },
+  {
     key: "jinochio",
     name: "jinochio",
     type: "cafe24",
@@ -411,19 +452,20 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        // 온라인샵 (unisex 편집샵 — 성별 구분 없음)
-        {name: "Top", cateNo: 218, gender: ["unisex"]}, // 상의
-        {name: "Outer", cateNo: 220, gender: ["unisex"]}, // 아우터
-        {name: "Bottom", cateNo: 219, gender: ["unisex"]}, // 하의
-        {name: "Shoes", cateNo: 223, gender: ["unisex"]}, // 신발
-        {name: "Bag", cateNo: 222, gender: ["unisex"]}, // 가방
-        {name: "Accessories", cateNo: 229, gender: ["unisex"]}, // 악세사리
-        {name: "Accessories", cateNo: 224, gender: ["unisex"]}, // 모자
-        {name: "Accessories", cateNo: 221, gender: ["unisex"]}, // 벨트
-        {name: "Accessories", cateNo: 1078, gender: ["unisex"]}, // 주얼리
+        // 성별 미구분 상품군이다. 편집샵 자체가 unisex라는 뜻은 아니므로 성별을
+        // 채우지 않는다. 상품 단위 근거가 없으면 안전하게 적재에서 제외한다.
+        {name: "Top", cateNo: 218}, // 상의
+        {name: "Outer", cateNo: 220}, // 아우터
+        {name: "Bottom", cateNo: 219}, // 하의
+        {name: "Shoes", cateNo: 223}, // 신발
+        {name: "Bag", cateNo: 222}, // 가방
+        {name: "Accessories", cateNo: 229}, // 악세사리
+        {name: "Accessories", cateNo: 224}, // 모자
+        {name: "Accessories", cateNo: 221}, // 벨트
+        {name: "Accessories", cateNo: 1078}, // 주얼리
       ],
     },
-    notes: "unisex 편집샵. 700+ cate_no 중 의류 카테고리 9개만 사용. 브랜드(Needles, EG 등) 카테고리 제외",
+    notes: "성별 혼성 편집샵. 성별 미구분 온라인샵 카테고리는 gender 근거로 쓰지 않음. 700+ cate_no 중 의류 카테고리 9개만 사용.",
   },
   {
     key: "sculpstore",
@@ -3200,7 +3242,6 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "gimcontext", // 공식 카탈로그가 남녀공용 라인으로 전개됨
   "conichiwabonjour", // 공식 카탈로그가 남녀공용 라인으로 전개됨
   "sagega", // 공식 카탈로그가 남녀공용 라인으로 전개됨
-  "tape00", // 공식 카탈로그가 남녀공용 라인으로 전개됨
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {

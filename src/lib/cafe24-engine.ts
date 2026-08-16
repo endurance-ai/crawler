@@ -1146,7 +1146,9 @@ export async function crawlCafe24(
                 : null
               const images = await collectProductImagesFromPage(pg, [
                 product.imageUrl,
-                ...(product.images ?? []),
+                ...(product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
+                  ? (product.images ?? [])
+                  : []),
               ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
               if (options.enrichDetailPage) {
                 await options.enrichDetailPage(pg, product).catch(() => {})
@@ -1180,7 +1182,9 @@ export async function crawlCafe24(
                 : null
               const images = await collectProductImagesFromPage(pg, [
                 product.imageUrl,
-                ...(product.images ?? []),
+                ...(product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
+                  ? (product.images ?? [])
+                  : []),
               ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
               await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
               return {product, detail: null, detailFallbacks, detailStock, images}

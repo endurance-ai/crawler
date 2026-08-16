@@ -72,7 +72,10 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   gimcontext: ["unisex"],
   conichiwabonjour: ["unisex"],
   sagega: ["unisex"],
-  tape00: ["unisex"],
+  // 공식 현행 카탈로그가 스커트·여성 슬리브리스와 여성 모델 착용으로 구성된다.
+  // 과거 8DIVISION의 성별 미구분 카테고리에서 유입된 unisex를 근거로 쓰지 않는다.
+  // https://tape00.cafe24.com/product/list.html?cate_no=56
+  tape00: ["women"],
   hyxia: ["women"],
   moraehouse: ["women"],
   en3ai: ["women"],
@@ -294,6 +297,12 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   rense: ["women"], // OUTWEAR/TOPS/BOTTOMS/DRESS/ACC
   treemingbird: ["women"], // DRESSES/SKIRTS/SWIMWEAR + Halter Neck Backless Knit Top
   yahnsisi: ["women"], // Tops/Knits/Basics/Bottoms/Dresses + Lazy Summer Dress
+  // 공식 Online Store 438개가 Dress/Long Skirt/Bikini/Bra Top 등 여성복으로
+  // 구성되고 남성·유니섹스 부서가 없다. DB brand_node 2153도 검토된
+  // gender_scope=["women"]이며, 기존 unisex 상품은 8DIVISION 범용 카테고리와
+  // unverified_legacy 백필에서 온 값이라 근거로 쓰지 않는다.
+  // https://jijivisha.kr/category/online-store/23/
+  jijivisha: ["women"],
 
   // ── 크롤 캐시 상품명 어휘 판정 (2026-08-03) ──────────────────
   // data/<site>-products.json 에서 여성 전용 의류 어휘(원피스/스커트/블라우스/
