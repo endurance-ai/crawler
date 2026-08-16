@@ -152,9 +152,10 @@ export class LocalProductImageSelector {
     const candidates = analyzed.map((item) => item.analysis)
     const ranked = rankImageCandidates(candidates, beforeUrl)
     const selectedAt = new Date().toISOString()
+    const selectedSourceImageUrl = urls.includes(sourceImageUrl) ? sourceImageUrl : ranked.selected.url
     const updated: Product = {
       ...product,
-      sourceImageUrl,
+      sourceImageUrl: selectedSourceImageUrl,
       imageUrl: ranked.selected.url,
       images: ranked.ordered.map((item) => item.url),
       imageSelection: {

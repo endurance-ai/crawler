@@ -1,11 +1,10 @@
 /** 휴면 — 모델컷 선별(macOS 전용). 배선·제약은 `src/select-product-images.ts` 헤더 참조. */
 import {extractStructuredProduct} from "./parsers/structured-data"
+import {normalizeProductImageUrl} from "./product-images"
 
 export const IMAGE_SELECTION_VERSION = "mac-vision-v1"
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
-const ASSET_RE =
-  /(?:^|[/_.-])(icon|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|size[-_ ]?chart)(?:[/_.-]|$)/i
 const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
 const PRODUCT_IMAGE_HINT_RE =
   /(?:product|prd|gallery|thumb|zoom|swiper|slick|goods|item[-_ ]?image|detail[-_ ]?image)/i
@@ -54,30 +53,8 @@ export interface RankedImageSelection {
   score: number
 }
 
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#0?39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-}
-
 function safeImageUrl(raw: string, pageUrl: string): string | null {
-  const cleaned = decodeHtmlEntities(raw.trim())
-  if (!cleaned || cleaned.startsWith("data:") || cleaned.startsWith("blob:")) return null
-  try {
-    const url = new URL(cleaned, pageUrl)
-    if (url.protocol !== "https:" && url.protocol !== "http:") return null
-    url.hash = ""
-    const normalized = url.toString()
-    if (ASSET_RE.test(url.pathname)) return null
-    // Extension-less CDN URLs are common; only reject explicit non-image assets.
-    if (/\.(?:css|html?|js|json|pdf|svg|woff2?)(?:$|[?#])/i.test(normalized)) return null
-    return normalized
-  } catch {
-    return null
-  }
+  return normalizeProductImageUrl(raw, pageUrl)
 }
 
 function attr(tag: string, name: string): string | null {

@@ -48,6 +48,27 @@ test("fallback 이미지 선택은 10장을 넘는 전체 배열을 보존한다
   assert.equal(selected.images?.length, 13)
   assert.equal(selected.imageSelection?.candidateCount, 13)
 })
+test("신규상품 fallback은 utility 대표 이미지를 버리고 실제 상품 이미지를 선택한다", () => {
+  const utility = "https://img.echosting.cafe24.com/skin/base_ko_KR/common/ico_tip_title.gif"
+  const actual = "https://cdn.example/product.jpg"
+  const selected = withFallbackImageSelection({
+    ...product,
+    imageUrl: utility,
+    sourceImageUrl: utility,
+    images: [utility, actual],
+  })
+  assert.equal(selected.imageUrl, actual)
+  assert.equal(selected.sourceImageUrl, actual)
+  assert.deepEqual(selected.images, [actual])
+})
+
+test("utility 이미지밖에 없는 신규상품은 DB payload를 만들지 않는다", () => {
+  const utility = "https://img.echosting.cafe24.com/skin/base_ko_KR/common/ico_tip_title.gif"
+  assert.throws(
+    () => productToCandidateDbRow({...product, imageUrl: utility, images: [utility]}, config, 11),
+    /candidate has no usable product image/,
+  )
+})
 test("신규상품 DB payload는 기존 brand_node_id와 source platform을 강제한다", () => {
   const row = productToCandidateDbRow(product, config, 11)
   assert.equal(row.brand_node_id, 11)
