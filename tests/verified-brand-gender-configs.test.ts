@@ -7,6 +7,40 @@ import {
 } from "../src/configs/gender-defaults"
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("8DIVISION의 성별 미구분 상품군을 unisex로 세탁하지 않는다", () => {
+  const eightDivision = getSiteConfig("8division")
+  assert.ok(eightDivision?.category?.categories?.length)
+  assert.ok(eightDivision.category.categories.every((category) => category.gender === undefined))
+  assert.equal(eightDivision.defaultGender, undefined)
+  assert.notEqual(eightDivision.verifiedUnisexDefault, true)
+})
+
+test("Jijivisha 자사몰은 검증된 여성 카탈로그 기본값을 사용한다", () => {
+  const jijivisha = getSiteConfig("jijivisha")
+  assert.deepEqual(jijivisha?.defaultGender, ["women"])
+  assert.notEqual(jijivisha?.verifiedUnisexDefault, true)
+})
+
+test("NOIRER 혼성 브랜드의 상품 성별은 공식 MEN/WOMEN 부서에서 가져온다", () => {
+  const noirer = getSiteConfig("noirer")
+  assert.equal(noirer?.defaultGender, undefined)
+  assert.notEqual(noirer?.verifiedUnisexDefault, true)
+  assert.deepEqual(noirer?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 76, gender: ["men"]},
+    {cateNo: 202, gender: ["men"]},
+    {cateNo: 321, gender: ["men"]},
+    {cateNo: 341, gender: ["men"]},
+    {cateNo: 180, gender: ["women"]},
+    {cateNo: 326, gender: ["women"]},
+  ])
+})
+
+test("0Tape 여성 카탈로그를 과거 편집샵 unisex 값으로 분류하지 않는다", () => {
+  const tape = getSiteConfig("tape00")
+  assert.deepEqual(tape?.defaultGender, ["women"])
+  assert.notEqual(tape?.verifiedUnisexDefault, true)
+})
+
 test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
   assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])
