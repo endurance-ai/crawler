@@ -11,6 +11,25 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "erer",
+    name: "ERER (에르에르)",
+    type: "cafe24",
+    baseUrl: "https://erer.kr",
+    brand: "ERER (에르에르)",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "WOMEN", cateNo: 118, gender: ["women"]},
+        {name: "MEN", cateNo: 119, gender: ["men"]},
+      ],
+    },
+    notes: "brand_node id=5412. 공식 WOMEN/MEN 부서로 상품 성별을 분류하며 양쪽에 함께 노출되는 [UN] 상품은 Cafe24 product_no dedup에서 unisex로 병합한다.",
+  },
+  {
     key: "tape00",
     name: "0Tape",
     type: "cafe24",

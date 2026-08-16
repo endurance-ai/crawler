@@ -41,6 +41,16 @@ test("0Tape 여성 카탈로그를 과거 편집샵 unisex 값으로 분류하�
   assert.notEqual(tape?.verifiedUnisexDefault, true)
 })
 
+test("ERER 혼성 카탈로그는 공식 WOMEN/MEN 부서로 상품 성별을 분류한다", () => {
+  const erer = getSiteConfig("erer")
+  assert.equal(erer?.defaultGender, undefined)
+  assert.notEqual(erer?.verifiedUnisexDefault, true)
+  assert.deepEqual(erer?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 118, gender: ["women"]},
+    {cateNo: 119, gender: ["men"]},
+  ])
+})
+
 test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
   assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])
