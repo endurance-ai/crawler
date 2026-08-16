@@ -38,6 +38,10 @@ import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
+  omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
+  // https://omirad.com/pages/about-omirad
+  "james-coward": ["men"], // Official stockist Neighbour lists the complete label under James Coward Mens and describes its menswear basis.
+  // https://www.shopneighbour.com/collections/james-coward-mens
   areyou: ["women"], // Dresses throughout the official catalogue; detail pages consistently publish a female model's bust/waist/hips.
   // https://areyou.kr/category/shop/48/
   // https://areyou.kr/product/detail.html?product_no=821

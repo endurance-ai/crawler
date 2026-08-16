@@ -54,6 +54,12 @@ test("2026-08 Korean/KRW batch keeps the verified live feeds and gender evidence
 })
 
 test("inactive Korean/KRW batch keeps official gender departments and defaults", () => {
+  assert.deepEqual(getSiteConfig("omirad")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("james-coward")?.defaultGender, ["men"])
+  const omiradNoise = getSiteConfig("omirad")?.kidsGenderNoisePatterns ?? []
+  for (const value of ["omirad-divine-baby-graphic-tee", "retro-spice-girl-pearl-hoodie"]) {
+    assert.doesNotMatch(omiradNoise.reduce((text, pattern) => text.replace(pattern, " "), value), /\b(?:baby|girl)\b/)
+  }
   assert.deepEqual(getSiteConfig("areyou")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("east-sea")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("erikacavallini")?.defaultGender, ["women"])
