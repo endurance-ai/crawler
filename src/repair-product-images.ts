@@ -1,6 +1,6 @@
 /**
- * Revisit registered product detail pages and atomically union every product
- * image into products.images. Dry-run by default; --apply --all writes.
+ * Revisit registered product detail pages and atomically replace legacy image
+ * pools with product-owned candidates. Dry-run by default; --apply --all writes.
  *
  * Examples:
  *   pnpm repair:product-images -- --site=roughside --limit=20
@@ -24,8 +24,10 @@ interface ProductRow {
   id: number
   product_url: string
   image_url: string | null
+  source_image_url: string | null
   images: string[] | null
   platform: string
+  image_selection_version: string | null
 }
 
 interface CollectedRow {
@@ -88,7 +90,11 @@ function safeProductUrl(row: ProductRow): boolean {
 }
 
 async function collectOne(page: Page, row: ProductRow): Promise<CollectedRow> {
-  const existing = mergeProductImages(row.image_url, row.product_url, row.images)
+  const existing = mergeProductImages(
+    row.image_selection_version === "mac-vision-v2" ? row.image_url : row.source_image_url,
+    row.product_url,
+    row.image_selection_version === "mac-vision-v2" ? row.images : [],
+  )
   const config = getSiteConfig(row.platform)
 
   // These engines already receive complete image sets from their catalogue
@@ -113,7 +119,7 @@ async function collectOne(page: Page, row: ProductRow): Promise<CollectedRow> {
       if (response.ok) {
         const nativeImages = extractShopifyProductImages(await response.json())
         if (nativeImages.length > 0) {
-          return {row, images: mergeProductImages(row.image_url, row.product_url, row.images, nativeImages)}
+          return {row, images: mergeProductImages(existing[0], row.product_url, existing.slice(1), nativeImages)}
         }
       }
     } catch {
@@ -130,7 +136,8 @@ async function collectOne(page: Page, row: ProductRow): Promise<CollectedRow> {
   if (!navigation.ok) return {row, images: existing, error: navigation.error ?? "navigation failed"}
   await page.waitForTimeout(500)
   try {
-    return {row, images: await collectProductImagesFromPage(page, existing)}
+    const images = await collectProductImagesFromPage(page, existing)
+    return images.length > 0 ? {row, images} : {row, images, error: "no product-owned images found"}
   } catch (error) {
     return {row, images: existing, error: error instanceof Error ? error.message : String(error)}
   }
@@ -149,9 +156,12 @@ async function main(): Promise<void> {
   const apply = process.argv.includes("--apply")
   const all = process.argv.includes("--all")
   const site = argValue("site")
+  const ids = (argValue("ids") ?? "").split(",").map((value) => value.trim()).filter(Boolean)
   const limit = argValue("limit") ? positiveInt("limit", 1) : null
   const concurrency = positiveInt("concurrency", 3)
-  if (apply && !all && !site) throw new Error("writes require --all or --site=<platform>")
+  if (apply && !all && !site && ids.length === 0) {
+    throw new Error("writes require --all, --site=<platform>, or --ids=<id,...>")
+  }
 
   const checkpointPath = path.resolve(
     argValue("checkpoint") ?? "data/product-image-backfill/checkpoint.jsonl",
@@ -165,10 +175,11 @@ async function main(): Promise<void> {
   for (let offset = 0; ; offset += pageSize) {
     let query = db
       .from("products")
-      .select("id,product_url,image_url,images,platform")
+      .select("id,product_url,image_url,source_image_url,images,platform,image_selection_version")
       .order("id", {ascending: true})
       .range(offset, offset + pageSize - 1)
     if (site) query = query.eq("platform", site)
+    if (ids.length > 0) query = query.in("id", ids)
     const {data, error} = await query
     if (error) throw new Error(`product query failed: ${error.message}`)
     const pageRows = (data ?? []) as ProductRow[]
@@ -225,23 +236,58 @@ async function main(): Promise<void> {
           const slice = platformRows.slice(index, index + contexts.length)
           const collected = await Promise.all(slice.map((row, worker) => collectOne(contexts[worker].page, row)))
           const successful = collected.filter((item) => !item.error)
+          const appliedIds = new Set<number>()
           failed += collected.length - successful.length
           for (const item of collected.filter((entry) => entry.error)) {
             console.warn(`   FAIL ${item.row.id}: ${item.error}`)
           }
 
           if (apply && successful.length > 0) {
-            const {error} = await db.rpc("merge_product_images", {
-              updates: successful.map((item) => ({product_url: item.row.product_url, images: item.images})),
+            const selectedAt = new Date().toISOString()
+            const {data: applied, error} = await db.rpc("apply_product_image_selections", {
+              selections: successful.map((item) => ({
+                id: item.row.id,
+                before_url: item.row.image_url,
+                after_url: item.images[0],
+                source_image_url: item.row.source_image_url ?? item.images[0],
+                images: item.images,
+                kind: "fallback",
+                score: 0,
+                version: "ownership-repair-v2",
+                candidate_count: item.images.length,
+                selected_at: selectedAt,
+              })),
             })
             if (error) {
               failed += successful.length
               console.error(`   RPC failed: ${error.message}`)
               continue
             }
+            if (typeof applied === "number" && applied !== successful.length) {
+              console.warn(`   optimistic apply skipped ${successful.length - applied}/${successful.length} rows`)
+              const {data: verified, error: verifyError} = await db
+                .from("products")
+                .select("id,image_url,image_selection_version")
+                .in("id", successful.map((item) => item.row.id))
+              if (verifyError) throw new Error(`apply verification failed: ${verifyError.message}`)
+              const expected = new Map(successful.map((item) => [item.row.id, item.images[0]]))
+              for (const row of verified ?? []) {
+                if (
+                  row.image_selection_version === "ownership-repair-v2" &&
+                  row.image_url === expected.get(row.id)
+                ) appliedIds.add(row.id)
+              }
+            } else {
+              for (const item of successful) appliedIds.add(item.row.id)
+            }
           }
 
           for (const item of successful) {
+            if (apply && !appliedIds.has(item.row.id)) {
+              failed++
+              console.warn(`   NOT APPLIED ${item.row.id}: optimistic condition or validation rejected update`)
+              continue
+            }
             const status = sameUrls(item.row.images, item.images) ? "unchanged" : "updated"
             if (status === "updated") updated++
             else unchanged++
