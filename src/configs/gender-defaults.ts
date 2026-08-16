@@ -37,6 +37,14 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
+  areyou: ["women"], // Dresses throughout the official catalogue; detail pages consistently publish a female model's bust/waist/hips.
+  // https://areyou.kr/category/shop/48/
+  // https://areyou.kr/product/detail.html?product_no=821
+  "east-sea": ["women"], // Official swimwear size guide uses Korean women sizes 44-66 and bust-cup sizing.
+  // https://east-sea.kr/product/detail.html?product_no=219
+  erikacavallini: ["women"], // Official full shop is dresses/skirts/women silhouettes with no men's department.
+  // https://erikacavallini.com/en-eu
   // ── 2026-08-13~14 신규 한국몰 공식 카탈로그 검증 ──────────────
   girlsgirls: ["women"],
   hannui: ["women"],

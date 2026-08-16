@@ -201,6 +201,8 @@ export interface SiteConfig {
   shopifyExcludedTags?: string[]
   /** Exact Shopify product handles for non-merchandise records such as shipping add-ons. */
   shopifyExcludedHandles?: string[]
+  /** Official-site vocabulary used only when the generic Shopify classifier has no result. */
+  shopifyCategoryTextPatterns?: Record<string, RegExp[]>
   /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
   genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
   /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */

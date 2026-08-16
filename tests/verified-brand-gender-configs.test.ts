@@ -53,6 +53,35 @@ test("2026-08 Korean/KRW batch keeps the verified live feeds and gender evidence
   )
 })
 
+test("inactive Korean/KRW batch keeps official gender departments and defaults", () => {
+  assert.deepEqual(getSiteConfig("areyou")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("east-sea")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("erikacavallini")?.defaultGender, ["women"])
+
+  assert.deepEqual(
+    getSiteConfig("kyod")?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})),
+    [
+      {cateNo: 44, gender: ["women"]},
+      {cateNo: 30, gender: ["men"]},
+    ],
+  )
+  assert.deepEqual(getSiteConfig("flabelus")?.shopifyGenderCollections, {
+    women: ["woman"],
+    men: ["for-him", "flabelus-man"],
+  })
+  assert.equal(getSiteConfig("flabelus")?.shopifyCategoryTextPatterns?.shoes?.length, 1)
+  assert.deepEqual(getSiteConfig("kjacques")?.shopifyGenderCollections, {
+    women: ["sandale-tropezienne-femme"],
+    men: ["homme"],
+  })
+  assert.equal(getSiteConfig("kjacques")?.shopifyCategoryTextPatterns, undefined)
+  assert.equal(getSiteConfig("kjacques")?.defaultCategory, "shoes")
+  assert.equal(
+    getSiteConfig("erikacavallini")?.shopifyCategoryTextPatterns?.bottoms?.some((pattern) => pattern.test("Pantalone Alfio")),
+    true,
+  )
+})
+
 test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
   assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])

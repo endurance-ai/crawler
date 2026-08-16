@@ -109,6 +109,35 @@ test("Shopify 단일 상품군 기본값은 상품 모델명의 오탐보다 우
   assert.equal(products[0]?.category, "bags")
 })
 
+test("site-local category vocabulary fills only unresolved Shopify categories", () => {
+  const products = parseShopifyProducts({products: [
+    {
+      id: 1,
+      title: "Jimson",
+      handle: "jimson",
+      vendor: "Flabelus",
+      product_type: "",
+      body_html: "",
+      tags: [],
+      variants: [{id: 1, title: "Default", price: "100", available: true, sku: "J"}],
+      images: [],
+    },
+    {
+      id: 2,
+      title: "Golf Shorts",
+      handle: "golf-shorts",
+      vendor: "Flabelus",
+      product_type: "",
+      body_html: "",
+      tags: [],
+      variants: [{id: 2, title: "Default", price: "100", available: true, sku: "S"}],
+      images: [],
+    },
+  ]}, BASE_URL, KEY, {...KRW_PARSE_OPTIONS, categoryTextPatterns: {shoes: [/./]}})
+
+  assert.deepEqual(products.map(({category}) => category), ["shoes", "bottoms"])
+})
+
 test("shopify 모델 설명 성별은 opt-in이며 구조화 부서 태그가 우선한다", () => {
   const base = {
     id: 1,

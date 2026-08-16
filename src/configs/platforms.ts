@@ -11,6 +11,25 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "kyod",
+    name: "KYOD",
+    type: "cafe24",
+    baseUrl: "https://kyod.kr",
+    brand: "KYOD",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "WOMEN ALL ITEMS", cateNo: 44, gender: ["women"]},
+        {name: "MEN", cateNo: 30, gender: ["men"]},
+      ],
+    },
+    notes: "brand_node id=5766. Official About says KYOD spans women's and men's clothing; crawl the official WOMEN ALL ITEMS=44 and MEN=30 departments separately.",
+  },
+  {
     key: "lvir",
     name: "LVIR",
     type: "cafe24",
@@ -3894,6 +3913,15 @@ const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women:
 // `/products.json`에 컬렉션 소속이 빠지는 Shopify 혼성몰용 공식 근거.
 // 상품 handle이 아래 공식 부서 컬렉션에 속할 때만 engine 성별을 부여한다.
 const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["shopifyGenderCollections"]>> = {
+  // Official navigation separates Woman, Man, and Kids. Kids remains unresolved
+  // and is therefore excluded from the adult import path.
+  // https://flabelus.com/collections/woman
+  // https://flabelus.com/collections/for-him
+  flabelus: {women: ["woman"], men: ["for-him", "flabelus-man"]},
+  // Official storefront separates the Femme and Homme sandal catalogues.
+  // https://www.kjacques.fr/collections/sandale-tropezienne-femme
+  // https://www.kjacques.fr/collections/homme
+  kjacques: {women: ["sandale-tropezienne-femme"], men: ["homme"]},
   // https://www.amiparis.com/collections/women-view-all
   // https://www.amiparis.com/collections/men-view-all
   // https://www.amiparis.com/collections/unisex-ami-must-haves
@@ -3947,8 +3975,30 @@ const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   "ihnomuhnit",
 ])
 
+// Official storefront language/model vocabulary used only after the generic
+// Shopify type/tag/title classifier has no result.
+const SITE_SHOPIFY_CATEGORY_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["shopifyCategoryTextPatterns"]>> = {
+  // Explicit clothing/accessory nouns resolve generically first; remaining
+  // abstract literary model names are products from the official shoe line.
+  flabelus: {shoes: [/./]},
+  erikacavallini: {
+    dresses: [/\b(?:abito|abiti|chemisier)\b/i],
+    outerwear: [/\b(?:giacca|giacche|cappotto|cappotti|caban|pelliccia|gilet)\b/i],
+    knitwear: [/\b(?:maglia|maglie)\b/i],
+    tops: [/\b(?:camicia|camicie|blusa|bluse|body)\b/i],
+    bottoms: [/\b(?:pantalone|pantaloni|gonna|gonne|bermuda)\b/i],
+    shoes: [/\b(?:stivale|stivali|stivaletto|stivaletti|decollete|décolleté|sabot|fusbet)\b/i],
+    bags: [/\b(?:pochette|borsa|borse)\b/i],
+    jewelry: [/\b(?:collana|collane|orecchino|orecchini|monoorecchino|spilla|spille|bracciale|bracciali)\b/i],
+    accessories: [/\b(?:cintura|cinture)\b/i],
+  },
+}
+
 // generated 설정을 다시 만들더라도 유지돼야 하는, 공식몰 전체 상품군 기본값.
 const SITE_DEFAULT_CATEGORIES: Record<string, string> = {
+  // Every product admitted by the official Femme/Homme gender collections is
+  // a sandal; model names such as Bikini must not be read as swimwear.
+  kjacques: "shoes",
   // 공식 About이 FANE을 가방 라인으로 명시한다. BRA/LOGE/LISSE/MIE는 가방 모델명이다.
   // https://www.faneofficiel.fr/pages/about
   faneofficiel: "bags",
@@ -3985,6 +4035,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const genderTextPatterns = SITE_GENDER_TEXT_PATTERNS[key] ?? config.genderTextPatterns
   const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
   const defaultCategory = SITE_DEFAULT_CATEGORIES[key] ?? config.defaultCategory
+  const shopifyCategoryTextPatterns = SITE_SHOPIFY_CATEGORY_TEXT_PATTERNS[key] ?? config.shopifyCategoryTextPatterns
   const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
   if (
     fallback === config.defaultGender
@@ -3995,6 +4046,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     && genderTextPatterns === config.genderTextPatterns
     && genderFromModelDescription === config.genderFromModelDescription
     && defaultCategory === config.defaultCategory
+    && shopifyCategoryTextPatterns === config.shopifyCategoryTextPatterns
     && verifyStockFromDetail === config.verifyStockFromDetail
   ) return config
   return {
@@ -4007,6 +4059,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ...(genderTextPatterns ? {genderTextPatterns} : {}),
     ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
     ...(defaultCategory ? {defaultCategory} : {}),
+    ...(shopifyCategoryTextPatterns ? {shopifyCategoryTextPatterns} : {}),
     ...(verifyStockFromDetail ? {verifyStockFromDetail: true} : {}),
   }
 }

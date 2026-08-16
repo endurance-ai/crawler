@@ -158,6 +158,8 @@ export interface ShopifyParseOptions {
   excludedTags?: string[]
   /** Exact Shopify handles to omit before product mapping. */
   excludedHandles?: string[]
+  /** Opt-in, site-local category vocabulary applied only after generic classification fails. */
+  categoryTextPatterns?: SiteConfig["shopifyCategoryTextPatterns"]
 }
 
 /**
@@ -319,12 +321,27 @@ export function parseShopifyProducts(
     const genderFromEvidence = inferredGender !== null
     const gender: string[] = genderFromEvidence ? [inferredGender] : [...(options.defaultGender || [])]
 
+    const classifiedCategory = classifyShopifyCategory(
+      options.categoryTextPatterns ? (sp.product_type || "") : (options.defaultCategory || sp.product_type || ""),
+      sp.title,
+      sp.tags,
+    )
+    if (!classifiedCategory.category && options.categoryTextPatterns) {
+      const categoryText = `${sp.title} ${sp.tags.join(" ")}`
+      for (const [categoryName, patterns] of Object.entries(options.categoryTextPatterns)) {
+        if (patterns.some((pattern) => pattern.test(categoryText))) {
+          classifiedCategory.category = categoryName
+          break
+        }
+      }
+    }
+
     allProducts.push({
       brand: options.brandOverride || sp.vendor || options.brandFallback || "",
       gender,
       genderSource: genderFromEvidence ? ("engine" as const) : ("config_default" as const),
       name: sp.title,
-      ...classifyShopifyCategory(options.defaultCategory || sp.product_type || "", sp.title, sp.tags),
+      ...classifiedCategory,
       ...pricing,
       priceFormatted,
       imageUrl,
@@ -510,6 +527,7 @@ export async function crawlShopify(
           genderFromModelDescription: config.genderFromModelDescription,
           excludedTags: config.shopifyExcludedTags,
           excludedHandles: config.shopifyExcludedHandles,
+          categoryTextPatterns: config.shopifyCategoryTextPatterns,
           keepOutOfStock: options.listingOnly || options.includeOutOfStock,
         }),
       )
