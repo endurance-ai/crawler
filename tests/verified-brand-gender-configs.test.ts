@@ -51,6 +51,21 @@ test("ERER 혼성 카탈로그는 공식 WOMEN/MEN 부서로 상품 성별을 �
   ])
 })
 
+test("여성 자사몰과 혼성 브랜드의 검증된 여성 상품 예외를 보존한다", () => {
+  assert.deepEqual(getSiteConfig("innir")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("odlyworkshop")?.defaultGender, ["women"])
+  assert.equal(
+    inferVerifiedSiteGenderFromName("blackpurple", "[REFURB]Deux-Eyelet Long Handle Bag_Red"),
+    "women",
+  )
+  assert.equal(
+    inferVerifiedSiteGenderFromName("mmmcorp", "Cotton Check Pattern T-Shirts_Check"),
+    "women",
+  )
+  assert.equal(inferVerifiedSiteGenderFromName("blackpurple", "Basic Chain Necklace"), null)
+  assert.equal(inferVerifiedSiteGenderFromName("mmmcorp", "Basic Logo T-Shirt"), null)
+})
+
 test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보존한다", () => {
   assert.deepEqual(getSiteConfig("girlsgirls")?.defaultGender, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.amiment, ["women"])

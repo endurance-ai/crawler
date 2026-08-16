@@ -76,6 +76,10 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 과거 8DIVISION의 성별 미구분 카테고리에서 유입된 unisex를 근거로 쓰지 않는다.
   // https://tape00.cafe24.com/product/list.html?cate_no=56
   tape00: ["women"],
+  // 공식 자사몰이 여성 카탈로그이며, 8DIVISION 범용 카테고리에서 유입된
+  // engine=unisex 값은 상품 성별 근거가 아니다.
+  innir: ["women"],
+  odlyworkshop: ["women"],
   hyxia: ["women"],
   moraehouse: ["women"],
   en3ai: ["women"],
@@ -407,5 +411,7 @@ export function inferVerifiedSiteGenderFromName(
     (/(?:^|\W)(?:WOMAN|WOMEN|W'S)(?:\W|$)/i.test(name) || /^W(?:\s|[-_])/i.test(name.trim()))
   ) return "women"
   if (site === "yiyae" && /(?:^|\W)W'S(?:\W|$)/i.test(name)) return "women"
+  if (site === "blackpurple" && /Deux[- ]Eyelet Long Handle Bag/i.test(name)) return "women"
+  if (site === "mmmcorp" && /Cotton Check Pattern/i.test(name)) return "women"
   return null
 }
