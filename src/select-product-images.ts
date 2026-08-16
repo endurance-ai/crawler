@@ -25,7 +25,10 @@ import {createClient, type SupabaseClient} from "@supabase/supabase-js"
 import {chromium, type Browser} from "playwright"
 
 import type {Product} from "./lib/types"
-import {IMAGE_SELECTION_VERSION} from "./lib/product-image-selection"
+import {
+  IMAGE_SELECTION_VERSION,
+  needsImageReselection,
+} from "./lib/product-image-selection"
 import {
   isProductImageUtilityAsset,
   mergeProductImages,
@@ -330,7 +333,7 @@ async function processProducts(
   let skipped = 0
   const rows: SelectionManifestRow[] = []
   const updated = await mapLimit(products, concurrency, async (product) => {
-    if (!force && product.imageSelection?.version === IMAGE_SELECTION_VERSION) {
+    if (!force && !needsImageReselection(product)) {
       skipped += 1
       return product
     }

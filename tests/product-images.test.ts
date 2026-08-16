@@ -44,6 +44,8 @@ test("normalizeProductImageUrl rejects utility, template, and non-image assets",
     null,
   )
   assert.equal(normalizeProductImageUrl("/images/size-guide.jpg", page), null)
+  assert.equal(normalizeProductImageUrl("/web/main/nb03.jpg", page), null)
+  assert.equal(normalizeProductImageUrl("/web/product/big/img_product_big.gif", page), null)
   assert.equal(normalizeProductImageUrl("${imageUrl}", page), null)
   assert.equal(normalizeProductImageUrl("javascript:alert(1)", page), null)
   assert.equal(normalizeProductImageUrl("/assets/product?id=1", page), "https://shop.example.com/assets/product?id=1")
@@ -93,9 +95,41 @@ test("collectProductImagesFromHtml uses structured and product-hinted images onl
     [
       "https://cdn.example.com/main.jpg",
       "https://cdn.example.com/back.jpg",
-      "https://shop.example.com/large.jpg",
-      "https://shop.example.com/small.jpg",
     ],
+  )
+})
+
+test("8division product data excludes global campaigns and unrelated product cards", () => {
+  const html = `
+    <script type="application/ld+json">{
+      "@type":"Product",
+      "name":"Bandana - Rectangle (Eggplant)",
+      "image":[
+        "https://www.8division.com/web/product/big/202605/9aa367a19dea094159269f58cc6504e8.jpg",
+        "https://www.8division.com/web/product/extra/big/202605/one.jpg"
+      ]
+    }</script>
+    <img class="main-banner" src="/web/main/nb03.jpg">
+    <div class="xans-product-list"><img class="product-image" src="/web/product/medium/unrelated-shirt.png"></div>
+  `
+  assert.deepEqual(
+    collectProductImagesFromHtml(html, "https://www.8division.com/product/bandana/1"),
+    [
+      "https://www.8division.com/web/product/big/202605/9aa367a19dea094159269f58cc6504e8.jpg",
+      "https://www.8division.com/web/product/extra/big/202605/one.jpg",
+    ],
+  )
+})
+
+test("HTML fallback accepts only explicit galleries, not generic product cards", () => {
+  const html = `
+    <img class="product-image" src="/unowned-card.jpg">
+    <img class="product-gallery-image" src="/owned-front.jpg">
+    <img class="recommended product-gallery-image" src="/unowned-recommendation.jpg">
+  `
+  assert.deepEqual(
+    collectProductImagesFromHtml(html, "https://shop.example.com/products/1"),
+    ["https://shop.example.com/owned-front.jpg"],
   )
 })
 

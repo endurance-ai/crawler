@@ -1,9 +1,9 @@
 import {extractStructuredProduct} from "./parsers/structured-data"
 
-export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v1"
+export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v2"
 
 export const PRODUCT_IMAGE_UTILITY_ASSET_PATTERN =
-  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$))`
+  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|img_(?:product_big|404)\.(?:gif|jpe?g|png|webp)(?:$))`
 const UTILITY_ASSET_RE = new RegExp(PRODUCT_IMAGE_UTILITY_ASSET_PATTERN, "i")
 const NON_IMAGE_EXT_RE = /\.(?:css|html?|js|json|pdf|svg|woff2?)(?:$|[?#])/i
 const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
@@ -130,11 +130,17 @@ export function collectProductImagesFromHtml(
   existing: string[] = [],
 ): string[] {
   const structured = extractStructuredProduct(html)
+  // Product JSON-LD / OG belongs to the current PDP. Do not widen an already
+  // authoritative pool with arbitrary DOM images from recommendations, global
+  // campaigns, or another product card rendered on the same page.
+  if ((structured?.images.length ?? 0) > 0) {
+    return mergeProductImages(existing[0], pageUrl, existing.slice(1), structured?.images)
+  }
   const hinted: string[] = []
   for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
     const tag = match[0]
-    if (!/(?:product|prd|gallery|detail|zoom|goods|item[-_ ]?image)/i.test(tag)) continue
-    if (/(?:recommend|related|relation|recent|banner|size[-_ ]?(?:chart|guide))/i.test(tag)) continue
+    if (!/(?:xans-product-(?:image|addimage)|keyImg|product[-_ ]?(?:gallery|images)|(?:gallery|detail|zoom)[-_ ]?(?:image|img)|item[-_ ]?image)/i.test(tag)) continue
+    if (/(?:product[-_ ]?(?:list|card)|recommend|related|relation|recent|banner|lookbook|collection|size[-_ ]?(?:chart|guide))/i.test(tag)) continue
     const srcset = attr(tag, "srcset") ?? attr(tag, "data-srcset")
     if (srcset) hinted.push(bestSrcsetUrl(srcset) ?? "")
     for (const name of ["data-zoom-image", "data-origin", "data-original", "data-lazy-src", "data-src", "src"]) {
@@ -142,7 +148,7 @@ export function collectProductImagesFromHtml(
       if (value) hinted.push(value)
     }
   }
-  return mergeProductImages(existing[0], pageUrl, existing.slice(1), structured?.images, hinted)
+  return mergeProductImages(existing[0], pageUrl, existing.slice(1), hinted)
 }
 
 /** Collect only product-owned gallery/detail DOM nodes; never scan the whole page. */
@@ -155,20 +161,13 @@ export async function collectProductImagesFromPage(
       ".xans-product-image",
       ".xans-product-addimage",
       ".keyImg",
-      "#prdDetail",
-      "#productDetail",
-      ".cont_detail",
-      ".product-detail",
-      ".detail_cont",
-      ".prd-detail-desc",
       "[class*='product-gallery']",
       "[class*='product-images']",
-      "[class*='product-description']",
       "[data-component*='ProductImage']",
       "[data-testid*='product-image']",
     ]
     const excluded =
-      "header, footer, nav, [class*='relation'], [class*='recommend'], [class*='recent'], [class*='banner'], [class*='size-chart'], [class*='size-guide']"
+      "header, footer, nav, [class*='product-list'], [class*='product-card'], [class*='relation'], [class*='recommend'], [class*='recent'], [class*='banner'], [class*='lookbook'], [class*='collection'], [class*='size-chart'], [class*='size-guide']"
     const values: string[] = []
     const seenElements = new Set<Element>()
     for (const selector of roots) {
@@ -208,7 +207,9 @@ export async function collectProductImagesFromPage(
     return {values, structuredHtml}
   })
   const structured = extractStructuredProduct(extracted.structuredHtml)
-  return mergeProductImages(existing[0], page.url(), existing.slice(1), structured?.images, extracted.values)
+  return (structured?.images.length ?? 0) > 0
+    ? mergeProductImages(existing[0], page.url(), existing.slice(1), structured?.images)
+    : mergeProductImages(existing[0], page.url(), existing.slice(1), extracted.values)
 }
 
 export function hasExplicitImageExtension(url: string): boolean {

@@ -13,6 +13,7 @@ import {
 import {ProductImageAnalysisCache} from "./product-image-analysis-cache"
 import {ProductImageVisionClient} from "./product-image-vision-client"
 import {downloadRemoteImage, fetchProductHtml} from "./safe-remote-image"
+import {PRODUCT_IMAGE_COLLECTION_VERSION} from "./product-images"
 
 export interface ProductImageSelectionResult {
   product: Product
@@ -109,16 +110,16 @@ export class LocalProductImageSelector {
   ): Promise<ProductImageSelectionResult> {
     const beforeUrl = product.imageUrl
     const sourceImageUrl = product.sourceImageUrl || beforeUrl
+    const collectionIsTrusted = product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
     const existing = [
       sourceImageUrl,
-      beforeUrl,
-      ...(Array.isArray(product.images) ? product.images : []),
+      ...(collectionIsTrusted ? [beforeUrl, ...(Array.isArray(product.images) ? product.images : [])] : []),
     ].filter((url): url is string => typeof url === "string" && url.length > 0)
 
     let urls = collectImageCandidatesFromHtml("", product.productUrl, existing)
     let detailEnriched = false
     const errors: string[] = []
-    if (options.enrichDetail !== false && urls.length < 2) {
+    if (options.enrichDetail !== false && (!collectionIsTrusted || urls.length < 2)) {
       try {
         const html = await fetchProductHtml(product.productUrl)
         urls = collectImageCandidatesFromHtml(html, product.productUrl, existing)
@@ -158,6 +159,7 @@ export class LocalProductImageSelector {
       sourceImageUrl: selectedSourceImageUrl,
       imageUrl: ranked.selected.url,
       images: ranked.ordered.map((item) => item.url),
+      imageCollectionVersion: PRODUCT_IMAGE_COLLECTION_VERSION,
       imageSelection: {
         kind: ranked.kind,
         score: ranked.score,

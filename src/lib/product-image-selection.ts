@@ -1,13 +1,8 @@
 /** 휴면 — 모델컷 선별(macOS 전용). 배선·제약은 `src/select-product-images.ts` 헤더 참조. */
-import {extractStructuredProduct} from "./parsers/structured-data"
-import {normalizeProductImageUrl} from "./product-images"
+import {collectProductImagesFromHtml} from "./product-images"
 
-export const IMAGE_SELECTION_VERSION = "mac-vision-v1"
+export const IMAGE_SELECTION_VERSION = "mac-vision-v2"
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
-
-const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
-const PRODUCT_IMAGE_HINT_RE =
-  /(?:product|prd|gallery|thumb|zoom|swiper|slick|goods|item[-_ ]?image|detail[-_ ]?image)/i
 
 export type ImageSelectionKind = "model" | "product" | "fallback"
 
@@ -53,29 +48,35 @@ export interface RankedImageSelection {
   score: number
 }
 
-function safeImageUrl(raw: string, pageUrl: string): string | null {
-  return normalizeProductImageUrl(raw, pageUrl)
+interface ImageReselectionInput {
+  productUrl: string
+  imageUrl: string
+  sourceImageUrl?: string
+  images?: string[]
+  imageSelection?: {
+    version: string
+    candidateCount: number
+  }
 }
 
-function attr(tag: string, name: string): string | null {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const quoted = new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i").exec(tag)
-  if (quoted) return quoted[2]
-  return new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*([^\\s>]+)`, "i").exec(tag)?.[1] ?? null
-}
+/**
+ * A matching selector version is only current for the candidate set it saw.
+ * Image collection can append richer gallery images after selection, so
+ * candidate growth must make the product eligible again.
+ */
+export function needsImageReselection(product: ImageReselectionInput): boolean {
+  const selection = product.imageSelection
+  if (!selection || selection.version !== IMAGE_SELECTION_VERSION) return true
 
-function srcsetCandidates(value: string): Array<{url: string; width: number}> {
-  return value
-    .split(",")
-    .map((part) => {
-      const match = part.trim().match(/^(\S+)(?:\s+(\d+(?:\.\d+)?)(w|x))?$/i)
-      if (!match) return null
-      const numeric = Number(match[2] ?? 0)
-      const width = match[3]?.toLowerCase() === "x" ? numeric * 1000 : numeric
-      return {url: match[1], width: Number.isFinite(width) ? width : 0}
-    })
-    .filter((item): item is {url: string; width: number} => item !== null)
-    .sort((a, b) => b.width - a.width)
+  const knownCandidates = collectImageCandidatesFromHtml("", product.productUrl, [
+    product.sourceImageUrl,
+    product.imageUrl,
+    ...(product.images ?? []),
+  ].filter((url): url is string => typeof url === "string" && url.length > 0))
+  const selectedCandidateCount = Number.isFinite(selection.candidateCount)
+    ? Math.max(0, selection.candidateCount)
+    : 0
+  return knownCandidates.length > selectedCandidateCount
 }
 
 /**
@@ -90,51 +91,7 @@ export function collectImageCandidatesFromHtml(
   pageUrl: string,
   existing: string[] = [],
 ): string[] {
-  const candidates: string[] = []
-  const seen = new Set<string>()
-  const add = (raw: string | null | undefined): void => {
-    if (!raw) return
-    const normalized = safeImageUrl(raw, pageUrl)
-    if (!normalized || seen.has(normalized)) return
-    seen.add(normalized)
-    candidates.push(normalized)
-  }
-
-  for (const url of existing) add(url)
-
-  const structured = extractStructuredProduct(html)
-  for (const url of structured?.images ?? []) add(url)
-
-  const imageTags = [...html.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0])
-  const orderedTags = [
-    ...imageTags.filter((tag) => PRODUCT_IMAGE_HINT_RE.test(tag)),
-    ...imageTags.filter((tag) => !PRODUCT_IMAGE_HINT_RE.test(tag)),
-  ]
-  for (const tag of orderedTags) {
-    for (const name of ["srcset", "data-srcset"]) {
-      const value = attr(tag, name)
-      if (value) {
-        for (const item of srcsetCandidates(value)) add(item.url)
-      }
-    }
-    for (const name of [
-      "data-zoom-image",
-      "data-origin",
-      "data-original",
-      "data-lazy-src",
-      "data-src",
-      "src",
-    ]) {
-      add(attr(tag, name))
-    }
-  }
-
-  // Some galleries expose direct image anchors instead of img elements.
-  for (const match of html.matchAll(/<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1[^>]*>/gi)) {
-    if (IMAGE_EXT_RE.test(match[2])) add(match[2])
-  }
-
-  return candidates
+  return collectProductImagesFromHtml(html, pageUrl, existing)
 }
 
 function clamp(value: number, min = 0, max = 1): number {
