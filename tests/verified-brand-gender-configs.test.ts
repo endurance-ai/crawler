@@ -513,6 +513,30 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(maisonMichel?.shopifyGenderCollections, {
     unisex: ["fedoras", "berets", "canotiers"],
   })
+  const saySaySay = getSiteConfig("global-5463")
+  assert.equal(saySaySay?.type, "cafe24")
+  assert.equal(saySaySay?.defaultGender, undefined)
+  assert.equal(saySaySay?.genderTextPatterns?.women?.[0]?.test("(W) CLASSIC TOP"), true)
+  assert.equal(saySaySay?.genderTextPatterns?.unisex?.[0]?.test("(UNISEX) FIELD PANTS"), true)
+  assert.equal(saySaySay?.genderTextPatterns?.unisex?.[0]?.test("FIELD PANTS"), false)
+  assert.deepEqual(saySaySay?.category?.categories, [
+    {name: "Outer", cateNo: 44, url: "/category/outer/44/"},
+    {name: "Top", cateNo: 52, url: "/category/top/52/"},
+    {name: "Bottom", cateNo: 54, url: "/category/bottom/54/"},
+    {name: "Acc", cateNo: 58, url: "/category/acc/58/"},
+  ])
+  const subcategory = getSiteConfig("en-5510")
+  assert.equal(subcategory?.defaultGender, undefined)
+  assert.equal(subcategory?.genderTextPatterns?.unisex?.[0]?.test("SUB_F751 Black & Cream 모두보기"), true)
+  assert.equal(subcategory?.genderTextPatterns?.unisex?.[0]?.test("SUB_F113 Black 모두보기"), false)
+  assert.deepEqual(subcategory?.category?.categories, [
+    {name: "Shoes", cateNo: 24, url: "/category/모두보기/24/"},
+  ])
+  const simuero = getSiteConfig("simuero")
+  assert.equal(simuero?.defaultGender, undefined)
+  assert.deepEqual(simuero?.shopifyGenderCollections, {
+    men: ["gift-guide-pieces-for-him"],
+  })
   assert.deepEqual(getSiteConfig("asif-calie")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("asif-calie")?.category?.categories, [
     {name: "SHOP", cateNo: 50, gender: ["women"]},

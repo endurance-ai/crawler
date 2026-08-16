@@ -3069,6 +3069,64 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     crawlDelay: 1500,
     notes: "brand_node_id=1450. Official collection descriptions explicitly identify fedoras and berets as suitable for men and women, and canotiers as suitable for everyone; only products in those verified collections receive unisex gender.",
   },
+  {
+    key: "global-5463",
+    name: "SAYSAYSAY",
+    type: "cafe24",
+    baseUrl: "https://say-say-say.com",
+    brand: "SAYSAYSAY",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    genderTextPatterns: {
+      women: [/^\(W\)(?:\s|$)/i],
+      unisex: [/^\(UNISEX\)(?:\s|$)/i],
+    },
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Outer", cateNo: 44, url: "/category/outer/44/"},
+        {name: "Top", cateNo: 52, url: "/category/top/52/"},
+        {name: "Bottom", cateNo: 54, url: "/category/bottom/54/"},
+        {name: "Acc", cateNo: 58, url: "/category/acc/58/"},
+      ],
+    },
+    notes: "brand_node_id=5463. Corrected stale Shopify detection to the live Cafe24 catalogue. Only official product-name prefixes (W) and (UNISEX) provide gender; unmarked products remain unresolved.",
+  },
+  {
+    key: "en-5510",
+    name: "subcategory (서브카테고리)",
+    type: "cafe24",
+    baseUrl: "https://sub-category.com",
+    brand: "subcategory (서브카테고리)",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    genderTextPatterns: {
+      unisex: [/^SUB_F751 (?:Black & Cream|Brown&Orange|Khaki&Black|Black|Gray&Black)(?:\s|$)/i],
+    },
+    category: {
+      discovery: "manual",
+      categories: [{name: "Shoes", cateNo: 24, url: "/category/모두보기/24/"}],
+    },
+    notes: "brand_node_id=5515. Only the five current SUB_F751 variants whose official detail options explicitly contain both W38-W40 and M40-M44 receive unisex gender; other footwear remains unresolved.",
+  },
+  {
+    key: "simuero",
+    name: "SIMUERO",
+    type: "shopify",
+    baseUrl: "https://simuero.com",
+    brand: "SIMUERO",
+    sourceCurrency: "KRW",
+    shopifyGenderCollections: {
+      men: ["gift-guide-pieces-for-him"],
+    },
+    maxPages: 300,
+    crawlDelay: 1500,
+    notes: "brand_node_id=1483. Only products in the official Pieces for Him collection receive men gender; no site-wide gender default.",
+  },
   // ─── 커스텀 브랜드 파일럿: imweb (2026-07-16) ─────────────────
   // detection.platform_family=imweb 재분류(brand-crawl detect fingerprint 확장)
   // 결과에서 robots.txt 허용 25개 선정. 카테고리는 엔진 자동 탐색(.shop-item
