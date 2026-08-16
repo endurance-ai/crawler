@@ -173,7 +173,6 @@ test("NOMANUAL의 공식 WOMAN baby tee는 아동복으로 오인하지 않는�
 
 test("TEXTURE SEOUL은 빈 표준 목록 대신 공식 pretty URL 카테고리를 수집한다", () => {
   const texture = getSiteConfig("textureseoul")
-  assert.equal(texture?.trustedCategory, true)
   assert.equal(texture?.category?.discovery, "manual")
   assert.equal(texture?.selectors?.productName, "h3.project-excerpt-title-inner")
   assert.equal(

@@ -2461,7 +2461,6 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://texture-seoul.co.kr",
     brand: "TEXTURE SEOUL",
-    trustedCategory: true,
     paginate: false,
     selectors: {
       productItem: 'li[id^="anchorBoxId_"]',
