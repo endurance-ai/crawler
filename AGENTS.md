@@ -54,6 +54,8 @@ Run crawler/import commands carefully. They may hit external sites or write to D
 - Keep platform-specific selectors and quirks in config or parser modules, not scattered through import code.
 - DB schema changes should be made in `../kiko.ai-app/database/migrations/`, then crawler import code should follow.
 - Do not commit `.env`, crawl output, or downloaded artifacts.
+- Never use `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or another external AI API for Codex research, classification, verification, or reasoning. Use the tools included with the Codex subscription.
+- Project API keys may be used only for an actual product feature or crawler run explicitly requested by the user.
 - Existing `.claude/`, `.moai/`, and `CLAUDE.md` contain important prior decisions, specs, workflow expectations, and domain context. Use them as project knowledge when relevant. Only translate or skip Claude-specific execution protocols that conflict with Codex, such as Claude subagent routing or Claude-only question/approval tools.
 
 ## Harness and Quality Policy
