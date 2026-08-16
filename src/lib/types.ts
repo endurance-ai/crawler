@@ -203,6 +203,11 @@ export interface SiteConfig {
   shopifyExcludedHandles?: string[]
   /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
   genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
+  /**
+   * Cafe24 목록의 남녀 부서가 서로 중복될 때 category 파라미터를 제거한 상세의
+   * 공식 카테고리 계층으로 성별을 최종 확정한다.
+   */
+  cafe24CanonicalDetailGender?: boolean
   /** Shopify 상품 설명의 명시적 Male:/Female: 모델 라벨을 성별 근거로 사용한다. */
   genderFromModelDescription?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */

@@ -45,6 +45,8 @@ test("ERER 혼성 카탈로그는 공식 WOMEN/MEN 부서로 상품 성별을 �
   const erer = getSiteConfig("erer")
   assert.equal(erer?.defaultGender, undefined)
   assert.notEqual(erer?.verifiedUnisexDefault, true)
+  assert.equal(erer?.cafe24CanonicalDetailGender, true)
+  assert.equal(erer?.genderTextPatterns?.unisex?.[0]?.test("[UN] Basic Logo T-Shirt"), true)
   assert.deepEqual(erer?.category?.categories?.map(({cateNo, gender}) => ({cateNo, gender})), [
     {cateNo: 118, gender: ["women"]},
     {cateNo: 119, gender: ["men"]},

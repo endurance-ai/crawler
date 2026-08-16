@@ -294,6 +294,7 @@ export interface Cafe24DetailFallbacks {
   sourceCurrency: Product["sourceCurrency"] | null
   sourcePrice: number | null
   descriptionFirstLine: string | null
+  categoryNames?: string[]
 }
 
 export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Cafe24DetailFallbacks> {
@@ -392,6 +393,18 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       }
 
       var html = document.documentElement.innerHTML
+      var categoryNames: string[] = []
+      var cafe24Window = window as typeof window & {
+        CAFE24?: {FRONT_JS_CONFIG_SHOP?: {oCategoryInfo?: Record<string, {category_name?: unknown}>}}
+      }
+      var categoryInfo = cafe24Window.CAFE24?.FRONT_JS_CONFIG_SHOP?.oCategoryInfo
+      if (categoryInfo && typeof categoryInfo === "object") {
+        var categoryValues = Object.values(categoryInfo)
+        for (var ci = 0; ci < categoryValues.length; ci++) {
+          var categoryName = categoryValues[ci]?.category_name
+          if (typeof categoryName === "string" && categoryName.trim()) categoryNames.push(categoryName.trim())
+        }
+      }
       var scriptProductPrice = ""
       var scriptSalePrice = ""
       var productPriceMatch = html.match(/var\s+product_price\s*=\s*['"]([^'"]+)['"]/)
@@ -411,6 +424,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         scriptSalePrice,
         detailPriceText,
         descFirstLine,
+        categoryNames,
       }
       /* eslint-enable no-var */
     })
@@ -426,6 +440,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       scriptSalePrice: "",
       detailPriceText: "",
       descFirstLine: "",
+      categoryNames: [] as string[],
     }))
 
   const name = firstUsefulName([...raw.names, raw.descFirstLine])
@@ -482,6 +497,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     sourceCurrency,
     sourcePrice: price,
     descriptionFirstLine: firstUsefulName([raw.descFirstLine]),
+    categoryNames: raw.categoryNames,
   }
 }
 
