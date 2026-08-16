@@ -483,9 +483,36 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   }
   const amun = getSiteConfig("amunofficial")
   assert.equal(amun?.disabled, undefined)
+  assert.equal(amun?.baseUrl, "https://amunofficial.kr")
   assert.deepEqual(amun?.defaultGender, ["women"])
   assert.equal(amun?.defaultCategory, "swimwear")
   assert.deepEqual(amun?.category?.categories, [{name: "SHOP AMUN", cateNo: 130, gender: ["women"]}])
+  assert.equal(getSiteConfig("en-3885")?.baseUrl, "https://enzoblues.com")
+  assert.equal(getSiteConfig("en-3885")?.selectors?.productItem, '.item[id^="anchorBoxId_"]')
+  assert.deepEqual(getSiteConfig("en-3885")?.category?.categories?.map(({cateNo, gender, url}) => ({cateNo, gender, url})), [
+    {cateNo: 97, gender: ["women"], url: "/category/outer/97/"},
+    {cateNo: 98, gender: ["women"], url: "/category/top/98/"},
+    {cateNo: 99, gender: ["women"], url: "/category/bottom/99/"},
+    {cateNo: 118, gender: ["women"], url: "/category/dress/118/"},
+    {cateNo: 101, gender: ["women"], url: "/category/acc/101/"},
+    {cateNo: 100, gender: ["women"], url: "/category/bag/100/"},
+  ])
+  assert.equal(getSiteConfig("global-5403")?.type, "cafe24")
+  assert.deepEqual(getSiteConfig("global-5403")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("global-5403")?.category?.categories?.map(({cateNo, url}) => ({cateNo, url})), [
+    {cateNo: 53, url: "/category/Outer/53/"},
+    {cateNo: 47, url: "/category/Top/47/"},
+    {cateNo: 27, url: "/category/Bottom/27/"},
+    {cateNo: 63, url: "/category/Dress/63/"},
+    {cateNo: 60, url: "/category/Acc/60/"},
+  ])
+  const maisonMichel = getSiteConfig("michel-paris")
+  assert.equal(maisonMichel?.sourceCurrency, "KRW")
+  assert.equal(maisonMichel?.defaultCategory, "headwear")
+  assert.equal(maisonMichel?.shopifyCategoryTextPatterns?.headwear?.length, 1)
+  assert.deepEqual(maisonMichel?.shopifyGenderCollections, {
+    unisex: ["fedoras", "berets", "canotiers"],
+  })
   assert.deepEqual(getSiteConfig("asif-calie")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("asif-calie")?.category?.categories, [
     {name: "SHOP", cateNo: 50, gender: ["women"]},
