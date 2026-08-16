@@ -446,4 +446,12 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.deepEqual(amun?.defaultGender, ["women"])
   assert.equal(amun?.defaultCategory, "swimwear")
   assert.deepEqual(amun?.category?.categories, [{name: "SHOP AMUN", cateNo: 130, gender: ["women"]}])
+  assert.deepEqual(getSiteConfig("asif-calie")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("asif-calie")?.category?.categories, [
+    {name: "SHOP", cateNo: 50, gender: ["women"]},
+  ])
+  assert.deepEqual(getSiteConfig("le17septembre")?.category?.categories, [
+    {name: "WOMEN VIEW ALL", cateNo: 100, gender: ["women"]},
+    {name: "MEN VIEW ALL", cateNo: 103, gender: ["men"]},
+  ])
 })
