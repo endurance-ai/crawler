@@ -1,9 +1,9 @@
 /**
- * 재수집으로 대표 이미지가 실제로 바뀐 행을 찾아낸다 — 순수 판정부.
+ * 재수집으로 canonical image_url 이 실제로 바뀐 행을 찾아낸다 — 순수 판정부.
  * DB 접근/삭제는 tools/invalidate-changed-embeddings.ts.
  *
  * 배경: product_embeddings 에는 무효화 트리거도 이미지 해시도 없다.
- * kiko.ai-app/scripts/aws/embed_products.py 의 pending 판정은 순수하게
+ * 임베딩 배치의 pending 판정은 순수하게
  * "product_embeddings 행이 없음" 안티조인이라, 재수집으로 images 가 바뀌어도
  * 임베딩은 조용히 stale 상태로 남는다. **행을 지우는 것이 유일한 무효화 수단**이다.
  *
@@ -14,16 +14,13 @@
  */
 
 /**
- * embed_products.py 의 대표 이미지 선택과 **동일한** 규칙.
- * `imgs[0] if imgs and imgs[0] else row.get("image_url")` — 빈 문자열인 첫
- * 원소를 걸러내는 부분까지 그대로 옮겨야 한다.
+ * products.image_url 은 serving/search/embedding 대표 이미지의 단일 출처다.
+ * images[0] 은 호환용 mirror라서 두 필드가 어긋나도 image_url 을 덮어쓰지 않는다.
  */
 export function representativeImage(row: {
   images?: string[] | null
   image_url?: string | null
 }): string | null {
-  const first = row.images?.[0]
-  if (first) return first
   return row.image_url || null
 }
 
@@ -48,12 +45,6 @@ export function normalizeImageUrl(raw: string | null): string | null {
     const host = url.hostname.toLowerCase().replace(/^www\./, "")
     const pathname = url.pathname
       .replace(/_(\d+x\d*|x\d+)(?=\.[a-z0-9]+$)/i, "")
-      // 2026-07-28 파일럿 032c 실측: 같은 상품의 각도별 파일명
-      // ("32_00245-2_top.jpg" vs "32_00245-2.jpg")이 변경 비율 20% 경보를
-      // 넘겨 임베딩 무효화가 자동 보류됐다. embed_products.py 는 어차피
-      // images[0] 하나만 쓰므로, 어느 각도 파일이 오든 "그 상품 사진"이라는
-      // 사실은 같다 — 사이즈 접미사와 같은 취급.
-      .replace(/_(top|bottom|back|front|side|detail|alt|flat)(?=\.[a-z0-9]+$)/i, "")
     return `${host}${pathname}`
   } catch {
     return trimmed
@@ -86,19 +77,19 @@ export interface ImageChangeDecision {
 export interface ImageChangeSummary {
   total: number
   byBucket: Record<ImageChangeBucket, number>
-  /** 임베딩을 지워야 하는 id — changed 와 was_null_now_set 만. */
+  /** 임베딩을 지워야 하는 id — canonical image_url 이 바뀌거나 소실된 행. */
   invalidateIds: number[]
   samples: ImageChangeDecision[]
 }
 
 /**
- * was_set_now_null 은 무효화 대상이 아니다: 대표 이미지가 사라진 행은 새로
- * 임베딩할 원본이 없으므로, 기존 임베딩을 지우면 검색에서 그냥 사라진다.
- * 옛 벡터라도 있는 편이 낫다 — 지우는 판단은 사람이 따로 해야 한다.
+ * 대표 이미지가 사라졌는데 옛 벡터를 남기면 검색 결과가 깨진 image_url 을
+ * 계속 노출한다. 소실도 변경과 동일하게 무효화한다.
  */
 const INVALIDATING: ReadonlySet<ImageChangeBucket> = new Set<ImageChangeBucket>([
   "changed",
   "was_null_now_set",
+  "was_set_now_null",
 ])
 
 export function diffImageSnapshots(
