@@ -454,4 +454,27 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
     {name: "WOMEN VIEW ALL", cateNo: 100, gender: ["women"]},
     {name: "MEN VIEW ALL", cateNo: 103, gender: ["men"]},
   ])
+  assert.deepEqual(getSiteConfig("lvir")?.category?.categories, [
+    {name: "26 SPRING SUMMER", cateNo: 342, gender: ["women"]},
+  ])
+  assert.deepEqual(getSiteConfig("yujiofficial")?.category?.categories, [
+    {name: "WOMEN", cateNo: 58, gender: ["women"]},
+    {name: "MEN", cateNo: 59, gender: ["men"]},
+  ])
+  assert.deepEqual(getSiteConfig("safarispot")?.category?.categories, [
+    {name: "SIGNATURE", cateNo: 287, gender: ["unisex"]},
+  ])
+  assert.deepEqual(getSiteConfig("colocynth")?.category?.categories, [
+    {name: "ALL", cateNo: 87, gender: ["women"]},
+  ])
+  assert.deepEqual(getSiteConfig("en-208")?.category?.categories, [
+    {name: "WOMEN", cateNo: 48, gender: ["women"]},
+    {name: "MEN", cateNo: 49, gender: ["men"]},
+  ])
+  assert.deepEqual(getSiteConfig("en-1190")?.category?.categories, [
+    {name: "ALL", cateNo: 784, gender: ["unisex"]},
+  ])
+  for (const key of ["safarispot", "en-1190"]) {
+    assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true, key)
+  }
 })
