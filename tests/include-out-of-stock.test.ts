@@ -25,11 +25,26 @@ import {
   inferCafe24ListingStock,
   mergeCafe24DuplicateCategory,
   mergeCafe24DuplicateGender,
+  reuseExistingCafe24Detail,
   shouldKeepOutOfStock,
 } from "../src/lib/cafe24-engine"
 
 import type {Product} from "../src/lib/types"
 import fixture from "./fixtures/shopify-products.fixture.json" with {type: "json"}
+
+test("cafe24: restart reuses cached detail and restores its completion marker", () => {
+  const product = {
+    productUrl: "https://shop.test/product/item/1/category/24/display/1/",
+  } as Product
+  const detail = {material: null, productCode: "P-1"}
+
+  assert.equal(reuseExistingCafe24Detail(product, detail, false), detail)
+  assert.match(product.detailFetchedAt ?? "", /^\d{4}-\d{2}-\d{2}T/)
+
+  const stockVerified = {...product, detailFetchedAt: undefined}
+  assert.equal(reuseExistingCafe24Detail(stockVerified, detail, true), null)
+  assert.equal(stockVerified.detailFetchedAt, undefined)
+})
 
 test("cafe24: custom shop page can be used as a manual category URL", () => {
   assert.equal(

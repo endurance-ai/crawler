@@ -205,6 +205,20 @@ export interface CrawlCafe24Options {
   enrichDetailPage?: (page: Cafe24Page, product: Product) => Promise<void>
 }
 
+export function reuseExistingCafe24Detail(
+  product: Product,
+  known: DetailData | undefined,
+  verifyStockFromDetail: boolean,
+): DetailData | null {
+  if (!known || verifyStockFromDetail) return null
+
+  // `product` is rebuilt from the fresh listing, so it does not carry the
+  // previous run's marker. Restore one with the cached detail; otherwise every
+  // restart would visit the same detail page again.
+  product.detailFetchedAt ??= new Date().toISOString()
+  return known
+}
+
 /**
  * 품절 상품을 결과에 남길지 결정한다.
  *
@@ -1122,8 +1136,12 @@ export async function crawlCafe24(
             // 재요청하지 않고 그대로 재사용 (2026-07-06 — 중단 후 재실행 시 이미 끝낸
             // 상세크롤을 반복하지 않기 위함). 마커는 Product.detailFetchedAt 이다
             // (2026-07-29 이전에는 color 유무로 판정 → color 가 VLM 으로 이관되며 교체).
-            const known = options.existingDetails?.get(product.productUrl)
-            if (known && product.detailFetchedAt && !config.verifyStockFromDetail) {
+            const known = reuseExistingCafe24Detail(
+              product,
+              options.existingDetails?.get(product.productUrl),
+              config.verifyStockFromDetail === true,
+            )
+            if (known) {
               return {
                 product,
                 detail: known,
