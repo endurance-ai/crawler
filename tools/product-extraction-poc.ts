@@ -59,6 +59,7 @@ interface CliOptions {
   runId: string
   strictFirecrawlUrls: boolean
   allowExistingUrlFallback: boolean
+  includeOutOfStock: boolean
   help: boolean
 }
 
@@ -251,6 +252,7 @@ Options:
   --run-id=ID                  Run folder name. Default: timestamp
   --strict-firecrawl-urls      Do not top up Firecrawl URL samples from existing baseline URLs
   --no-existing-url-fallback   Same as --strict-firecrawl-urls
+  --include-out-of-stock       Keep sold-out products and crawl their detail pages (recollection)
   --help                       Print this message
 
 Required env for full default run:
@@ -311,6 +313,7 @@ function parseArgs(argv = process.argv.slice(2)): CliOptions {
     runId: stringFlag(flags, "run-id") ?? timestampId(),
     strictFirecrawlUrls: strict,
     allowExistingUrlFallback: !strict,
+    includeOutOfStock: Boolean(flags["include-out-of-stock"]),
     help: Boolean(flags.help),
   }
 }
@@ -427,6 +430,7 @@ async function crawlCafe24Chromium(
   config: SiteConfig,
   limit: number,
   detailParser: ReturnType<typeof getDetailParser> | undefined,
+  includeOutOfStock: boolean,
   enrichDetailPage?: (page: Page, product: Product) => Promise<void>,
 ): Promise<CrawlResult> {
   const browser = await chromium.launch({headless: true})
@@ -437,6 +441,7 @@ async function crawlCafe24Chromium(
     const result = await crawlCafe24(page, clonePocConfig(config, limit), detailParser, undefined, {
       sampleLimit: limit,
       detailConcurrency: cafe24DetailConcurrency(),
+      includeOutOfStock,
       // Chromium detail-crawl pages are real Playwright Pages under the hood
       // (createPlaywrightDetailPageFactory) even though crawlCafe24's own
       // Cafe24Page type is narrower — safe to cast only on this branch.
@@ -455,13 +460,14 @@ async function runExistingVariant(
   config: SiteConfig,
   limit: number,
   stats: RuntimeStats,
+  includeOutOfStock: boolean,
   enrichDetailPage?: (page: Page, product: Product) => Promise<void>,
 ): Promise<Product[]> {
   const started = Date.now()
   let result: CrawlResult
 
   if (config.type === "shopify") {
-    result = await crawlShopify(clonePocConfig(config, limit))
+    result = await crawlShopify(clonePocConfig(config, limit), {includeOutOfStock})
   } else if (config.type === "cafe24") {
     const detailParser = config.crawlDetails ? getDetailParser(config.key) : undefined
     const engine = parseCafe24EngineMode(process.env.CRAWLER_CAFE24_ENGINE)
@@ -487,14 +493,15 @@ async function runExistingVariant(
         // env var was set (2026-07-20 bulk onboarding).
         result = await crawlCafe24WithLightpanda(clonePocConfig(config, limit), detailParser, undefined, {
           detailConcurrency: cafe24DetailConcurrency(),
+          includeOutOfStock,
         })
         if (result.stats.totalProducts === 0) throw new Error("Lightpanda returned 0 products")
       } catch (err) {
         console.warn(`⚠️ ${config.key} Lightpanda failed — Chromium fallback: ${(err as Error).message}`)
-        result = await crawlCafe24Chromium(config, limit, detailParser)
+        result = await crawlCafe24Chromium(config, limit, detailParser, includeOutOfStock)
       }
     } else {
-      result = await crawlCafe24Chromium(config, limit, detailParser, enrichDetailPage)
+      result = await crawlCafe24Chromium(config, limit, detailParser, includeOutOfStock, enrichDetailPage)
     }
   } else {
     throw new Error(`Existing POC only supports cafe24/shopify, got ${config.type}`)
@@ -1780,7 +1787,13 @@ async function main(): Promise<void> {
     //    per product during its own detail-crawl loop).
     let pool: Product[] = []
     try {
-      pool = await runExistingVariant(config, options.poolLimit, existingRuntime, enrichDetailPageFn)
+      pool = await runExistingVariant(
+        config,
+        options.poolLimit,
+        existingRuntime,
+        options.includeOutOfStock,
+        enrichDetailPageFn,
+      )
     } catch (err) {
       existingRuntime.errors.push(messageOf(err))
     }

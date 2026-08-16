@@ -17,12 +17,13 @@
 #                          products than this are silently truncated — raise it
 #                          for full-catalog re-collection.
 #   --pool-limit <n>      candidate pool cap (default 2000)
+#   --include-out-of-stock keep sold-out products through the crawl stage.
+#                          Intended for re-collection, not initial onboarding.
 #   --import-flags "<..>" flags passed to import-products.ts
 #                          (default "--no-new-brands --in-stock-only").
-#                          Re-collecting existing rows wants neither: the former
-#                          drops products whose brand is not yet in brand_nodes,
-#                          the latter skips out-of-stock rows so they keep
-#                          whatever data they already had.
+#                          Re-collection keeps --no-new-brands because every
+#                          target brand already exists, but must remove
+#                          --in-stock-only so sold-out rows are refreshed too.
 #   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
 #                          variant to crawl AND the one onboard-classify.ts reads
 #                          back out of products.jsonl (kept in lockstep — see
@@ -49,6 +50,7 @@ CONFIGS=""
 VARIANTS="existing"
 PRODUCT_LIMIT=2000
 POOL_LIMIT=2000
+INCLUDE_OUT_OF_STOCK=0
 IMPORT_FLAGS="--no-new-brands --in-stock-only"
 
 while [ $# -gt 0 ]; do
@@ -62,6 +64,7 @@ while [ $# -gt 0 ]; do
     --variants) VARIANTS="$2"; shift 2 ;;
     --product-limit) PRODUCT_LIMIT="$2"; shift 2 ;;
     --pool-limit) POOL_LIMIT="$2"; shift 2 ;;
+    --include-out-of-stock) INCLUDE_OUT_OF_STOCK=1; shift ;;
     --import-flags) IMPORT_FLAGS="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -126,6 +129,8 @@ for c in $(seq "$START" "$END"); do
   # existing pool (see runHybridVariant), not a standalone replacement for it.
   CRAWL_VARIANTS="existing"
   if [ "$VARIANTS" = "hybrid" ]; then CRAWL_VARIANTS="existing,hybrid"; fi
+  POC_STOCK_FLAGS=""
+  if [ "$INCLUDE_OUT_OF_STOCK" -eq 1 ]; then POC_STOCK_FLAGS="--include-out-of-stock"; fi
 
   if [ -s "$OUT_ROOT/chunk-$c/products.jsonl" ]; then
     echo "chunk $c crawl SKIPPED (existing $(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl") rows)"
@@ -133,7 +138,7 @@ for c in $(seq "$START" "$END"); do
     CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
       $PNPM tsx tools/product-extraction-poc.ts \
       --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit="$PRODUCT_LIMIT" --pool-limit="$POOL_LIMIT" \
-      --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
+      $POC_STOCK_FLAGS --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)
   echo "chunk $c crawl done: $ROWS rows"

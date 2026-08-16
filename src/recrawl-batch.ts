@@ -183,6 +183,11 @@ function runChunk(args: {
         String(args.chunkIndex),
         "--out-root",
         args.outRoot,
+        "--include-out-of-stock",
+        // 재수집 대상은 이미 등록된 브랜드다. 신규 brand_node 생성은 막되,
+        // 품절 행도 기존 상품과 함께 upsert하도록 --in-stock-only는 사용하지 않는다.
+        "--import-flags",
+        "--no-new-brands",
       ],
       {cwd: REPO_ROOT, stdio: "inherit", env: process.env},
     )
