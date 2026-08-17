@@ -11,6 +11,36 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "ulikasanctus",
+    name: "Ulikasanctus",
+    type: "cafe24",
+    baseUrl: "https://ulikasanctus.com",
+    brand: "Ulikasanctus",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "SHOP", cateNo: 55}],
+    },
+    notes: "Official product feed=55. Exclude News/Pop-up/Exhibition archive=76 and editorial Session archive=82, whose pages can inherit an unrelated product price from theme widgets.",
+  },
+  {
+    key: "thewarld",
+    name: "THE W@RLD (더왈드)",
+    type: "cafe24",
+    baseUrl: "https://thewarld.com",
+    brand: "THE W@RLD (더왈드)",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [{name: "SHOP", cateNo: 46}],
+    },
+    notes: "Official product feed=46. Exclude editorial/campaign archive=50 (price-less pages).",
+  },
+  {
     key: "franmeriko",
     name: "FRANMERIKO (프랑메리코)",
     type: "cafe24",

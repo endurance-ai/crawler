@@ -210,7 +210,15 @@ export function reuseExistingCafe24Detail(
   known: DetailData | undefined,
   verifyStockFromDetail: boolean,
 ): DetailData | null {
-  if (!known || verifyStockFromDetail) return null
+  // The lightweight cache only carries parser fields, not the confirmed detail
+  // price tuple. Reusing it for a freshly rebuilt listing product with unknown
+  // pricing would skip both detail pricing and the later price-recovery pass.
+  if (
+    !known ||
+    verifyStockFromDetail ||
+    product.pricingObservation?.version !== 2 ||
+    product.pricingObservation.state === "unknown"
+  ) return null
 
   // `product` is rebuilt from the fresh listing, so it does not carry the
   // previous run's marker. Restore one with the cached detail; otherwise every

@@ -125,7 +125,13 @@ test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보�
   assert.deepEqual(getSiteConfig("samostuff")?.defaultGender, ["men"])
   assert.deepEqual(getSiteConfig("thewarld")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("thewarld")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("thewarld")?.category?.categories, [
+    {name: "SHOP", cateNo: 46},
+  ])
   assert.deepEqual(getSiteConfig("ulikasanctus")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("ulikasanctus")?.category?.categories, [
+    {name: "SHOP", cateNo: 55},
+  ])
   assert.deepEqual(getSiteConfig("kuko")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("kuko")?.verifiedUnisexDefault, true)
   assert.deepEqual(SITE_GENDER_DEFAULTS.findoubt, ["women"])
