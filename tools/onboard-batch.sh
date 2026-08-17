@@ -141,6 +141,17 @@ RUN_WITH_TIMEOUT() {
       exec @ARGV;
       exit 127;
     }
+    my $stop_group = sub {
+      my ($signal, $exit_code) = @_;
+      kill $signal, -$pid;
+      select undef, undef, undef, 2;
+      kill "KILL", -$pid;
+      waitpid($pid, 0);
+      exit $exit_code;
+    };
+    $SIG{INT} = sub { $stop_group->("INT", 130) };
+    $SIG{TERM} = sub { $stop_group->("TERM", 143) };
+    $SIG{HUP} = sub { $stop_group->("TERM", 129) };
     $SIG{ALRM} = sub {
       kill "TERM", -$pid;
       select undef, undef, undef, 5;
