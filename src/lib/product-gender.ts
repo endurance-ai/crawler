@@ -94,6 +94,8 @@ export interface GenderResolutionOptions {
   verifiedUnisexDefault?: boolean
   /** 공식몰에서 검증한 사이트별 상품명/카테고리 성별 표기. */
   genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
+  /** 공식 Shopify 부서 태그의 사이트별 prefix. */
+  genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
 }
 
 // ─── 규칙 ────────────────────────────────────────────────────────────────
@@ -277,9 +279,13 @@ export function inferGenderFromDepartmentTagPrefixes(
 export function inferGenderFromModelDescription(value: unknown): ProductGender | null {
   if (typeof value !== "string" || !value) return null
   const text = value.replace(/<[^>]+>/g, " ")
-  if (/\bunisex(?:\s+fit)?\b/i.test(text)) return "unisex"
-  const men = /\bmale\s*(?:[:(])/i.test(text) || /男性着用モデル/.test(text)
-  const women = /\bfemale\s*(?:[:(])/i.test(text) || /女性着用モデル/.test(text)
+  if (/\bunisex(?:\s+(?:fit|item|product))?\b/i.test(text) || /유니섹스|남녀\s*(?:공용|모두)/u.test(text)) {
+    return "unisex"
+  }
+  const men = /\b(?:male|man)\s*(?:model\s*)?(?:[:(])/i.test(text)
+    || /男性着用モデル|남성\s*모델/u.test(text)
+  const women = /\b(?:female|woman)\s*(?:model\s*)?(?:[:(])/i.test(text)
+    || /女性着用モデル|여성\s*모델/u.test(text)
   if (men && women) return "unisex"
   if (men) return "men"
   if (women) return "women"
@@ -399,7 +405,9 @@ export function resolveProductGenderWithSource(
   // 편집샵이 두 부서에 함께 올린 상품은 "판정 실패"가 아니라 "확인된 남녀공용"이다
   // (inferDualDepartmentFromTags 헤더 참조). 텍스트가 이미 한쪽으로 확정됐으면
   // 건드리지 않는다 — 구체 성별이 unisex 를 이기는 기존 규율 그대로다.
-  const fromText = rawFromText ?? inferDualDepartmentFromTags(evidence.tags)
+  const fromText = rawFromText
+    ?? inferGenderFromDepartmentTagPrefixes(evidence.tags, options.genderDepartmentTagPrefixes)
+    ?? inferDualDepartmentFromTags(evidence.tags)
 
   // URL 과 텍스트가 어긋나는 경우.
   //

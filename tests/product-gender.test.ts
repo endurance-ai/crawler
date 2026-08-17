@@ -45,6 +45,10 @@ test("명시적 모델 라벨은 한쪽/양쪽 착용을 구분하고 일반 문
     inferGenderFromModelDescription("男性着用モデルは 187cm Lサイズ。女性着用モデルは 175cm Lサイズ。"),
     "unisex",
   )
+  assert.equal(inferGenderFromModelDescription("Man Model : Height 187cm / L Size 착용"), "men")
+  assert.equal(inferGenderFromModelDescription("Woman Model : Height 177cm / L Size 착용"), "women")
+  assert.equal(inferGenderFromModelDescription("남성모델 180cm L / 여성 모델 174cm S"), "unisex")
+  assert.equal(inferGenderFromModelDescription("남녀 모두 착용할 수 있는 유니섹스 제품"), "unisex")
   assert.equal(inferGenderFromModelDescription("A feminine fit for all models"), null)
 })
 

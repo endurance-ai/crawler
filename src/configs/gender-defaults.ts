@@ -37,6 +37,86 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // 공식 취급처의 티셔츠·셔츠 재킷·베스트가 모두 남성으로 명시된다.
+  // https://www.musinsa.com/products/6703095
+  // https://www.musinsa.com/products/5104828
+  // https://www.musinsa.com/products/5736480
+  formlich: ["men"],
+  // 공식 취급처가 의류·헤드웨어·소품의 성별을 공용으로 명시한다.
+  // https://www.musinsa.com/products/4869252
+  // https://www.musinsa.com/products/5344093
+  // https://www.musinsa.com/products/5343959
+  "sport-chamber": ["unisex"],
+  // 공식 취급처가 의류·가방·헤어 액세서리 전 상품군을 여성으로 명시한다.
+  // https://www.musinsa.com/products/6369020
+  // https://www.musinsa.com/products/6659318
+  "rough-type": ["women"],
+  // 공식 취급처의 시즌 의류(재킷·데님·오프숄더)가 모두 여성으로 명시된다.
+  // https://www.musinsa.com/products/5828855
+  // https://www.musinsa.com/products/4543872
+  aniv: ["women"],
+  // 공식 브랜드 소개가 유니섹스 패션으로 명시한다.
+  // https://contents.libere-official.com/
+  "libere-official": ["unisex"],
+  // 공식 About이 록·거리문화 기반의 캐주얼 유니섹스 브랜드이며 모든 제품을
+  // 같은 범위로 설명한다.
+  // https://en.rollingstudios.co.kr/shopinfo/about.html?cate_no=27
+  rollingstudios: ["unisex"],
+  // 공식 취급처가 브랜드를 `도심 속 하루를 살아가는 남성`을 위한 옷으로
+  // 소개하고 개별 상품 성별도 남성으로 명시한다.
+  // https://www.musinsa.com/products/6315171
+  lundy: ["men"],
+  // 공식 취급처의 일반 RR 상품은 공용으로 명시되고, W. 접두 라인만 여성으로
+  // 분리된다. W. 예외는 사이트 텍스트 패턴에서 먼저 처리한다.
+  // https://www.musinsa.com/products/6412271
+  // https://www.musinsa.com/products/6006877
+  roaringrad: ["unisex"],
+  // 공식 SHOP은 일반 남성 상품군과 별도 WOMEN 부서를 운영한다. WOMEN은
+  // cate_no=88 맵에서 먼저 분리한다.
+  // https://not4nerd.net/
+  not4nerd: ["men"],
+  // 공식 메인 문구가 `Ungentle, Gentleman`이고 일반 JEWELRY와 WOMEN을 별도
+  // 부서로 운영한다. WOMEN 상품은 cate_no 맵에서 먼저 분리한다.
+  // https://aekki.com/
+  aekki: ["men"],
+  // 공식 LOW CLASSIC/Lc 전체는 여성복이며, 별도 Unisex 부서는 카테고리
+  // 성별 맵에서 먼저 분리한다.
+  // https://lowclassic.com/product/lc-list.html?cate_no=576
+  lowclassic: ["women"],
+  // 공식 카탈로그와 공식 입점처가 전 상품을 남성 카테고리로 전개한다.
+  // https://unaffected.co.kr/category/unaffected/23/
+  // https://m.ssfshop.com/UNAFFECTED/MEN/list
+  "unaffected-2757": ["men"],
+  // 공식 컬렉션이 성별 부서를 나누지 않고, 같은 사이즈 체계에서 남·여 모델
+  // 착용 예시를 각각 제공하는 주얼리 전체 컬렉션이다.
+  // https://www.werkstatt-muenchen.com/products/bracelet-hammered-link
+  // https://www.werkstatt-muenchen.com/bangle-hook-plain-gold
+  "werkstatt-muenchen": ["unisex"],
+  // 공식 선글라스의 동일 SKU(Nayah 등)가 MEN/WOMEN 컬렉션에 함께 실린다.
+  // https://mellerbrand.com/collections/sunglasses-men
+  // https://mellerbrand.com/collections/sunglasses-women
+  meller: ["unisex"],
+  // 공식 상세가 여성 신체 치수 모델과 여성 체형을 살리는 패턴을 명시한다.
+  // https://mmmcorp.co.kr/product/studded-summer-wide-denimlight-blue/323/
+  mmmcorp: ["women"],
+  // 공식몰 전체 내비게이션이 남성 부서이고 상세도 남성 모델 기준으로 전개한다.
+  // https://intheraw.co.kr/product/detail.html?product_no=1029
+  intheraw: ["men"],
+  // 공식 상세가 여성 모델·44~55 착용 기준을 명시하고 SK&OPS 부서를 운영한다.
+  // https://sandric.kr/product/detail.html?product_no=468
+  sandric: ["women"],
+  // 공식 신발 전 사이즈가 W/M 또는 EU 35.5~46으로 함께 제공되고,
+  // 공식 의류 상세도 제품을 unisex fit으로 명시한다.
+  // https://eastpacifictrade.com/collections/all
+  // https://eastpacifictrade.com/products/striped-rugby-shirt-khaki
+  eastpacifictrade: ["unisex"],
+  // 공식 온라인스토어가 전체 상품을 남성(cate_no=216) 아래 전개한다.
+  // https://www.wooyoungmi.com/product/list.html?cate_no=216
+  wooyoungmi: ["men"],
+  // 공식 상세가 일반 상품에 남성·여성 모델 착용 사이즈를 함께 명시한다.
+  // 상품명에 Women을 명시한 별도 슬림 라인은 사이트 패턴으로 먼저 분리한다.
+  // https://away.te-ket.com/product/folder-tee-red/1466/display/1/
+  "te-ket": ["unisex"],
   // ── 2026-08-13~14 신규 한국몰 공식 카탈로그 검증 ──────────────
   girlsgirls: ["women"],
   hannui: ["women"],
@@ -367,16 +447,14 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //
   //   oryany          핸드백/지갑 전용(SHOULDER/CROSS/TOTE/WALLET/BACKPACK).
   //                   의류가 아니라 성별 판정 근거가 상품에 없다. n=504.
-  //   roaringrad      사이트에 성별 구분이 없음 — "구분 없음"은 unisex 의
-  //   samostuff       근거가 아니라 "모름"이다. 명시적 남녀공용 표방 필요.
+  //   samostuff       사이트에 성별 구분이 없음 — "구분 없음"은 unisex 의
+  //                   근거가 아니라 "모름"이다. 명시적 남녀공용 표방 필요.
   //   nuakle          DB(men 51.9%)와 캐시 어휘(여성 17/남성 0)가 충돌.
   //   ceyesseoul      표본 2~21건으로 판정 불가.
   //   dearunknown
   //   groundiam
   //   parrtofficial
   //
-  //   aekki           주얼리 전용(반지/팔찌/귀걸이). 사이트가 남녀 컬렉션을
-  //                   함께 운영 — 혼성이라 사이트 기본값이 성립하지 않는다.
   //   a-cold-wall-2808  카탈로그 119건 전체에 성별 신호 없음(상품명이 순수
   //                   제품 서술, 태그·URL 모두 무신호). 재크롤로도 해결 안 됨.
   //   beheavyer       상품 코퍼스에 성별 어휘 0.

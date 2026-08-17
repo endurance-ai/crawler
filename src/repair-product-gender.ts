@@ -137,6 +137,7 @@ function siteDefaultFor(platform: string | null): {
   verifiedUnisexDefault: boolean
   kidsGenderNoisePatterns?: RegExp[]
   genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
+  genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
 } {
   if (!platform) return {siteDefaultGender: [], verifiedUnisexDefault: false}
   const config = getSiteConfig(platform)
@@ -145,6 +146,7 @@ function siteDefaultFor(platform: string | null): {
     verifiedUnisexDefault: config?.verifiedUnisexDefault === true,
     kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
     genderTextPatterns: config?.genderTextPatterns,
+    genderDepartmentTagPrefixes: config?.genderDepartmentTagPrefixes,
   }
 }
 
@@ -348,6 +350,7 @@ async function applyPlan(planPath: string): Promise<void> {
 
   const platformFilter = flag("platform")
   const brandFilter = flag("brand-node") !== null ? Number(flag("brand-node")) : null
+  const stampUnverified = has("stamp-unverified")
   const applied = loadProgress(absolute)
   if (applied.size > 0) console.log(`   ⏩ 이전 실행에서 ${applied.size}행 적용됨 — 건너뜀`)
 
@@ -359,14 +362,17 @@ async function applyPlan(planPath: string): Promise<void> {
   // (더 이상 값이 안 바뀌므로 "drift"로 잡혀) 전혀 무관한 이후 --platform 호출까지
   // 막아버린다.
   const targetIds = plan.decisions
-    .filter((d) => d.after !== null)
+    .filter((d) => d.after !== null || (stampUnverified && d.bucket === "unchanged"))
     .filter((d) => !applied.has(d.id))
     .filter((d) => !platformFilter || d.platform === platformFilter)
     .filter((d) => brandFilter === null || d.brand_node_id === brandFilter)
     .map((d) => d.id)
 
   console.log(`🔁 계획 재검증: ${targetIds.length}행${platformFilter ? ` (platform=${platformFilter})` : ""}`)
-  const expected = new Map(plan.decisions.map((d) => [d.id, JSON.stringify(d.after)]))
+  const expected = new Map(plan.decisions.map((d) => [d.id, JSON.stringify({
+    after: d.after,
+    gender_source: d.gender_source,
+  })]))
   const rowsById = new Map<number, ProductGenderRow>()
   for (let i = 0; i < targetIds.length; i += PAGE_SIZE) {
     const chunk = targetIds.slice(i, i + PAGE_SIZE)
@@ -385,7 +391,7 @@ async function applyPlan(planPath: string): Promise<void> {
     // 가드가 어차피 걸러내므로 drift 로 세지 않는다.
     if (!row) continue
     const now = classifyGenderRepair(row, {useDescription: plan.use_description, ...siteDefaultFor(row.platform)})
-    if (JSON.stringify(now.after) !== expected.get(id)) drifted += 1
+    if (JSON.stringify({after: now.after, gender_source: now.gender_source}) !== expected.get(id)) drifted += 1
   }
   if (drifted > 0) {
     throw new Error(
@@ -395,7 +401,6 @@ async function applyPlan(planPath: string): Promise<void> {
   }
   console.log("   ✅ drift 없음")
 
-  const stampUnverified = has("stamp-unverified")
   const sleepMs = flag("sleep-ms") !== null ? Number(flag("sleep-ms")) : 0
 
   // (after, gender_source) 가 같은 결정을 묶어 배치당 payload 하나로 만든다.

@@ -226,7 +226,7 @@ function isKidsRow(row: ProductGenderRow, opts: GenderResolutionOptions = {}): b
     (current, pattern) => current.replace(pattern, " "),
     value,
   ) ?? value
-  const blob = [row.name, row.category, row.subcategory].filter(Boolean).join(" ")
+  const blob = [row.name, row.category, row.subcategory, ...(row.tags ?? [])].filter(Boolean).join(" ")
   return isKidsText(stripNoise(blob)) || isKidsText(stripNoise(row.product_url))
 }
 
