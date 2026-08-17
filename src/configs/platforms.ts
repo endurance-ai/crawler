@@ -2788,8 +2788,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://miuki.kr",
     brand: "미유키 MIUKI",
     paginate: true,
+    crawlDetails: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    notes: "Verified live Cafe24 feed; detail crawling confirms pricing observation v2 before import.",
   },
   {
     key: "outdoorserviceworks",
