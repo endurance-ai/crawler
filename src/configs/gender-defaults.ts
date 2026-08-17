@@ -92,6 +92,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   hannui: ["women"],
   whateverwewant: ["men"],
   yiyae: ["men"],
+  "en-579": ["women"], // Official company page explicitly describes DRAE as a Seoul-based womenswear brand.
+  // https://en.drae.kr/shopinfo/company.html
   noregret: ["women"],
   roompauline: ["women"],
   "s-sil": ["women"],

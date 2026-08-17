@@ -205,6 +205,10 @@ test("Yiyae는 랜딩 페이지가 아닌 공식 SHOP 상품 피드를 수집한
   ])
 })
 
+test("DRAE는 공식 회사 소개의 womenswear 범위를 유지한다", () => {
+  assert.deepEqual(getSiteConfig("en-579")?.defaultGender, ["women"])
+})
+
 test("감사한 짧은 공식 상품명 카탈로그만 온보딩 이상치 예외를 갖는다", () => {
   const heavenMayhem = getSiteConfig("heavenmayhem-1914")
   assert.equal(heavenMayhem?.verifiedShortProductNames, true)
