@@ -389,7 +389,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     brand: "KIJIKO",
     defaultGender: ["women"],
     trustedCategory: true,
-    paginate: false,
+    paginate: true,
+    maxPages: 100,
     crawlDetails: true,
     selectors: {
       productItem: 'li[id^="anchorBoxId_"]',
@@ -400,9 +401,16 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     },
     category: {
       discovery: "manual",
-      categories: [{name: "SHOP", cateNo: 1, gender: ["women"], url: "/"}],
+      categories: [
+        {name: "TOP", cateNo: 60, gender: ["women"]},
+        {name: "SKIRT", cateNo: 61, gender: ["women"]},
+        {name: "DRESS", cateNo: 67, gender: ["women"]},
+        {name: "OUTER", cateNo: 59, gender: ["women"]},
+        {name: "BOTTOM", cateNo: 56, gender: ["women"]},
+        {name: "ACCESSORIES", cateNo: 63, gender: ["women"]},
+      ],
     },
-    notes: "brand_node id=5620. 공식몰 여성 카탈로그 메뉴(TOP/SKIRT/DRESS/OUTER/BOTTOM)와 메인 상품 피드 검증.",
+    notes: "brand_node id=5620. Official womenswear catalogue departments TOP/SKIRT/DRESS/OUTER/BOTTOM/ACCESSORIES; list cards omit prices, so detail crawling is required.",
   },
   {
     key: "yiyae",

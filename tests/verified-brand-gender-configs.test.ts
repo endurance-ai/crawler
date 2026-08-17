@@ -187,7 +187,12 @@ test("KIJIKO는 공식 여성 카탈로그의 메인 상품 피드를 수집한�
   assert.equal(kijiko?.crawlDetails, true)
   assert.equal(kijiko?.selectors?.productName, 'img[id^="eListPrdImage"]')
   assert.deepEqual(kijiko?.category?.categories, [
-    {name: "SHOP", cateNo: 1, gender: ["women"], url: "/"},
+    {name: "TOP", cateNo: 60, gender: ["women"]},
+    {name: "SKIRT", cateNo: 61, gender: ["women"]},
+    {name: "DRESS", cateNo: 67, gender: ["women"]},
+    {name: "OUTER", cateNo: 59, gender: ["women"]},
+    {name: "BOTTOM", cateNo: 56, gender: ["women"]},
+    {name: "ACCESSORIES", cateNo: 63, gender: ["women"]},
   ])
 })
 
