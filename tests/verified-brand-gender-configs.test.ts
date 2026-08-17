@@ -41,6 +41,16 @@ test("0Tape 여성 카탈로그를 과거 편집샵 unisex 값으로 분류하�
   assert.notEqual(tape?.verifiedUnisexDefault, true)
 })
 
+test("Loadingroom 여성 카탈로그를 레거시 unisex 값으로 분류하지 않는다", () => {
+  const loadingroom = getSiteConfig("loading-room")
+  assert.deepEqual(loadingroom?.defaultGender, ["women"])
+  assert.notEqual(loadingroom?.verifiedUnisexDefault, true)
+  assert.equal(
+    loadingroom?.kidsGenderNoisePatterns?.some((pattern) => "BABY TEE".replace(pattern, "").trim() === ""),
+    true,
+  )
+})
+
 test("ERER 혼성 카탈로그는 공식 WOMEN/MEN 부서로 상품 성별을 분류한다", () => {
   const erer = getSiteConfig("erer")
   assert.equal(erer?.defaultGender, undefined)

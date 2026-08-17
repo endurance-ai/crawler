@@ -20,6 +20,7 @@ import {
   cleanGenderScope,
   isKidsText,
   resolveProductGenderWithSource,
+  type GenderResolutionOptions,
   type GenderSource,
   type ProductGender,
 } from "./product-gender"
@@ -124,20 +125,24 @@ export function classifyGenderRepair(
   opts: {
     useDescription?: boolean
     siteDefaultGender?: string[]
-    verifiedUnisexDefault?: boolean
-  } = {},
+  } & GenderResolutionOptions = {},
 ): GenderRepairDecision {
   const before = cleanGenderScope(row.gender)
 
-  let resolved = resolveProductGenderWithSource([], {
-    name: row.name,
-    category: row.category,
-    subcategory: row.subcategory,
-    description: row.description,
-    tags: row.tags,
-    productUrl: row.product_url,
-    useDescription: opts.useDescription ?? false,
-  })
+  let resolved = resolveProductGenderWithSource(
+    [],
+    {
+      name: row.name,
+      category: row.category,
+      subcategory: row.subcategory,
+      description: row.description,
+      tags: row.tags,
+      productUrl: row.product_url,
+      useDescription: opts.useDescription ?? false,
+    },
+    "engine",
+    opts,
+  )
 
   // 사이트 전역 기본값(SiteConfig.defaultGender + gender-defaults.ts)을 write-path
   // 와 동일하게 최후 폴백으로 적용한다. 이게 없으면 URL·상품명에 성별 신호가 없는
@@ -147,7 +152,7 @@ export function classifyGenderRepair(
   // conflict(URL↔텍스트 불일치)일 때는 폴백하지 않는다 — 두 근거가 싸우는 상황에서
   // 사이트 기본값을 밀어넣는 것은 판정이 아니라 추측이다.
   const siteDefault = cleanGenderScope(opts.siteDefaultGender)
-  if (resolved.gender.length === 0 && !resolved.conflict && siteDefault.length > 0 && !isKidsRow(row)) {
+  if (resolved.gender.length === 0 && !resolved.conflict && siteDefault.length > 0 && !isKidsRow(row, opts)) {
     resolved = resolveProductGenderWithSource(siteDefault, {}, "config_default", {
       verifiedUnisexDefault: opts.verifiedUnisexDefault,
     })
@@ -166,7 +171,7 @@ export function classifyGenderRepair(
   // 근거를 찾지 못함. gender 는 건드리지 않고 출처만 표시해 "셀 수 있는" 상태로
   // 만든다 — 재크롤 대상이자, 끝내 갱신되지 않으면 삭제 후보다.
   if (resolved.gender.length === 0) {
-    const kids = isKidsRow(row)
+    const kids = isKidsRow(row, opts)
     return {
       ...base,
       bucket: kids ? "kids" : "unverified",
@@ -216,9 +221,13 @@ function repairSourceOf(source: GenderSource | null): GenderSource | null {
  * "kids 가드 발동"과 "신호 없음"을 모두 {gender: [], source: null} 로 내므로
  * 여기서 다시 확인한다.
  */
-function isKidsRow(row: ProductGenderRow): boolean {
+function isKidsRow(row: ProductGenderRow, opts: GenderResolutionOptions = {}): boolean {
+  const stripNoise = (value: string) => opts.kidsGenderNoisePatterns?.reduce(
+    (current, pattern) => current.replace(pattern, " "),
+    value,
+  ) ?? value
   const blob = [row.name, row.category, row.subcategory].filter(Boolean).join(" ")
-  return isKidsText(blob) || isKidsText(row.product_url)
+  return isKidsText(stripNoise(blob)) || isKidsText(stripNoise(row.product_url))
 }
 
 export function summarizeGenderRepair(decisions: GenderRepairDecision[]): GenderRepairSummary {

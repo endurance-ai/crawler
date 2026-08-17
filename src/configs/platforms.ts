@@ -3195,6 +3195,9 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
 const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 공식 여성 카탈로그의 성인 티셔츠 상품형이며 실제 아동 라인은 없다.
+  // https://loading-room.com/products/baby-tee-black
+  "loading-room": [/\bbaby[-\s]+tee\b/gi],
   // 여성용 슬림핏 티셔츠의 상품형 이름. 실제 아동 라인은 없다.
   toomuch: [/\bbaby[-\s]?(?:t|tee|t[-\s]?shirt)\b/gi],
   // 공식 여성 컬렉션의 성인 XXS-2XL 상품에서 쓰는 색상명이다.
