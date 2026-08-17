@@ -90,7 +90,6 @@ async function main(): Promise<void> {
     const file = path.join(dataDir, `${site}-products.json`)
     const products = JSON.parse(fs.readFileSync(file, "utf8")) as CrawledProduct[]
     const index = indexCrawledGender(products)
-    if (index.size === 0) throw new Error(`${file}: 성별이 확정된 Cafe24 상품이 없다`)
     indexes.set(site, index)
   }
 
@@ -107,6 +106,9 @@ async function main(): Promise<void> {
       if (gender.length === 1) index.set(category.cateNo, gender)
     }
     categoryIndexes.set(site, index)
+    if ((indexes.get(site)?.size ?? 0) === 0 && index.size === 0) {
+      throw new Error(`${site}: 상품번호 또는 공식 카테고리 성별 근거가 없다`)
+    }
   }
 
   const decisions: Array<LegacyRow & {
