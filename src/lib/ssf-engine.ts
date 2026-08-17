@@ -49,7 +49,10 @@ export function parseSsfProductList(
     if (salePrice === null) continue
     const originalMatch = priceBody.match(/<del>([\s\S]*?)<\/del>/)
     const originalPrice = originalMatch ? parseWon(originalMatch[1]!) : null
-    const productUrl = new URL(hrefMatch[1]!.replaceAll("&amp;", "&"), config.baseUrl).toString()
+    // Category query parameters make the same SSF SKU look unique when it is
+    // listed in more than one leaf department. Persist the retailer's stable
+    // canonical detail path instead.
+    const productUrl = new URL(`/JUUN-J/${encodeURIComponent(productCode)}/good`, config.baseUrl).toString()
 
     products.push({
       brand: config.brand ?? "",

@@ -39,6 +39,7 @@ test("parses SSF listing evidence without guessing gender", () => {
   assert.equal(products[0]?.originalPrice, 690_000)
   assert.equal(products[0]?.salePrice, 655_500)
   assert.equal(products[0]?.productCode, "GM001")
+  assert.equal(products[0]?.productUrl, "https://www.ssfshop.com/JUUN-J/GM001/good")
   assert.equal(ssfTotalPages(html), 6)
 })
 
