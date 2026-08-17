@@ -71,6 +71,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   xeniatelunts: ["unisex"], // The official sizing guide says all products are gender-neutral; the full catalogue labels each current product Gender Neutral.
   // https://xeniatelunts.com/pages/sizing-explained
   // https://xeniatelunts.com/collections/all
+  chintiandparker: ["women"], // Official About explicitly calls the full offering womenswear made to enliven women's wardrobes.
+  // https://www.chintiandparker.com/pages/about-us
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
   omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
   // https://omirad.com/pages/about-omirad

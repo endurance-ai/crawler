@@ -156,6 +156,7 @@ test("QC 재검증 브랜드에는 명시 근거가 있는 성별만 적용한�
   assert.deepEqual(getSiteConfig("johannaortiz")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("xeniatelunts")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("xeniatelunts")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("chintiandparker")?.defaultGender, ["women"])
 
   const taats = getSiteConfig("taats")
   assert.equal(taats?.defaultGender, undefined)
