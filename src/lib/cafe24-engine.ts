@@ -1012,6 +1012,10 @@ export async function crawlCafe24(
   } else {
     try {
       categories = await discoverCategories(page, config)
+      if (config.excludedCategoryNos?.length) {
+        const excluded = new Set(config.excludedCategoryNos)
+        categories = categories.filter((category) => !excluded.has(category.cateNo))
+      }
       console.log(`${tag} 📋 자동 탐색: ${categories.length}개 카테고리 발견`)
     } catch (err) {
       const msg = `카테고리 탐색 실패: ${err}`

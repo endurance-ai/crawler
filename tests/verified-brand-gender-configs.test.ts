@@ -123,6 +123,7 @@ test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보�
   assert.equal(getSiteConfig("dared")?.verifiedUnisexDefault, true)
   assert.deepEqual(getSiteConfig("lossyrow")?.defaultGender, ["women"])
   assert.equal(getSiteConfig("lossyrow")?.verifiedCategoryTextOverride, true)
+  assert.deepEqual(getSiteConfig("lossyrow")?.excludedCategoryNos, [75])
   assert.equal(
     getSiteConfig("lossyrow")?.kidsGenderNoisePatterns
       ?.some((pattern) => "boy-fit denim pants".replace(pattern, "").trim() === ""),

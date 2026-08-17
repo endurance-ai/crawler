@@ -217,6 +217,8 @@ export interface SiteConfig {
   verifyStockFromDetail?: boolean
   /** 카테고리 탐색 설정 */
   category?: CategoryConfig
+  /** Cafe24 auto-discovery category numbers verified as editorial/non-SKU feeds. */
+  excludedCategoryNos?: number[]
   /** 단일 상품군 스토어에서 목록이 카테고리명을 제공하지 않을 때 쓰는 검증된 기본 대분류. */
   defaultCategory?: string
   /** 단일 상품군 스토어에서 공식 상세로 검증한 기본 소분류. */

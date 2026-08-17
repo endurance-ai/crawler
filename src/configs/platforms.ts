@@ -2103,8 +2103,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     brand: "LOSSYROW",
     paginate: true,
     verifiedCategoryTextOverride: true,
+    excludedCategoryNos: [75],
     category: {discovery: "auto"},
-    notes: "Official women's catalogue. Product-name category overrides verified for legacy TOP/sale feeds where explicit scarf/knit names are more accurate than navigation labels.",
+    notes: "Official women's catalogue. Product-name category overrides verified for legacy TOP/sale feeds where explicit scarf/knit names are more accurate than navigation labels. Exclude CREATOR PICKS=75 composite styling pages.",
   },
   {
     key: "samostuff",
