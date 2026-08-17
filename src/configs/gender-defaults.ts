@@ -43,6 +43,17 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   khaite: ["women"], // Official About explicitly calls the house's output womenswear and accessories; the shop labels its full RTW collection Women's Designer Ready-to-Wear.
   // https://khaite.com/pages/about
   // https://khaite.com/collections/ready-to-wear
+  franmeriko: ["women"], // Official homepage metadata explicitly identifies the label as 여성의류, 여성의류브랜드, and 여자브랜드.
+  // https://franmeriko.com/
+  dared: ["unisex"], // Official About explicitly says the brand develops designs with no gender boundaries.
+  // https://dared.kr/
+  lossyrow: ["women"], // Official single-department catalogue is dresses/skirts/blouses with no men's department; HAGO classifies the brand only under 여성.
+  // https://lossyrow.com/
+  // https://www.hago.kr/goods/brand/1508
+  samostuff: ["men"], // Official stockist 8DIVISION carries the full label under Men; current Musinsa SKU metadata also explicitly says 성별 남.
+  // https://samostuff.com/shopinfo/stockist.html
+  // https://8division.com/en/product/men.html?cate_no=3491
+  // https://www.musinsa.com/products/6301755
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
   omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
   // https://omirad.com/pages/about-omirad
@@ -368,7 +379,6 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //   oryany          핸드백/지갑 전용(SHOULDER/CROSS/TOTE/WALLET/BACKPACK).
   //                   의류가 아니라 성별 판정 근거가 상품에 없다. n=504.
   //   roaringrad      사이트에 성별 구분이 없음 — "구분 없음"은 unisex 의
-  //   samostuff       근거가 아니라 "모름"이다. 명시적 남녀공용 표방 필요.
   //   nuakle          DB(men 51.9%)와 캐시 어휘(여성 17/남성 0)가 충돌.
   //   ceyesseoul      표본 2~21건으로 판정 불가.
   //   dearunknown

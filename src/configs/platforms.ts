@@ -4061,6 +4061,7 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
 // 성별 메뉴가 없다는 사실만으로는 여기에 추가하지 않는다.
 const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
+  "dared", // 공식 About이 "no gender boundaries"라고 명시
   "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
   "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
