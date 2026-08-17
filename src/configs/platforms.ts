@@ -3307,6 +3307,27 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     notes: "brand_node_id=5515. Only the five current SUB_F751 variants whose official detail options explicitly contain both W38-W40 and M40-M44 receive unisex gender; other footwear remains unresolved.",
   },
   {
+    key: "khaksli",
+    name: "KHAK",
+    type: "cafe24",
+    baseUrl: "https://khaksli.cafe24.com",
+    brand: "KHAK",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Outerwear", cateNo: 24, url: "/category/outerwear/24/"},
+        {name: "Tops", cateNo: 25, url: "/category/tops/25/"},
+        {name: "Bottoms", cateNo: 27, url: "/category/bottoms/27/"},
+        {name: "Accessories", cateNo: 42, url: "/category/accessories/42/"},
+      ],
+    },
+    notes: "brand_node id=5260. Official product departments only; exclude duplicate New=28, Archives=43, editorial In Progress=44, and the non-merchandise Index=45 record.",
+  },
+  {
     key: "simuero",
     name: "SIMUERO",
     type: "shopify",

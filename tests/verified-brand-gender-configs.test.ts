@@ -222,6 +222,12 @@ test("MIUKI는 상세 가격을 확인한 뒤 공식 여성 피드를 적재한�
   assert.deepEqual(getSiteConfig("miuki")?.defaultGender, ["women"])
 })
 
+test("KHAK은 Index가 아닌 공식 상품 부서만 수집한다", () => {
+  const khak = getSiteConfig("khaksli")
+  assert.equal(khak?.defaultGender, undefined)
+  assert.deepEqual(khak?.category?.categories?.map(({cateNo}) => cateNo), [24, 25, 27, 42])
+})
+
 test("감사한 짧은 공식 상품명 카탈로그만 온보딩 이상치 예외를 갖는다", () => {
   const heavenMayhem = getSiteConfig("heavenmayhem-1914")
   assert.equal(heavenMayhem?.verifiedShortProductNames, true)
