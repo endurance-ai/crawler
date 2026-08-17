@@ -65,3 +65,7 @@ test("custom + imweb detection은 imweb 설정으로 복원한다", () => {
   assert.equal(generatedPlatformType(row({platform_type: "custom"})), null)
   assert.equal(queuePlatformType("imweb"), "custom")
 })
+
+test("SSF engine is persisted through the coarse custom queue type", () => {
+  assert.equal(queuePlatformType("ssf"), "custom")
+})

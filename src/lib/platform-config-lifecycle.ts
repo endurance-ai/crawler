@@ -55,5 +55,5 @@ export function shouldDisableGeneratedConfig(row: PlatformConfigLifecycleRow): b
  * represented as custom and its concrete family lives in detection JSON.
  */
 export function queuePlatformType(type: PlatformType): string {
-  return type === "imweb" ? "custom" : type
+  return type === "imweb" || type === "ssf" ? "custom" : type
 }

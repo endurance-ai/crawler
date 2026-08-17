@@ -105,7 +105,18 @@ export interface PricingObservation {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "farfetch" | "imweb"
+export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "farfetch" | "imweb" | "ssf"
+
+export interface SsfCategory {
+  /** Official SSF Shop category route, without query parameters. */
+  path: string
+  /** SSF display-category identifier used for paging. */
+  dspCtgryNo: string
+  /** kiko canonical category supplied by the official leaf department. */
+  category: string
+  /** Explicit department evidence from SSF Shop navigation. */
+  gender: "men" | "women"
+}
 
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
@@ -154,6 +165,8 @@ export interface SiteConfig {
   type: PlatformType
   /** 사이트 기본 URL */
   baseUrl: string
+  /** SSF Shop leaf departments. Only used by the fetch-based SSF engine. */
+  ssfCategories?: SsfCategory[]
   /** 단일브랜드 자사몰의 하우스 브랜드명 (DOM에서 브랜드 추출 실패 시 폴백) */
   brand?: string
   /**

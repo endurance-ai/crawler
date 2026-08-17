@@ -31,6 +31,7 @@ import {
 } from "./lib/cafe24-engine-selection"
 import {crawlImweb} from "./lib/imweb-engine"
 import {crawlShopify} from "./lib/shopify-engine"
+import {crawlSsf} from "./lib/ssf-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
 import {
@@ -576,6 +577,22 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
   const zaraSites = configs.filter((c) => c.type === "zara")
   const farfetchSites = configs.filter((c) => c.type === "farfetch")
   const imwebSites = configs.filter((c) => c.type === "imweb")
+  const ssfSites = configs.filter((c) => c.type === "ssf")
+
+  // SSF Shop is server-rendered and fetch-based. Keep it sequential to avoid
+  // bursting the retailer while paging explicit brand departments.
+  for (const config of ssfSites) {
+    try {
+      if (dryRun) {
+        await probeSite(config)
+        continue
+      }
+      const result = await crawlSsf(config)
+      results.push(await saveResultAndTrim(outDir, result))
+    } catch (err) {
+      console.error(`❌ ${config.name} 크롤 실패:`, err)
+    }
+  }
 
   // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
   if (uniqloSites.length > 0) {

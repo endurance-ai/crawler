@@ -35,6 +35,7 @@ import {
   type RefreshWorklistEntry,
 } from "./lib/refresh-source"
 import {crawlShopify} from "./lib/shopify-engine"
+import {crawlSsf} from "./lib/ssf-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
 import {crawlZara} from "./lib/zara-engine"
@@ -46,6 +47,7 @@ const ALL_TYPES: PlatformType[] = [
   "uniqlo",
   "zara",
   "farfetch",
+  "ssf",
 ]
 
 interface Flags {
@@ -170,6 +172,8 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
       return crawlZara(listingConfig)
     case "farfetch":
       return crawlFarfetch(listingConfig)
+    case "ssf":
+      return crawlSsf(listingConfig)
     case "cafe24": {
       const browser = await chromium.launch({headless: true})
       try {

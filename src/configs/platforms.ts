@@ -11,6 +11,57 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "juunj",
+    name: "Juun.J",
+    type: "ssf",
+    baseUrl: "https://www.ssfshop.com",
+    brand: "Juun.J",
+    trustedCategory: true,
+    maxPages: 20,
+    crawlDelay: 250,
+    ssfCategories: [
+      {path: "/JUUN-J/Outerwear/list", dspCtgryNo: "SFMA42A05", category: "outerwear", gender: "men"},
+      {path: "/JUUN-J/Knitwear/list", dspCtgryNo: "SFMA42A03", category: "knitwear", gender: "men"},
+      {path: "/JUUN-J/Jackets-Vests/list", dspCtgryNo: "SFMA42A19", category: "outerwear", gender: "men"},
+      {path: "/JUUN-J/T-Shirts/list", dspCtgryNo: "SFMA42A01", category: "tops", gender: "men"},
+      {path: "/JUUN-J/Shirts/list", dspCtgryNo: "SFMA42A02", category: "tops", gender: "men"},
+      {path: "/JUUN-J/Pants-Trousers/list", dspCtgryNo: "SFMA42A04", category: "bottoms", gender: "men"},
+      {path: "/JUUN-J/Fashion-Accessories/list", dspCtgryNo: "SFMA42A11", category: "accessories", gender: "men"},
+      {path: "/JUUN-J/Outerwear/list", dspCtgryNo: "SFMA41A07", category: "outerwear", gender: "women"},
+      {path: "/JUUN-J/Jackets-Vests/list", dspCtgryNo: "SFMA41A21", category: "outerwear", gender: "women"},
+      {path: "/JUUN-J/Knitwear/list", dspCtgryNo: "SFMA41A03", category: "knitwear", gender: "women"},
+      {path: "/JUUN-J/Shirts-Blouses/list", dspCtgryNo: "SFMA41A02", category: "tops", gender: "women"},
+      {path: "/JUUN-J/T-shirts/list", dspCtgryNo: "SFMA41A01", category: "tops", gender: "women"},
+      {path: "/JUUN-J/Dresses/list", dspCtgryNo: "SFMA41A06", category: "dresses", gender: "women"},
+      {path: "/JUUN-J/Pants-Trousers/list", dspCtgryNo: "SFMA41A04", category: "bottoms", gender: "women"},
+      {path: "/JUUN-J/Skirts/list", dspCtgryNo: "SFMA41A05", category: "bottoms", gender: "women"},
+      {path: "/JUUN-J/Fashion-Accessories/list", dspCtgryNo: "SFMA41A12", category: "accessories", gender: "women"},
+      {path: "/JUUN-J/JewelryWatches/list", dspCtgryNo: "SFMA41A36", category: "jewelry", gender: "women"},
+      {path: "/JUUN-J/WomenBags/list", dspCtgryNo: "SFMA46A09", category: "bags", gender: "women"},
+      {path: "/JUUN-J/WomensWallet/list", dspCtgryNo: "SFMA46A10", category: "accessories", gender: "women"},
+      {path: "/JUUN-J/WomensShoes/list", dspCtgryNo: "SFMA46A12", category: "shoes", gender: "women"},
+      {path: "/JUUN-J/MensBags/list", dspCtgryNo: "SFMA46A13", category: "bags", gender: "men"},
+      {path: "/JUUN-J/MensShoes/list", dspCtgryNo: "SFMA46A18", category: "shoes", gender: "men"},
+    ],
+    notes: "brand_node id=1436. Official SSF Shop navigation explicitly separates MEN, WOMEN, and gendered bag/shoe departments; categories and genders come only from those leaf routes.",
+  },
+  {
+    key: "postarchivefaction",
+    name: "Post Archive Faction",
+    type: "shopify",
+    baseUrl: "https://postarchivefaction.com",
+    brand: "Post Archive Faction",
+    sourceCurrency: "KRW",
+    defaultGender: ["men"],
+    trustedCategory: true,
+    shopifyCategoryTextPatterns: {
+      shoes: [/wallabee/i],
+      eyewear: [/\b(?:koharu eclipse|junya racer)\b/i],
+    },
+    maxPages: 10,
+    notes: "brand_node id=3922. Official Shopify KR market exposes KRW. Pitti Uomo's official brand guide explicitly classifies PAF as menswear; do not infer unisex. Official product descriptions identify Wallabee as a boot and Koharu/Junya Racer as custom-lens eyewear. This exact node supersedes the duplicate id=95 crawl mapping.",
+  },
+  {
     key: "ulikasanctus",
     name: "Ulikasanctus",
     type: "cafe24",
@@ -4049,7 +4100,15 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
 ]
 
-export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]
+// Legacy generated keys whose brand_node has been consolidated into a manual,
+// canonical source. Filtering here also protects deployments that have not yet
+// regenerated platforms.generated.ts after the DB status transition.
+const SUPERSEDED_GENERATED_KEYS = new Set(["postarchivefaction-95"])
+
+export const PLATFORMS: SiteConfig[] = [
+  ...MANUAL_PLATFORMS,
+  ...GENERATED_PLATFORMS.filter((config) => !SUPERSEDED_GENERATED_KEYS.has(config.key)),
+]
 
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
