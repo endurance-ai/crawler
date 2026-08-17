@@ -3328,6 +3328,25 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     notes: "brand_node id=5260. Official product departments only; exclude duplicate New=28, Archives=43, editorial In Progress=44, and the non-merchandise Index=45 record.",
   },
   {
+    key: "backalleydream",
+    name: "backalleydream",
+    type: "cafe24",
+    baseUrl: "https://backalleydream.com",
+    brand: "backalleydream",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    verifyStockFromDetail: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "ALL", cateNo: 42, url: "/category/ALL/42/"},
+      ],
+    },
+    notes: "brand_node id=5251. Official ALL=42 feed; listing cards render false sold-out state, while detail option_stock_data exposes is_selling=T/use_soldout=F, so stock must be verified from detail.",
+  },
+  {
     key: "simuero",
     name: "SIMUERO",
     type: "shopify",
