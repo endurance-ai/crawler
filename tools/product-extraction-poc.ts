@@ -1009,7 +1009,7 @@ async function runHybridVariant(
     const page = await context.newPage()
     page.on("dialog", (dialog) => dialog.dismiss().catch(() => {}))
 
-    for (const product of baseProducts) {
+    for (const [productIndex, product] of baseProducts.entries()) {
       const base = existingProductToPoc(product, config, 0)
       const started = Date.now()
       const usage: TokenUsage = {input_tokens: 0, output_tokens: 0, total_tokens: 0}
@@ -1057,6 +1057,10 @@ async function runHybridVariant(
         })
       } finally {
         await page.goto("about:blank", {timeout: 5000}).catch(() => {})
+        const completed = productIndex + 1
+        if (completed % 25 === 0 || completed === baseProducts.length) {
+          console.log(`[${config.key}] hybrid progress ${completed}/${baseProducts.length}`)
+        }
       }
     }
     await context.close().catch(() => {})
