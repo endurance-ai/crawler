@@ -35,6 +35,21 @@ test("NOIRER 혼성 브랜드의 상품 성별은 공식 MEN/WOMEN 부서에서 
   ])
 })
 
+test("999HUMANITY와 COOR는 공식 MEN/WOMEN 상위 부서에서 상품 성별을 가져온다", () => {
+  for (const [key, expectedParents, expectedLeaves] of [
+    ["humanity", [43, 49], [45, 59, 245, 47, 180, 66, 55, 51, 244, 52, 243, 67, 69]],
+    ["en-1111", [75, 74], [94, 95, 76, 78, 79, 80, 81, 82, 83, 93, 92, 84, 85, 86, 87, 102, 88, 98, 97]],
+  ] as const) {
+    const config = getSiteConfig(key)
+    assert.equal(config?.defaultGender, undefined)
+    assert.equal(config?.trustedCategory, true)
+    const categories = config?.category?.categories ?? []
+    assert.ok(expectedParents.every((cateNo) => categories.some((category) => category.cateNo === cateNo)))
+    assert.ok(expectedLeaves.every((cateNo) => categories.some((category) => category.cateNo === cateNo)))
+    assert.ok(categories.every((category) => category.gender?.length === 1))
+  }
+})
+
 test("0Tape 여성 카탈로그를 과거 편집샵 unisex 값으로 분류하지 않는다", () => {
   const tape = getSiteConfig("tape00")
   assert.deepEqual(tape?.defaultGender, ["women"])
