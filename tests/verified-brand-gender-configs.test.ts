@@ -184,6 +184,7 @@ test("KIJIKO는 공식 여성 카탈로그의 메인 상품 피드를 수집한�
   const kijiko = getSiteConfig("kijiko")
   assert.equal(kijiko?.disabled, undefined)
   assert.deepEqual(kijiko?.defaultGender, ["women"])
+  assert.equal(kijiko?.crawlDetails, true)
   assert.equal(kijiko?.selectors?.productName, 'img[id^="eListPrdImage"]')
   assert.deepEqual(kijiko?.category?.categories, [
     {name: "SHOP", cateNo: 1, gender: ["women"], url: "/"},
@@ -200,7 +201,9 @@ test("Yiyae는 랜딩 페이지가 아닌 공식 SHOP 상품 피드를 수집한
 })
 
 test("감사한 짧은 공식 상품명 카탈로그만 온보딩 이상치 예외를 갖는다", () => {
-  assert.equal(getSiteConfig("heavenmayhem-1914")?.verifiedShortProductNames, true)
+  const heavenMayhem = getSiteConfig("heavenmayhem-1914")
+  assert.equal(heavenMayhem?.verifiedShortProductNames, true)
+  assert.deepEqual(heavenMayhem?.shopifyGenderCollections, {women: ["gifts-for-her"]})
   assert.equal(getSiteConfig("en-5510")?.verifiedShortProductNames, true)
   assert.equal(getSiteConfig("en-5510")?.defaultCategory, "shoes")
 })

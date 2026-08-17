@@ -390,6 +390,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     defaultGender: ["women"],
     trustedCategory: true,
     paginate: false,
+    crawlDetails: true,
     selectors: {
       productItem: 'li[id^="anchorBoxId_"]',
       // 메인 위젯은 설명/가격 블록 없이 상품 이미지 alt에만 상품명을 둔다.
@@ -430,6 +431,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     trustedCategory: true,
     verifiedShortProductNames: true,
+    shopifyGenderCollections: {
+      women: ["gifts-for-her"],
+    },
     maxPages: 300,
     crawlDelay: 1500,
     notes: "brand_node id=1914. The reviewed official catalogue legitimately uses short accessory model names such as PRIZE EARRINGS, STELLA CHOKER, and PENCIL CASE; do not treat that naming pattern as navigation contamination.",
