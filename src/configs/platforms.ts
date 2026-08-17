@@ -1855,11 +1855,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Washed Pajama", cateNo: 48, gender: ["unisex"]},
-        {name: "Loungewear", cateNo: 56, gender: ["unisex"]},
+        {name: "Washed Pajama", cateNo: 48},
+        {name: "Loungewear", cateNo: 56},
       ],
     },
-    notes: "dry-run으로 확인된 실제 카테고리 2개(New Arrivals/Sale/Archives는 상품 목록이 아니라 제외)",
+    notes: "dry-run으로 확인된 실제 카테고리 2개(New Arrivals/Sale/Archives는 상품 목록이 아니라 제외). 공식몰에 명시적 성별 근거가 없어 gender는 의도적으로 비워 둔다.",
   },
   {
     key: "marun5",
@@ -4124,6 +4124,8 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "dared", // 공식 About이 "no gender boundaries"라고 명시
   "thewarld", // 공식 입점 샵이 unisex/gender-neutral 및 남녀 고객층을 명시
   "kuko", // 공식 입점 샵이 전 디자인을 genderless/gender-neutral로 명시
+  "einpflanzin", // 공식 소개가 성별을 뛰어넘는 디자인을 명시하고 무신사가 유니섹스 브랜드로 분류
+  "xeniatelunts", // 공식 sizing guide가 전 상품을 gender-neutral로 명시
   "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
   "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치

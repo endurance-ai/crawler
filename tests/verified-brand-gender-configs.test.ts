@@ -149,6 +149,19 @@ test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보�
   assert.equal(inferVerifiedSiteGenderFromName("whateverwewant", "W'S ZIP KNIT"), "women")
 })
 
+test("QC 재검증 브랜드에는 명시 근거가 있는 성별만 적용한다", () => {
+  assert.deepEqual(getSiteConfig("einpflanzin")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("einpflanzin")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("universalworks")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("johannaortiz")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("xeniatelunts")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("xeniatelunts")?.verifiedUnisexDefault, true)
+
+  const taats = getSiteConfig("taats")
+  assert.equal(taats?.defaultGender, undefined)
+  assert.deepEqual(taats?.category?.categories?.map(({gender}) => gender), [undefined, undefined])
+})
+
 test("FEYRE는 공식 여성 SHOP 전체 목록을 수집한다", () => {
   const feyre = getSiteConfig("feyre")
   assert.equal(feyre?.disabled, undefined)

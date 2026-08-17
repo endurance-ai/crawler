@@ -60,6 +60,17 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://ulika.cafe24.com/shop2/
   kuko: ["unisex"], // Official shop 60% explicitly says all KUKO designs are genderless / gender-neutral.
   // https://global.sixty-percent.com/shops/kuko
+  einpflanzin: ["unisex"], // Official brand copy says its designs transcend gender; Musinsa explicitly classifies it as a unisex contemporary label.
+  // https://einpflanzin.com/
+  // https://www.musinsa.com/products/6763590
+  universalworks: ["men"], // The official storefront identifies itself as "Contemporary Menswear Clothing" and its catalogue is the men's line.
+  // https://universalworks.com/
+  johannaortiz: ["women"], // Official House copy says the collection is for modern women and the RTW catalogue is explicitly women's designer ready-to-wear.
+  // https://www.johannaortiz.com/pages/the-house
+  // https://www.johannaortiz.com/collections/ready-to-wear
+  xeniatelunts: ["unisex"], // The official sizing guide says all products are gender-neutral; the full catalogue labels each current product Gender Neutral.
+  // https://xeniatelunts.com/pages/sizing-explained
+  // https://xeniatelunts.com/collections/all
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
   omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
   // https://omirad.com/pages/about-omirad
