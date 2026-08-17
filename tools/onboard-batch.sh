@@ -17,6 +17,9 @@
 #                          products than this are silently truncated — raise it
 #                          for full-catalog re-collection.
 #   --pool-limit <n>      candidate pool cap (default 2000)
+#   --crawl-timeout-minutes <n> wall timeout for one crawl chunk (default 0,
+#                          disabled). A timeout records a zero-row tally entry
+#                          and continues with the next chunk.
 #   --include-out-of-stock keep sold-out products through the crawl stage.
 #                          Intended for re-collection, not initial onboarding.
 #   --import-flags "<..>" flags passed to import-products.ts
@@ -50,6 +53,7 @@ CONFIGS=""
 VARIANTS="existing"
 PRODUCT_LIMIT=2000
 POOL_LIMIT=2000
+CRAWL_TIMEOUT_MINUTES=0
 INCLUDE_OUT_OF_STOCK=0
 IMPORT_FLAGS="--no-new-brands --in-stock-only"
 
@@ -64,6 +68,7 @@ while [ $# -gt 0 ]; do
     --variants) VARIANTS="$2"; shift 2 ;;
     --product-limit) PRODUCT_LIMIT="$2"; shift 2 ;;
     --pool-limit) POOL_LIMIT="$2"; shift 2 ;;
+    --crawl-timeout-minutes) CRAWL_TIMEOUT_MINUTES="$2"; shift 2 ;;
     --include-out-of-stock) INCLUDE_OUT_OF_STOCK=1; shift ;;
     --import-flags) IMPORT_FLAGS="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
@@ -91,6 +96,10 @@ if [ "$ENGINE" = "lightpanda" ] && [ ! -x "bin/lightpanda" ]; then
   echo "error: bin/lightpanda not found or not executable. Run scripts/install-lightpanda.sh first." >&2
   exit 1
 fi
+if ! [[ "$CRAWL_TIMEOUT_MINUTES" =~ ^[0-9]+$ ]]; then
+  echo "error: --crawl-timeout-minutes must be a non-negative integer (got: $CRAWL_TIMEOUT_MINUTES)" >&2
+  exit 1
+fi
 
 ENV_FILE="${CRAWLER_ENV_FILE:-.env.local}"
 PNPM="corepack pnpm@10.33.2 exec dotenv -e $ENV_FILE --"
@@ -110,6 +119,41 @@ echo "onboard-batch: chunks $START..$END of $NCHUNKS · engine=$ENGINE · config
 
 DB_COUNT() {
   $PNPM node -e 'const{createClient}=require("@supabase/supabase-js");createClient(process.env.DB_URL,process.env.DB_TOKEN).from("products").select("*",{count:"exact",head:true}).then(({count})=>console.log(count)).catch(()=>console.log(0))' 2>/dev/null | tail -1
+}
+
+# macOS has no coreutils `timeout` by default. Run the command in its own
+# process group so a wall timeout terminates Playwright/browser descendants as
+# well as the pnpm wrapper; killing only the wrapper leaves orphan Chromium
+# processes and the next chunk stalls on the same resources.
+RUN_WITH_TIMEOUT() {
+  local timeout_seconds="$1"
+  shift
+  if [ "$timeout_seconds" -le 0 ]; then
+    "$@"
+    return $?
+  fi
+  perl -MPOSIX -e '
+    my $timeout = shift @ARGV;
+    my $pid = fork();
+    die "fork failed: $!" unless defined $pid;
+    if ($pid == 0) {
+      POSIX::setsid() or die "setsid failed: $!";
+      exec @ARGV;
+      exit 127;
+    }
+    $SIG{ALRM} = sub {
+      kill "TERM", -$pid;
+      select undef, undef, undef, 5;
+      kill "KILL", -$pid;
+      waitpid($pid, 0);
+      exit 124;
+    };
+    alarm $timeout;
+    waitpid($pid, 0);
+    alarm 0;
+    my $status = $?;
+    exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
+  ' "$timeout_seconds" "$@"
 }
 
 for c in $(seq "$START" "$END"); do
@@ -135,10 +179,19 @@ for c in $(seq "$START" "$END"); do
   if [ -s "$OUT_ROOT/chunk-$c/products.jsonl" ]; then
     echo "chunk $c crawl SKIPPED (existing $(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl") rows)"
   else
-    CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
-      $PNPM tsx tools/product-extraction-poc.ts \
+    if RUN_WITH_TIMEOUT "$((CRAWL_TIMEOUT_MINUTES * 60))" \
+      env CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
+      corepack pnpm@10.33.2 exec dotenv -e "$ENV_FILE" -- \
+      tsx tools/product-extraction-poc.ts \
       --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit="$PRODUCT_LIMIT" --pool-limit="$POOL_LIMIT" \
-      $POC_STOCK_FLAGS --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
+      $POC_STOCK_FLAGS --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1; then
+      :
+    else
+      CRAWL_STATUS=$?
+      echo "chunk $c crawl failed/timeout (exit=$CRAWL_STATUS) — continuing" >&2
+      echo "$c,$ENGINE,0,0,0,0,0,0" >> "$TALLY"
+      continue
+    fi
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)
   echo "chunk $c crawl done: $ROWS rows"
