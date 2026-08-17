@@ -37,7 +37,7 @@ test("NOIRER 혼성 브랜드의 상품 성별은 공식 MEN/WOMEN 부서에서 
 
 test("999HUMANITY와 COOR는 공식 MEN/WOMEN 상위 부서에서 상품 성별을 가져온다", () => {
   for (const [key, expectedParents, expectedLeaves] of [
-    ["humanity", [43, 49], [45, 59, 245, 47, 180, 66, 55, 51, 244, 52, 243, 67, 69]],
+    ["humanity", [42, 43, 23, 49], [45, 59, 245, 47, 180, 66, 55, 51, 244, 52, 243, 67, 69]],
     ["en-1111", [75, 74], [94, 95, 76, 78, 79, 80, 81, 82, 83, 93, 92, 84, 85, 86, 87, 102, 88, 98, 97]],
   ] as const) {
     const config = getSiteConfig(key)
@@ -48,6 +48,97 @@ test("999HUMANITY와 COOR는 공식 MEN/WOMEN 상위 부서에서 상품 성별�
     assert.ok(expectedLeaves.every((cateNo) => categories.some((category) => category.cateNo === cateNo)))
     assert.ok(categories.every((category) => category.gender?.length === 1))
   }
+
+  const coorCategories = getSiteConfig("en-1111")?.category?.categories ?? []
+  for (const cateNo of [178, 179, 181]) {
+    assert.deepEqual(coorCategories.find((category) => category.cateNo === cateNo)?.gender, ["men"])
+  }
+  assert.deepEqual(coorCategories.find((category) => category.cateNo === 182)?.gender, ["women"])
+  assert.deepEqual(coorCategories.find((category) => category.cateNo === 186)?.gender, ["men"])
+})
+
+test("TEKET 일반 라인은 공용이고 Women 명시 상품은 여성으로 우선 분리한다", () => {
+  const teket = getSiteConfig("te-ket")
+  assert.deepEqual(teket?.defaultGender, ["unisex"])
+  assert.equal(teket?.verifiedUnisexDefault, true)
+  assert.equal(teket?.genderTextPatterns?.women?.some((pattern) => pattern.test("Plan Women Tee White")), true)
+  assert.equal(teket?.genderTextPatterns?.women?.some((pattern) => pattern.test("Plan Tee White")), false)
+})
+
+test("WOOYOUNGMI 공식 온라인스토어는 남성 카탈로그 기본값을 사용한다", () => {
+  assert.deepEqual(getSiteConfig("wooyoungmi")?.defaultGender, ["men"])
+})
+
+test("EPT 공식 신발·의류 카탈로그는 검증된 공용 기본값을 사용한다", () => {
+  const ept = getSiteConfig("eastpacifictrade")
+  assert.deepEqual(ept?.defaultGender, ["unisex"])
+  assert.equal(ept?.verifiedUnisexDefault, true)
+})
+
+test("추가 공식몰의 검증된 브랜드 성별 기본값을 유지한다", () => {
+  for (const [key, gender] of [
+    ["meller", ["unisex"]],
+    ["mmmcorp", ["women"]],
+    ["intheraw", ["men"]],
+    ["sandric", ["women"]],
+    ["unaffected-2757", ["men"]],
+    ["werkstatt-muenchen", ["unisex"]],
+  ] as const) {
+    const config = getSiteConfig(key)
+    assert.deepEqual(config?.defaultGender, gender)
+    assert.equal(config?.verifiedUnisexDefault, gender[0] === "unisex" ? true : undefined)
+  }
+})
+
+test("LOW CLASSIC·SUADE·NOT4NERD의 공식 혼성 부서를 상품 단위로 보존한다", () => {
+  const lowClassic = getSiteConfig("lowclassic")
+  assert.deepEqual(lowClassic?.defaultGender, ["women"])
+  assert.equal(lowClassic?.kidsGenderNoisePatterns?.[0].test("Hollywood Baby Tee"), true)
+  assert.deepEqual(
+    lowClassic?.category?.categories?.filter(({cateNo}) => [467, 468].includes(cateNo)).map(({cateNo, gender}) => ({cateNo, gender})),
+    [{cateNo: 467, gender: ["unisex"]}, {cateNo: 468, gender: ["unisex"]}],
+  )
+  assert.deepEqual(getSiteConfig("suade")?.category?.categories?.filter(({cateNo}) => [24, 83].includes(cateNo)).map(({cateNo, gender}) => ({cateNo, gender})), [
+    {cateNo: 24, gender: ["men"]},
+    {cateNo: 83, gender: ["women"]},
+  ])
+  assert.deepEqual(getSiteConfig("not4nerd")?.category?.categories?.find(({cateNo}) => cateNo === 88)?.gender, ["women"])
+  assert.deepEqual(getSiteConfig("not4nerd")?.defaultGender, ["men"])
+})
+
+test("NUAKLE·AEKKI의 공식 남녀 부서를 레거시 상품까지 보존한다", () => {
+  const nuakle = getSiteConfig("nuakle")!
+  assert.deepEqual(nuakle.category?.categories?.find(({cateNo}) => cateNo === 75)?.gender, ["men"])
+  assert.deepEqual(nuakle.category?.categories?.find(({cateNo}) => cateNo === 74)?.gender, ["women"])
+  assert.equal(nuakle.genderTextPatterns?.men?.[0].test("(m) Safari jacket"), true)
+  assert.equal(nuakle.genderTextPatterns?.women?.[0].test("(w) Safari jacket"), true)
+
+  const aekki = getSiteConfig("aekki")!
+  assert.deepEqual(aekki.defaultGender, ["men"])
+  assert.deepEqual(aekki.category?.categories?.find(({cateNo}) => cateNo === 367)?.gender, ["women"])
+})
+
+test("LUNDY·ROARINGRAD·Aieul의 공식 상품 성별 구조를 보존한다", () => {
+  assert.deepEqual(getSiteConfig("lundy")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("roaringrad")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("roaringrad")?.verifiedUnisexDefault, true)
+  assert.equal(getSiteConfig("roaringrad")?.genderTextPatterns?.women?.[0].test("W.Slub Tee"), true)
+
+  const aieul = getSiteConfig("aieul")!
+  assert.deepEqual(aieul.category?.categories?.find(({cateNo}) => cateNo === 88)?.gender, ["men"])
+  assert.deepEqual(aieul.category?.categories?.find(({cateNo}) => cateNo === 94)?.gender, ["women"])
+})
+
+test("ROLLING STUDIOS·LIBERE의 공식 유니섹스 범위를 보존한다", () => {
+  for (const key of ["rollingstudios", "libere-official"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["unisex"])
+    assert.equal(getSiteConfig(key)?.verifiedUnisexDefault, true)
+  }
+})
+
+test("ROUGHTYPE·ANIV의 공식 여성 카탈로그 기본값을 보존한다", () => {
+  assert.deepEqual(getSiteConfig("rough-type")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("aniv")?.defaultGender, ["women"])
 })
 
 test("0Tape 여성 카탈로그를 과거 편집샵 unisex 값으로 분류하지 않는다", () => {
@@ -472,4 +563,51 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.equal(margeNoise.reduce((text, pattern) => text.replace(pattern, " "), "babypinklight summer girls girls club").trim(), "light")
   assert.equal(getSiteConfig("singularisca")?.brand, "singularisca")
   assert.deepEqual(getSiteConfig("singularisca")?.defaultGender, ["men"])
+})
+
+test("THE INNRS 과거 공식 WOMEN/MEN 카테고리 성별을 보존한다", () => {
+  const config = getSiteConfig("theinnrs")
+  assert.ok(config?.category && "categories" in config.category)
+  const genders = new Map(config.category.categories?.map(({cateNo, gender}) => [cateNo, gender]))
+  assert.deepEqual(genders.get(29), ["women"])
+  assert.deepEqual(genders.get(139), ["women"])
+  assert.deepEqual(genders.get(33), ["men"])
+  assert.deepEqual(genders.get(49), ["men"])
+  assert.deepEqual(genders.get(167), ["unisex"])
+  assert.equal(genders.get(170), undefined)
+})
+
+test("공식 남녀 모델 근거 브랜드와 남성 브랜드의 기본값을 보존한다", () => {
+  for (const site of ["cayl", "plasticproduct", "blackpurple", "goyowear"]) {
+    const config = getSiteConfig(site)
+    assert.deepEqual(config?.defaultGender, ["unisex"])
+    assert.equal(config?.verifiedUnisexDefault, true)
+  }
+  assert.equal(getSiteConfig("goyowear")?.genderTextPatterns?.women?.[0]?.test("W LIGHT ASKIN SINGLET"), true)
+  assert.equal(getSiteConfig("cayl")?.genderTextPatterns?.men?.[0]?.test("러닝화 (남성)"), true)
+  assert.deepEqual(getSiteConfig("birthofroyalchild")?.defaultGender, ["men"])
+})
+
+test("Kith 공식 mens/wmns 부서 태그를 상품 성별 근거로 사용한다", () => {
+  const prefixes = getSiteConfig("kith")?.genderDepartmentTagPrefixes
+  assert.deepEqual(prefixes, {men: ["mens"], women: ["wmns"]})
+  assert.deepEqual(getSiteConfig("kith")?.shopifyGenderCollections, {
+    men: ["menswear-new-arrivals"],
+    women: ["womens-new-arrivals"],
+  })
+  assert.deepEqual(getSiteConfig("bodega")?.shopifyGenderCollections, {
+    men: ["mens"],
+    women: ["womens-apparel", "womens-footwear"],
+  })
+})
+
+test("FORMLICH와 SPORT CHAMBER의 공식 전체 상품 성별을 보존한다", () => {
+  assert.deepEqual(getSiteConfig("formlich")?.defaultGender, ["men"])
+  assert.deepEqual(getSiteConfig("sport-chamber")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("sport-chamber")?.verifiedUnisexDefault, true)
+})
+
+test("HOMLY는 공식 남성 카탈로그를 쓰고 DURT 혼성몰은 전역 기본값을 쓰지 않는다", () => {
+  assert.deepEqual(getSiteConfig("homly")?.defaultGender, ["men"])
+  assert.equal(getSiteConfig("durt")?.defaultGender, undefined)
 })

@@ -6,6 +6,7 @@
  */
 
 import type {SiteConfig} from "../lib/types"
+import type {ProductGender} from "../lib/product-gender"
 import {SITE_GENDER_DEFAULTS} from "./gender-defaults"
 import {GENERATED_PLATFORMS} from "./platforms.generated"
 
@@ -23,6 +24,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
+        // 상세 페이지의 원본 상품 부서 선택값. VIEW ALL(43/49)의 상위 루트다.
+        {name: "MEN ROOT", cateNo: 42, gender: ["men"]},
         {name: "MEN", cateNo: 43, gender: ["men"]},
         {name: "MEN OUTER", cateNo: 45, gender: ["men"]},
         {name: "MEN TOP", cateNo: 59, gender: ["men"]},
@@ -30,6 +33,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
         {name: "MEN PANTS", cateNo: 47, gender: ["men"]},
         {name: "MEN BAGS", cateNo: 180, gender: ["men"]},
         {name: "MEN ACC", cateNo: 66, gender: ["men"]},
+        {name: "WOMEN ROOT", cateNo: 23, gender: ["women"]},
         {name: "WOMEN", cateNo: 49, gender: ["women"]},
         {name: "WOMEN OUTER", cateNo: 55, gender: ["women"]},
         {name: "WOMEN TOP", cateNo: 51, gender: ["women"]},
@@ -76,6 +80,13 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
         {name: "WOMEN BAGS", cateNo: 88, gender: ["women"]},
         {name: "WOMEN SHOES", cateNo: 98, gender: ["women"]},
         {name: "WOMEN ACCESSORIES", cateNo: 97, gender: ["women"]},
+        // 공식 BLACK FRIDAY 트리에서 ALL/할인율 부서는 남성 상품군이고,
+        // WOMEN은 182로 별도 분리된다.
+        {name: "MEN BLACK FRIDAY ALL", cateNo: 186, gender: ["men"]},
+        {name: "MEN BLACK FRIDAY 40%", cateNo: 178, gender: ["men"]},
+        {name: "MEN BLACK FRIDAY 30%", cateNo: 179, gender: ["men"]},
+        {name: "MEN BLACK FRIDAY 10%", cateNo: 181, gender: ["men"]},
+        {name: "WOMEN BLACK FRIDAY", cateNo: 182, gender: ["women"]},
       ],
     },
     notes: "공식 MEN/WOMEN 상위 목록과 캠페인·룩북의 양쪽 전개를 상품 단위로 보존한다.",
@@ -2788,11 +2799,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "shopify",
     baseUrl: "https://birthofroyalchild.com",
     brand: "BIRTH OF ROYAL CHILD (BORC)",
-    defaultGender: ["unisex"],
+    defaultGender: ["men"],
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "brand_node id=5361. meta.json currency=USD, /products.json reachable. detect=shopify.",
+    notes: "brand_node id=5361. 공식 상품 이미지 대체텍스트가 Men's streetwear로 명시. meta.json currency=USD, /products.json reachable.",
   },
   {
     key: "nofaithstudios",
@@ -3101,9 +3112,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "durt",
     type: "imweb",
     baseUrl: "https://durt.co.kr",
-    defaultGender: ["unisex"],
     brand: "durt",
-    notes: "imweb 파일럿 — brand_node_id=5365, detect platform_family=imweb",
+    notes: "imweb 파일럿 — brand_node_id=5365. 공식 취급처에서 남성·여성 상품이 모두 확인돼 전역 기본값을 쓰지 않음.",
   },
   {
     key: "corebrass",
@@ -3128,9 +3138,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Homly",
     type: "imweb",
     baseUrl: "https://homly.kr",
-    defaultGender: ["unisex"],
+    defaultGender: ["men"],
     brand: "Homly",
-    notes: "imweb 파일럿 — brand_node_id=2170, detect platform_family=imweb",
+    notes: "brand_node id=2170. 공식 상세 전반이 남성 모델(174~179cm/63~67kg)과 30~34인치 하의 치수로 전개됨.",
   },
   {
     key: "monjagal",
@@ -3265,6 +3275,14 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
 const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 공식 여성/Unisex 성인 카탈로그의 티셔츠 핏 이름이다. 실제 키즈 부서가 아니다.
+  // https://lowclassic.com/product/detail.html?product_no=12094
+  // https://lowclassic.com/product/detail.html?product_no=12149
+  // 크롤 결과는 색상을 공백 없이 붙이기도 한다(`Baby TeeYellow`).
+  lowclassic: [/\bbaby[-\s]+tee/gi],
+  // 공식 옵션이 성인 S/M/L/XL인 그래픽명이며 아동복이 아니다.
+  // https://eastpacifictrade.com/products/spray-boy-t-shirt-blue.js
+  eastpacifictrade: [/\bspray[-\s]+boy[-\s]+t[-\s]*shirt\b/gi],
   // 공식 여성 카탈로그의 성인 티셔츠 상품형이며 실제 아동 라인은 없다.
   // https://loading-room.com/products/baby-tee-black
   "loading-room": [/\bbaby[-\s]+tee\b/gi],
@@ -3316,6 +3334,18 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
 // 성별 메뉴가 없다는 사실만으로는 여기에 추가하지 않는다.
 const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
+  "sport-chamber", // 공식 취급처가 의류·헤드웨어·소품을 모두 공용으로 명시
+  "libere-official", // 공식 브랜드 콘텐츠가 유니섹스 패션 브랜드로 명시
+  "rollingstudios", // 공식 About이 캐주얼 유니섹스 브랜드이며 모든 제품으로 범위를 명시
+  "roaringrad", // 공식 취급처가 일반 RR 상품을 공용, W. 접두 별도 라인을 여성으로 명시
+  "werkstatt-muenchen", // 공식 통합 주얼리 컬렉션에서 남·여 모델 착용 예시를 함께 제공
+  "meller", // 동일 Nayah SKU가 공식 MEN/WOMEN 선글라스 컬렉션 양쪽에 소속
+  "cayl", // 공식 의류 상세가 동일 SKU에 남·여 모델 착용 사이즈를 함께 명시
+  "plasticproduct", // 공식 의류 상세가 동일 SKU에 Man/Woman 모델 착용 사이즈를 함께 명시
+  "blackpurple", // 성별 구획 없는 액세서리 카탈로그와 동일 SKU의 남·여 착용자 근거
+  "goyowear", // 일반 상품은 W/M 모델을 함께 명시하며 W 접두 상품만 우먼즈 예외
+  "eastpacifictrade", // 공식 신발 W/M·EU 전 사이즈와 의류 상세의 Unisex 명시
+  "te-ket", // 일반 상품 상세에 동일 SKU의 남·여 모델 착용 사이즈를 함께 명시
   "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
   "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
@@ -3339,6 +3369,9 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
 ])
 
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
+  // Kith 공식 Shopify 부서 태그. `wmns`는 범용 성별 사전에 없는 축약형이라
+  // 사이트가 실제로 부서 태그로 쓰는 이 범위에서만 판정한다.
+  kith: {men: ["mens"], women: ["wmns"]},
   // 공식 Shopify 태그: M_ACCESSORIES / W_ACCESSORIES, man_product / woman_product.
   "nude-project": {men: ["M_", "man_product"], women: ["W_", "woman_product"]},
   // 공식 Woman 컬렉션의 태그: woman, women, womanpants, womantees, ea#woman 등.
@@ -3355,6 +3388,15 @@ const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women:
 // `/products.json`에 컬렉션 소속이 빠지는 Shopify 혼성몰용 공식 근거.
 // 상품 handle이 아래 공식 부서 컬렉션에 속할 때만 engine 성별을 부여한다.
 const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["shopifyGenderCollections"]>> = {
+  // 공식 편집샵의 현재 남녀 신상품 부서. 동일 handle이 양쪽에 있으면 엔진에서
+  // unisex로 합치며, 레거시 복구 도구도 같은 공식 소속을 사용한다.
+  // https://kith.com/collections/menswear-new-arrivals
+  // https://kith.com/collections/womens-new-arrivals
+  kith: {men: ["menswear-new-arrivals"], women: ["womens-new-arrivals"]},
+  // https://bdgastore.com/collections/mens
+  // https://bdgastore.com/collections/womens-apparel
+  // https://bdgastore.com/collections/womens-footwear
+  bodega: {men: ["mens"], women: ["womens-apparel", "womens-footwear"]},
   // https://www.amiparis.com/collections/women-view-all
   // https://www.amiparis.com/collections/men-view-all
   // https://www.amiparis.com/collections/unisex-ami-must-haves
@@ -3390,6 +3432,17 @@ const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["sh
 }
 
 const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTextPatterns"]>> = {
+  // 공식 취급처에서 `W.` 품번/상품명은 여성, 일반 RR 상품은 공용으로 분리된다.
+  roaringrad: {women: [/^\s*W\./i]},
+  // 공식 상품명이 남녀 핏을 `(m)` / `(w)`로 직접 구분한다.
+  // https://nuakle.com/category/men/75/ / https://nuakle.com/category/women/74/
+  nuakle: {men: [/^\s*\(m\)/i], women: [/^\s*\(w\)/i]},
+  // 공식 상품명의 W 접두사는 별도 우먼즈 핏이다. 나머지는 남녀 모델을 함께 쓴다.
+  goyowear: {women: [/^W(?:OMEN(?:'S)?|OMENS)?\b/i]},
+  // 협업 신발처럼 상품명에 성별을 직접 명시한 예외가 있다.
+  cayl: {women: [/여성/u, /\bWOMEN(?:'S)?\b/i], men: [/남성/u, /\bMEN(?:'S)?\b/i]},
+  // 일반 라인은 남녀 모델이 함께 착용하지만 Women 상품은 별도 슬림핏·사이즈로 명시한다.
+  "te-ket": {women: [/\bWomen\b/i]},
   // 공식 메인 컬렉션의 두 상품명이 INNERPASSION VOL.01 HER / HIM이고,
   // 각 링크도 공식몰에서 별도 HER/HIM 상세로 제공된다.
   // https://a82.co.kr/collection/list.html?cate_no=47
@@ -3400,6 +3453,10 @@ const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTe
 }
 
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
+  // 상세 설명이 `남녀 모두`, `남성모델`/`여성모델` 라벨을 일관되게 제공한다.
+  "horlisun",
+  "the-nockin",
+  "suade",
   // 공식 상품 설명에 Male (키): 사이즈 / Female (키): 사이즈 형식이 일관되게 존재한다.
   "coldcultureworldwide",
   // 공식 상품 설명에 `男性着用モデル`/`女性着用モデル`과 착용 사이즈를 명시한다.
@@ -3407,6 +3464,47 @@ const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   // 공식 상품 설명에 `Classic unisex fit`이 있는 상품만 제품 단위로 인식한다.
   "ihnomuhnit",
 ])
+
+// AUTO-GENERATED Cafe24 설정의 카테고리에 공식 부서 성별을 보강한다.
+// generated 파일을 직접 고치면 재생성 때 사라지므로 여기서 cate_no별로 합성한다.
+const SITE_CAFE24_CATEGORY_GENDERS: Record<string, Record<number, ProductGender[]>> = {
+  // 공식 메뉴의 MEN/WOMEN 하위 부서.
+  // https://aieul.co/
+  aieul: {
+    88: ["men"], 90: ["men"], 91: ["men"], 92: ["men"], 93: ["men"],
+    94: ["women"], 95: ["women"], 96: ["women"], 97: ["women"], 98: ["women"],
+  },
+  // 현재 MEN/WOMEN 최상위와 같은 상품명의 (m)/(w) 표기로 검증한 과거 부서.
+  nuakle: {
+    29: ["men"], 30: ["men"], 31: ["men"], 56: ["men"], 75: ["men"],
+    32: ["women"], 33: ["women"], 36: ["women"], 57: ["women"], 74: ["women"],
+  },
+  // 공식 메뉴가 일반 JEWELRY와 WOMEN을 분리한다. WOMEN 하위 부서 번호는
+  // 현재 페이지 소스에도 보존돼 있어 일반 남성 기본값보다 먼저 적용한다.
+  aekki: {
+    401: ["women"], 367: ["women"], 368: ["women"], 369: ["women"],
+    370: ["women"], 371: ["women"],
+  },
+  // 공식 내비게이션의 Lc/LOW CLASSIC Unisex 부서.
+  // https://lowclassic.com/product/lc-list.html?cate_no=467
+  // https://lowclassic.com/product/lc-list.html?cate_no=468
+  lowclassic: {467: ["unisex"], 468: ["unisex"]},
+  // 공식 MAN/WOMAN 최상위 부서. 상세의 명시적 남녀공용 문구가 더 우선한다.
+  suade: {24: ["men"], 83: ["women"]},
+  // 공식 SHOP 내 WOMEN 전용 부서. 나머지 SHOP은 일괄 성별을 가정하지 않는다.
+  not4nerd: {88: ["women"]},
+  // 2026-08 이전 공식 메뉴의 WOMEN/MEN 부서 번호. 같은 product_no가 양쪽에
+  // 동시에 실린 상품은 repair 도구가 두 근거를 합쳐 unisex로 판정한다.
+  // https://theinnrs.com/ (공식 메뉴 및 검색 캐시의 breadcrumb)
+  theinnrs: {
+    30: ["women"], 29: ["women"], 139: ["women"], 31: ["women"],
+    46: ["women"], 47: ["women"], 161: ["women"], 43: ["women"],
+    45: ["women"], 146: ["women"],
+    48: ["men"], 33: ["men"], 49: ["men"], 50: ["men"],
+    51: ["men"], 151: ["men"],
+    167: ["unisex"], 168: ["unisex"], 169: ["unisex"], 180: ["unisex"],
+  },
+}
 
 // generated 설정을 다시 만들더라도 유지돼야 하는, 공식몰 전체 상품군 기본값.
 const SITE_DEFAULT_CATEGORIES: Record<string, string> = {
@@ -3447,6 +3545,28 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const genderFromModelDescription = SITE_GENDER_MODEL_DESCRIPTION_SITES.has(key) || config.genderFromModelDescription
   const defaultCategory = SITE_DEFAULT_CATEGORIES[key] ?? config.defaultCategory
   const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
+  const categoryGenders = SITE_CAFE24_CATEGORY_GENDERS[key]
+  const category = categoryGenders
+    ? (() => {
+        const existing = config.category && "categories" in config.category
+          ? config.category.categories ?? []
+          : []
+        const existingNumbers = new Set(existing.map(({cateNo}) => cateNo))
+        return {
+          discovery: "manual" as const,
+          categories: [
+            ...existing.map((entry) => ({
+              ...entry,
+              ...(categoryGenders[entry.cateNo] ? {gender: categoryGenders[entry.cateNo]} : {}),
+            })),
+            ...Object.entries(categoryGenders)
+              .map(([cateNo, gender]) => ({cateNo: Number(cateNo), gender}))
+              .filter(({cateNo}) => !existingNumbers.has(cateNo))
+              .map((entry) => ({name: `OfficialGender${entry.cateNo}`, ...entry})),
+          ],
+        }
+      })()
+    : config.category
   if (
     fallback === config.defaultGender
     && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
@@ -3457,6 +3577,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     && genderFromModelDescription === config.genderFromModelDescription
     && defaultCategory === config.defaultCategory
     && verifyStockFromDetail === config.verifyStockFromDetail
+    && category === config.category
   ) return config
   return {
     ...config,
@@ -3469,6 +3590,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
     ...(genderFromModelDescription ? {genderFromModelDescription: true} : {}),
     ...(defaultCategory ? {defaultCategory} : {}),
     ...(verifyStockFromDetail ? {verifyStockFromDetail: true} : {}),
+    ...(category !== config.category ? {category} : {}),
   }
 }
 
