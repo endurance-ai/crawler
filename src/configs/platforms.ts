@@ -2015,11 +2015,12 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://piscess.shop",
     brand: "PISCESS",
     paginate: true,
+    crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [{name: "All", cateNo: 42, gender: ["women"]}],
     },
-    notes: "ALL(42) 단일 피드. NEW(210)/BEST(74)/X GEUNGHEE(215)는 ALL과 중복되는 컬렉션 뷰라 제외",
+    notes: "ALL(42) single feed. NEW(210)/BEST(74)/X GEUNGHEE(215) are duplicate collection views; detail crawling confirms pricing observation v2 before import.",
   },
   {
     key: "mu-row",

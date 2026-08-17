@@ -209,6 +209,14 @@ test("DRAE는 공식 회사 소개의 womenswear 범위를 유지한다", () => 
   assert.deepEqual(getSiteConfig("en-579")?.defaultGender, ["women"])
 })
 
+test("Piscess는 상세 가격을 확인한 뒤 공식 여성 피드를 적재한다", () => {
+  const piscess = getSiteConfig("piscess")
+  assert.equal(piscess?.crawlDetails, true)
+  assert.deepEqual(piscess?.category?.categories, [
+    {name: "All", cateNo: 42, gender: ["women"]},
+  ])
+})
+
 test("감사한 짧은 공식 상품명 카탈로그만 온보딩 이상치 예외를 갖는다", () => {
   const heavenMayhem = getSiteConfig("heavenmayhem-1914")
   assert.equal(heavenMayhem?.verifiedShortProductNames, true)
