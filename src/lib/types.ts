@@ -189,6 +189,8 @@ export interface SiteConfig {
    * heuristics. Canonical category folding still applies.
    */
   trustedCategory?: boolean
+  /** Allow deterministic product-name taxonomy to replace a verified noisy site category without review. */
+  verifiedCategoryTextOverride?: boolean
   /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
   /**

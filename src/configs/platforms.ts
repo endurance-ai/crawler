@@ -2102,8 +2102,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://lossyrow.com",
     brand: "LOSSYROW",
     paginate: true,
+    verifiedCategoryTextOverride: true,
     category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    notes: "Official women's catalogue. Product-name category overrides verified for legacy TOP/sale feeds where explicit scarf/knit names are more accurate than navigation labels.",
   },
   {
     key: "samostuff",
@@ -4052,6 +4053,12 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
 const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // 공식 여성 카탈로그의 성인 상품명이다. Girls Line은 그래픽명이고
+  // boy-fit은 여성 데님 실루엣이므로 아동복 근거로 쓰지 않는다.
+  lossyrow: [
+    /\bgirls[-\s]+line\b/gi,
+    /\bboy[-\s]*fit[-\s]+denim[-\s]+pants\b/gi,
+  ],
   // Official adult women's blouse color; the sibling Beige SKU shares the same product design.
   // https://franmeriko.com/product/dew-halter-blouse-baby-blue/2169/category/88/display/1/
   franmeriko: [

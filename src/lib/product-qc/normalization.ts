@@ -51,6 +51,8 @@ export interface ProductQcInput {
 export interface ProductQcOptions {
   /** 입력 category 가 신뢰 가능한 출처(LLM 보강)에서 왔는가. 기본 false. */
   trustedCategory?: boolean
+  /** Site-specific audit confirmed that explicit product-name taxonomy is safer than its noisy category labels. */
+  verifiedCategoryTextOverride?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
@@ -421,6 +423,7 @@ export function inferCategoryFromText(text: string): Category | null {
 function normalizeCategoryField(
   product: ProductQcInput,
   trustedCategory: boolean,
+  verifiedTextOverride: boolean,
 ): {
   value: string | null
   reason: string | null
@@ -458,7 +461,9 @@ function normalizeCategoryField(
     // ② 이름 기반 번복. 신뢰 출처에서는 건너뛴다 — 구제할 원본이 아니다.
     // 아래 두 text_fallback 은 남긴다: 값이 **없을 때** 채우는 것이라 번복이 아니다.
     if (inferred && current !== inferred && !trustedCategory) {
-      return {value: inferred, reason: "category_text_conflict", confidence: 0.5, needsReview: true}
+      return verifiedTextOverride
+        ? {value: inferred, reason: "category_verified_text_override", confidence: 0.8, needsReview: false}
+        : {value: inferred, reason: "category_text_conflict", confidence: 0.5, needsReview: true}
     }
     return {value: current, reason: current === raw ? null : "category_canonicalized", confidence: 0.9, needsReview: false}
   }
@@ -589,7 +594,11 @@ export function normalizeProductTextFields<T extends ProductQcInput>(
   const confidences: number[] = []
   let needsReview = false
 
-  const category = normalizeCategoryField(product, options.trustedCategory === true)
+  const category = normalizeCategoryField(
+    product,
+    options.trustedCategory === true,
+    options.verifiedCategoryTextOverride === true,
+  )
   confidences.push(category.confidence)
   if (category.needsReview) needsReview = true
   if (category.reason) reasons.push(category.reason)

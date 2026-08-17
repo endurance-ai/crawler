@@ -38,6 +38,17 @@ test("QC reviews category conflicts instead of overwriting them", () => {
   assert.ok(result.reasons.includes("category_text_conflict"))
 })
 
+test("QC auto-fixes a category conflict only after a site-specific text audit", () => {
+  const result = normalizeProductTextFields(
+    product({name: "Lossy Turtle Neck Pola Knit", category: "tops"}),
+    {verifiedCategoryTextOverride: true},
+  )
+
+  assert.equal(result.action, "auto_fix")
+  assert.equal(result.product.category, "knitwear")
+  assert.ok(result.reasons.includes("category_verified_text_override"))
+})
+
 test("QC does not read 'Short Sleeve' as shorts (bottoms alias excludes it)", () => {
   // 실측 사고 2026-08-01: "Archive Short Sleeves"(반팔티)를 LLM 이 tops 로 냈는데
   // bottoms 별칭의 `shorts?` 가 홑단어 Short 를 잡아 번복 → 후보가 탈락했다.
