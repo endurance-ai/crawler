@@ -38,7 +38,7 @@
  * 플래그:
  *   --plan=<path>     읽기 전용. 분류 + 분포 출력 + 계획 파일 생성 (= dry run)
  *   --apply=<path>    계획 파일 재검증 후 쓰기
- *   --scope=          null-gender(기본) | multi-gender | unisex | all | source-null
+ *   --scope=          null-gender(기본) | multi-gender | unisex | unverified-legacy | all | source-null
  *   --platform=       특정 플랫폼만 (단계적 적용)
  *   --brand-node=     특정 brand_node_id 만
  *   --limit=          최대 처리 행 수
@@ -129,18 +129,22 @@ function has(name: string): boolean {
 const MULTI_GENDER_FILTER = "gender.cs.{men,women},gender.cs.{men,unisex},gender.cs.{women,unisex}"
 
 /** `--scope` 허용값. `all` 은 필터 없이 전수 스캔이다. */
-const SCOPES = ["null-gender", "multi-gender", "unisex", "source-null", "all"]
+const SCOPES = ["null-gender", "multi-gender", "unisex", "unverified-legacy", "source-null", "all"]
 
 /** 플랫폼 키 → 사람이 검증한 사이트 전역 기본 성별 (getSiteConfig 가 gender-defaults.ts 를 병합해 준다). */
 function siteDefaultFor(platform: string | null): {
   siteDefaultGender: string[]
   verifiedUnisexDefault: boolean
+  kidsGenderNoisePatterns?: RegExp[]
+  genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
 } {
   if (!platform) return {siteDefaultGender: [], verifiedUnisexDefault: false}
   const config = getSiteConfig(platform)
   return {
     siteDefaultGender: config?.defaultGender ?? [],
     verifiedUnisexDefault: config?.verifiedUnisexDefault === true,
+    kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
+    genderTextPatterns: config?.genderTextPatterns,
   }
 }
 
@@ -161,6 +165,7 @@ async function* streamProducts(
     if (opts.scope === "null-gender") q = q.is("gender", null)
     else if (opts.scope === "unisex") q = q.contains("gender", ["unisex"])
     else if (opts.scope === "multi-gender") q = q.or(MULTI_GENDER_FILTER)
+    else if (opts.scope === "unverified-legacy") q = q.eq("gender_source", "unverified_legacy")
     else if (opts.scope === "source-null") q = q.is("gender_source", null)
     if (opts.platform) q = q.eq("platform", opts.platform)
     if (opts.brandNodeId !== null) q = q.eq("brand_node_id", opts.brandNodeId)
@@ -442,6 +447,7 @@ async function applyPlan(planPath: string): Promise<void> {
       let q = db.from("products").update(payload).in("id", batch.map((r) => r.id))
       if (plan.scope === "unisex") q = q.contains("gender", ["unisex"])
       if (plan.scope === "multi-gender") q = q.contains("gender", JSON.parse(beforeRaw) as string[])
+      if (plan.scope === "unverified-legacy") q = q.eq("gender_source", "unverified_legacy")
       const {data, error} = await q.select("id")
       if (error) throw new Error(`apply failed (${afterRaw}/${source}): ${error.message}`)
 

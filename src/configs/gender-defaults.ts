@@ -76,6 +76,11 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 과거 8DIVISION의 성별 미구분 카테고리에서 유입된 unisex를 근거로 쓰지 않는다.
   // https://tape00.cafe24.com/product/list.html?cate_no=56
   tape00: ["women"],
+  // 공식 전체 카탈로그가 Tops/Dresses & Skirts 등 여성복으로 구성되고,
+  // 별도 남성 부서나 남성 전용 상품 신호가 없다. 과거 적재된 unisex는
+  // unverified_legacy이므로 현행 공식몰 기준으로 교정한다.
+  // https://loading-room.com/collections/all
+  "loading-room": ["women"],
   // 공식 자사몰이 여성 카탈로그이며, 8DIVISION 범용 카테고리에서 유입된
   // engine=unisex 값은 상품 성별 근거가 아니다.
   innir: ["women"],
