@@ -11,6 +11,23 @@ import {GENERATED_PLATFORMS} from "./platforms.generated"
 
 export const MANUAL_PLATFORMS: SiteConfig[] = [
   {
+    key: "franmeriko",
+    name: "FRANMERIKO (프랑메리코)",
+    type: "cafe24",
+    baseUrl: "https://franmeriko.com",
+    brand: "FRANMERIKO (프랑메리코)",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "SHOP", cateNo: 88, url: "/category/shop/88/"},
+      ],
+    },
+    notes: "Official SHOP=88 is the product feed. Exclude stale empty categories, editorial season archive=123, and Instagram styling archive=124.",
+  },
+  {
     key: "aieul",
     name: "Aieul",
     type: "cafe24",
@@ -4005,6 +4022,11 @@ export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFO
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
 const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
+  // Official adult women's blouse color; the sibling Beige SKU shares the same product design.
+  // https://franmeriko.com/product/dew-halter-blouse-baby-blue/2169/category/88/display/1/
+  franmeriko: [
+    /\bbaby[-\s]+blue\b/gi,
+  ],
   // Official adult M-XXL streetwear. `baby` is the cherub graphic name and
   // `girl` survives only in a stale handle after the hoodie was renamed.
   // https://omirad.com/products/omirad-divine-baby-graphic-tee
@@ -4063,6 +4085,7 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
 const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "dared", // 공식 About이 "no gender boundaries"라고 명시
   "thewarld", // 공식 입점 샵이 unisex/gender-neutral 및 남녀 고객층을 명시
+  "kuko", // 공식 입점 샵이 전 디자인을 genderless/gender-neutral로 명시
   "brand", // Bite The Bullet: 남·여 모델 착용 + 공식 상품 설명의 Unisex 명시
   "reaven", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치
   "vicinityclo", // 공식 홈페이지·Instagram 기반 2026-07-15 브랜드 리서치

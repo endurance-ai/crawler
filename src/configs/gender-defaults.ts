@@ -56,6 +56,10 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://www.musinsa.com/products/6301755
   thewarld: ["unisex"], // Official shop 60% explicitly describes the label as a unisex / gender-neutral outdoor brand for both men and women.
   // https://global.sixty-percent.com/shops/thewarld
+  ulikasanctus: ["women"], // Official English storefront explicitly labels the catalogue Women's Clothing.
+  // https://ulika.cafe24.com/shop2/
+  kuko: ["unisex"], // Official shop 60% explicitly says all KUKO designs are genderless / gender-neutral.
+  // https://global.sixty-percent.com/shops/kuko
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
   omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
   // https://omirad.com/pages/about-omirad

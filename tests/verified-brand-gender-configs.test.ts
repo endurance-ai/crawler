@@ -106,15 +106,28 @@ test("신규 공식몰의 검증된 성별 기본값과 상품명 예외를 보�
   assert.deepEqual(SITE_GENDER_DEFAULTS.lossyrow, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.samostuff, ["men"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.thewarld, ["unisex"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.ulikasanctus, ["women"])
+  assert.deepEqual(SITE_GENDER_DEFAULTS.kuko, ["unisex"])
   assert.deepEqual(getSiteConfig("baserange")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("khaite")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("franmeriko")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("franmeriko")?.category?.categories, [
+    {name: "SHOP", cateNo: 88, url: "/category/shop/88/"},
+  ])
+  assert.equal(
+    getSiteConfig("franmeriko")?.kidsGenderNoisePatterns
+      ?.some((pattern) => "Baby Blue".replace(pattern, "").trim() === ""),
+    true,
+  )
   assert.deepEqual(getSiteConfig("dared")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("dared")?.verifiedUnisexDefault, true)
   assert.deepEqual(getSiteConfig("lossyrow")?.defaultGender, ["women"])
   assert.deepEqual(getSiteConfig("samostuff")?.defaultGender, ["men"])
   assert.deepEqual(getSiteConfig("thewarld")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("thewarld")?.verifiedUnisexDefault, true)
+  assert.deepEqual(getSiteConfig("ulikasanctus")?.defaultGender, ["women"])
+  assert.deepEqual(getSiteConfig("kuko")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("kuko")?.verifiedUnisexDefault, true)
   assert.deepEqual(SITE_GENDER_DEFAULTS.findoubt, ["women"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.jabberwocky, ["men"])
   assert.deepEqual(SITE_GENDER_DEFAULTS.sirena, ["women"])
