@@ -80,8 +80,8 @@ async function main() {
       fail++
       continue
     }
-    const verifiedShortModelNames = c.trustedCategory === true
-      && ["eyewear", "shoes"].includes(c.defaultCategory)
+    const verifiedShortModelNames = c.verifiedShortProductNames === true
+      || (c.trustedCategory === true && ["eyewear", "shoes"].includes(c.defaultCategory))
     if (isAnomaly(rs) && !verifiedShortModelNames) {
       anom++
       continue

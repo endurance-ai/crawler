@@ -190,6 +190,21 @@ test("KIJIKO는 공식 여성 카탈로그의 메인 상품 피드를 수집한�
   ])
 })
 
+test("Yiyae는 랜딩 페이지가 아닌 공식 SHOP 상품 피드를 수집한다", () => {
+  const yiyae = getSiteConfig("yiyae")
+  assert.equal(yiyae?.disabled, undefined)
+  assert.deepEqual(yiyae?.defaultGender, ["men"])
+  assert.deepEqual(yiyae?.category?.categories, [
+    {name: "SHOP", cateNo: 247, url: "/product/list.html?cate_no=247"},
+  ])
+})
+
+test("감사한 짧은 공식 상품명 카탈로그만 온보딩 이상치 예외를 갖는다", () => {
+  assert.equal(getSiteConfig("heavenmayhem-1914")?.verifiedShortProductNames, true)
+  assert.equal(getSiteConfig("en-5510")?.verifiedShortProductNames, true)
+  assert.equal(getSiteConfig("en-5510")?.defaultCategory, "shoes")
+})
+
 test("ROYAL OAK은 공식 26HS 여성 카탈로그 범위를 유지한다", () => {
   const royalOak = getSiteConfig("royaloakseoul")
   assert.equal(royalOak?.disabled, undefined)
