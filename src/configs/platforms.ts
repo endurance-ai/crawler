@@ -3635,6 +3635,33 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     notes: "brand_node_id=5254. Official full catalogue is women-specific (pad-cup dresses/camisoles and swimwear); corrected live ALL category.",
   },
   {
+    key: "en-3896",
+    name: "EUNOIA",
+    type: "cafe24",
+    baseUrl: "https://byeunoia.com",
+    brand: "EUNOIA",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Women Outer", cateNo: 35, gender: ["women"]},
+        {name: "Women Dress", cateNo: 40, gender: ["women"]},
+        {name: "Women Top", cateNo: 36, gender: ["women"]},
+        {name: "Women Vest", cateNo: 45, gender: ["women"]},
+        {name: "Women Bottom", cateNo: 37, gender: ["women"]},
+        {name: "Women Acc", cateNo: 38, gender: ["women"]},
+        {name: "Men 26SS", cateNo: 771, gender: ["men"]},
+        {name: "Men 25FW", cateNo: 756, gender: ["men"]},
+        {name: "Men 25SS", cateNo: 729, gender: ["men"]},
+        {name: "Men 24FW", cateNo: 64, gender: ["men"]},
+        {name: "Men 24SS", cateNo: 471, gender: ["men"]},
+      ],
+    },
+    notes: "brand_node_id=3896. Official navigation explicitly separates Women product types from Men seasonal collections; gender is assigned only from those department routes.",
+  },
+  {
     key: "hormoneapparel",
     name: "Hormone Apparel (호르몬)",
     type: "cafe24",
@@ -4190,7 +4217,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
 // Legacy generated keys whose brand_node has been consolidated into a manual,
 // canonical source. Filtering here also protects deployments that have not yet
 // regenerated platforms.generated.ts after the DB status transition.
-const SUPERSEDED_GENERATED_KEYS = new Set(["postarchivefaction-95"])
+const SUPERSEDED_GENERATED_KEYS = new Set(["postarchivefaction-95", "en-3896"])
 
 export const PLATFORMS: SiteConfig[] = [
   ...MANUAL_PLATFORMS,

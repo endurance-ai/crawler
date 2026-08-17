@@ -237,6 +237,23 @@ test("backalleydream은 상세 옵션으로 목록 품절 오탐을 교정한다
   ])
 })
 
+test("EUNOIA는 공식 Women/Men 부서 경로에만 성별을 부여한다", () => {
+  const eunoia = getSiteConfig("en-3896")
+
+  assert.ok(eunoia)
+  assert.equal(eunoia.defaultGender, undefined)
+  assert.equal(eunoia.category?.discovery, "manual")
+  const categories = eunoia.category?.categories ?? []
+  assert.deepEqual(
+    categories.filter((category) => category.gender?.includes("women")).map((category) => category.cateNo),
+    [35, 40, 36, 45, 37, 38],
+  )
+  assert.deepEqual(
+    categories.filter((category) => category.gender?.includes("men")).map((category) => category.cateNo),
+    [771, 756, 729, 64, 471],
+  )
+})
+
 test("감사한 짧은 공식 상품명 카탈로그만 온보딩 이상치 예외를 갖는다", () => {
   const heavenMayhem = getSiteConfig("heavenmayhem-1914")
   assert.equal(heavenMayhem?.verifiedShortProductNames, true)
