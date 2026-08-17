@@ -54,6 +54,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // https://samostuff.com/shopinfo/stockist.html
   // https://8division.com/en/product/men.html?cate_no=3491
   // https://www.musinsa.com/products/6301755
+  thewarld: ["unisex"], // Official shop 60% explicitly describes the label as a unisex / gender-neutral outdoor brand for both men and women.
+  // https://global.sixty-percent.com/shops/thewarld
   // ── 2026-08-16 Korean/KRW inactive batch official-site review ──
   omirad: ["men"], // Official mission explicitly describes the catalogue as street fashion for a young man.
   // https://omirad.com/pages/about-omirad
