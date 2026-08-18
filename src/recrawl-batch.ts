@@ -63,6 +63,8 @@ const POC_SUPPORTED_TYPES = new Set(["cafe24", "shopify"])
 interface Flags {
   budgetMinutes: number
   limit: number
+  maxProducts: number
+  includeQcFailed: boolean
   chunkSize: number
   chunkTimeoutMinutes: number
   maxFailedChunks: number
@@ -90,6 +92,8 @@ function parseFlags(): Flags {
   return {
     budgetMinutes: num("budget-minutes", 240),
     limit: num("limit", 0),
+    maxProducts: num("max-products", 0),
+    includeQcFailed: raw["include-qc-failed"] === true,
     chunkSize: Math.max(1, num("chunk-size", 10)),
     chunkTimeoutMinutes: num("chunk-timeout-minutes", 120),
     maxFailedChunks: Math.max(1, num("max-failed-chunks", 2)),
@@ -115,14 +119,23 @@ interface Worklist {
   skippedUnsupported: string[]
 }
 
-async function fetchWorklist(db: ProductCollectionClient, types: string[]): Promise<Worklist> {
+async function fetchWorklist(
+  db: ProductCollectionClient,
+  types: string[],
+  maxProducts: number,
+  includeQcFailed: boolean,
+): Promise<Worklist> {
   const PAGE = 1000
   const rows: WorklistEntry[] = []
   for (let offset = 0; ; offset += PAGE) {
     const {data, error} = await db
       .from("product_crawl_status")
       .select("brand_node_id, platform_key, platform_type, status, updated_at, imported_at")
-      .or("status.in.(imported,embedded,crawled),and(status.eq.qc_failed,imported_at.not.is.null)")
+      .or(
+        includeQcFailed
+          ? "status.in.(imported,embedded,crawled,qc_failed)"
+          : "status.in.(imported,embedded,crawled),and(status.eq.qc_failed,imported_at.not.is.null)",
+      )
       .not("platform_key", "is", null)
       .order("updated_at", {ascending: true, nullsFirst: true})
       .range(offset, offset + PAGE - 1)
@@ -142,9 +155,52 @@ async function fetchWorklist(db: ProductCollectionClient, types: string[]): Prom
     deduped.push(row)
   }
 
+  if (maxProducts > 0 && deduped.length > 0) {
+    const counts = new Map<number, number>()
+    for (let offset = 0; ; offset += PAGE) {
+      const {data, error} = await db
+        .from("products")
+        .select("brand_node_id")
+        .in("brand_node_id", deduped.map((row) => row.brand_node_id))
+        .range(offset, offset + PAGE - 1)
+      if (error) throw new Error(`product count 조회 실패: ${error.message}`)
+      for (const row of data ?? []) {
+        const brandNodeId = Number((row as {brand_node_id: number}).brand_node_id)
+        counts.set(brandNodeId, (counts.get(brandNodeId) ?? 0) + 1)
+      }
+      if ((data ?? []).length < PAGE) break
+    }
+    rows.splice(0, rows.length, ...deduped.filter((row) => {
+      const count = counts.get(row.brand_node_id) ?? 0
+      return count >= 1 && count <= maxProducts
+    }))
+
+    const {data: canonicalRows, error: canonicalError} = await db
+      .from("product_crawl_brands")
+      .select("brand_node_id, platform_key, status, status_updated_at, imported_at")
+      .in("brand_node_id", rows.map((row) => row.brand_node_id))
+    if (canonicalError) throw new Error(`canonical worklist 조회 실패: ${canonicalError.message}`)
+    const canonicalById = new Map(
+      (canonicalRows ?? []).map((row) => [Number(row.brand_node_id), row as {
+        brand_node_id: number
+        platform_key: string | null
+        status: string
+        status_updated_at: string | null
+        imported_at: string | null
+      }]),
+    )
+    rows.splice(0, rows.length, ...rows.flatMap((row) => {
+      const canonical = canonicalById.get(row.brand_node_id)
+      if (!canonical || canonical.platform_key !== row.platform_key) return []
+      return [{...row, status: canonical.status, updated_at: canonical.status_updated_at, imported_at: canonical.imported_at}]
+    }))
+  } else {
+    rows.splice(0, rows.length, ...deduped)
+  }
+
   const allowed = new Set(types)
   const result: Worklist = {entries: [], skippedNoConfig: [], skippedUnsupported: []}
-  for (const row of deduped) {
+  for (const row of rows) {
     const config = getSiteConfig(row.platform_key)
     if (!config || config.disabled) {
       result.skippedNoConfig.push(row.platform_key)
@@ -183,11 +239,10 @@ function runChunk(args: {
         String(args.chunkIndex),
         "--out-root",
         args.outRoot,
-        "--include-out-of-stock",
         // 재수집 대상은 이미 등록된 브랜드다. 신규 brand_node 생성은 막되,
         // 품절 행도 기존 상품과 함께 upsert하도록 --in-stock-only는 사용하지 않는다.
         "--import-flags",
-        "--no-new-brands",
+        "--no-new-brands --allow-qwen-deferred",
       ],
       {cwd: REPO_ROOT, stdio: "inherit", env: process.env},
     )
@@ -209,14 +264,18 @@ function runChunk(args: {
 }
 
 /** onboard-batch.sh 가 청크 완료 시 append 하는 tally CSV 의 해당 청크 행. */
-function readTallyRow(outRoot: string, chunkIndex: number): {importOk: number; crawled: number} | null {
+function readTallyRow(outRoot: string, chunkIndex: number): {brandsPass: number; importOk: number; crawled: number} | null {
   const tallyPath = path.join(REPO_ROOT, outRoot, "onboard-tally.csv")
   if (!fs.existsSync(tallyPath)) return null
   const lines = fs.readFileSync(tallyPath, "utf-8").trim().split("\n").slice(1)
   for (const line of lines) {
     const cols = line.split(",")
     if (Number(cols[0]) === chunkIndex) {
-      return {crawled: Number(cols[3] ?? 0), importOk: Number(cols[4] ?? 0)}
+      return {
+        brandsPass: Number(cols[2] ?? 0),
+        crawled: Number(cols[3] ?? 0),
+        importOk: Number(cols[4] ?? 0),
+      }
     }
   }
   return null
@@ -294,7 +353,7 @@ async function main() {
   const startedAt = Date.now()
   const budgetMs = flags.budgetMinutes * 60_000
 
-  const worklist = await fetchWorklist(db, flags.types)
+  const worklist = await fetchWorklist(db, flags.types, flags.maxProducts, flags.includeQcFailed)
   let entries = worklist.entries
   if (flags.limit > 0) entries = entries.slice(0, flags.limit)
 
@@ -365,11 +424,12 @@ async function main() {
     brandsAttempted += chunkKeys.length
 
     const tally = readTallyRow(outRoot, c)
+    const brandsPass = tally?.brandsPass ?? 0
     const importOk = tally?.importOk ?? 0
     importOkTotal += importOk
     crawledTotal += tally?.crawled ?? 0
 
-    const chunkFailed = res.code !== 0 || importOk === 0
+    const chunkFailed = res.code !== 0 || brandsPass === 0
     if (chunkFailed) {
       consecutiveFailedChunks++
       const detail = res.timedOut
