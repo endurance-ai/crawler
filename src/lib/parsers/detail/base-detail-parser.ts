@@ -5,6 +5,7 @@
  */
 
 import type {Cafe24Page} from "../../cafe24-page"
+import {inferGenderFromModelDescription} from "../../product-gender"
 import type {DetailData, IDetailParser} from "./types"
 
 export class BaseDetailParser implements IDetailParser {
@@ -109,6 +110,9 @@ export class BaseDetailParser implements IDetailParser {
 
       result.material = extracted.material
       result.productCode = extracted.productCode
+      // description 원문은 result 에 담지 않는다 (material 과 동일한 원칙) —
+      // 계산된 성별 값 하나만 남긴다.
+      result.genderHint = inferGenderFromModelDescription(extracted.description)
     } catch (err) {
       console.warn(`   ⚠️ 상세 파싱 실패: ${productUrl} — ${(err as Error).message}`)
     }

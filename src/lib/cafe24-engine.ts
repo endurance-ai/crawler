@@ -1273,6 +1273,17 @@ export async function crawlCafe24(
           }
           if (detail?.material) product.material = detail.material
           if (detail?.productCode) product.productCode = detail.productCode
+          // 상품 단위 근거(카테고리/URL/이름)가 아직 없을 때만 상세 설명의
+          // 피팅 모델 라벨("woman model :" 등)로 보강한다 — 사이트별
+          // genderFromModelDescription 플래그로 명시 opt-in한 사이트에서만.
+          if (
+            config.genderFromModelDescription
+            && detail?.genderHint
+            && (product.gender?.length ?? 0) === 0
+          ) {
+            product.gender = [detail.genderHint]
+            product.genderSource = "engine"
+          }
           if (
             detail?.material ||
             detail?.productCode ||
