@@ -439,6 +439,9 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   kindersalmon: ["women"], // DRESSES / SHIRTS & BLOUSE / KNITWEAR — 남성 섹션 없음
   magnetarchive: ["women"], // Outer/Top/Bottom/Dress/Swimwear/Jewelry (+Magnet Kids)
   "brand-4cb9": ["women"], // 더핑크 — "여성의류 쇼핑몰" 명시, OPS&SKIRT 카테고리
+  // 브랜드 태그라인이 "Soft, dreamy, and effortlessly feminine ❥･•" 로 명시,
+  // 전 상품군이 dress/skirt (2026-08-19 실측, gender-site-survey-deep 조사).
+  rosettte: ["women"],
 
   // ── 의도적으로 비워둔 사이트 (근거 불충분) ────────────────────
   //
@@ -478,6 +481,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //     en-1111 (coor) MEN'S / WOMEN'S 캠페인 분리
   //     glowny         WOMEN + GLOWNY CLASSIC(유니섹스) + GIRLS(아동)
   //     millowomen     MEN(Pokémon..) / WOMEN(miffy..) — 이름과 달리 혼성
+  //     a82            HER / HIM 섹션 분리 (2026-08-19 실측) — cateNo 확인 후
+  //                    카테고리 단위 gender 태깅 필요, defaultGender 아님.
   //
   //   ── 판정 불가 (카테고리는 여성형이나 명시 없음) ──
   //     oheshio        OUTERWEAR/TOP/BOTTOMS/DRESS/BAG/ACC
