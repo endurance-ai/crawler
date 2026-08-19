@@ -84,6 +84,9 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
 const CAFE24_BASE_URL_BY_KEY: Partial<Record<string, string>> = {
   // The former .shop host no longer has DNS; the KR storefront is live here.
   sideservice: "https://sideservice.store",
+  // The m. subdomain serves no TLS at all, so the crawl has been failing since
+  // 2026-07-13. The desktop host serves the same catalog and product paths.
+  "draw-attention": "https://drawattention.cafe24.com",
 }
 
 const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
