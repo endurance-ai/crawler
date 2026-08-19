@@ -442,6 +442,8 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 브랜드 태그라인이 "Soft, dreamy, and effortlessly feminine ❥･•" 로 명시,
   // 전 상품군이 dress/skirt (2026-08-19 실측, gender-site-survey-deep 조사).
   rosettte: ["women"],
+  // 남성 브랜드로 사람이 직접 확인 (2026-08-19).
+  "cozy-tex": ["men"],
 
   // ── 의도적으로 비워둔 사이트 (근거 불충분) ────────────────────
   //
