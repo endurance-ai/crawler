@@ -8583,7 +8583,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     key: "draw-attention",
     name: "draw attention",
     type: "cafe24",
-    baseUrl: "https://m.drawattention.cafe24.com",
+    baseUrl: "https://drawattention.cafe24.com",
     brand: "draw attention",
     paginate: true,
     maxPages: 300,

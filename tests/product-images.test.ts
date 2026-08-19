@@ -55,6 +55,26 @@ test("normalizeProductImageUrl rejects utility, template, and non-image assets",
   )
 })
 
+test("normalizeProductImageUrl upgrades cleartext URLs to https", () => {
+  const page = "https://shop.example.com/products/1"
+  // iOS ATS blocks http:// outright, so a stored cleartext URL is a dead image
+  // in the app even when the host redirects to https.
+  assert.equal(
+    normalizeProductImageUrl("http://shop.example.com/cdn/shop/files/tee.jpg?v=1", page),
+    "https://shop.example.com/cdn/shop/files/tee.jpg?v=1",
+  )
+  // Protocol-relative URLs resolved against an http page get upgraded too.
+  assert.equal(
+    normalizeProductImageUrl("//cdn.shopify.com/s/files/tee.jpg", "http://shop.example.com/products/1"),
+    "https://cdn.shopify.com/s/files/tee.jpg",
+  )
+  // The upgrade collapses http/https duplicates of the same asset.
+  assert.deepEqual(
+    mergeProductImages("http://shop.example.com/a.jpg", page, ["https://shop.example.com/a.jpg"]),
+    ["https://shop.example.com/a.jpg"],
+  )
+})
+
 test("isProductImageUtilityAsset distinguishes UI assets from product names", () => {
   const page = "https://shop.example.com/products/1"
   assert.equal(isProductImageUtilityAsset("/common/ico_tip_title.gif", page), true)

@@ -49,6 +49,12 @@ export function normalizeProductImageUrl(raw: unknown, pageUrl: string): string 
   try {
     const url = new URL(cleaned, pageUrl)
     if (url.protocol !== "https:" && url.protocol !== "http:") return null
+    // iOS App Transport Security blocks cleartext loads outright — it never
+    // follows the host's http→https redirect — so an http:// URL renders as an
+    // empty card in the app even though curl/browsers resolve it fine. Shopify's
+    // og:image fallback emits store-domain http URLs, so upgrade here rather
+    // than at each producer.
+    if (url.protocol === "http:") url.protocol = "https:"
     url.hash = ""
     if (isProductImageUtilityAsset(url.toString(), pageUrl) || NON_IMAGE_EXT_RE.test(url.toString())) return null
     return url.toString()
