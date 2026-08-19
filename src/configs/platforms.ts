@@ -3268,6 +3268,159 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     },
     notes: "brand_node_id=5840. Official bag catalogue; product descriptions explicitly state suitability for both men and women.",
   },
+  // ── 2026-08-19 cafe24 온보딩 파일럿 (batch 1) ────────────────────────────
+  // product_crawl_status 에는 있는데 platforms.ts/generated 어디에도 SiteConfig 가
+  // 없어 크롤 자체가 안 되던 cafe24 사이트 64곳 중 첫 5곳. 카테고리는 전부
+  // 공식 내비게이션/sitemap.xml 에서 실제 cateNo 를 읽어 수동 매핑했다 —
+  // placeholder 번호를 쓰지 않는다(2026-08-18~19 gender_missing 전량 드랍 사고).
+  {
+    key: "omn-omnipotent",
+    name: "옴니포턴트 (OMN)",
+    type: "cafe24",
+    baseUrl: "https://omn-omnipotent.com",
+    brand: "옴니포턴트 (OMN)",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        // 리프를 먼저 둔다 — dedupe 시 비generic 카테고리는 먼저 잡힌 쪽이
+        // 남으므로(mergeCafe24DuplicateCategory), 뒤에 오는 상위 부서보다
+        // 세부 타입이 살아남는다.
+        {name: "Flat", cateNo: 135, gender: ["women"]},
+        {name: "Boots", cateNo: 136, gender: ["women"]},
+        {name: "Loafer", cateNo: 137, gender: ["women"]},
+        {name: "Sandal", cateNo: 138, gender: ["women"]},
+        {name: "Sneakers", cateNo: 157, gender: ["women"]},
+        {name: "Heels", cateNo: 187, gender: ["women"]},
+        {name: "Top Handle", cateNo: 171, gender: ["women"]},
+        {name: "Small Bags", cateNo: 173, gender: ["women"]},
+        {name: "Shoulder Bags", cateNo: 174, gender: ["women"]},
+        {name: "Tote Bags", cateNo: 176, gender: ["women"]},
+        {name: "Duffel Bags", cateNo: 177, gender: ["women"]},
+        {name: "Backpack", cateNo: 178, gender: ["women"]},
+        {name: "Card Holder", cateNo: 179, gender: ["women"]},
+        {name: "Bifold Wallet", cateNo: 180, gender: ["women"]},
+        {name: "Passport Holder", cateNo: 181, gender: ["women"]},
+        {name: "Keyrings", cateNo: 182, gender: ["women"]},
+        {name: "Belts", cateNo: 183, gender: ["women"]},
+        {name: "Caps", cateNo: 184, gender: ["women"]},
+        {name: "Socks", cateNo: 185, gender: ["women"]},
+        // Re:omn SALE(192) 전용 상품 10개는 위 본 카탈로그에 없다(실측).
+        {name: "Bag", cateNo: 197, gender: ["women"]},
+        {name: "Shoes", cateNo: 198, gender: ["women"]},
+        // 상위 부서는 리프에서 새는 상품용 catch-all (Bag 141 이 리프 합계보다 3개 많다).
+        {name: "Shoes", cateNo: 55, gender: ["women"]},
+        {name: "Bag", cateNo: 141, gender: ["women"]},
+        {name: "Wallet", cateNo: 142, gender: ["women"]},
+        {name: "Acc", cateNo: 143, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node_id=5544. 공식몰에 성별 부서가 없어 공식 취급처 카탈로그로 women 확정 — 무신사 브랜드 목록 86건 전량 '여성'(https://www.musinsa.com/brand/omnipotent). 상품 총 182건(본 카탈로그 172 + SALE 전용 10).",
+  },
+  {
+    key: "seystudio",
+    name: "SEYSTUDIO (세이스튜디오)",
+    type: "cafe24",
+    baseUrl: "https://seystudio.co.kr",
+    brand: "SEYSTUDIO (세이스튜디오)",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Bags", cateNo: 24, gender: ["women"]},
+        {name: "Accessories", cateNo: 25, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node_id=5509. 공식 취급처 카탈로그로 women 확정 — 무신사 브랜드 목록 37건 전량 '여성'(https://www.musinsa.com/brand/seystudio). 부서 29(Shoulder Bag)는 24(Bags)와 상품 21건이 완전히 동일한 중복 부서라 제외했다. 58(BEST)/42(lookbook)는 부분집합이다. 상품 총 38건.",
+  },
+  {
+    key: "visusoffice",
+    name: "visus (비수스)",
+    type: "cafe24",
+    baseUrl: "https://visusoffice.com",
+    brand: "visus (비수스)",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Tops", cateNo: 44, gender: ["women"]},
+        {name: "Trousers & Shorts", cateNo: 47, gender: ["women"]},
+        {name: "Skirts", cateNo: 50, gender: ["women"]},
+        {name: "Outer", cateNo: 62, gender: ["women"]},
+        // catch-all — 위 타입 부서 합(113)에 없는 상품이 Shop/SALE 쪽에 3건 있다.
+        {name: "Shop", cateNo: 51, gender: ["women"]},
+        {name: "New Arrivals", cateNo: 52, gender: ["women"]},
+        {name: "SALE", cateNo: 66, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node_id=5499. 공식 취급처 카탈로그로 women 확정 — 무신사 브랜드 목록 100건 전량 '여성'(https://www.musinsa.com/brand/visus). 카테고리 번호는 공식 sitemap.xml 의 /category/<slug>/<no>/ 에서 읽었다. 상품 총 116건.",
+  },
+  {
+    key: "octette",
+    name: "OCTETTE (오떼뜨)",
+    type: "cafe24",
+    baseUrl: "https://octette.co.kr",
+    brand: "OCTETTE (오떼뜨)",
+    defaultGender: ["women"],
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Tops", cateNo: 32, gender: ["women"]},
+        {name: "Pants", cateNo: 27, gender: ["women"]},
+        {name: "Skirt", cateNo: 34, gender: ["women"]},
+        {name: "Dress", cateNo: 37, gender: ["women"]},
+        {name: "Outwears", cateNo: 29, gender: ["women"]},
+        {name: "Swimwear", cateNo: 70, gender: ["women"]},
+        // catch-all. SHOP(24) 1,102건이 최대 상위집합이지만 타입 부서에만 있는
+        // 상품도 14건 있어 양쪽을 모두 돈다. 이름이 generic 이라 타입 라벨을 덮지 않는다.
+        {name: "SHOP", cateNo: 24, gender: ["women"]},
+        {name: "All", cateNo: 100, gender: ["women"]},
+        {name: "New Arrivals", cateNo: 26, gender: ["women"]},
+        {name: "EXCLUSIVE", cateNo: 129, gender: ["women"]},
+      ],
+    },
+    notes: "brand_node_id=5540. 공식몰이 스스로 여성복으로 명시한다 — SHOP(24) 페이지 title '여성의류 브랜드 오떼뜨', Outwears(29) title '여성 아우터'. 무신사 브랜드 목록 100건도 전량 '여성'(https://www.musinsa.com/brand/octette). 상품 약 1,116건으로 파일럿 5곳 중 최대다. SEASON(25)/컬렉션(48·49·50·131·132·133)은 /collection/ 룩북 경로라 제외.",
+  },
+  {
+    key: "s-sil",
+    name: "SSIL",
+    type: "cafe24",
+    baseUrl: "https://s-sil.com",
+    brand: "SSIL",
+    trustedCategory: true,
+    paginate: true,
+    maxPages: 100,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "목걸이·펜던트", cateNo: 48},
+        {name: "반지", cateNo: 49},
+        {name: "팔찌", cateNo: 50},
+        {name: "귀걸이", cateNo: 51},
+        {name: "헤어 액세서리", cateNo: 138},
+        {name: "잡화", cateNo: 223},
+        {name: "의류", cateNo: 242},
+      ],
+    },
+    notes: "brand_node_id=320. defaultGender 는 gender-defaults.ts 의 기존 검증값(women)이 getSiteConfig 에서 채운다 — 여기에 중복 선언하지 않는다. 위 7개 타입 부서가 전 상품 330건을 덮는다(소재별 209/210, 라인별, 컬렉션, 프로모션 부서는 전부 부분집합임을 실측 확인).",
+  },
 ]
 
 export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]

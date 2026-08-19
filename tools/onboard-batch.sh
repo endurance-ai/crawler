@@ -18,11 +18,23 @@
 #                          for full-catalog re-collection.
 #   --pool-limit <n>      candidate pool cap (default 2000)
 #   --import-flags "<..>" flags passed to import-products.ts
-#                          (default "--no-new-brands --in-stock-only").
-#                          Re-collecting existing rows wants neither: the former
-#                          drops products whose brand is not yet in brand_nodes,
-#                          the latter skips out-of-stock rows so they keep
-#                          whatever data they already had.
+#                          (default "--no-new-brands"). Drops products whose
+#                          brand is not yet in brand_nodes; re-collecting
+#                          existing rows wants this removed too.
+#
+# Out-of-stock products ARE collected (2026-08-19). The crawl always passes
+# --include-out-of-stock and the import default no longer carries
+# --in-stock-only, matching tools/recollect-batch.sh.
+#
+# Why: out-of-stock is filtered at the CRAWL layer (cafe24-engine.ts, right
+# after dedupe and BEFORE the detail crawl), not just at import — so the old
+# default never even opened those detail pages and they were absent from
+# products.jsonl entirely. `in_stock=false` is the exposure switch
+# (sql/096_recollect_cohort_suppress.sql): search and curation already hide
+# those rows, and import upserts the whole row on product_url conflict, so a
+# restock is recovered by a cheap listing refresh instead of a fresh detail
+# crawl. Filtering here would recreate exactly the hole recollect-batch.sh
+# was written to avoid.
 #   --variants <name>     existing (default) | hybrid — product-extraction-poc.ts
 #                          variant to crawl AND the one onboard-classify.ts reads
 #                          back out of products.jsonl (kept in lockstep — see
@@ -57,7 +69,7 @@ CONFIGS=""
 VARIANTS="existing"
 PRODUCT_LIMIT=2000
 POOL_LIMIT=2000
-IMPORT_FLAGS="--no-new-brands --in-stock-only"
+IMPORT_FLAGS="--no-new-brands"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -140,6 +152,7 @@ for c in $(seq "$START" "$END"); do
     CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
       $PNPM tsx tools/product-extraction-poc.ts \
       --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit="$PRODUCT_LIMIT" --pool-limit="$POOL_LIMIT" \
+      --include-out-of-stock \
       --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)

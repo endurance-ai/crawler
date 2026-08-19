@@ -98,6 +98,14 @@ tools/onboard-batch.sh --configs /tmp/batch.json \
 | `--chunk-size` | 20 | 청크당 브랜드 수 |
 | `--start` / `--end` | 0 / 마지막 | 실행할 청크 인덱스 범위 (inclusive) |
 | `--out-root` | `poc-runs` | 크롤 결과·로그·tally CSV 저장 위치 |
+| `--import-flags` | `--no-new-brands` | import-products.ts 에 넘길 플래그 |
+
+**품절 상품도 수집한다** (2026-08-19). 크롤은 항상 `--include-out-of-stock` 로 돌고,
+`--import-flags` 기본값에서 `--in-stock-only` 가 빠졌다 — `tools/recollect-batch.sh` 와
+같은 규칙이다. 품절 필터는 import 가 아니라 **크롤 레이어**(`cafe24-engine.ts`, dedupe
+직후·상세 크롤 **전**)에 있어서, 예전 기본값은 그 상품들의 상세 페이지를 열지도 않았고
+`products.jsonl` 에서 통째로 빠졌다. 노출은 `in_stock` 이 이미 막으므로(검색 RPC 는
+`in_stock=true` 만 본다) 담아두는 쪽이 재입고 복구를 리스팅 갱신만으로 끝낼 수 있다.
 
 **⚠️ `--out-root`는 배치마다 다른 값을 써라.** 같은 out-root를 재사용하면 이전 배치의
 `chunk-N/products.jsonl`이 남아있어 크롤이 "이미 있음"으로 스킵되고 엉뚱한 청크의 브랜드가
