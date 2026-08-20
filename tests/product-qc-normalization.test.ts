@@ -461,3 +461,39 @@ test("BMUET Korean product names resolve before the import conflict gate", () =>
   assert.equal(inferCategoryFromText("깅엄 체크 라인 디테일 볼륨 스커트 블랙"), "bottoms")
   assert.equal(inferCategoryFromText("도트 리본 디테일 미니 원피스"), "dresses")
 })
+
+test("CRAWLER_QC_NORMALIZATION_ENABLED=false still resolves and gates gender", () => {
+  // 실측 사고 2026-08-21: recollect-batch.sh 크롤 단계가 이 플래그를 꺼서
+  // category 정규화를 건너뛰는데, applyProductQcGate 전체가 조기 return 해서
+  // gender 추론(normalizeGenderField -> resolveProductGenderWithSource)까지
+  // 같이 꺼져버렸다 — url/text 로 성별을 추론하던 사이트 59곳이 하룻밤 동안
+  // 전량 gender=[] 로 하드 검증에 걸려 0건 적재됐다. 이 플래그는 category만
+  // 건드려야 하고 gender 는 항상 돌아야 한다.
+  const prev = process.env.CRAWLER_QC_NORMALIZATION_ENABLED
+  process.env.CRAWLER_QC_NORMALIZATION_ENABLED = "false"
+  try {
+    // 성별은 URL 에서 추론 가능해야 통과한다.
+    const resolved = normalizeProductTextFields(
+      product({
+        name: "Archive Piece 001",
+        category: "SALE",
+        gender: [],
+        genderSource: "config_default",
+        productUrl: "https://example.com/women/1",
+      }),
+    )
+    assert.deepEqual(resolved.product.gender, ["women"])
+    // category 정규화는 꺼져 있으므로 원문("SALE")이 그대로 남는다.
+    assert.equal(resolved.product.category, "SALE")
+
+    // 성별 근거가 전혀 없으면 이 플래그와 무관하게 여전히 review 로 드랍된다.
+    const unresolved = normalizeProductTextFields(
+      product({name: "Archive Piece 001", category: "SALE", gender: [], genderSource: "config_default", productUrl: "https://example.com/product/1"}),
+    )
+    assert.equal(unresolved.action, "review")
+    assert.ok(unresolved.reasons.includes("gender_missing"))
+  } finally {
+    if (prev === undefined) delete process.env.CRAWLER_QC_NORMALIZATION_ENABLED
+    else process.env.CRAWLER_QC_NORMALIZATION_ENABLED = prev
+  }
+})
