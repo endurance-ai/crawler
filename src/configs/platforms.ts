@@ -3790,18 +3790,23 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        // 이 사이트는 /product/list.html?cate_no=N 쿼리스트링 경로가 404다
-        // (2026-08-20 batch2 1차 실측) — 반드시 pretty-URL 슬러그(/category/<슬러그>/N/)
-        // 를 명시해야 한다. Skirt/Knit/Top/Bags/Acc(구 cateNo 51~55)는 실제
-        // 슬러그를 못 찾아 제외 — 카테고리 오분류 방지를 위해 확인된 5개만 사용.
-        {name: "Jackets", cateNo: 29, gender: ["women"], url: "/category/(%EC%A4%91%EB%B6%84%EB%A5%98)-Jackets/29/"},
-        {name: "Coats", cateNo: 30, gender: ["women"], url: "/category/(%EC%A4%91%EB%B6%84%EB%A5%98)-Coats/30/"},
-        {name: "Blazers", cateNo: 31, gender: ["women"], url: "/category/(%EC%A4%91%EB%B6%84%EB%A5%98)-Blazers/31/"},
-        {name: "Tees", cateNo: 32, gender: ["women"], url: "/category/(%EC%A4%91%EB%B6%84%EB%A5%98)-Tees/32/"},
-        {name: "Shirts", cateNo: 33, gender: ["women"], url: "/category/(%EC%A4%91%EB%B6%84%EB%A5%98)-Shirts/33/"},
+        {name: "Skirt", cateNo: 52, gender: ["women"]},
+        {name: "Knit", cateNo: 53, gender: ["women"]},
+        {name: "Top", cateNo: 54, gender: ["women"]},
+        {name: "Tote", cateNo: 48, gender: ["women"]},
+        {name: "Shoulder", cateNo: 46, gender: ["women"]},
+        {name: "Cross", cateNo: 47, gender: ["women"]},
+        {name: "Backpack", cateNo: 49, gender: ["women"]},
+        {name: "Eco", cateNo: 181, gender: ["women"]},
+        {name: "Pouch", cateNo: 182, gender: ["women"]},
+        {name: "Acc", cateNo: 51, gender: ["women"]},
       ],
     },
-    notes: "대분류/중분류/소분류/상세분류 깊은 계층 구조. 무신사 취급처 표본 30건 중 29건 '여성' — women 확정. 2026-08-20 batch2 1차 크롤에서 query-param URL(cate_no=)이 전부 404 — pretty-URL 슬러그로 수정.",
+    selectors: {
+      productName: ".mc-p-name",
+      productPrice: ".mc-p-price",
+    },
+    notes: "대분류/중분류/소분류/상세분류 깊은 계층 구조. 무신사 취급처 표본 30건 중 29건 '여성' — women 확정. 2026-08-20 batch2 1차 실측(pretty-URL 슬러그로 수정)이 틀렸다 — 재조사 결과 cate_no=29~41(Jackets/Coats/Blazers/Tees/Shirts 등 대/중/소/상세분류 메가메뉴)는 pretty-URL이든 query-param(cate_no=)이든 전부 404, 사이트에 실제로 게시되지 않은 죽은 카테고리다. 반면 상단 플랫 내비의 cate_no=42~55/181/182/194(All/New/Best/Archive/Clothes/Skirt/Knit/Top/Acc/Bags/Tote/Shoulder/Cross/Backpack/Eco/Pouch)는 전부 query-param 그대로 200 정상 응답 — 애초에 pretty-URL 문제가 아니었다. Clothes(44)·Bags(55)는 하위 카테고리 합산 롤업이라 제외하고 리프 카테고리만 사용. 카테고리 URL을 고쳐도 여전히 0건이었던 2차 원인: 신형 테마 커스텀 클래스(.mc-p-name/.mc-p-price)가 기본 셀렉터 8종과 전부 안 맞음(li[id^=anchorBoxId] 자체는 정상 매칭) — selectors 오버라이드로 해결. 상품 URL도 /product/detail.html?product_no= 가 아니라 /product/<slug>/<no>/category/... 프리티 URL이라 productLink 기본값(a[href*=\"/product/\"] 부분 문자열 매치)이 우연히 통과했다.",
   },
   {
     key: "musedofficial",
@@ -3930,7 +3935,11 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
         {name: "Acc", cateNo: 86, gender: ["women"]},
       ],
     },
-    notes: "brand_node id 없음(신규). 슈즈 전문 브랜드 — Mary Jane/Mule/Pumps/Flats 는 여성화 전용 실루엣으로 women 확정.",
+    selectors: {
+      productName: ".product_name",
+      productPrice: ".original_price",
+    },
+    notes: "brand_node id 없음(신규). 슈즈 전문 브랜드 — Mary Jane/Mule/Pumps/Flats 는 여성화 전용 실루엣으로 women 확정. 2026-08-20 batch2 실크롤에서 전량 0건 — 원인은 swiper.js 타이밍이 아니라 신형 테마 클래스명(.product_name 언더스코어, .original_price)이 기본 셀렉터 8종과 전부 안 맞은 것(실측: ul.prdList>li 는 26개 정상 매칭, name/price 만 실패). selectors 오버라이드로 해결 — 할인가는 별도 .sale_price 클래스 기반 로직(cafe24-engine.ts price2El)이 오버라이드와 무관하게 자동 처리.",
   },
   {
     key: "pleasenofollow",
@@ -4184,8 +4193,14 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     paginate: true,
     maxPages: 100,
     crawlDetails: true,
-    category: {discovery: "auto"},
-    notes: "brand_node id 없음(신규). 홈페이지·sitemap.xml 정적 크롤로 카테고리 cateNo 를 전혀 못 찾음(JS 렌더 SPA 로 추정) — discovery:auto 로 런타임에 실제 내비를 발견한다. defaultGender 는 gender-defaults.ts 의 기존 검증값(men, 2026-08-13~14 공식 카탈로그 검증)이 getSiteConfig 에서 채운다.",
+    category: {
+      discovery: "manual",
+      categories: [{name: "All", cateNo: 247, gender: ["men"]}],
+    },
+    selectors: {
+      productPrice: ".custom",
+    },
+    notes: "brand_node id 없음(신규). discovery:auto 가 0개였던 원인은 SPA/로그인 문제가 아니라 순수 타이밍 — 홈페이지 nav 링크(cate_no=)가 domcontentloaded+2초 대기로는 아직 안 그려지고 5초는 돼야 나타난다(엔진의 discoverCategories 는 2초 고정 대기라 항상 0개). 실측: 실제 cate_no 링크는 2개뿐 — cate_no=23('Collection', /product/campainlist.html)은 상품이 아니라 시즌 룩북(26 SPRING SUMMER 등, campain_detail.html 로 연결 — 실제 구매 가능 상품 아님)이라 제외, cate_no=247('2026', 전체상품 리스트, 39건)만 진짜 카테고리라 discovery:manual 로 고정. 가격도 기본 셀렉터 8종 전부 미스매치(.price 가 주석 처리돼 있고 실제는 <p class=\"custom\">) — selectors 오버라이드로 해결, 할인가는 <p class=\"sale\"> 가 기존 [class*=sale] 폴백 로직으로 자동 처리됨. defaultGender 는 gender-defaults.ts 의 기존 검증값(men, 2026-08-13~14 공식 카탈로그 검증)이 getSiteConfig 에서 채운다.",
   },
 ]
 
