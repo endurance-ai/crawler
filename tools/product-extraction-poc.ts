@@ -1749,7 +1749,13 @@ async function main(): Promise<void> {
   console.log(`Output: ${runDir}`)
 
   for (const brandKey of options.brands) {
-    const config = extraConfigs.get(brandKey) ?? getSiteConfig(brandKey)
+    // Registry config wins over POC_EXTRA_BRANDS when both exist: the extra-brands
+    // JSON round-trips through JSON.stringify (recrawl-batch.ts writes worklist
+    // configs to disk), which silently corrupts RegExp fields like
+    // genderTextPatterns into "{}" (RegExp has no enumerable own properties).
+    // extraConfigs stays the fallback for genuinely new brands not yet in
+    // platforms.ts, where it's the only source of truth.
+    const config = getSiteConfig(brandKey) ?? extraConfigs.get(brandKey)
     if (!config) throw new Error(`Unknown brand key: ${brandKey}`)
 
     console.log(`\n[${brandKey}] starting`)

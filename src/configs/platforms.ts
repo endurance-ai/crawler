@@ -5672,6 +5672,12 @@ const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
   "phingerin",
   // 공식 상품 설명에 `Classic unisex fit`이 있는 상품만 제품 단위로 인식한다.
   "ihnomuhnit",
+  // 폐지된 레거시 카테고리(cate_no=61)에 남은 33건이 (m)/(w) 이름 접두사도,
+  // 현재 부서 카테고리(74/75)도 없어 unverified_legacy 로 남았다. 상세 페이지가
+  // 상품마다 `woman model : 173cm` / `man model : 187cm` 형태로 성별을 명시한다
+  // (2026-08-18 실측: crop camisole 시리즈 등). cafe24-engine 은 이 신호를
+  // genderTextPatterns/카테고리 신호가 없을 때만 보강으로 쓴다.
+  "nuakle",
 ])
 
 // AUTO-GENERATED Cafe24 설정의 카테고리에 공식 부서 성별을 보강한다.
