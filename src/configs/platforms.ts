@@ -2667,8 +2667,19 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     baseUrl: "https://aftrsmmr.com",
     brand: "애프터썸머",
     paginate: true,
-    category: {discovery: "auto"},
-    notes: "3차 배치 draft — dry-run 필요",
+    defaultGender: ["women"],
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Outer", cateNo: 24},
+        {name: "Top", cateNo: 25},
+        {name: "Bottom", cateNo: 26},
+        {name: "Bag", cateNo: 28},
+        {name: "Acc", cateNo: 43},
+      ],
+    },
+    notes: "홈페이지 nav에서 실제 카테고리 5개 확인(ALL=23은 집계라 제외, LOOKBOOK=42는 상품 목록 아님). "
+      + "defaultGender=women — brand_nodes.wiki.gender_source(2026-08-14, 자사몰 상품 구성 기준: blouse/lace/flower 프린트 등 여성복 다수, 남성복 지표 전무, 신뢰도 med) 근거.",
   },
   {
     key: "themysterioushotel",
