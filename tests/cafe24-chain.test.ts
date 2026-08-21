@@ -56,6 +56,30 @@ test("Cafe24 category chain parses pretty category URLs and rejects product deta
   )
 })
 
+test("Cafe24 category chain accepts department-specific list.html category pages", () => {
+  assert.deepEqual(
+    parseCafe24CategoryHref(
+      "/product/man_list.html?cate_no=25",
+      "https://example.com",
+      "OUTER",
+    ),
+    {
+      name: "OUTER",
+      cateNo: 25,
+      url: "https://example.com/product/man_list.html?cate_no=25",
+    },
+  )
+
+  assert.equal(
+    parseCafe24CategoryHref(
+      "/product/woman_list.html?cate_no=176",
+      "https://example.com",
+      "SALE",
+    )?.cateNo,
+    176,
+  )
+})
+
 test("Cafe24 category validation removes global widgets and rejects stale category pages", () => {
   const global = product({
     name: "Global recommendation",

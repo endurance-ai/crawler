@@ -63,8 +63,13 @@ export function parseCafe24CategoryHref(
   }
 
   const pathname = url.pathname
+  // Cafe24 category listing pages aren't always /product/list.html — many sites
+  // route departments through /product/man_list.html, /product/woman_list.html,
+  // /product/magazine_list.html, etc. Product detail pages never end in .html
+  // (they're slug/id/category/display path segments), so anchoring on that
+  // extension distinguishes listing pages from detail pages without an allowlist.
   const isProductDetail =
-    /\/product\//i.test(pathname) && !/\/product\/list\.html$/i.test(pathname)
+    /\/product\//i.test(pathname) && !/\/product\/[a-z0-9_]*list\.html$/i.test(pathname)
   if (isProductDetail) return null
   if (/\/(?:board|member|order|myshop|article)\//i.test(pathname)) return null
 

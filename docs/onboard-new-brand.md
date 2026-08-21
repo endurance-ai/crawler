@@ -15,13 +15,21 @@
 | 항목 | 규칙 | 근거 |
 |---|---|---|
 | **category 필수** | 없으면(빈문자/null) **적재 안 됨**. DB 컬럼도 `NOT NULL`. | validator `z.string().min(1)` + migration 091 |
-| **품절 제외** | `inStock=false`(품절/sold out) 상품은 크롤·적재 모두에서 제외. | crawler `!inStock` 필터 + import `--in-stock-only` |
+| **품절 포함** (2026-08-19 변경) | `inStock=false` 상품도 **수집·적재한다.** 크롤은 `--include-out-of-stock`, import 는 `--in-stock-only` 없이 돈다. | crawl `shouldKeepOutOfStock` + `tools/recollect-batch.sh` 와 동일 규칙 |
 | **신규 브랜드 차단(옵션)** | `--no-new-brands` 시 `brand_nodes` 미등록 브랜드는 INSERT 안 하고 해당 상품도 제외. | import `--no-new-brands` |
 | **색상은 크롤러가 안 뽑음** | 색상 단일 출처는 VLM `product_features.primary_color`. 크롤러 색상 로직은 2026-07-29 제거. | CLAUDE.md §18 |
 | **임베딩 이미지** | 대표 이미지 SOT는 `image_url`. `images[0]`은 호환용 mirror이며 둘이 어긋나도 임베딩 입력을 결정하지 않는다. | `embed_batch_devapp.py` fetch 쿼리 |
 | **신규 브랜드는 신뢰 출처만** (2026-07-30) | 미등록 브랜드의 `brand_nodes` 자동 INSERT 는 **단일브랜드 자사몰**(`config.brand` 또는 `SELF_BRANDED`, `multiBrand` 아님)에서만 한다. 멀티브랜드 편집샵의 미등록 브랜드는 INSERT 없이 **상품이 격리**된다. | `lib/brand-provenance.ts` |
 
 > 의미: **category를 못 뽑는 상품은 검색 품질 무가치로 보고 버린다.** 색상·성별은 크롤러 책임이 아니다(VLM).
+
+> **품절을 왜 담는가** (2026-08-19): 품절 필터는 import 플래그가 아니라 **크롤 레이어**에
+> 있었다 — `cafe24-engine.ts` 가 dedupe 직후 **상세 크롤에 들어가기 전에** 잘라내므로,
+> 그 상품들은 상세 페이지를 열지도 않고 `products.jsonl` 에서 통째로 빠졌다. 노출은
+> `in_stock` 이 이미 막는다(검색 RPC 는 `in_stock=true` 만 본다 — `operations.md` §6.4).
+> 담아두면 재입고가 리스팅 갱신만으로 복구되지만, 안 담으면 상세 크롤을 처음부터
+> 다시 해야 한다. `tools/recollect-batch.sh` 가 재수집 경로에서 먼저 이 규칙을 세웠고
+> (`--include-out-of-stock` + `--in-stock-only` 미사용), 온보딩 경로만 예외였던 것을 맞췄다.
 
 > **provenance 가드가 왜 필요했나**: 편집샵은 상품마다 브랜드가 달라, 크롤러가 DOM 에서
 > 브랜드를 잘못 주워오면 그 쓰레기가 그대로 신규 `brand_nodes` 가 됐다. 실측 오염 —
@@ -75,8 +83,8 @@ npm test              # 기존 golden 깨지면 안 됨
 # (선택) 카테고리 탐색만 — 상품 안 긁음
 npm run crawl -- --dry-run --site=<key>
 
-# 온보딩 크롤 — 기본으로 --detail (상세 페이지) 사용.
-npm run crawl -- --site=<key> --detail
+# 온보딩 크롤 — 기본으로 --detail (상세 페이지) + --include-out-of-stock (품절 포함).
+npm run crawl -- --site=<key> --detail --include-out-of-stock
 ```
 출력: `data/<key>-products.json`
 
@@ -86,7 +94,8 @@ npm run crawl -- --site=<key> --detail
 
 ### 크롤 후 확인 사항
 - **category 채움률**: 출력 JSON에서 `category`가 비어있는 비율이 높으면 카테고리 매핑 점검.
-- **품절 제외 동작**: `[품절]` 로그가 보이고 해당 상품이 결과에서 빠졌는지.
+- **품절 포함 동작**: `[품절]` 로그가 보이는 상품이 결과에 **남아 있는지**(`inStock=false`로).
+  `--include-out-of-stock` 를 빠뜨리면 상세 크롤 전에 잘려 결과에서 통째로 사라진다.
 - **멈춤 없이 완료**: 한 상세 페이지가 멈춰도 timeout으로 넘어감(evaluate 20s / detail 25s / 사이트 전체 20분). 사이트가 통째로 안 끝나면 `SITE_TIMEOUT_MS` 안에 강제 종료됨.
 
 ---
@@ -104,12 +113,13 @@ DB_TOKEN=<service JWT>
 ### 4-2. 적재 실행
 ```bash
 # .env.local 은 npm 스크립트(dotenv -e .env)가 안 읽으므로 명시 호출
-npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-stock-only --site=<key>
+npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --site=<key>
 ```
 플래그 의미:
 - `--no-new-brands` — 미등록 브랜드 상품 제외 (정식 신규 브랜드면 뺀다)
-- `--in-stock-only` — 품절 상품 제외
 - `--site=<key>` — 특정 플랫폼만 적재(생략 시 `data/` 전체)
+- `--in-stock-only` — 품절 상품 제외. **온보딩에서는 쓰지 않는다** — `--include-out-of-stock`
+  로 일부러 가져온 품절을 여기서 걸러내면 방금 만든 구멍을 그대로 재생산한다.
 
 ### 4-3. 적재 중/후 확인 사항
 - **`validation_reject` 로그** = category 누락으로 버려진 상품. 다수면 크롤 추출 품질 문제 → 2단계로 회귀.
@@ -124,7 +134,9 @@ npx dotenv -e .env.local -- npx tsx src/import-products.ts --no-new-brands --in-
             count(*) FILTER (WHERE in_stock=false) out_of_stock
      FROM products WHERE platform='<key>';"
   ```
-  → `null_rows=0`, `out_of_stock=0` 이어야 정상.
+  → `null_rows=0` 이어야 정상. `out_of_stock` 은 0 이 아니어도 된다 — 품절도 적재하며
+    노출은 검색 RPC 의 `in_stock=true` 조건이 막는다. 오히려 사이트에 품절이 보이는데
+    `out_of_stock=0` 이면 `--include-out-of-stock` 이 누락된 것이다.
 
 > migration 091(category NOT NULL)은 이미 적용됨. validator가 막으니 신규 적재에서 null은 안 들어간다.
 
@@ -166,8 +178,8 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
 ```
 브랜드 선정(+brand_nodes 등록)
   → 크롤 코드(config/셀렉터) 작성 → npm run typecheck && npm test
-  → npm run crawl -- --site=<key> --detail   (온보딩 기본=상세: category/품절 확인)
-  → import-products --no-new-brands --in-stock-only --site=<key>   (validation_reject/스키마 확인)
+  → npm run crawl -- --site=<key> --detail --include-out-of-stock  (온보딩 기본=상세+품절포함)
+  → import-products --no-new-brands --site=<key>                   (validation_reject/스키마 확인)
   → embed_batch_devapp.py --download-workers 8                     (재실행으로 커버리지 수렴)
 ```
 

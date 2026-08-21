@@ -22,6 +22,7 @@ import {fileURLToPath} from "node:url"
 
 import {createProductCollectionClient} from "../src/lib/product-collection"
 import {MANUAL_PLATFORMS} from "../src/configs/platforms"
+import {CAFE24_CATEGORY_NAME_BACKFILL} from "./cafe24-category-name-overrides.generated"
 import {
   generatedPlatformType,
   shouldDisableGeneratedConfig,
@@ -84,6 +85,9 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
 const CAFE24_BASE_URL_BY_KEY: Partial<Record<string, string>> = {
   // The former .shop host no longer has DNS; the KR storefront is live here.
   sideservice: "https://sideservice.store",
+  // The m. subdomain serves no TLS at all, so the crawl has been failing since
+  // 2026-07-13. The desktop host serves the same catalog and product paths.
+  "draw-attention": "https://drawattention.cafe24.com",
 }
 
 const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
@@ -93,6 +97,9 @@ const CAFE24_SELECTORS_BY_KEY: Partial<Record<string, SiteConfig["selectors"]>> 
   openyy: {productName: ".title a"},
 }
 
+// Hand-curated overrides. Always wins over CAFE24_CATEGORY_NAME_BACKFILL
+// (tools/backfill-cafe24-category-names.ts's auto-discovered names) below —
+// see buildEntrySource's `cafe24Categories` line.
 const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
   // Official navigation exposes separate WOMEN and MEN departments. Use leaf
   // categories so aggregate/new/sale pages cannot erase the gender evidence.
@@ -397,7 +404,7 @@ function buildEntrySource(
     ? CAFE24_SOURCE_CURRENCY_BY_KEY[row.platform_key]
     : undefined
   const cafe24Categories = row.platform_type === "cafe24"
-    ? CAFE24_CATEGORIES_BY_KEY[row.platform_key]
+    ? CAFE24_CATEGORIES_BY_KEY[row.platform_key] ?? CAFE24_CATEGORY_NAME_BACKFILL[row.platform_key]
     : undefined
   const cafe24Selectors = row.platform_type === "cafe24"
     ? CAFE24_SELECTORS_BY_KEY[row.platform_key]

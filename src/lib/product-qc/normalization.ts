@@ -589,35 +589,46 @@ export function normalizeProductTextFields<T extends ProductQcInput>(
   const confidences: number[] = []
   let needsReview = false
 
-  const category = normalizeCategoryField(product, options.trustedCategory === true)
-  confidences.push(category.confidence)
-  if (category.needsReview) needsReview = true
-  if (category.reason) reasons.push(category.reason)
-  if (category.value && category.value !== product.category) {
-    changes.push({field: "category", before: product.category, after: category.value, reason: category.reason ?? "category_normalized", confidence: category.confidence})
-    next.category = category.value
-  }
+  // CRAWLER_QC_NORMALIZATION_ENABLED=false only suppresses category/subcategory
+  // normalization (recollect-batch.sh's crawl stage uses this for trustedCategory
+  // sites whose pure style-code names make category text-matching misfire — see
+  // the flag's usage site for the full story). Gender must stay independent of
+  // this switch: it isn't a text-matching false-positive risk like category is,
+  // and skipping it here would leave product.gender empty going into the
+  // always-on gender:min(1) validation gate downstream, silently dropping every
+  // product regardless of site (real incident: 2026-08-20/21 overnight recollect
+  // batch produced zero output across 59 sites this way).
+  if (isQcEnabled()) {
+    const category = normalizeCategoryField(product, options.trustedCategory === true)
+    confidences.push(category.confidence)
+    if (category.needsReview) needsReview = true
+    if (category.reason) reasons.push(category.reason)
+    if (category.value && category.value !== product.category) {
+      changes.push({field: "category", before: product.category, after: category.value, reason: category.reason ?? "category_normalized", confidence: category.confidence})
+      next.category = category.value
+    }
 
-  // Resolve subcategory against the QC-canonicalized category (next.category),
-  // not the raw input — an aliased category like "Outer"/"sweater" must still
-  // land its subcategory in the right family's vocabulary. next.category can
-  // still be a non-canonical raw string here (category normalization leaves it
-  // untouched when it needs review — see the truthy guard above), so re-check
-  // validity rather than trust the cast; SUBCATEGORIES[bogusKey] would throw.
-  const canonicalCategory: Category | null =
-    typeof next.category === "string" && isValidCategory(next.category) ? next.category : null
-  const subcategory = normalizeSubcategoryField(product, canonicalCategory)
-  confidences.push(subcategory.confidence)
-  if (subcategory.reason) reasons.push(subcategory.reason)
-  if (subcategory.value !== (product.subcategory ?? null)) {
-    changes.push({
-      field: "subcategory",
-      before: product.subcategory,
-      after: subcategory.value,
-      reason: subcategory.reason ?? "subcategory_normalized",
-      confidence: subcategory.confidence,
-    })
-    next.subcategory = subcategory.value
+    // Resolve subcategory against the QC-canonicalized category (next.category),
+    // not the raw input — an aliased category like "Outer"/"sweater" must still
+    // land its subcategory in the right family's vocabulary. next.category can
+    // still be a non-canonical raw string here (category normalization leaves it
+    // untouched when it needs review — see the truthy guard above), so re-check
+    // validity rather than trust the cast; SUBCATEGORIES[bogusKey] would throw.
+    const canonicalCategory: Category | null =
+      typeof next.category === "string" && isValidCategory(next.category) ? next.category : null
+    const subcategory = normalizeSubcategoryField(product, canonicalCategory)
+    confidences.push(subcategory.confidence)
+    if (subcategory.reason) reasons.push(subcategory.reason)
+    if (subcategory.value !== (product.subcategory ?? null)) {
+      changes.push({
+        field: "subcategory",
+        before: product.subcategory,
+        after: subcategory.value,
+        reason: subcategory.reason ?? "subcategory_normalized",
+        confidence: subcategory.confidence,
+      })
+      next.subcategory = subcategory.value
+    }
   }
 
   const gender = normalizeGenderField(product, options)
@@ -655,8 +666,9 @@ export function applyProductQcGate<T extends ProductQcInput>(
   site: string,
   options: ProductQcOptions = {},
 ): T[] {
-  if (!isQcEnabled()) return products
-
+  // No early return on !isQcEnabled() here — normalizeProductTextFields already
+  // scopes that flag to category/subcategory only. Gender resolution and its
+  // review/reject filtering must always run through this loop.
   const accepted: T[] = []
   for (const product of products) {
     const result = normalizeProductTextFields(product, options)
