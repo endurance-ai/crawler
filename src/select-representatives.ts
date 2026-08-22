@@ -14,7 +14,7 @@
  *   1) brand_node_id 매핑된 product 만 대상.
  *   2) image_url 보유 + image_url 이 icon/logo/badge 류 아님.
  *   3) category 분산 우선 (round-robin: top/bottom/outer/dress/acc/...).
- *   4) 같은 category 내 in_stock=true 우선, 그 다음 created_at DESC (신상).
+ *   4) 같은 category 내 in_stock=true 우선, 그 다음 first_seen_at DESC (신상).
  *   5) 부족하면 in_stock=false fallback.
  *
  * 사용법:
@@ -89,7 +89,7 @@ interface ProductRow {
   category: string | null
   image_url: string | null
   in_stock: boolean | null
-  created_at: string | null
+  first_seen_at: string | null
   is_brand_representative: boolean
 }
 
@@ -134,14 +134,14 @@ function selectDiverse(products: ProductRow[], target: number): ProductRow[] {
     buckets.get(cat)!.push(p)
   }
 
-  // 3) 각 bucket 내 정렬 — in_stock=true 먼저, 그 다음 created_at DESC
+  // 3) 각 bucket 내 정렬 — in_stock=true 먼저, 그 다음 first_seen_at DESC
   for (const list of buckets.values()) {
     list.sort((a, b) => {
       const aStock = a.in_stock ? 1 : 0
       const bStock = b.in_stock ? 1 : 0
       if (aStock !== bStock) return bStock - aStock
-      const aTime = a.created_at ? Date.parse(a.created_at) : 0
-      const bTime = b.created_at ? Date.parse(b.created_at) : 0
+      const aTime = a.first_seen_at ? Date.parse(a.first_seen_at) : 0
+      const bTime = b.first_seen_at ? Date.parse(b.first_seen_at) : 0
       return bTime - aTime
     })
   }
@@ -188,7 +188,7 @@ async function processBrand(
   for (;;) {
     const {data, error} = await db
       .from("products")
-      .select("id, category, image_url, in_stock, created_at, is_brand_representative")
+      .select("id, category, image_url, in_stock, first_seen_at, is_brand_representative")
       .eq("brand_node_id", brand.id)
       .range(offset, offset + PAGE - 1)
     if (error) {
