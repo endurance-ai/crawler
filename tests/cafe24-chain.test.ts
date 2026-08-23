@@ -18,6 +18,7 @@ import {
   parseCafe24PriceCandidate,
   parseCafe24PriceCandidates,
   parseCafe24CategoryHref,
+  resolveCafe24DetailFieldsFromRaw,
   runFirstUsefulCafe24Step,
 } from "../src/lib/cafe24-chain"
 import type {Product} from "../src/lib/types"
@@ -339,4 +340,57 @@ test("Cafe24 equal product and sale meta prices confirm a regular detail price",
     source: "detail",
     version: 2,
   })
+})
+
+test("Cafe24 USD price resolution ignores unlabeled coupon-banner numbers when JSON-LD confirms the real price", () => {
+  // Real-world blackpurple.kr case: a "$10 OFF Orders Over $160" coupon
+  // banner and a "[silver925]" spec both land in priceText (broad `tr, li,
+  // [class*=price]` selector), but JSON-LD offers.price is trustworthy.
+  // Before the fix, pairedLow (10) was blindly trusted as a sale price,
+  // producing a final price of $10 instead of the real $39.92.
+  const detail = resolveCafe24DetailFieldsFromRaw({
+    names: ["DEX CORE CAMP CAP"],
+    priceText: "price $10 OFF Orders Over $160 discount",
+    metaPrice: "",
+    metaSalePrice: "",
+    metaCurrency: "",
+    jsonLdPrice: "39.92",
+    jsonLdCurrency: "USD",
+    scriptProductPrice: "39.92",
+    scriptSalePrice: "",
+    detailPriceText: "",
+    descFirstLine: "",
+    descText: "",
+    categoryNames: [],
+  })
+
+  assert.equal(detail.sourceCurrency, "USD")
+  assert.equal(detail.price, 39.92)
+  assert.equal(detail.originalPrice, 39.92)
+  assert.equal(detail.salePrice, null)
+})
+
+test("Cafe24 USD sale-price pairing still works without a contradicting structured price", () => {
+  // No JSON-LD/meta/script price at all — pairedLow/pairedHigh from free text
+  // is the only signal available, so it should still be trusted as before.
+  const detail = resolveCafe24DetailFieldsFromRaw({
+    names: ["Some Jacket"],
+    priceText: "price $70.00 $100.00",
+    metaPrice: "",
+    metaSalePrice: "",
+    metaCurrency: "",
+    jsonLdPrice: "",
+    jsonLdCurrency: "",
+    scriptProductPrice: "",
+    scriptSalePrice: "",
+    detailPriceText: "",
+    descFirstLine: "",
+    descText: "",
+    categoryNames: [],
+  })
+
+  assert.equal(detail.sourceCurrency, "USD")
+  assert.equal(detail.price, 70)
+  assert.equal(detail.originalPrice, 100)
+  assert.equal(detail.salePrice, 70)
 })
