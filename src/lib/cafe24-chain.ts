@@ -299,6 +299,12 @@ export interface Cafe24DetailFallbacks {
   sourceCurrency: Product["sourceCurrency"] | null
   sourcePrice: number | null
   descriptionFirstLine: string | null
+  /**
+   * 상세 설명 본문 전체(길이 제한). `SIZE - man model : 187cm` 처럼 성별을
+   * 명시하는 착용 모델 표기가 여기에만 있는 사이트가 있어, 첫 줄만으로는
+   * 읽을 수 없는 근거를 남긴다.
+   */
+  descriptionText: string | null
   categoryNames?: string[]
 }
 
@@ -340,11 +346,13 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       }
 
       var descFirstLine = ""
+      var descText = ""
       var detailPriceText = ""
       var descEls = document.querySelectorAll(".cont_detail, #prdDetail, .product-detail, .xans-product-detaildesign, .detail_cont, #productDetail")
       for (var d = 0; d < descEls.length; d++) {
         var desc = ((descEls[d] as HTMLElement).innerText || descEls[d].textContent || "").trim()
         if (!desc) continue
+        if (descText.length < 8000) descText += (descText ? "\n" : "") + desc.slice(0, 8000 - descText.length)
         var lines = desc.split(/\n+/)
         for (var li = 0; li < lines.length; li++) {
           var line = lines[li].replace(/\s+/g, " ").trim()
@@ -429,6 +437,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
         scriptSalePrice,
         detailPriceText,
         descFirstLine,
+        descText,
         categoryNames,
       }
       /* eslint-enable no-var */
@@ -445,9 +454,35 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
       scriptSalePrice: "",
       detailPriceText: "",
       descFirstLine: "",
+      descText: "",
       categoryNames: [] as string[],
     }))
 
+  return resolveCafe24DetailFieldsFromRaw(raw)
+}
+
+export interface RawCafe24DetailData {
+  names: string[]
+  priceText: string
+  metaPrice: string
+  metaSalePrice: string
+  metaCurrency: string
+  jsonLdPrice: string
+  jsonLdCurrency: string
+  scriptProductPrice: string
+  scriptSalePrice: string
+  detailPriceText: string
+  descFirstLine: string
+  descText: string
+  categoryNames: string[]
+}
+
+/**
+ * `page.evaluate()`가 뽑아온 raw DOM 텍스트를 최종 가격/이름 필드로 정제한다.
+ * `page` 없이도 순수 함수로 테스트 가능하도록 `extractCafe24DetailFallbacks`
+ * 에서 분리했다 — Playwright fixture 없이 raw 오염 시나리오를 재현할 수 있다.
+ */
+export function resolveCafe24DetailFieldsFromRaw(raw: RawCafe24DetailData): Cafe24DetailFallbacks {
   const name = firstUsefulName([...raw.names, raw.descFirstLine])
   const sourceCurrency =
     normalizeCafe24Currency(raw.metaCurrency) ??
@@ -462,17 +497,29 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
   const pairedHigh = detailPriceValues.length >= 2 ? Math.max(...detailPriceValues) : null
   const labeledSale = parseCafe24LabeledPrice(combinedPriceText, "sale", sourceCurrency)
   const labeledOriginal = parseCafe24LabeledPrice(combinedPriceText, "original", sourceCurrency)
-  const saleCandidate =
-    parseCafe24PriceCandidate(raw.metaSalePrice, sourceCurrency) ??
-    parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency) ??
-    labeledSale ??
-    pairedLow
   const explicitRegularCandidates = [
     labeledOriginal,
     parseCafe24PriceCandidate(raw.scriptProductPrice, sourceCurrency),
     parseCafe24PriceCandidate(raw.metaPrice, sourceCurrency),
     parseCafe24PriceCandidate(raw.jsonLdPrice, sourceCurrency),
   ].filter((value): value is number => value !== null)
+  // pairedLow/pairedHigh come from unlabeled `$<number>` scraping across `tr,
+  // li, [class*=price]` elements. For USD (unlike KRW's labeled/`>= 1000`
+  // guarded pattern), this regularly sweeps in unrelated numbers — coupon
+  // banners ("$10 OFF Orders Over $160") and specs baked into the product
+  // name ("15mm", "[silver925]", "(6pcs)") all match. Trust pairedLow as a
+  // sale-price guess only when there's no confirmed structured price to
+  // contradict it, or when pairedHigh roughly agrees with that confirmed
+  // price — otherwise the pair is noise, not a real price/sale split.
+  const explicitBase = explicitRegularCandidates[0] ?? null
+  const pairedPairTrustworthy = explicitBase === null || (
+    pairedHigh !== null && Math.abs(pairedHigh - explicitBase) / explicitBase < 0.05
+  )
+  const saleCandidate =
+    parseCafe24PriceCandidate(raw.metaSalePrice, sourceCurrency) ??
+    parseCafe24PriceCandidate(raw.scriptSalePrice, sourceCurrency) ??
+    labeledSale ??
+    (pairedPairTrustworthy ? pairedLow : null)
   const regularCandidates = [
     ...explicitRegularCandidates,
     pairedHigh,
@@ -502,6 +549,7 @@ export async function extractCafe24DetailFallbacks(page: Cafe24Page): Promise<Ca
     sourceCurrency,
     sourcePrice: price,
     descriptionFirstLine: firstUsefulName([raw.descFirstLine]),
+    descriptionText: raw.descText ? raw.descText : null,
     categoryNames: raw.categoryNames,
   }
 }
