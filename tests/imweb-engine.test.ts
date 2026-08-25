@@ -106,3 +106,28 @@ test("non-https image_url is dropped (empty imageUrl, no images array)", () => {
   assert.equal(p.imageUrl, "")
   assert.equal(p.images, undefined)
 })
+
+// ─── 부서별 성별 맵 (2026-08-25) ──────────────────────────────────────────
+//
+// imweb 위젯 JSON 에는 성별 필드가 없다. MEN/WOMEN 부서를 모두 운영하는
+// 자사몰(taille.kr)에 사이트 전역 defaultGender 를 걸면 한쪽 부서가 통째로
+// 반대 성별로 적재된다 — 실측 2026-08-25: Taille 609행 중 MEN 브랜치 414행이
+// ["women"] 으로 들어가 남성복이 여성 검색에 노출됐다.
+
+test("카테고리 성별이 있으면 상품 단위 근거(engine)로 실린다", () => {
+  const p = parseImwebListItem(item(), {...CONFIG, defaultGender: ["women"]}, "Outer", ["men"])
+  assert.ok(p)
+  assert.deepEqual(p.gender, ["men"])
+  assert.equal(p.genderSource, "engine")
+})
+
+test("카테고리 성별이 없으면 사이트 전역 기본값(config_default)으로 폴백한다", () => {
+  const p = parseImwebListItem(item(), CONFIG, "Outer")
+  assert.ok(p)
+  assert.deepEqual(p.gender, ["men"]) // CONFIG.defaultGender
+  assert.equal(p.genderSource, "config_default")
+
+  const empty = parseImwebListItem(item(), CONFIG, "Outer", [])
+  assert.ok(empty)
+  assert.equal(empty.genderSource, "config_default")
+})

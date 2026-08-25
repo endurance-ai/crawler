@@ -88,6 +88,7 @@ export function parseImwebListItem(
   item: ImwebListItem,
   config: Pick<SiteConfig, "key" | "name" | "brand" | "defaultGender" | "defaultCategory" | "defaultSubcategory" | "sourceCurrency">,
   category: string,
+  categoryGender?: string[],
 ): Product | null {
   const props = item.properties
   const name = typeof props.name === "string" ? props.name.trim() : ""
@@ -121,11 +122,15 @@ export function parseImwebListItem(
     // imweb 자사몰은 반드시 config.brand 를 설정해야 하며(미설정 시 import 단계에서
     // 격리), 멀티브랜드 편집샵은 온보딩 LLM 브랜드 추출로 처리한다.
     brand: config.brand || "",
-    // imweb 위젯 JSON 에는 성별 필드가 없다. 사이트 전역 기본값만 실을 수 있고,
-    // config_default 는 dedup rank 최하위라 import 단계에서 상품명/URL 추론이
-    // 이기면 그쪽으로 교체된다.
-    gender: [...(config.defaultGender ?? [])],
-    genderSource: "config_default" as const,
+    // imweb 위젯 JSON 에는 성별 필드가 없다. 근거는 둘 중 하나다:
+    //   · 부서가 나뉜 사이트 → 크롤한 메뉴의 성별(categoryGender)이 상품 단위
+    //     근거이므로 genderSource: "engine" 으로 올린다.
+    //   · 부서가 없는 단일 성별 자사몰 → 사이트 전역 defaultGender.
+    //     config_default 는 dedup rank 최하위라 import 단계에서 상품명/URL
+    //     추론이 이기면 그쪽으로 교체된다.
+    ...(categoryGender && categoryGender.length > 0
+      ? {gender: [...categoryGender], genderSource: "engine" as const}
+      : {gender: [...(config.defaultGender ?? [])], genderSource: "config_default" as const}),
     name,
     category: category || config.defaultCategory || "",
     subcategory: config.defaultSubcategory,
@@ -274,9 +279,20 @@ export async function crawlImweb(config: SiteConfig): Promise<CrawlResult> {
     const context = await browser.newContext({userAgent: USER_AGENT})
     const page = await context.newPage()
 
-    // 1. 카테고리: 수동(config.categoryUrls) 우선, 없으면 자동 탐색
-    let categories: Array<{name: string; url: string}>
-    if (config.categoryUrls && config.categoryUrls.length > 0) {
+    // 1. 카테고리: 성별 맵(config.category.categories) → categoryUrls → 자동 탐색
+    //
+    // 성별 맵이 최우선인 이유: imweb 위젯 JSON 에는 성별 필드가 없어서 예전에는
+    // 사이트 전역 defaultGender 밖에 실을 수 없었다. 그런데 MEN/WOMEN 부서를
+    // 모두 운영하는 자사몰(taille.kr)에 전역값을 걸면 한쪽 부서가 통째로
+    // 반대 성별로 적재된다(실측 2026-08-25: Taille 609행 중 MEN 브랜치 414행이
+    // ["women"] 으로 적재돼 남성복이 여성 검색에 노출). 부서가 나뉜 사이트는
+    // 메뉴 단위로 성별을 적고 그것을 상품 단위 근거(engine)로 올린다.
+    let categories: Array<{name: string; url: string; gender?: string[]}>
+    const genderMappedCategories = (config.category?.categories ?? []).filter((c) => c.url)
+    if (genderMappedCategories.length > 0) {
+      categories = genderMappedCategories.map((c) => ({name: c.name, url: c.url!, gender: c.gender}))
+      console.log(`   카테고리 수동 맵: ${categories.length}개 (성별 지정 ${categories.filter((c) => c.gender?.length).length}개)`)
+    } else if (config.categoryUrls && config.categoryUrls.length > 0) {
       categories = config.categoryUrls.map((url) => ({name: "", url}))
     } else {
       categories = await discoverCategories(page, config.baseUrl)
@@ -303,7 +319,7 @@ export async function crawlImweb(config: SiteConfig): Promise<CrawlResult> {
           const key = String(item.properties.code ?? item.properties.idx ?? item.link)
           if (seen.has(key)) continue
           seen.add(key)
-          const product = parseImwebListItem(item, config, category.name)
+          const product = parseImwebListItem(item, config, category.name, category.gender)
           if (product) {
             products.push(product)
             added++

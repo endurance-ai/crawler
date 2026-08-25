@@ -350,7 +350,9 @@ function singleEvidence(gender: ProductGender[]): ProductGender[] {
 /**
  * 상품 성별 결의. 우선순위:
  *
- *   1. 엔진이 뽑은 상품 성별 (카테고리 유래 등 상품 단위 근거, 단일값만)
+ *   1. 엔진이 뽑은 상품 성별 men/women (카테고리 유래 등 상품 단위 근거, 단일값만).
+ *      엔진 unisex 는 약한 주장이라 3·4 가 men/women 을 명시하면 양보하고,
+ *      그런 신호가 없을 때만 확정된다 (6 위, config_default 바로 위).
  *   2. kids 가드 (성인 토큰 없이 아동 신호만 있으면 미확인)
  *   3. URL 경로
  *   4. 상품명/카테고리/태그 텍스트
@@ -374,7 +376,22 @@ export function resolveProductGenderWithSource(
   // 전역 기본값은 URL/텍스트 추론보다 **아래**에서만 쓰여야 한다. 그러지 않으면
   // dedup merge 에서 동순위 충돌이 나 ['men','women'] union 이 만들어진다.
   const isConfigDefault = productGenderSource === "config_default"
-  if (fromProduct.length > 0 && !isConfigDefault) {
+
+  // 엔진이 뽑은 men/women 은 상품 단위 단언이므로 그대로 확정한다.
+  //
+  // unisex 만 예외다 (2026-08-25). 엔진 unisex 의 실제 출처는 대부분
+  // `SiteConfig.category.categories[].gender` 인데, 성별 부서가 없는 편집샵을
+  // 온보딩할 때 "성별 구분이 없다"를 unisex 로 적어 버린 경우가 섞여 있다.
+  // 그건 "남녀공용 확인됨"이 아니라 "모름"이고, 아래 config_default 분기가
+  // 전역 `defaultGender: ["unisex"]` 를 바로 그 이유로 버린다 — 같은 값을
+  // 카테고리에 적었다고 통과시키면 앞뒤가 맞지 않는다.
+  // 그래서 엔진 unisex 는 URL·상품명이 men/women 을 명시하면 양보한다.
+  // URL↔텍스트 병합에서 이미 쓰는 "구체가 unisex 를 이긴다" 규율 그대로다.
+  // 실측(2026-08-25): etcseoul 이 10개 카테고리를 전부 unisex 로 적어
+  // `킨_ MEN'S JASPER [SILVER MINK]` 가 여성 검색에 노출됐다. 전 코퍼스에서
+  // 이 규칙이 뒤집는 행은 10개 플랫폼 267행이다.
+  const engineGender = !isConfigDefault && fromProduct.length === 1 ? fromProduct[0]! : null
+  if (engineGender !== null && engineGender !== "unisex") {
     return {gender: fromProduct, source: productGenderSource}
   }
 
@@ -393,8 +410,13 @@ export function resolveProductGenderWithSource(
     (cleaned, pattern) => cleaned.replace(pattern, " "),
     value,
   ) ?? value
+  //
+  // 엔진이 unisex 를 준 행은 이 가드를 타지 않는다 — 아래에서 엔진 값으로
+  // 확정되므로 기존 동작이 그대로 보존된다. 엔진 unisex 에 대한 이번 변경은
+  // "구체 신호가 있을 때만 양보" 하나로 좁혀 둔다.
   if (
-    rawFromText === null
+    engineGender === null
+    && rawFromText === null
     && fromUrl === null
     && (isKidsText(stripKidsNoise(text)) || isKidsText(stripKidsNoise(url)))
   ) {
@@ -421,8 +443,16 @@ export function resolveProductGenderWithSource(
   if (fromUrl !== null && fromText !== null && fromUrl !== fromText) {
     if (fromUrl === "unisex") return {gender: [fromText], source: "text"}
     if (fromText === "unisex") return {gender: [fromUrl], source: "url"}
+    // 엔진 unisex 가 있어도 상충을 덮지 않는다 — 그 값 자체가 "모름"이라
+    // 두 근거 중 어느 쪽을 지지하는 증거가 못 된다.
+    if (engineGender !== null) return {gender: [engineGender], source: productGenderSource}
     return {gender: [], source: null, conflict: {url: fromUrl, text: fromText}}
   }
+  // 구체 신호(men/women)만 엔진 unisex 를 이긴다. 양쪽 다 unisex 이거나
+  // 신호가 없으면 아래에서 엔진 값으로 확정된다.
+  if (fromUrl !== null && fromUrl !== "unisex") return {gender: [fromUrl], source: "url"}
+  if (fromText !== null && fromText !== "unisex") return {gender: [fromText], source: "text"}
+  if (engineGender !== null) return {gender: [engineGender], source: productGenderSource}
   if (fromUrl !== null) return {gender: [fromUrl], source: "url"}
   if (fromText !== null) return {gender: [fromText], source: "text"}
 
