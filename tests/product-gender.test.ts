@@ -468,3 +468,57 @@ test("men vs women 은 여전히 진짜 충돌", () => {
   assert.deepEqual(r.gender, [])
   assert.deepEqual(r.conflict, {url: "men", text: "women"})
 })
+
+// ─── 엔진 unisex 는 약한 주장이다 (2026-08-25) ────────────────────────────
+//
+// 엔진 unisex 의 실제 출처는 대부분 `SiteConfig.category.categories[].gender`
+// 이고, 성별 부서가 없는 편집샵을 온보딩하며 "구분이 없다"를 unisex 로 적은
+// 경우가 섞여 있다. 전역 `defaultGender: ["unisex"]` 는 같은 이유로 버려지는데
+// 카테고리에 적으면 통과하던 비대칭을 없앤다.
+
+test("엔진 unisex 는 상품명의 명시적 성별에 양보한다", () => {
+  // 실측: etcseoul 이 10개 카테고리를 전부 unisex 로 적어 이 상품이
+  // 여성 검색 결과에 노출됐다.
+  assert.deepEqual(
+    resolveProductGenderWithSource(["unisex"], {name: "킨_ MEN'S JASPER [SILVER MINK]"}),
+    {gender: ["men"], source: "text"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource(["unisex"], {name: "KEEN WOMEN'S JASPER"}),
+    {gender: ["women"], source: "text"},
+  )
+  assert.deepEqual(
+    resolveProductGenderWithSource(["unisex"], {name: "Wool Coat", productUrl: "https://x.com/kr/ko/men/coat-1"}),
+    {gender: ["men"], source: "url"},
+  )
+})
+
+test("엔진 unisex 는 구체 신호가 없으면 그대로 확정된다", () => {
+  assert.deepEqual(
+    resolveProductGenderWithSource(["unisex"], {name: "GARMENT-DYED SOUND BAR T-SHIRT"}),
+    {gender: ["unisex"], source: "engine"},
+  )
+  // 텍스트도 unisex 면 서로 지지하므로 여전히 unisex.
+  assert.deepEqual(
+    resolveProductGenderWithSource(["unisex"], {name: "UNISEX RELAXED TEE"}),
+    {gender: ["unisex"], source: "engine"},
+  )
+})
+
+test("엔진 men/women 은 여전히 URL·텍스트를 이긴다", () => {
+  assert.deepEqual(
+    resolveProductGenderWithSource(["women"], {name: "MEN'S COAT", productUrl: "https://x.com/men/1"}),
+    {gender: ["women"], source: "engine"},
+  )
+})
+
+test("엔진 unisex 는 URL↔텍스트 상충을 덮지 않고 유지된다", () => {
+  // 두 근거가 싸우는 상황에서 "모름"인 엔진값은 어느 쪽도 지지하지 못한다.
+  // 다만 적재 수율을 지키기 위해 기존 unisex 를 그대로 둔다 (미확인으로
+  // 떨어뜨리지 않는다).
+  const r = resolveProductGenderWithSource(["unisex"], {
+    name: "WOMEN'S COAT",
+    productUrl: "https://x.com/kr/ko/men/coat-1",
+  })
+  assert.deepEqual(r, {gender: ["unisex"], source: "engine"})
+})

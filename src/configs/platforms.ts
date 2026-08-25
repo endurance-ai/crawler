@@ -503,19 +503,27 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 446, gender: ["unisex"]},
-        {name: "Outer", cateNo: 170, gender: ["unisex"]}, // Jacket
-        {name: "Knitwear", cateNo: 450, gender: ["unisex"]},
-        {name: "Shirts", cateNo: 169, gender: ["unisex"]},
-        {name: "Top", cateNo: 171, gender: ["unisex"]}, // T-Shirts
-        {name: "Bottom", cateNo: 103, gender: ["unisex"]},
-        {name: "Bottom", cateNo: 1368, gender: ["unisex"]}, // Shorts
-        {name: "Shoes", cateNo: 137, gender: ["unisex"]},
-        {name: "Accessories", cateNo: 26, gender: ["unisex"]}, // Headwear
-        {name: "Accessories", cateNo: 27, gender: ["unisex"]},
+        // 2026-08-25 정정: 원래 10개 전부 gender: ["unisex"] 였다. **틀렸다** —
+        // etcseoul.com 내비게이션에는 성별 부서가 아예 없다(품목 + 브랜드 축만
+        // 있다). "성별 구분이 없다"는 unisex 의 근거가 아니라 "모름"이고,
+        // 검색 RPC 가 unisex 를 남녀 양쪽에 노출하므로 그대로 두면 남성복이
+        // 여성 결과로 샌다(실측: `킨_ MEN'S JASPER [SILVER MINK]` 가 상품명에
+        // MEN'S 를 달고도 unisex 로 적재돼 여성 검색에 노출). 같은 파일의
+        // 8division 처리와 동일하게 성별을 채우지 않는다 — 상품 단위 근거
+        // (상품명 MEN'S/WOMEN'S 표기)가 있으면 그쪽이 쓰인다.
+        {name: "Outer", cateNo: 446},
+        {name: "Outer", cateNo: 170}, // Jacket
+        {name: "Knitwear", cateNo: 450},
+        {name: "Shirts", cateNo: 169},
+        {name: "Top", cateNo: 171}, // T-Shirts
+        {name: "Bottom", cateNo: 103},
+        {name: "Bottom", cateNo: 1368}, // Shorts
+        {name: "Shoes", cateNo: 137},
+        {name: "Accessories", cateNo: 26}, // Headwear
+        {name: "Accessories", cateNo: 27},
       ],
     },
-    notes: "unisex. Coat/Jacket 분리, 10개 카테고리",
+    notes: "성별 미구분 편집샵(내비에 MEN/WOMEN 부서 없음). 카테고리를 gender 근거로 쓰지 않음 — 상품명 표기만 사용. Coat/Jacket 분리, 10개 카테고리",
   },
   {
     key: "visualaid",
@@ -3171,14 +3179,54 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     brand: "RAR",
     notes: "imweb 파일럿 — brand_node_id=5341, detect platform_family=imweb",
   },
+  // 2026-08-25 정정: 원래 `defaultGender: ["women"]` 하나였다. **틀렸다** —
+  // taille.kr 은 /Menshop 과 /Womenshop 을 모두 운영하는 남녀 병행 브랜드다.
+  // 그 결과 MEN 부서 상품이 통째로 여성으로 적재됐다(실측: 609행 중 414행,
+  // 예 `BLANCHE COMO SHIRT INK BLACK` /171·/195 = MEN 인데 ["women"]).
+  // imweb 메뉴 번호는 URL 경로 그대로이고 부서가 그 트리로 갈리므로, 메뉴를
+  // 성별과 함께 고정해 상품 단위 근거(engine)로 올린다. 2026-08-25 라이브에서
+  // 각 페이지의 active 브레드크럼(MEN/WOMEN > READY TO WEAR > …)으로 확인.
+  //
+  // 순서 주의: imweb 엔진은 상품 code 로 dedup 하고 **먼저 만난 카테고리**의
+  // 이름·성별을 쓴다. 품목 메뉴를 앞에, 부서 전체 메뉴(모두 보기/새로운 컬렉션)를
+  // 뒤에 둬야 category 값이 품목으로 남는다.
+  // defaultGender 는 두지 않는다 — 맵에 빠진 메뉴가 생기면 조용히 한쪽 성별로
+  // 세탁되는 것이 이번 사고의 원인이었다.
   {
     key: "taille",
     name: "Taille",
     type: "imweb",
-    baseUrl: "https://taille.kr",
-    defaultGender: ["women"],
     brand: "Taille",
-    notes: "imweb 파일럿 — brand_node_id=2205, detect platform_family=imweb",
+    baseUrl: "https://taille.kr",
+    category: {
+      discovery: "manual",
+      categories: [
+        // ── MEN (/Menshop > READY TO WEAR = 170) ──
+        {name: "Outer", cateNo: 172, url: "https://taille.kr/172", gender: ["men"]}, // 아우터
+        {name: "Outer", cateNo: 235, url: "https://taille.kr/235", gender: ["men"]}, // 레더
+        {name: "Outer", cateNo: 236, url: "https://taille.kr/236", gender: ["men"]}, // 수트
+        {name: "Top", cateNo: 173, url: "https://taille.kr/173", gender: ["men"]}, // 탑
+        {name: "Knitwear", cateNo: 204, url: "https://taille.kr/204", gender: ["men"]}, // 니트웨어
+        {name: "Bottom", cateNo: 174, url: "https://taille.kr/174", gender: ["men"]}, // 팬츠
+        {name: "Bottom", cateNo: 205, url: "https://taille.kr/205", gender: ["men"]}, // 데님
+        {name: "Accessories", cateNo: 175, url: "https://taille.kr/175", gender: ["men"]}, // 액세서리
+        {name: "", cateNo: 196, url: "https://taille.kr/196", gender: ["men"]}, // 에센셜
+        {name: "", cateNo: 171, url: "https://taille.kr/171", gender: ["men"]}, // 새로운 컬렉션
+        {name: "", cateNo: 195, url: "https://taille.kr/195", gender: ["men"]}, // 모두 보기
+        // ── WOMEN (/Womenshop > READY TO WEAR = 176) ──
+        {name: "Outer", cateNo: 178, url: "https://taille.kr/178", gender: ["women"]}, // 아우터
+        {name: "Outer", cateNo: 237, url: "https://taille.kr/237", gender: ["women"]}, // 레더
+        {name: "Top", cateNo: 179, url: "https://taille.kr/179", gender: ["women"]}, // 탑
+        {name: "Knitwear", cateNo: 206, url: "https://taille.kr/206", gender: ["women"]}, // 니트웨어
+        {name: "Bottom", cateNo: 180, url: "https://taille.kr/180", gender: ["women"]}, // 팬츠
+        {name: "Bottom", cateNo: 207, url: "https://taille.kr/207", gender: ["women"]}, // 데님
+        {name: "Accessories", cateNo: 181, url: "https://taille.kr/181", gender: ["women"]}, // 액세서리
+        {name: "", cateNo: 198, url: "https://taille.kr/198", gender: ["women"]}, // 에센셜
+        {name: "", cateNo: 177, url: "https://taille.kr/177", gender: ["women"]}, // 새로운 컬렉션
+        {name: "", cateNo: 197, url: "https://taille.kr/197", gender: ["women"]}, // 모두 보기
+      ],
+    },
+    notes: "imweb 파일럿 — brand_node_id=2205, detect platform_family=imweb. MEN/WOMEN 부서 병행 — 메뉴별 성별 맵 필수(2026-08-25 라이브 확인)",
   },
   {
     key: "dogmaehks",
