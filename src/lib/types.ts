@@ -107,6 +107,14 @@ export interface PricingObservation {
 
 export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "farfetch" | "imweb"
 
+export interface Cafe24ListingCursor {
+  version: 1
+  engine: "cafe24"
+  configFingerprint: string
+  categoryIndex: number
+  page: number
+}
+
 export interface Cafe24Selectors {
   /** 상품 리스트 컨테이너 (기본: ul.thumbnail) */
   listContainer?: string
@@ -297,7 +305,13 @@ export interface CrawlResult {
     detailMs?: number
     /** 상세 페이지 내비게이션 시도 횟수(증분 크롤이 제거할 대상 비용). */
     detailNavCount?: number
+    /** Product cards seen again through another category in this slice. */
+    duplicateProductObservations?: number
+    /** Number of configured/discovered categories completed in this slice. */
+    categoriesCompleted?: number
   }
+  /** Present only when a listing slice stopped cleanly at a page boundary. */
+  continuation?: Cafe24ListingCursor
   /** 크롤이 실패했거나 불완전하다는 신호 — 엔진/네트워크 오류. */
   errors: string[]
   /**

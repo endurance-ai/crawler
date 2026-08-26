@@ -15,16 +15,25 @@ import {runAsyncPool} from "./lib/async-pool"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlFarfetch} from "./lib/farfetch-engine"
 import {crawlImweb} from "./lib/imweb-engine"
-import {diffListing, type RefreshableRow, type RefreshUpdate} from "./lib/listing-refresh"
+import {
+  diffListing,
+  refreshCycleCoverage,
+  type RefreshableRow,
+  type RefreshUpdate,
+} from "./lib/listing-refresh"
 import {createProductCollectionClient, type ProductCollectionClient} from "./lib/product-collection"
 import {installRequestBlocking} from "./lib/request-blocking"
 import {
   enqueueRefreshCandidates,
+  checkpointRefreshCycle,
+  finalizeRefreshCycle,
   finishRefreshRun,
   loadExistingBrands,
   loadRefreshProductCounts,
   loadRefreshRunOutcomes,
   loadRefreshSourceStates,
+  reconcileStaleRefreshRuns,
+  startOrResumeRefreshCycle,
   startRefreshRun,
   syncRefreshSources,
   touchProductsLastSeen,
@@ -38,6 +47,9 @@ import {crawlShopify} from "./lib/shopify-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
 import {crawlZara} from "./lib/zara-engine"
+
+const DB_READ_TIMEOUT_MS = 20_000
+const DB_PRIMARY_WRITE_TIMEOUT_MS = 10_000
 
 const ALL_TYPES: PlatformType[] = [
   "cafe24",
@@ -55,6 +67,7 @@ interface Flags {
   site: string | null
   minCoverage: number
   concurrency: number
+  sourceSliceMinutes: number
   dryRun: boolean
   auditPrices: boolean
   priceOnly: boolean
@@ -69,6 +82,7 @@ function parseFlags(): Flags {
     site: null,
     minCoverage: 0.7,
     concurrency: 2,
+    sourceSliceMinutes: 10,
     dryRun: false,
     auditPrices: false,
     priceOnly: false,
@@ -86,6 +100,8 @@ function parseFlags(): Flags {
     else if (arg.startsWith("--min-coverage=")) flags.minCoverage = Number(arg.split("=")[1])
     else if (arg.startsWith("--concurrency=")) {
       flags.concurrency = Math.max(1, Math.floor(Number(arg.split("=")[1]) || 1))
+    } else if (arg.startsWith("--source-slice-minutes=")) {
+      flags.sourceSliceMinutes = Math.max(1, Number(arg.split("=")[1]) || 10)
     }
   }
   return flags
@@ -137,7 +153,9 @@ async function fetchExistingRows(
   for (let offset = 0; ; offset += pageSize) {
     const {data, error} = await db
       .from("products")
-      .select("product_url, price, original_price, sale_price, source_price, source_currency, in_stock")
+      .select(
+        "product_url, price, original_price, sale_price, source_price, source_currency, in_stock,last_seen_at",
+      )
       .eq("platform", platformKey)
       // ORDER BY 없는 LIMIT/OFFSET 은 페이지 간 행 순서가 보장되지 않아 누락이 생긴다.
       // 누락된 행은 existing 에 없으므로 크롤된 그 URL 이 **신규 상품으로 오인**되어
@@ -148,6 +166,7 @@ async function fetchExistingRows(
       // loadExistingBrands 는 같은 이유로 이미 .order("id") 를 붙여 뒀다.
       .order("product_url", {ascending: true})
       .range(offset, offset + pageSize - 1)
+      .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
     if (error) throw new Error(`products 조회 실패: ${error.message}`)
     const page = (data ?? []) as RefreshableRow[]
     rows.push(...page)
@@ -157,7 +176,10 @@ async function fetchExistingRows(
 }
 
 /** Listing-only crawl through every registered engine. */
-async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
+async function crawlListing(
+  config: SiteConfig,
+  options: {cursor?: RefreshWorklistEntry["refresh_cursor"]; deadlineAt?: number} = {},
+): Promise<CrawlResult> {
   const listingConfig: SiteConfig = {...config, crawlDetails: false, crawlReviews: false}
   switch (config.type) {
     case "shopify":
@@ -190,7 +212,10 @@ async function crawlListing(config: SiteConfig): Promise<CrawlResult> {
           // 가격을 리스트에 안 띄우는 상점 대응 — 가격이 빠진 상품만 상세를 본다.
           // 건강한 상점은 방문 0회다. shopify/imweb 는 JSON/API 에서 가격이 나오므로 대상 아님.
           recoverMissingPriceFromDetail: true,
+          priceRecoveryMode: "missing-current",
           detailConcurrency: 4,
+          listingCursor: options.cursor ?? undefined,
+          listingDeadlineAt: options.deadlineAt,
         })
       } finally {
         await browser.close()
@@ -219,6 +244,7 @@ async function applyUpdates(
       .from("products")
       .update({...payload, updated_at: new Date().toISOString()})
       .eq("product_url", update.productUrl)
+      .abortSignal(AbortSignal.timeout(DB_PRIMARY_WRITE_TIMEOUT_MS))
     if (error) {
       failed += 1
       if (failed <= 3) console.error(`   ❌ update 실패 ${update.productUrl}: ${error.message}`)
@@ -244,7 +270,16 @@ async function main() {
   const startedAt = Date.now()
   const budgetMs = flags.budgetMinutes * 60_000
 
-  if (!flags.dryRun && !flags.auditPrices) await syncRefreshSources(db, PLATFORMS)
+  if (!flags.dryRun && !flags.auditPrices) {
+    await syncRefreshSources(db, PLATFORMS)
+    try {
+      const staleBefore = new Date(startedAt - 12 * 60 * 60_000).toISOString()
+      const reconciled = await reconcileStaleRefreshRuns(db, staleBefore)
+      if (reconciled > 0) console.log(`🧹 중단된 refresh 실행 기록 ${reconciled}건 정리`)
+    } catch (error) {
+      console.error(`⚠️ 중단 실행 기록 정리 실패 (계속 진행): ${error}`)
+    }
+  }
   const [worklist, brands] = await Promise.all([
     fetchWorklist(db, flags.types, flags.ignoreBackoff || flags.auditPrices),
     flags.dryRun || flags.auditPrices ? Promise.resolve([]) : loadExistingBrands(db),
@@ -285,7 +320,8 @@ async function main() {
   console.log(
     `📋 갱신 워크리스트: ${entries.length}개 소스 · DB ${targetProducts}행` +
       ` (스킵 ${worklist.skipped.length}) | 예산 ${flags.budgetMinutes}분` +
-      ` | 동시 ${flags.concurrency}개 | 완전성 가드 ${flags.minCoverage}`,
+      ` | 동시 ${flags.concurrency}개 | 소스 조각 ${flags.sourceSliceMinutes}분` +
+      ` | 완전성 가드 ${flags.minCoverage}`,
   )
   if (flags.auditPrices) console.log("   🔍 가격 감사 모드 — 크롤/DB 조회만 수행하고 쓰지 않음")
   if (flags.priceOnly) console.log("   💰 가격 전용 모드 — 재고/last_seen/candidate는 변경하지 않음")
@@ -319,24 +355,71 @@ async function main() {
   let brandUnmatchedTotal = 0
   let guardTripped = 0
   let attempted = 0
+  let partialSlices = 0
   let budgetStopped = false
+  let skippedSources = 0
+  let writeFailures = 0
+  let lastSeenFailures = 0
+  let candidateFailures = 0
+  let telemetryFailures = 0
   const failures: string[] = []
 
+  const finishRunBestEffort = async (
+    run: {id: number; startedAt: number} | null,
+    input: Omit<Parameters<typeof finishRefreshRun>[1], "id" | "startedAt">,
+  ): Promise<void> => {
+    if (!run || flags.auditPrices) return
+    try {
+      await finishRefreshRun(db, {...input, id: run.id, startedAt: run.startedAt})
+    } catch (error) {
+      telemetryFailures += 1
+      const detail = error instanceof Error ? error.message : String(error)
+      console.error(`   ⚠️ ${input.platformKey} 실행 기록 마감 실패 (계속 진행): ${detail}`)
+    }
+  }
+
+  const initialSourceCount = entries.length
   await runAsyncPool(
     entries,
     flags.concurrency,
     async (entry) => {
       attempted += 1
       const label = `${entry.platform_key} (${entry.config.type})`
-      const run = flags.auditPrices
-        ? {id: 0, startedAt: Date.now()}
-        : await startRefreshRun(db, {
+      const sourceStartedAt = Date.now()
+      let run: {id: number; startedAt: number; sourceStateError?: string | null} | null = flags.auditPrices
+        ? {id: 0, startedAt: sourceStartedAt}
+        : null
+      if (!flags.auditPrices) {
+        try {
+          run = await startRefreshRun(db, {
             platformKey: entry.platform_key,
             command: flags.priceOnly ? "refresh-listing --price-only" : "refresh-listing",
           })
+          if (run.sourceStateError) {
+            telemetryFailures += 1
+            console.error(
+              `   ⚠️ ${label} source 시작 상태 기록 실패 (실제 갱신은 계속): ${run.sourceStateError}`,
+            )
+          }
+        } catch (error) {
+          telemetryFailures += 1
+          const detail = error instanceof Error ? error.message : String(error)
+          console.error(`   ⚠️ ${label} 실행 기록 시작 실패 (실제 갱신은 계속): ${detail}`)
+        }
+      }
       try {
+        const cycleStartedAt = flags.auditPrices
+          ? entry.refresh_cycle_started_at ?? new Date(sourceStartedAt).toISOString()
+          : await startOrResumeRefreshCycle(db, {
+              platformKey: entry.platform_key,
+              existingStartedAt: entry.refresh_cycle_started_at,
+            })
+        const sliceDeadlineAt = sourceStartedAt + flags.sourceSliceMinutes * 60_000
         const [crawlResult, existing] = await Promise.all([
-          crawlListing(entry.config),
+          crawlListing(entry.config, {
+            cursor: entry.refresh_cursor,
+            deadlineAt: entry.config.type === "cafe24" ? sliceDeadlineAt : undefined,
+          }),
           fetchExistingRows(db, entry.platform_key),
         ])
         const crawled = crawlResult.products
@@ -349,13 +432,20 @@ async function main() {
           price_unknown: crawled.filter(
             (product) => !product.pricingObservation || product.pricingObservation.state === "unknown",
           ).length,
+          price_unknown_without_current: crawled.filter((product) => {
+            const observation = product.pricingObservation
+            if (observation?.version === 2 && observation.state !== "unknown") return false
+            const current = product.sourcePrice ?? product.price
+            return !(typeof current === "number" && Number.isFinite(current) && current > 0)
+          }).length,
           invalid_price_pairs: crawled.filter(
             (product) => product.salePrice !== null &&
               (!(product.originalPrice !== null && product.salePrice < product.originalPrice) ||
               product.price !== product.salePrice),
           ).length,
         }
-        const priceUpdatesSkipped = pricingMetrics.price_unknown + pricingMetrics.invalid_price_pairs
+        const priceUpdatesSkipped =
+          pricingMetrics.price_unknown_without_current + pricingMetrics.invalid_price_pairs
         const provisional = diffListing({
           crawled,
           existing,
@@ -367,35 +457,17 @@ async function main() {
         // 보지 않는다. 섞여 있던 동안 가격을 못 읽는 것이 재고 이탈 감지까지 막았고
         // 런이 failed 로 남아 성공 이력이 영구히 안 쌓였다 (실측 42개 소스).
         const qualityWarnings = crawlResult.qualityWarnings ?? []
-        if (pricingMetrics.price_unknown > 0) {
-          qualityWarnings.push(`price_unknown=${pricingMetrics.price_unknown}`)
+        const unknownWarning = `price_unknown=${pricingMetrics.price_unknown}`
+        if (pricingMetrics.price_unknown > 0 && !qualityWarnings.includes(unknownWarning)) {
+          qualityWarnings.push(unknownWarning)
         }
         if (pricingMetrics.invalid_price_pairs > 0) {
           qualityWarnings.push(`invalid_price_pairs=${pricingMetrics.invalid_price_pairs}`)
         }
-        // 닿지 못한 것(unreachable)은 가드에서는 errors 와 동일하게 본다 — 리스트가
-        // 안 열렸는데 사라진 상품을 품절 처리하면 안 된다. 백오프에서만 다르게 센다.
+        // 부분 조각에서는 확인하지 않은 상품을 절대 품절 처리하지 않는다. 전체
+        // 주기가 끝나면 last_seen_at 과 cycleStartedAt 으로 한 번에 판정한다.
         const unreachable = crawlResult.unreachable ?? []
-        const guardOk =
-          crawlResult.errors.length === 0 &&
-          unreachable.length === 0 &&
-          provisional.coverage >= flags.minCoverage
-        if (!guardOk && provisional.missingUrls.length > 0) {
-          guardTripped += 1
-          console.log(
-            `   ⚠️ 완전성 가드 — coverage ${(provisional.coverage * 100).toFixed(0)}%` +
-              `, engine errors ${crawlResult.errors.length}, 도달실패 ${unreachable.length}` +
-              `; 누락 ${provisional.missingUrls.length}건 품절 처리 안 함`,
-          )
-        }
-        const diff = guardOk
-          ? diffListing({
-              crawled,
-              existing,
-              sourceCurrency: entry.config.sourceCurrency,
-              markMissingOutOfStock: true,
-            })
-          : provisional
+        const diff = provisional
         const priceN = diff.updates.filter((update) => update.patch.price !== undefined).length
         const stockN = diff.updates.filter((update) =>
           update.reasons.some((reason) => reason.includes("품절") || reason.includes("재입고")),
@@ -408,47 +480,117 @@ async function main() {
         // 확인된 상품은 실제로 살아있고, 사라진 상품을 죽이는 판단은 가드가 따로 한다.
         const seen = flags.auditPrices || flags.priceOnly
           ? {ok: 0, failed: 0}
-          : await touchProductsLastSeen(db, diff.confirmedUrls, new Date(run.startedAt).toISOString())
-        const queued = flags.auditPrices || flags.priceOnly
-          ? {discovered: 0, brandUnmatched: 0, queued: 0}
-          : await enqueueRefreshCandidates(db, {
+          : await touchProductsLastSeen(
+              db,
+              diff.confirmedUrls,
+              new Date().toISOString(),
+            )
+        let queued = {discovered: 0, brandUnmatched: 0}
+        let candidateError: string | null = null
+        if (!flags.auditPrices && !flags.priceOnly) {
+          try {
+            queued = await enqueueRefreshCandidates(db, {
               products: unknownProducts(crawled, diff.unknownUrls),
               config: entry.config,
               brands,
             })
+          } catch (error) {
+            candidateFailures += 1
+            candidateError = error instanceof Error ? error.message : String(error)
+            console.error(`   ⚠️ ${label} candidate 적재 실패 (가격·재고는 유지): ${candidateError}`)
+          }
+        }
+
+        const cycleDegraded =
+          entry.refresh_cycle_degraded ||
+          crawlResult.errors.length > 0 ||
+          unreachable.length > 0 ||
+          seen.failed > 0
+        const cycleCoverage = flags.auditPrices && !entry.refresh_cycle_started_at
+          ? provisional.coverage
+          : refreshCycleCoverage(existing, diff.confirmedUrls, cycleStartedAt)
+        const complete = !crawlResult.continuation
+        const coverageOk = cycleCoverage >= flags.minCoverage
+        const markMissingOutOfStock =
+          complete && !flags.priceOnly && !cycleDegraded && coverageOk
+        const shouldRequeue = Boolean(crawlResult.continuation) && Date.now() - startedAt < budgetMs
+        let missingStockN = 0
+
+        if (!flags.auditPrices) {
+          if (crawlResult.continuation) {
+            await checkpointRefreshCycle(db, {
+              platformKey: entry.platform_key,
+              cycleStartedAt,
+              cursor: crawlResult.continuation,
+              degraded: cycleDegraded,
+            })
+          } else {
+            missingStockN = await finalizeRefreshCycle(db, {
+              platformKey: entry.platform_key,
+              cycleStartedAt,
+              markMissingOutOfStock,
+            })
+          }
+        }
+
+        if (crawlResult.continuation) {
+          partialSlices += 1
+          entry.refresh_cursor = crawlResult.continuation
+          entry.refresh_cycle_started_at = cycleStartedAt
+          entry.refresh_cycle_degraded = cycleDegraded
+          console.log(
+            `   ↪ 부분 완료 — category ${crawlResult.continuation.categoryIndex + 1}` +
+              ` page ${crawlResult.continuation.page}부터 재개`,
+          )
+        } else if (!markMissingOutOfStock && !flags.priceOnly) {
+          guardTripped += 1
+          console.log(
+            `   ⚠️ 주기 완전성 가드 — coverage ${(cycleCoverage * 100).toFixed(0)}%` +
+              `, degraded=${cycleDegraded}; 미확인 상품 품절 처리 안 함`,
+          )
+        }
 
         priceChanged += priceN
-        stockChanged += stockN
+        stockChanged += stockN + missingStockN
         candidateTotal += queued.discovered
         brandUnmatchedTotal += queued.brandUnmatched
+        writeFailures += applied.failed
+        lastSeenFailures += seen.failed
         // 런 성패도 품질 경고를 보지 않는다 — 가격을 못 읽어도 재고 갱신은 성공한 것이다.
         // 경고는 아래 메트릭에 남겨 추적 가능하게 둔다.
         // unreachable 은 failed 로 친다(성공이 아니므로 last_succeeded_at 을 올리면
         // 안 된다). 다만 백오프 사다리는 metrics.unreachable_only 를 보고 건너뛴다.
         const failed =
-          applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
+          applied.failed > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
         const unreachableOnly =
           unreachable.length > 0 && applied.failed === 0 && seen.failed === 0 && crawlResult.errors.length === 0
+        const dbPartialOnly =
+          applied.failed > 0 && crawlResult.errors.length === 0 && unreachable.length === 0
+        const status = failed
+          ? "failed"
+          : crawlResult.continuation
+            ? "partial"
+            : !flags.priceOnly && (cycleDegraded || !coverageOk)
+              ? "skipped"
+              : "success"
         console.log(
           `✓ ${label}: 리스트 ${crawled.length} · DB ${existing.length}` +
-            ` · 변경 ${diff.updates.length}(가격 ${priceN}, 재고 ${stockN})` +
+            ` · 변경 ${diff.updates.length + missingStockN}` +
+            `(가격 ${priceN}, 재고 ${stockN + missingStockN})` +
             ` · 생존확인 ${seen.ok}` +
             ` · LLM후보 ${queued.discovered} · 브랜드불일치 ${queued.brandUnmatched}` +
             (qualityWarnings.length > 0 ? ` · ⚠️ ${qualityWarnings.join("; ")}` : "") +
             ` · 세일 ${pricingMetrics.sale_detected} · 가격미확정 ${pricingMetrics.price_unknown}` +
-            ` · ${minutes(Date.now() - run.startedAt)}`,
+            ` · ${minutes(Date.now() - (run?.startedAt ?? sourceStartedAt))}`,
         )
-        if (!flags.auditPrices) await finishRefreshRun(db, {
-          id: run.id,
+        await finishRunBestEffort(run, {
           platformKey: entry.platform_key,
-          status: failed ? "failed" : "success",
-          startedAt: run.startedAt,
+          status,
           errorMessage: failed
             ? [
                 ...crawlResult.errors,
                 ...unreachable,
                 applied.failed > 0 ? `update failures=${applied.failed}` : "",
-                seen.failed > 0 ? `last_seen failures=${seen.failed}` : "",
               ]
                 .filter(Boolean)
                 .join(" | ")
@@ -459,31 +601,50 @@ async function main() {
             updated: applied.ok,
             last_seen_touched: seen.ok,
             price_changed: priceN,
-            stock_changed: stockN,
+            stock_changed: stockN + missingStockN,
             candidates: queued.discovered,
             brand_unmatched: queued.brandUnmatched,
-            coverage: Number(diff.coverage.toFixed(3)),
-            guard_tripped: !guardOk,
+            coverage: Number(cycleCoverage.toFixed(3)),
+            slice_coverage: Number(diff.coverage.toFixed(3)),
+            partial: Boolean(crawlResult.continuation),
+            continuation: crawlResult.continuation ?? null,
+            cycle_started_at: cycleStartedAt,
+            cycle_degraded: cycleDegraded,
+            guard_tripped: complete && !markMissingOutOfStock && !flags.priceOnly,
+            missing_marked_out_of_stock: missingStockN,
+            duplicate_product_observations: crawlResult.stats.duplicateProductObservations ?? 0,
+            categories_completed: crawlResult.stats.categoriesCompleted ?? 0,
             engine_errors: crawlResult.errors,
             quality_warnings: qualityWarnings,
             unreachable,
             unreachable_only: unreachableOnly,
+            db_partial_only: dbPartialOnly,
+            last_seen_failures: seen.failed,
+            candidate_enqueue_error: candidateError,
             ...pricingMetrics,
             price_updates_skipped: priceUpdatesSkipped,
-            pricing_complete: pricingMetrics.price_unknown === 0 && pricingMetrics.invalid_price_pairs === 0,
+            pricing_complete:
+              pricingMetrics.price_unknown_without_current === 0 && pricingMetrics.invalid_price_pairs === 0,
           },
         })
-        done += 1
+        // Requeue only after the current run record is closed. Appending to the
+        // shared ordered array puts resumed work behind every source that has
+        // not received its first slice and prevents two workers from running
+        // the same source concurrently.
+        if (shouldRequeue) entries.push(entry)
+        if (complete) done += 1
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error)
+        skippedSources += 1
         failures.push(`${entry.platform_key}: ${detail}`)
-        console.error(`✖ ${label} 실패: ${detail}`)
-        if (!flags.auditPrices) await finishRefreshRun(db, {
-          id: run.id,
+        console.error(`✖ ${label} 실패 (다음 소스로 진행): ${detail}`)
+        await finishRunBestEffort(run, {
           platformKey: entry.platform_key,
           status: "failed",
           errorMessage: detail,
-          startedAt: run.startedAt,
+          metrics: {
+            db_partial_only: detail.startsWith("products 조회 실패:"),
+          },
         })
       }
     },
@@ -495,12 +656,17 @@ async function main() {
   )
 
   if (budgetStopped) {
-    console.log(`\n⏱️ 예산 ${flags.budgetMinutes}분 소진 — ${attempted}개 소스 시도 후 종료`)
+    console.log(`\n⏱️ 예산 ${flags.budgetMinutes}분 소진 — ${attempted}개 조각 시도 후 종료`)
   }
   console.log(
-    `\n📊 갱신 완료: ${done}개 소스 · 가격변동 ${priceChanged} · 재고변동 ${stockChanged}` +
+    `\n📊 갱신 완료: ${done}/${initialSourceCount}개 소스` +
+      ` · 조각 ${attempted}(부분 ${partialSlices})` +
+      ` · 가격변동 ${priceChanged} · 재고변동 ${stockChanged}` +
       ` · LLM후보 ${candidateTotal} · 브랜드불일치 ${brandUnmatchedTotal}` +
-      ` · 가드발동 ${guardTripped} · 소요 ${minutes(Date.now() - startedAt)}`,
+      ` · 가드발동 ${guardTripped} · 소스스킵 ${skippedSources}` +
+      ` · UPDATE실패 ${writeFailures} · 생존확인실패 ${lastSeenFailures}` +
+      ` · candidate실패 ${candidateFailures} · telemetry실패 ${telemetryFailures}` +
+      ` · 소요 ${minutes(Date.now() - startedAt)}`,
   )
   if (failures.length > 0) {
     console.log(`   ⚠️ 실패 ${failures.length}개: ${failures.slice(0, 5).join(" | ")}`)
