@@ -471,21 +471,31 @@ export async function detectShopifyActiveCurrency(
 ): Promise<CurrencyCode | null> {
   const separator = baseUrl.includes("?") ? "&" : "?"
   const url = `${baseUrl}/${separator}country=${encodeURIComponent(country)}`.replace(/\/\/([?&])/, "/$1")
-  try {
-    const res = await fetchImpl(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
-        Cookie: `localization=${country}`,
-      },
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!res.ok) return null
-    return parseShopifyActiveCurrency(await res.text())
-  } catch {
-    return null
+  // 두 번 시도한다. 실패하면 config 값을 그대로 쓰게 되는데 — 통화를 config 로
+  // 단정하던 예전 동작이 바로 그것이다 — 한 번의 일시적 타임아웃으로 안전망이
+  // 조용히 꺼지면 안 된다. 홈페이지가 1MB 를 넘는 스토어가 흔해(slamjam 1.5MB)
+  // 짧은 제한시간에서 실측으로 간헐 실패했다.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchImpl(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+          Cookie: `localization=${country}`,
+        },
+        signal: AbortSignal.timeout(30_000),
+      })
+      if (!res.ok) return null
+      const currency = parseShopifyActiveCurrency(await res.text())
+      if (currency) return currency
+      // 부트스트랩이 없는 스토어는 재시도해도 안 나온다.
+      return null
+    } catch {
+      if (attempt === 1) return null
+    }
   }
+  return null
 }
 
 /**
