@@ -275,15 +275,60 @@ pnpm exec dotenv -e .env.local -- tsx tools/repair-product-platforms.ts --apply=
 
 `products.gender` 출처가 VLM 에서 크롤러로 되돌아왔다. 연구실 배치에 영향이 있다.
 
-### 코드는 자동으로 반영된다
+### ~~코드는 자동으로 반영된다~~ → **더 이상 아니다 (2026-08-26 정정)**
 
-`scripts/lib-batch-prep.sh` 의 `batch_prep()` 이 매 런 `git pull --ff-only` +
-`pnpm install` + config codegen 을 돌리고, `kiko-refresh.service` 가
-`OnSuccess=kiko-refresh-candidates.service` 로 연쇄한다. 즉 refresh 가 한 번 돌면
-신규상품 워커도 새 코드로 갱신된다. **수동 배포 단계는 없다.**
+> ⛔ 원문은 "`batch_prep()` 이 매 런 `git pull --ff-only` + `pnpm install` 을
+> 돌리므로 **수동 배포 단계는 없다**" 였다. **지금은 틀렸다.** 배포 방식이
+> 릴리스 디렉터리로 바뀌면서 자동 pull 이 꺼졌다. §9-1 을 볼 것.
+>
+> 이 서술을 믿고 방치한 결과, 실행 릴리스가 origin/dev 보다 **50 커밋 뒤**에서
+> 멈춰 있었고 커밋되지 않은 핫패치 17개 파일이 서버에만 쌓여 있었다
+> (2026-08-26 실측, PR #115 로 회수).
 
-단 `run-refresh-candidates.sh` 는 `batch_prep` 을 부르지 않는다. 워커만 단독
-실행할 일이 있으면 그 전에 pull 을 직접 해야 한다.
+`kiko-refresh.service` 가 `OnSuccess=kiko-refresh-candidates.service` 로
+연쇄한다는 것은 그대로다 — refresh 가 한 번 돌면 신규상품 워커가 이어서 돈다.
+
+### 9-1. 실제 배포 방식 — 릴리스 디렉터리 + 심볼릭
+
+```
+~/kiko-crawler-runtime  ->  ~/kiko-crawler-releases/<YYYYMMDD>-<이름>   ← 실행되는 코드
+~/kiko-crawler                                                          ← 별개 개발 체크아웃 (실행 안 됨)
+```
+
+systemd 유닛 둘 다 `WorkingDirectory=/home/kjk/kiko-crawler-runtime` 이고
+`ExecStart` 도 그 경로다. 즉 **배포 = 새 릴리스를 만들고 심볼릭을 옮기는 것**이다.
+
+유닛에 `Environment=BATCH_SKIP_UPDATE=true` 가 박혀 있고, `batch_prep()` 은 이
+값이 켜져 있으면 `git pull` 과 `pnpm install` 을 건너뛴다 (`prep 3/3` codegen 만
+돈다). **런타임을 핀 고정하는 것이 의도다** — 배치가 도는 도중에 코드가 바뀌지
+않게 한다. 그러므로 `~/kiko-crawler-runtime` 에서 `git pull` 을 기대하지 말 것.
+
+절차:
+
+```bash
+NEW=~/kiko-crawler-releases/$(date +%Y%m%d)-<이름>
+git clone -q ~/kiko-crawler-runtime "$NEW"
+cd "$NEW"
+git remote set-url origin git@github.com:endurance-ai/crawler.git
+git fetch -q origin dev && git checkout -q -B dev origin/dev
+cp -p ~/kiko-crawler-runtime/.env ~/kiko-crawler-runtime/.env.local ./
+corepack pnpm install --frozen-lockfile
+
+# 검증 후에만 교체 — 배치가 전부 inactive 인지 먼저 확인한다
+systemctl --user is-active kiko-refresh kiko-refresh-candidates \
+  kiko-price-backfill kiko-product-images
+node --test --import tsx ./tests/*.test.ts
+ln -sfn "$NEW" ~/kiko-crawler-runtime
+```
+
+롤백은 심볼릭을 이전 릴리스로 되돌리는 한 줄이다. 이전 릴리스 디렉터리를
+바로 지우지 말 것.
+
+⚠️ `pnpm install` 후 `node_modules/.pnpm` 에 `@esbuild+linux-x64` 가 있는지
+확인한다. 없으면 `tsx` 가 전부 죽는다 — 리포의 `pnpm-lock.yaml` 이 플랫폼
+바이너리를 빠뜨린 이력이 있다(2026-08-26, 이 커밋에서 수정).
+
+단 `run-refresh-candidates.sh` 는 `batch_prep` 을 부르지 않는다.
 
 ### [HARD] 배포 순서 — 이걸 어기면 신규상품 유입이 조용히 0 이 된다
 
