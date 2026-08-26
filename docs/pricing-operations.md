@@ -6,11 +6,14 @@
 - 세일가: `price = sale_price < original_price`
 - 미확정: 크롤 결과는 보존하되 import/refresh의 가격 UPDATE에는 사용하지 않는다.
 
-`pricingObservation.version = 2`이고 상태가 `sale` 또는 `regular`인 결과만 DB 가격을
-바꿀 수 있다. 이 규칙은 온보딩 import와 listing refresh가 공통 매퍼를 통해 동일하게
-적용한다. Shopify는 구매 가능한 variant 중 세일 variant가 하나라도 있으면 가장 낮은
-세일 현재가를 사용한다. Cafe24에서 목록 가격만으로 정상가/세일가를 구분할 수 없으면
-해당 상품의 상세 페이지를 확인한다.
+온보딩 import는 `pricingObservation.version = 2`이고 상태가 `sale` 또는 `regular`인
+결과만 DB 가격을 바꾼다. Shopify는 구매 가능한 variant 중 세일 variant가 하나라도
+있으면 가장 낮은 세일 현재가를 사용한다. Cafe24 refresh는 목록에 단일 현재가가 있으면
+저장된 `original_price`를 기준가로 판정한다. 현재가가 기준가보다 낮으면 세일, 같거나
+높으면 현재가를 새 정상가로 쓰고 `sale_price`를 비운다. 현재가 자체가 없는 상품만
+상세 페이지를 확인하되 목록과 상세를 합친 소스 조각 예산 안에서만 새 상세 요청을
+시작한다. 예산 안에 확인하지 못한 현재가는 기존 DB 가격을 유지한다. 신규상품 온보딩은
+기준가가 없으므로 기존처럼 미확정 가격을 상세에서 확인한다.
 
 ## 감사와 백필
 

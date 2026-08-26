@@ -299,22 +299,25 @@ pnpm exec dotenv -e .env.local -- tsx tools/repair-product-platforms.ts --apply=
 UPDATE 는 계속 성공하므로 대시보드는 초록색인 채 유입만 멈춘다 — migration 099 가
 기록한 color 사고와 같은 모양이다.
 
-⚠️ 사이클을 오해하지 말 것. `OnUnitInactiveSec=15min` 은 **주기가 아니라 런이
-끝난 뒤의 휴식**이다. `kiko-refresh.service` 가 `--budget-minutes=480`
-(TimeoutStartSec=32400) 이고 실측 한 패스가 6.5~8시간이므로 실제 사이클은
-**약 8~9시간 + 15분**이다. 신규상품 워커는 그 뒤에 `OnSuccess` 로 붙는다.
+현재 운영은 `18:00 KST` 야간 1회다. refresh는 600분 예산·소스당 10분 재개 조각·
+동시성 6·hard timeout 10시간 30분이며 성공 후 신규상품 워커가 `OnSuccess`로 이어진다. 가격·재고 행, 보조
+`last_seen`, candidate, 실행 이력의 개별 DB 실패는 기록하고 다음 항목으로 넘어간다.
+초기 worklist를 만들 수 없을 때만 전체 런이 실패한다.
 
-빈도가 낮다는 것이 위험을 줄이지 않는다 — 오히려 **발견이 늦다.** 하루 한두 번만
-도니까 실패가 다음 날에야 드러난다. 같은 이유로 이 서버가 새 코드를 받는 데도
-최대 9시간이 걸린다(진행 중인 런이 끝나야 `batch_prep()` 의 git pull 이 돈다).
-급하면 `systemctl --user start kiko-refresh.service` 로 한 사이클을 앞당길 수 있다.
+2026-08-17 고정 24소스 audit(15분 claim window)에서 동시성 4는 17조각·14소스,
+동시성 6은 27조각·23소스를 처리했고 둘 다 오류 0이었다. c6 메모리는 32GiB 가용,
+swap 0이어서 일일 커버리지 기준으로 6을 채택했다.
+
+운영 체크아웃은 `/home/kjk/kiko-crawler-runtime`이다. 작업용 dirty checkout과
+분리하며 배치 안에서 git pull이나 pnpm install을 실행하지 않는다. 새 코드 배포는
+runtime checkout을 명시적으로 fast-forward하고 검증한 뒤 수행한다.
 
 검증:
 
 ```bash
 ssh kjk@100.70.101.17
-git -C /home/kjk/kiko-crawler log --oneline -1     # 성별 롤백 커밋이 보여야 한다
-grep -c . /home/kjk/kiko-crawler/src/lib/product-gender.ts   # 파일이 있어야 한다
+git -C /home/kjk/kiko-crawler-runtime log --oneline -1
+grep -c . /home/kjk/kiko-crawler-runtime/src/lib/product-gender.ts
 systemctl --user status kiko-refresh-candidates
 ```
 
