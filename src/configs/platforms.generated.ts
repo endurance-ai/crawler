@@ -4,8 +4,8 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-26T01:30:31.033Z.
- * Total: 475 (active 451 / disabled 24)
+ * transitions. Generated 2026-08-26T05:59:13.235Z.
+ * Total: 475 (active 452 / disabled 23)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -756,8 +756,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    disabled: true,
-    notes: "generate-platform-configs.ts — brand_node_id=587, status=imported, auto-generated — currency undetected via /cart.js, disabled to avoid mispricing",
+    notes: "generate-platform-configs.ts — brand_node_id=587, status=imported, auto-generated",
   },
   {
     key: "bode",
@@ -2890,7 +2889,8 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://www.emostanceclub.co.kr",
     brand: "EMOSTANCECLUB",
-    notes: "generate-platform-configs.ts — brand_node_id=2470, status=embedded, auto-generated",
+    crawlDetails: true,
+    notes: "generate-platform-configs.ts — brand_node_id=2470, status=imported, auto-generated",
   },
   {
     key: "minedenim",
@@ -3800,22 +3800,24 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     key: "misekiseoul",
     name: "MISEKISEOUL",
     type: "cafe24",
-    baseUrl: "https://misekiseoul.com",
+    baseUrl: "https://misekiseoul.kr",
     brand: "MISEKISEOUL",
-    sourceCurrency: "JPY",
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
     category: {
       discovery: "manual",
       categories: [
-        {name: "Cat9", cateNo: 9},
-        {name: "Cat13", cateNo: 13},
-        {name: "cate_no=43", cateNo: 43},
-        {name: "cate_no=51", cateNo: 51},
+        {name: "MEN", cateNo: 79, gender: ["men"]},
+        {name: "WOMEN", cateNo: 98, gender: ["women"]},
+        {name: "COLLECTION", cateNo: 155},
+        {name: "COLLABORATION", cateNo: 153},
+        {name: "REI X MISEKI", cateNo: 191},
+        {name: "STYLE", cateNo: 180},
+        {name: "ARCHIVE", cateNo: 194},
       ],
     },
-    notes: "generate-platform-configs.ts — brand_node_id=3892, status=imported, auto-generated — sourceCurrency=JPY verified from rendered Cafe24 list price",
+    notes: "generate-platform-configs.ts — brand_node_id=3892, status=imported, auto-generated",
   },
   {
     key: "en-3896",
