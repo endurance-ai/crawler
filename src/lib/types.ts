@@ -4,6 +4,43 @@
 
 import type {GenderSource} from "./product-gender"
 
+// ─── 통화 ─────────────────────────────────────────────
+
+/**
+ * 수집 대상 사이트에서 실제로 관측된 ISO-4217 코드.
+ *
+ * 열린 `string` 대신 유니온인 이유는 config 오타를 컴파일 타임에 잡기
+ * 위해서다. 새 통화를 만나면 여기에 **추가**하고, 필요하면
+ * `CURRENCY_TO_COUNTRY`/`CURRENCY_SYMBOL`(src/lib/fx.ts)에도 넣는다 —
+ * 환율 자체는 런타임 테이블에서 오므로 여기 없다고 환산이 막히진 않는다.
+ */
+export type CurrencyCode =
+  | "KRW"
+  | "USD"
+  | "EUR"
+  | "GBP"
+  | "JPY"
+  | "CNY"
+  | "HKD"
+  | "TWD"
+  | "SGD"
+  | "THB"
+  | "AUD"
+  | "NZD"
+  | "CAD"
+  | "CHF"
+  | "SEK"
+  | "DKK"
+  | "NOK"
+  | "PLN"
+  | "EGP"
+  | "AED"
+  | "INR"
+  | "PHP"
+  | "VND"
+  | "MXN"
+  | "BRL"
+
 // ─── 상품 ─────────────────────────────────────────────
 
 export interface Product {
@@ -63,7 +100,7 @@ export interface Product {
   tags?: string[]
   productCode?: string
   /** 원본 통화 ISO 코드 (해외 사이트용, 기본 KRW). price 필드는 KRW 환산값 */
-  sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
+  sourceCurrency?: CurrencyCode
   /** 원본 통화 기준 가격 (환산 전) */
   sourcePrice?: number
   // ── LLM 보강 provenance (src/enrich-products-file.ts) ──
@@ -230,8 +267,16 @@ export interface SiteConfig {
   paginate?: boolean
   /** 최대 페이지 수 (기본: 10) */
   maxPages?: number
-  /** 원본 통화. 미지정 시 KRW로 간주 (Shopify/해외 멀티샵 Cafe24 등) */
-  sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
+  /**
+   * 원본 통화. 미지정 시 KRW로 간주 (Shopify/해외 멀티샵 Cafe24 등).
+   *
+   * Shopify 사이트는 이 값이 `?country=` 마켓 선택까지 좌우한다 —
+   * `CURRENCY_TO_COUNTRY[sourceCurrency]` 가 크롤 대상 마켓이므로, 한국
+   * 마켓을 지원하는 스토어는 KRW 로 두어야 현지 원화가를 그대로 받는다.
+   * 실제 통화는 크롤 시점에 재검증되며(`detectShopifyActiveCurrency`),
+   * 스토어가 이 통화를 내주지 않으면 관측된 통화로 덮어쓴다.
+   */
+  sourceCurrency?: CurrencyCode
   /** 요청 간 딜레이 ms (기본: 2000) */
   crawlDelay?: number
   /**

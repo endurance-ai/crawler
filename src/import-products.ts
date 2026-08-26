@@ -15,6 +15,7 @@ import {createClient} from "@supabase/supabase-js"
 // only the DB upsert payload sees post-conversion KRW.
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
 import {isConfirmedPricing, toDbPriceFields} from "./lib/product-pricing"
+import {initFxRates} from "./lib/fx"
 import {applyValidationGate} from "./lib/core/validation-gate"
 import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
@@ -548,6 +549,10 @@ async function resolveUnknownBrands(
 }
 
 async function main() {
+  // 환율은 적재 시점 기준이다. toDbPriceFields → convertToKrw 가 첫 상품을
+  // 만나기 전에 한 번 받아둔다 (실패해도 커밋된 스냅샷으로 계속 진행).
+  await initFxRates()
+
   const dataDir = path.join(process.cwd(), "data")
 
   if (!fs.existsSync(dataDir)) {

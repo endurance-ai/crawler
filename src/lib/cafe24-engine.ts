@@ -12,7 +12,8 @@
 import {installRequestBlocking} from "./request-blocking"
 import {gotoWithRetry, NavFailureError} from "./nav-retry"
 import {BRAND_NAME_PREFIX_PATTERN} from "./refresh-source"
-import type {CrawlResult, Product, SiteConfig} from "./types"
+import {CURRENCY_SYMBOL, ZERO_DECIMAL_CURRENCIES} from "./fx"
+import type {CrawlResult, CurrencyCode, Product, SiteConfig} from "./types"
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
 import type {DetailData} from "./parsers/detail/types"
@@ -148,6 +149,22 @@ export function cafe24ManualCategoryUrl(
   return category.url
     ? new URL(category.url, `${baseUrl.replace(/\/$/, "")}/`).toString()
     : `${baseUrl}/product/list.html?cate_no=${category.cateNo}`
+}
+
+/**
+ * Lowest amount we will believe as a real listing price, per currency.
+ *
+ * Guards against the parser picking a number out of the product name
+ * ("26SS" → 26) or a discount badge ("10%") and storing it as the price.
+ * The floor has to scale with the currency: ₩1,000 is the right cutoff for
+ * won but would reject a genuine ¥1,650 sock, so zero-decimal currencies get
+ * a floor scaled by their rough KRW magnitude and decimal currencies keep
+ * the original "any positive amount" rule ($9.12 is a normal price).
+ */
+export function minPlausiblePrice(currency: CurrencyCode): number {
+  if (currency === "KRW") return 1000
+  if (currency === "JPY" || currency === "VND") return 100
+  return 0
 }
 
 export interface CrawlCafe24Options {
@@ -558,6 +575,14 @@ async function collectProductsFromPage(
     pricePatternStr: config.pricePattern?.source || null,
     brandPrefixPatternStr: config.brandFromNamePrefix ? BRAND_NAME_PREFIX_PATTERN : null,
     sourceCurrency: config.sourceCurrency || "KRW",
+    // 가격 "모양"은 원화 여부가 아니라 소수 단위 유무로 갈린다. JPY 매장(예:
+    // misekiseoul)은 KRW 처럼 정수 + 천단위 콤마라서, KRW 가 아니라는 이유로
+    // 소수 패턴(/\d+(?:\.\d+)?/)을 물리면 "1,650" 에서 "1" 만 잡아간다.
+    zeroDecimalCurrency: ZERO_DECIMAL_CURRENCIES.has(config.sourceCurrency || "KRW"),
+    // 상품명 숫자("26SS" → 26)를 가격으로 오인하는 것을 막는 하한선. 통화마다
+    // 자릿수가 달라 KRW 의 1000 을 그대로 쓸 수 없다 (¥1,650 은 정상가다).
+    minPlausiblePrice: minPlausiblePrice(config.sourceCurrency || "KRW"),
+    currencySymbol: CURRENCY_SYMBOL[config.sourceCurrency || "KRW"] ?? (config.sourceCurrency || "KRW"),
     imageUtilityAssetPattern: PRODUCT_IMAGE_UTILITY_ASSET_PATTERN,
   }
 
@@ -582,7 +607,7 @@ async function collectProductsFromPage(
       // 381개 중 379개가 이 사고로 전부 null 처리됨).
       const priceRegex = args.pricePatternStr
         ? new RegExp(args.pricePatternStr)
-        : (args.sourceCurrency === "KRW" ? /\d[\d,]*/ : /\d+(?:\.\d+)?/)
+        : (args.zeroDecimalCurrency ? /\d[\d,]*/ : /\d+(?:\.\d+)?/)
       const products: Array<Record<string, unknown>> = []
 
       for (let j = 0; j < items.length; j++) {
@@ -663,11 +688,11 @@ async function collectProductsFromPage(
         // 캡처 그룹이 있으면 [1], 없으면 [0]
         const priceStr = priceMatch ? (priceMatch[1] || priceMatch[0]) : null
         const rawPrice = priceStr ? Number(priceStr.replace(/,/g, "")) : null
-        // KRW ₩1,000 미만은 비정상 (상품명의 숫자가 파싱된 경우 — e.g. "26SS" → 26).
-        // 해외 멀티샵 Cafe24는 $9.12 같은 소수 가격이 정상이라 0 초과만 검사한다.
-        let price = rawPrice !== null && (
-          args.sourceCurrency === "KRW" ? rawPrice >= 1000 : rawPrice > 0
-        ) ? rawPrice : null
+        // 하한선 미만은 비정상 (상품명의 숫자가 파싱된 경우 — e.g. "26SS" → 26).
+        // 해외 멀티샵 Cafe24는 $9.12 같은 소수 가격이 정상이라 하한이 0이다.
+        let price = rawPrice !== null && rawPrice > 0 && rawPrice >= args.minPlausiblePrice
+          ? rawPrice
+          : null
 
         // Cafe24 표준 spec 블록(.xans-product-listitem) 폴백.
         // 일부 테마는 가격을 .price 가 아닌 "판매가 : ₩X" 라벨 텍스트로만 노출 (beslow 등).
@@ -682,8 +707,8 @@ async function collectProductsFromPage(
             var specPrice = saleM ? Number(saleM[1]) : (listM ? Number(listM[1]) : null)
             if (specPrice !== null && specPrice >= 1000) price = specPrice
           } else {
-            var saleUsdM = specClean.match(/(?:discounted\s*price|sale\s*price|할인판매가)\s*:?\s*(?:USD|\$|EUR|€|GBP|£)?\s*(\d+(?:\.\d+)?)/i)
-            var listUsdM = specClean.match(/(?:price|판매가)\s*:?\s*(?:USD|\$|EUR|€|GBP|£)?\s*(\d+(?:\.\d+)?)/i)
+            var saleUsdM = specClean.match(/(?:discounted\s*price|sale\s*price|할인판매가|販売価格)\s*:?\s*(?:USD|\$|EUR|€|GBP|£|JPY|¥)?\s*(\d+(?:\.\d+)?)/i)
+            var listUsdM = specClean.match(/(?:price|판매가|価格)\s*:?\s*(?:USD|\$|EUR|€|GBP|£|JPY|¥)?\s*(\d+(?:\.\d+)?)/i)
             var specCurrencyPrice = saleUsdM ? Number(saleUsdM[1]) : (listUsdM ? Number(listUsdM[1]) : null)
             if (specCurrencyPrice !== null && specCurrencyPrice > 0) price = specCurrencyPrice
           }
@@ -815,11 +840,11 @@ async function collectProductsFromPage(
           const price2Match = price2Text.match(priceRegex)
           if (price2Match) {
             const p2 = Number((price2Match[1] || price2Match[0]).replace(/,/g, ""))
-            // 메인 가격(371~373줄)과 동일한 KRW 1000원 하한을 여기도 적용한다.
-            // 이 하한이 없으면 할인율 배지("10%")나 적립금 텍스트의 작은 숫자가
-            // price2 셀렉터에 걸려 세일가로 잘못 캡처된다 (실측: etce 1239건,
-            // lossyrow 698건이 이 경로로 1~1000원대 가격이 저장됨).
-            const p2Valid = args.sourceCurrency === "KRW" ? p2 >= 1000 : p2 > 0
+            // 메인 가격과 동일한 통화별 하한을 여기도 적용한다. 이 하한이 없으면
+            // 할인율 배지("10%")나 적립금 텍스트의 작은 숫자가 price2 셀렉터에
+            // 걸려 세일가로 잘못 캡처된다 (실측: etce 1239건, lossyrow 698건이
+            // 이 경로로 1~1000원대 가격이 저장됨).
+            const p2Valid = p2 > 0 && p2 >= args.minPlausiblePrice
             if (p2Valid && p2 < (price || Infinity)) {
               // price2가 더 싸면: price=원가, price2=세일가
               originalPrice = price
@@ -861,15 +886,11 @@ async function collectProductsFromPage(
         var priceFormatted = ""
         var effectivePrice = salePrice || price
         if (effectivePrice) {
-          if (args.sourceCurrency === "USD") {
-            priceFormatted = "$" + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
-          } else if (args.sourceCurrency === "EUR") {
-            priceFormatted = "€" + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
-          } else if (args.sourceCurrency === "GBP") {
-            priceFormatted = "£" + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
-          } else {
-            priceFormatted = "₩" + effectivePrice.toLocaleString()
-          }
+          // 통화별 if 사슬 대신 심볼 + 소수 단위 유무로 조립한다 — 통화가 늘 때마다
+          // 분기를 더하는 구조라 JPY 를 만나면 "₩4800"(원화 기호에 엔화 금액)이 됐다.
+          priceFormatted = args.zeroDecimalCurrency
+            ? args.currencySymbol + effectivePrice.toLocaleString()
+            : args.currencySymbol + effectivePrice.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2})
         }
 
         products.push({

@@ -5,8 +5,8 @@
  * 페이지네이션: ?page=N (기본 250개/페이지, 빈 배열 올 때까지)
  */
 
-import type {CrawlResult, Product, SiteConfig} from "./types"
-import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY} from "./fx"
+import type {CrawlResult, CurrencyCode, Product, SiteConfig} from "./types"
+import {CURRENCY_SYMBOL, CURRENCY_TO_COUNTRY, ZERO_DECIMAL_CURRENCIES} from "./fx"
 import {
   inferGenderFromDepartmentTagPrefixes,
   inferGenderFromModelDescription,
@@ -284,9 +284,11 @@ export function parseShopifyProducts(
     // value as `price`; import-products.ts handles FX conversion.
     // priceFormatted preserves the symbol + decimal precision
     // (USD/EUR/GBP: 2 decimals; KRW: integer with locale grouping).
+    // JPY 처럼 소수 단위가 없는 통화에 toFixed(2) 를 쓰면 "¥4800.00" 이라는
+    // 존재하지 않는 표기가 나온다 — KRW 특례가 아니라 zero-decimal 전체 규칙.
     const priceFormatted = pricing.price !== null
-      ? (currency === "KRW"
-          ? `${symbol}${pricing.price.toLocaleString("ko-KR")}`
+      ? (ZERO_DECIMAL_CURRENCIES.has(currency)
+          ? `${symbol}${pricing.price.toLocaleString(currency === "KRW" ? "ko-KR" : "en-US")}`
           : `${symbol}${pricing.price.toFixed(2)}`)
       : ""
     if (!inStock && !options.keepOutOfStock) continue  // 품절 상품 제외
@@ -436,6 +438,79 @@ export function buildShopifyProductsUrl(baseUrl: string, page: number, country: 
   return `${baseUrl}/products.json${separator}page=${page}&limit=250&country=${encodeURIComponent(country)}`
 }
 
+/**
+ * Read the market's active currency out of the storefront's inline
+ * `Shopify.currency = {"active":"KRW","rate":"1.0"}` bootstrap.
+ *
+ * `/products.json` carries prices but no currency, so it cannot be
+ * self-describing; the storefront HTML for the SAME `?country=` is the
+ * cheapest oracle that agrees with it. Verified 2026-08-26 against nine
+ * stores (slamjam, nodaleto, howly-dog, therasario, fiorucci, walesbonner,
+ * notfoundco, princssclub, alexander-digenova) — it matched the currency
+ * `products.json?country=KR` actually returned in every case, including the
+ * stores that ignore the KR market and fall back to USD/GBP/EGP.
+ */
+export function parseShopifyActiveCurrency(html: string): CurrencyCode | null {
+  const match = html.match(/Shopify\.currency\s*=\s*\{[^}]*?"active"\s*:\s*"([A-Z]{3})"/)
+  // The regex already constrains this to an ISO-4217 shape; an unlisted code
+  // still converts fine because rates are resolved from the runtime table.
+  return match ? (match[1] as CurrencyCode) : null
+}
+
+/**
+ * Probe which currency this store will price `products.json?country=` in.
+ *
+ * Returns null when the store does not expose the bootstrap (non-Shopify
+ * proxies, heavily customised themes) — callers must then fall back to the
+ * configured currency rather than guessing.
+ */
+export async function detectShopifyActiveCurrency(
+  baseUrl: string,
+  country: string,
+  fetchImpl: (url: string, init: RequestInit) => Promise<Response> = fetch,
+): Promise<CurrencyCode | null> {
+  const separator = baseUrl.includes("?") ? "&" : "?"
+  const url = `${baseUrl}/${separator}country=${encodeURIComponent(country)}`.replace(/\/\/([?&])/, "/$1")
+  try {
+    const res = await fetchImpl(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+        Cookie: `localization=${country}`,
+      },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!res.ok) return null
+    return parseShopifyActiveCurrency(await res.text())
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Decide which currency to tag this crawl's products with.
+ *
+ * The configured value is an *intent* ("crawl the KR market"), not a fact.
+ * When the store answers in a different currency we must believe the store,
+ * because the alternative is what produced the 2026-08 incident: 1,201 rows
+ * whose EUR/JPY/USD/EGP amounts were stored verbatim as won because the
+ * config said KRW and nothing checked.
+ */
+export function reconcileShopifyCurrency(
+  configured: CurrencyCode,
+  detected: CurrencyCode | null,
+): {currency: CurrencyCode; warning?: string} {
+  if (!detected || detected === configured) return {currency: configured}
+  return {
+    currency: detected,
+    warning:
+      `통화 불일치: config=${configured} 이지만 스토어가 ${detected} 로 응답 — ` +
+      `${detected} 로 적재하고 import 시 환산한다. 한국 마켓을 지원하는 스토어라면 ` +
+      `config.sourceCurrency 를 KRW 로 되돌려 현지 원화가를 직접 받는 편이 낫다.`,
+  }
+}
+
 export async function crawlShopify(
   config: SiteConfig,
   options: CrawlShopifyOptions = {},
@@ -445,13 +520,26 @@ export async function crawlShopify(
   const allProducts: Product[] = []
   const maxPages = config.maxPages || 20
   const delay = config.crawlDelay || 1000
-  const currency = config.sourceCurrency || "KRW"
-  const country = CURRENCY_TO_COUNTRY[currency]
+  const configuredCurrency = config.sourceCurrency || "KRW"
+  const country = CURRENCY_TO_COUNTRY[configuredCurrency] ?? "KR"
   const localizationCookie = `localization=${country}`
+
+  // 통화는 config 를 믿지 않고 스토어에 물어본다. config 는 "어느 마켓을
+  // 크롤할지"(= ?country=)를 정할 뿐이고, 스토어가 그 마켓을 지원하지 않으면
+  // 자기 기본 통화로 응답한다 — 그걸 config 값으로 단정해 적재한 것이
+  // 2026-08 통화 사고의 원인이었다.
+  const detected = await detectShopifyActiveCurrency(config.baseUrl, country)
+  const {currency, warning} = reconcileShopifyCurrency(configuredCurrency, detected)
+  if (warning) {
+    errors.push(warning)
+    console.warn(`   ⚠️  ${warning}`)
+  }
+
   const genderByHandle = await fetchShopifyGenderByHandle(config, country, localizationCookie, errors)
 
   console.log(`\n${"─".repeat(50)}`)
   console.log(`🏪 ${config.name} (${config.baseUrl}) [Shopify]`)
+  console.log(`   💱 market=${country} currency=${currency}${detected ? "" : " (스토어 통화 미확인 — config 값 사용)"}`)
   console.log(`${"─".repeat(50)}`)
 
   for (let page = 1; page <= maxPages; page++) {

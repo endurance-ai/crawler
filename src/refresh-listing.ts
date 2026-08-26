@@ -15,6 +15,7 @@ import {runAsyncPool} from "./lib/async-pool"
 import {crawlCafe24} from "./lib/cafe24-engine"
 import {crawlFarfetch} from "./lib/farfetch-engine"
 import {crawlImweb} from "./lib/imweb-engine"
+import {initFxRates} from "./lib/fx"
 import {diffListing, type RefreshableRow, type RefreshUpdate} from "./lib/listing-refresh"
 import {createProductCollectionClient, type ProductCollectionClient} from "./lib/product-collection"
 import {installRequestBlocking} from "./lib/request-blocking"
@@ -239,6 +240,9 @@ function unknownProducts(crawled: Product[], urls: string[]): Product[] {
 }
 
 async function main() {
+  // 가격 UPDATE 도 KRW 환산을 거치므로 갱신 시점 환율을 먼저 받는다.
+  await initFxRates()
+
   const flags = parseFlags()
   const db = createProductCollectionClient()
   const startedAt = Date.now()
