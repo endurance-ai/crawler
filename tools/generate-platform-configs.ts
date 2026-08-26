@@ -291,22 +291,6 @@ const IMWEB_DEFAULT_SUBCATEGORY_BY_KEY: Partial<Record<string, string>> = {
   kibata: "jeans",
 }
 
-/**
- * Imweb sources that should also fetch each PDP.
- *
- * The generator sets `crawlDetails: true` unconditionally for cafe24 but never
- * for imweb, so generated imweb sites ship only the single list-page thumbnail.
- * `enrichFromDetail` is what pulls the full gallery (plus JSON-LD availability
- * and sku) — representative-image selection needs several shots per product to
- * pick a model cut, and one thumbnail gives it nothing to choose from.
- *
- * Opt-in rather than on-by-default because it costs one extra request per
- * product; enable per site as image coverage is actually needed.
- */
-const IMWEB_CRAWL_DETAILS_KEYS = new Set([
-  // 2026-08-26: list page yields 1 thumbnail, the PDP yields 5 gallery images.
-  "emostanceclub-global",
-])
 
 interface CandidateRow {
   brand_node_id: number
@@ -522,7 +506,11 @@ function buildEntrySource(
     if (defaultCategory) lines.push(`    defaultCategory: ${JSON.stringify(defaultCategory)},`)
     const defaultSubcategory = IMWEB_DEFAULT_SUBCATEGORY_BY_KEY[row.platform_key]
     if (defaultSubcategory) lines.push(`    defaultSubcategory: ${JSON.stringify(defaultSubcategory)},`)
-    if (IMWEB_CRAWL_DETAILS_KEYS.has(row.platform_key)) lines.push("    crawlDetails: true,")
+    // cafe24 와 동일하게 무조건 켠다. imweb 리스트 위젯은 상품당 썸네일 1장만
+    // 주고 갤러리는 PDP 에만 있다 — 상품당 요청이 1회 늘지만, 초기 수집은
+    // 한 번뿐이고 이미지가 1장이면 대표컷(모델샷) 선별 자체가 불가능하다.
+    // 실측(emostanceclub-global): 1장 → 평균 6장, 해상도도 썸네일→원본.
+    lines.push("    crawlDetails: true,")
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected

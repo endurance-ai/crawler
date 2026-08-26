@@ -13,6 +13,7 @@ import {installRequestBlocking} from "./request-blocking"
 import {gotoWithRetry, NavFailureError} from "./nav-retry"
 import {BRAND_NAME_PREFIX_PATTERN} from "./refresh-source"
 import {CURRENCY_SYMBOL, ZERO_DECIMAL_CURRENCIES} from "./fx"
+import {shouldCrawlDetails} from "./platform-config-lifecycle"
 import type {CrawlResult, CurrencyCode, Product, SiteConfig} from "./types"
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
@@ -1161,7 +1162,8 @@ export async function crawlCafe24(
 
   // ── Step 3: 상세 페이지 크롤링 (파서 주입 + 3-way 병렬) ──
   // Step 3b(가격 복구)가 같은 상품을 두 번 방문하지 않도록 게이트를 변수로 뽑는다.
-  const ranFullDetail = Boolean(config.crawlDetails && detailParser && !options.listingOnly)
+  // 상세 크롤 여부는 shouldCrawlDetails 가 단일 출처다 (미설정=켬).
+  const ranFullDetail = Boolean(shouldCrawlDetails(config) && detailParser && !options.listingOnly)
   if (ranFullDetail && detailParser) {
     console.log(`\n${tag} 🔍 상세 크롤링 시작 — ${uniqueProducts.length}개 상품`)
     const detailStart = Date.now()

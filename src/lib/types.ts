@@ -317,7 +317,15 @@ export interface SiteConfig {
   notes?: string
   /** Cafe24 상세 페이지 셀렉터 오버라이드 */
   detailSelectors?: Cafe24DetailSelectors
-  /** 상세 페이지 크롤링 활성화 (기본: false) */
+  /**
+   * 상세 페이지 크롤링 활성화.
+   *
+   * cafe24/imweb 엔진에서는 **미설정이 곧 켬**이고, 끄려면 명시적 `false` 를
+   * 넣어야 한다. 리스트 페이지가 주는 이미지는 상품당 썸네일 1장뿐이고
+   * 갤러리는 PDP 에만 있어서, 꺼두면 대표컷 선별에 쓸 후보가 없다.
+   * 그 외 엔진(shopify 등)은 리스트 응답에 이미지 배열이 이미 들어 있어
+   * 이 값을 보지 않는다.
+   */
   crawlDetails?: boolean
   /** 리뷰 크롤링 활성화 (기본: false, crawlDetails가 true일 때만 동작) */
   crawlReviews?: boolean

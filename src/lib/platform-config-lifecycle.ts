@@ -1,4 +1,25 @@
-import type {PlatformType} from "./types"
+import type {PlatformType, SiteConfig} from "./types"
+
+/**
+ * Whether a cafe24/imweb crawl should also visit each PDP.
+ *
+ * Unset means ON. Only an explicit `false` turns it off, and the two places
+ * that pass one are deliberate: the `--no-detail` CLI flag, and
+ * `refresh-listing` (which only UPDATEs price/in_stock and has no use for the
+ * detail page).
+ *
+ * The default was flipped on 2026-08-26. As opt-in it silently capped these
+ * sites at one image per product — the list page yields a single thumbnail and
+ * the gallery lives only on the PDP — which leaves representative-image
+ * (model-shot) selection with nothing to choose from. Measured at the time:
+ * 16% of the catalogue (39,469 / 248,093 rows) had at most one image, and
+ * every imweb site with detail off sat at 51.4% while the one with it on sat
+ * at 0%. Initial collection happens once per product, so paying the extra
+ * request then is cheaper than a re-collection pass later.
+ */
+export function shouldCrawlDetails(config: Pick<SiteConfig, "crawlDetails">): boolean {
+  return config.crawlDetails !== false
+}
 
 export interface PlatformConfigLifecycleRow {
   status: string

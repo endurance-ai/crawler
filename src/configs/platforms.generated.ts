@@ -4,7 +4,7 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-26T05:59:13.235Z.
+ * transitions. Generated 2026-08-26T06:11:36.067Z.
  * Total: 475 (active 452 / disabled 23)
  */
 
@@ -956,6 +956,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://undermycar.co.kr",
     brand: "언더마이카",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=817, status=tech_detected, auto-generated",
   },
   {
@@ -1996,6 +1997,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://reveniomaker.co.kr",
     brand: "REVENIOMAKER",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=1674, status=tech_detected, auto-generated",
   },
   {
@@ -3590,6 +3592,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://finca.kr",
     brand: "FINCA",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=3868, status=tech_detected, auto-generated",
   },
   {
@@ -3598,6 +3601,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://gyulmedal.com",
     brand: "GYULMEDAL",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=3872, status=tech_detected, auto-generated",
   },
   {
@@ -3681,6 +3685,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://mascompany.kr",
     brand: "MASCOMPANY",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=3882, status=tech_detected, auto-generated",
   },
   {
@@ -3751,6 +3756,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://u-rago.com",
     brand: "URAGO",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=3888, status=tech_detected, auto-generated",
   },
   {
@@ -4120,6 +4126,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://essenceforge.com",
     brand: "**essenceforge**",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5191, status=tech_detected, auto-generated",
   },
   {
@@ -4275,6 +4282,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://hata-official.kr",
     brand: "HaTA",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5202, status=embedded, auto-generated",
   },
   {
@@ -4421,6 +4429,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://notknowing.kr",
     brand: "NOTKNOWING",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5214, status=tech_detected, auto-generated",
   },
   {
@@ -4695,6 +4704,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://nghtysvg.com",
     brand: "NGHTYSVG",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5243, status=embedded, auto-generated",
   },
   {
@@ -5113,6 +5123,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://girlsgirls.co.kr",
     brand: "GIRLSGIRLS",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5279, status=embedded, auto-generated",
   },
   {
@@ -5146,6 +5157,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://pacosply.com",
     brand: "PACOSPLY",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5283, status=embedded, auto-generated",
   },
   {
@@ -5356,6 +5368,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://odna.co.kr",
     brand: "ODNA",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5305, status=embedded, auto-generated",
   },
   {
@@ -5402,6 +5415,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://yileeonline.com",
     brand: "YILEE",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5318, status=embedded, auto-generated",
   },
   {
@@ -5523,6 +5537,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://en.welter-experiment.com",
     brand: "WELTER EXPERIMENT",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5329, status=qc_failed, auto-generated",
   },
   {
@@ -5822,6 +5837,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://summur-ahn.com",
     brand: "SUMMUR",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5360, status=qc_failed, auto-generated",
   },
   {
@@ -5976,6 +5992,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://tangojae.com",
     brand: "탄고재 TANGOJAE",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5374, status=embedded, auto-generated",
   },
   {
@@ -6109,6 +6126,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://fanyoung.com",
     brand: "FANYOUNG",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5386, status=embedded, auto-generated",
   },
   {
@@ -6414,6 +6432,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://eee-rrr.com",
     brand: "ER (EEERRR)",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5408, status=qc_failed, auto-generated",
   },
   {
@@ -6903,6 +6922,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://piarche.com",
     brand: "PIARCHE",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5458, status=embedded, auto-generated",
   },
   {
@@ -6949,6 +6969,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://personalobject.com",
     brand: "PERSONALOBJECT",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5460, status=embedded, auto-generated",
   },
   {
@@ -7009,6 +7030,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://9umiko.com",
     brand: "9umiko",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5467, status=embedded, auto-generated",
   },
   {
@@ -7040,6 +7062,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://shopattends.com",
     brand: "ATTENDS",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5469, status=embedded, auto-generated",
   },
   {
@@ -7483,6 +7506,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://s2asuras2.com",
     brand: "ASURA",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5523, status=embedded, auto-generated",
   },
   {
@@ -7555,6 +7579,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://lyex2.com",
     brand: "Lye Lye",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5531, status=embedded, auto-generated",
   },
   {
@@ -7615,6 +7640,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://oeisl.kr",
     brand: "oeisl",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5541, status=qc_failed, auto-generated",
   },
   {
@@ -7623,6 +7649,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://gochagocha.kr",
     brand: "GOCHAGOCHA",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5542, status=embedded, auto-generated",
   },
   {
@@ -7671,6 +7698,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://wholepaper.com",
     brand: "WHOLE PAPER",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5546, status=tech_detected, auto-generated",
   },
   {
@@ -7746,6 +7774,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://twentyoneaugust.imweb.me",
     brand: "TWENTYONEAUGUST",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5553, status=embedded, auto-generated",
   },
   {
@@ -7772,6 +7801,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://thesserpe.com",
     brand: "THE SSERPE",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5560, status=tech_detected, auto-generated",
   },
   {
@@ -7791,6 +7821,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://towtowarchive.com",
     brand: "TOWTOW ARCHIVE",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5571, status=embedded, auto-generated",
   },
   {
@@ -7835,6 +7866,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://label-archive.com",
     brand: "LABEL ARCHIVE",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5601, status=embedded, auto-generated",
   },
   {
@@ -7843,6 +7875,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://kindred.co.kr",
     brand: "Kindred",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5604, status=embedded, auto-generated",
   },
   {
@@ -7851,6 +7884,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://roompauline.kr",
     brand: "Pauline",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5606, status=embedded, auto-generated",
   },
   {
@@ -7937,6 +7971,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://hannui.com",
     brand: "HANNUI",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5700, status=embedded, auto-generated",
   },
   {
@@ -7945,6 +7980,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://sagega.online",
     brand: "SAGEGA",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5702, status=embedded, auto-generated",
   },
   {
@@ -7964,6 +8000,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     type: "imweb",
     baseUrl: "https://our-nation.com",
     brand: "OUR NATION",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5716, status=embedded, auto-generated",
   },
   {
@@ -8540,6 +8577,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     brand: "PUBLIC FIGURE",
     categoryUrls: ["https://publicfigure.kr/shop"],
     defaultCategory: "other",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5848, status=imported, auto-generated",
   },
   {
@@ -8591,6 +8629,7 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
     categoryUrls: ["https://www.kibata.kr/Online-Store/"],
     defaultCategory: "bottoms",
     defaultSubcategory: "jeans",
+    crawlDetails: true,
     notes: "generate-platform-configs.ts — brand_node_id=5864, status=imported, auto-generated",
   },
   {
