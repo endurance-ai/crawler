@@ -80,12 +80,6 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
   "en-3887": "USD",
   // Sienne English Cafe24 storefront declares SHOP_CURRENCY_INFO currency_code=USD.
   "en-4821": "USD",
-  // misekiseoul.com serves a Japan-market storefront only: product JSON-LD
-  // declares priceCurrency=JPY and the list labels render as 商品名/販売価格.
-  // There is no KR shop to switch to — `?shop_no=1..4` all return the same JPY
-  // page — so the prices are converted at import instead. Left unset, ¥1,650
-  // socks were stored as ₩1,650 (302 rows, 2026-08-26).
-  misekiseoul: "JPY",
 }
 
 /**
@@ -106,6 +100,13 @@ const BASE_URL_BY_KEY: Partial<Record<string, string>> = {
   // converted one. Key keeps its `-global` name so brand_node 2470's existing
   // product_crawl_status history stays attached.
   "emostanceclub-global": "https://www.emostanceclub.co.kr",
+  // Same story: misekiseoul.com is the Japan storefront (JSON-LD priceCurrency
+  // JPY, 商品名/販売価格 labels) and misekiseoul.kr is the Korean twin — a
+  // separate Cafe24 mall with its own product_no series but the identical
+  // category tree, pricing in KRW (₩89,000 jersey zip-up). We were crawling
+  // the JP one and storing ¥1,650 socks as ₩1,650 (302 rows, 2026-08-26).
+  // `?shop_no=` does not switch markets here; only the domain does.
+  misekiseoul: "https://misekiseoul.kr",
 }
 
 const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
@@ -119,6 +120,25 @@ const CAFE24_SELECTORS_BY_KEY: Partial<Record<string, SiteConfig["selectors"]>> 
 // (tools/backfill-cafe24-category-names.ts's auto-discovered names) below —
 // see buildEntrySource's `cafe24Categories` line.
 const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
+  // The recorded cateNos (9/13/43/51) are dead: 9 and 13 are board categories,
+  // 43/51 are decorative main-page links, and `list.html?cate_no=` returns an
+  // error for all four — the 2026-08-26 crawl collected 0 products. The live
+  // navigation uses the SEO paths (/category/men/79/ and friends), and the KR
+  // mall we now crawl (see BASE_URL_BY_KEY) exposes the same cateNo tree.
+  //
+  // MEN and WOMEN lead so their gender evidence wins the engine's first-seen
+  // dedup; the remaining branches are cross-cutting merchandising shelves
+  // (archive/collection/collaboration/style) that carry no gender signal, so
+  // they are listed without one rather than being defaulted to unisex.
+  misekiseoul: [
+    {name: "MEN", cateNo: 79, gender: ["men"]},
+    {name: "WOMEN", cateNo: 98, gender: ["women"]},
+    {name: "COLLECTION", cateNo: 155},
+    {name: "COLLABORATION", cateNo: 153},
+    {name: "REI X MISEKI", cateNo: 191},
+    {name: "STYLE", cateNo: 180},
+    {name: "ARCHIVE", cateNo: 194},
+  ],
   // Official navigation exposes separate WOMEN and MEN departments. Use leaf
   // categories so aggregate/new/sale pages cannot erase the gender evidence.
   dunststudio: [
@@ -270,6 +290,23 @@ const IMWEB_DEFAULT_SUBCATEGORY_BY_KEY: Partial<Record<string, string>> = {
   // Official detail pages identify the collection as 5-pocket denim jeans.
   kibata: "jeans",
 }
+
+/**
+ * Imweb sources that should also fetch each PDP.
+ *
+ * The generator sets `crawlDetails: true` unconditionally for cafe24 but never
+ * for imweb, so generated imweb sites ship only the single list-page thumbnail.
+ * `enrichFromDetail` is what pulls the full gallery (plus JSON-LD availability
+ * and sku) — representative-image selection needs several shots per product to
+ * pick a model cut, and one thumbnail gives it nothing to choose from.
+ *
+ * Opt-in rather than on-by-default because it costs one extra request per
+ * product; enable per site as image coverage is actually needed.
+ */
+const IMWEB_CRAWL_DETAILS_KEYS = new Set([
+  // 2026-08-26: list page yields 1 thumbnail, the PDP yields 5 gallery images.
+  "emostanceclub-global",
+])
 
 interface CandidateRow {
   brand_node_id: number
@@ -485,6 +522,7 @@ function buildEntrySource(
     if (defaultCategory) lines.push(`    defaultCategory: ${JSON.stringify(defaultCategory)},`)
     const defaultSubcategory = IMWEB_DEFAULT_SUBCATEGORY_BY_KEY[row.platform_key]
     if (defaultSubcategory) lines.push(`    defaultSubcategory: ${JSON.stringify(defaultSubcategory)},`)
+    if (IMWEB_CRAWL_DETAILS_KEYS.has(row.platform_key)) lines.push("    crawlDetails: true,")
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected
