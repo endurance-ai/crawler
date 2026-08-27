@@ -168,6 +168,61 @@ export function minPlausiblePrice(currency: CurrencyCode): number {
   return 0
 }
 
+/**
+ * 가격 텍스트로 인정할 수 있는 문자·라벨만 허용하는 화이트리스트.
+ *
+ * 세일가 셀렉터(`.price2, .sale_price, [class*=sale]`)의 `[class*=sale]` 은
+ * `sale_area` 같은 **컨테이너**도 잡는다. 그 컨테이너 텍스트에는 상품명이
+ * 섞여 있고, 기본 가격 정규식(숫자+콤마)은 거기서 첫 숫자를 집어간다 —
+ * 상품명이 "COMME des GARÇONS HOMME PLUS 1997 Pants" 면 연도 1997 이
+ * 세일가가 된다. 크기 하한(₩1,000)은 4자리 연도를 그대로 통과시킨다.
+ *
+ * 실측 2026-08-27: socio 27행을 포함해 전 카탈로그 51행이 1900~2030 값을
+ * 가격으로 갖고 있고 원가는 그 10배 이상이었다 (₩1,997 / 원가 ₩140,000).
+ */
+/**
+ * 가격 "값"을 라벨/통화기호에 붙은 것만 뽑아내는 앵커 정규식들.
+ *
+ * 리스트 폴백이 잡는 텍스트는 대개 가격 요소가 아니라 상품명과 가격이 함께
+ * 든 Cafe24 spec 블록이다. 거기서 첫 숫자를 집으면 상품명 안의 숫자(연도,
+ * "26SS" 등)가 가격이 된다 — 반드시 라벨/기호에 인접한 숫자만 취해야 한다.
+ *
+ * 라벨 어휘(할인판매가/판매가)는 아래 specText 폴백과 동일하게 유지한다.
+ */
+export const SALE_PRICE_ANCHOR = /할인판매가\s*:?\s*[₩￦]?\s*([\d,]{3,})/.source
+export const LIST_PRICE_ANCHOR = /판매가\s*:?\s*[₩￦]?\s*([\d,]{3,})/.source
+export const CURRENCY_ANCHOR = /(?:[₩￦]\s*([\d,]{3,})|KRW\s*([\d,]{3,})|([\d,]{3,})\s*원)/.source
+export const FOREIGN_ANCHOR = /(?:USD|\$|EUR|€|GBP|£|JPY|¥)\s*(\d+(?:\.\d+)?)/.source
+
+const PRICE_LIKE_TEXT_SOURCE = [
+  "^(?:",
+  // 값·구분자·기호
+  "[0-9.,\\s%()\\[\\]:~\\/\\-\\u2013\\u2014]",
+  // 통화 기호
+  "|[\\u20A9\\uFFE6$\\u20AC\\u00A3\\u00A5]",
+  // 통화 코드와 가격 라벨 (이 단어들만 가격 텍스트에 섞일 수 있다)
+  "|KRW|USD|EUR|GBP|JPY",
+  "|원|판매가|할인판매가|할인가|정가|소비자가|적립금|price|sale|off",
+  ")*$",
+].join("")
+
+export const PRICE_LIKE_TEXT_PATTERN = new RegExp(PRICE_LIKE_TEXT_SOURCE, "i")
+
+/** 가격 요소는 짧고 숫자 위주다. 상품명이 섞인 컨테이너는 여기서 걸러진다. */
+export const MAX_PRICE_TEXT_LENGTH = 80
+
+/**
+ * 이 텍스트를 통째로 "가격"으로 읽어도 되는지.
+ *
+ * 크기(하한)가 아니라 **구성**을 본다 — 숫자·구분자·통화기호·가격 라벨
+ * 외의 글자가 남으면 가격 요소가 아니라 다른 것을 잡은 것이다.
+ */
+export function isPriceLikeText(text: string): boolean {
+  const trimmed = text.trim()
+  if (trimmed.length === 0 || trimmed.length > MAX_PRICE_TEXT_LENGTH) return false
+  return PRICE_LIKE_TEXT_PATTERN.test(trimmed)
+}
+
 export interface CrawlCafe24Options {
   detailConcurrency?: number
   createDetailPage?: () => Promise<Cafe24DetailPageLease>
@@ -584,6 +639,14 @@ async function collectProductsFromPage(
     // 자릿수가 달라 KRW 의 1000 을 그대로 쓸 수 없다 (¥1,650 은 정상가다).
     minPlausiblePrice: minPlausiblePrice(config.sourceCurrency || "KRW"),
     currencySymbol: CURRENCY_SYMBOL[config.sourceCurrency || "KRW"] ?? (config.sourceCurrency || "KRW"),
+    // evaluate 안에서는 import 를 못 쓰므로 정규식을 source 문자열로 넘긴다
+    // (pricePatternStr 과 같은 방식). 판정 규칙의 정본은 isPriceLikeText 다.
+    priceLikeTextPatternStr: PRICE_LIKE_TEXT_PATTERN.source,
+    salePriceAnchorStr: SALE_PRICE_ANCHOR,
+    listPriceAnchorStr: LIST_PRICE_ANCHOR,
+    currencyAnchorStr: CURRENCY_ANCHOR,
+    foreignAnchorStr: FOREIGN_ANCHOR,
+    maxPriceTextLength: MAX_PRICE_TEXT_LENGTH,
     imageUtilityAssetPattern: PRODUCT_IMAGE_UTILITY_ASSET_PATTERN,
   }
 
@@ -668,19 +731,43 @@ async function collectProductsFromPage(
           priceText = (spacer.textContent || "").trim().replace(/\s+/g, " ")
         }
 
-        // 셀렉터 실패 시: 아이템 내 모든 span/p에서 가격 패턴 (₩/KRW + 숫자) 탐색
+        // 셀렉터 실패 시: 아이템 내 모든 span/p에서 가격 패턴 탐색.
+        //
+        // 라벨/통화기호에 **붙어 있는** 숫자만 취한다. 예전에는 "이 텍스트에
+        // 원화 기호가 있나"만 확인하고 블록 전체를 priceText 로 넘겼는데, 이
+        // 폴백이 잡는 것은 대개 가격 요소가 아니라 상품명과 가격이 함께 든
+        // Cafe24 spec 블록이라, 뒤의 숫자 정규식이 상품명의 첫 숫자를 집어갔다.
+        //   "상품명 : COMME des GARCONS HOMME 2016 Jacket 판매가 : 380,000"
+        //   -> 2016 (실제 가격 380,000 은 바로 뒤에 있었다)
+        // 실측 2026-08-27: socio 는 이름에 연도가 든 상품 37건 전부가 이 경로로
+        // 연도를 가격으로 받았다(정상 가격 0건). 전 카탈로그 51행.
         if (!priceText) {
           const spans = el.querySelectorAll("span, p, div")
           for (let k = 0; k < spans.length; k++) {
             const t = (spans[k].textContent || "").trim()
-            if (
-              t.match(/[₩\uFFE6][\d,]+/) ||
-              t.match(/KRW\s*[\d,]+/) ||
-              t.match(/^\d{1,3}(,\d{3})+원?$/) ||
-              (args.sourceCurrency !== "KRW" && t.match(/(?:USD|\$|EUR|€|GBP|£)\s*\d+(?:\.\d+)?/i))
-            ) {
+            // 할인가를 정가보다 먼저 본다 - 라벨 어휘는 아래 specText 폴백과 동일.
+            var anchored =
+              t.match(new RegExp(args.salePriceAnchorStr)) ||
+              t.match(new RegExp(args.listPriceAnchorStr)) ||
+              t.match(new RegExp(args.currencyAnchorStr))
+            // CURRENCY_ANCHOR 는 접두(원화기호/KRW)와 접미(원) 형태를 교대로
+            // 갖고 있어 매치된 그룹 번호가 다르다 — 첫 유효 그룹을 쓴다.
+            var anchoredValue = anchored ? (anchored[1] || anchored[2] || anchored[3]) : null
+            if (anchoredValue) {
+              priceText = anchoredValue
+              break
+            }
+            // 텍스트 자체가 가격 하나뿐인 경우 (라벨/기호 없음)
+            if (/^\d{1,3}(,\d{3})+원?$/.test(t)) {
               priceText = t
               break
+            }
+            if (args.sourceCurrency !== "KRW") {
+              var fx = t.match(new RegExp(args.foreignAnchorStr, "i"))
+              if (fx && fx[1]) {
+                priceText = fx[1]
+                break
+              }
             }
           }
         }
@@ -838,7 +925,14 @@ async function collectProductsFromPage(
         let salePrice: number | null = null
         if (price2El && !price2El.classList.contains("displaynone")) {
           const price2Text = (price2El.textContent || "").trim()
-          const price2Match = price2Text.match(priceRegex)
+          // [class*=sale] 은 가격 요소가 아니라 상품명이 든 컨테이너도 잡는다.
+          // 텍스트 구성이 가격이 아니면 첫 숫자를 세일가로 읽지 않는다 —
+          // 이게 없으면 상품명의 연도("... 1997 Pants")가 세일가가 된다.
+          const price2IsPriceLike =
+            price2Text.length > 0 &&
+            price2Text.length <= args.maxPriceTextLength &&
+            new RegExp(args.priceLikeTextPatternStr, "i").test(price2Text)
+          const price2Match = price2IsPriceLike ? price2Text.match(priceRegex) : null
           if (price2Match) {
             const p2 = Number((price2Match[1] || price2Match[0]).replace(/,/g, ""))
             // 메인 가격과 동일한 통화별 하한을 여기도 적용한다. 이 하한이 없으면
