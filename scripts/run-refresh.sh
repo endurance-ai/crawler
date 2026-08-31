@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# 리스트-only 재고/가격 갱신 wrapper — systemd(kiko-refresh.service)가 호출한다.
+# 목록 중심 재고/가격 갱신 wrapper — systemd(kiko-refresh.service)가 호출한다.
+# Cafe24 상세 방문은 목록에 현재가 자체가 없는 상품의 가격 복구에만 제한한다.
+# 온보딩급 전체 상세 재수집은 run-recrawl.sh(recrawl-batch.ts)를 사용한다.
 #
-# 상세 크롤도 LLM 도 돌지 않는다. 온보딩급 재수집이 필요할 때는 run-recrawl.sh
-# (recrawl-batch.ts) 를 쓴다 — 둘의 차이는 src/refresh-listing.ts 헤더 참조.
-#
-# Usage: scripts/run-refresh.sh [--budget-minutes=240 ...]
+# Usage: scripts/run-refresh.sh [--budget-minutes=600 --source-slice-minutes=10 ...]
 set -uo pipefail
 cd "$(dirname "$0")/.."
 

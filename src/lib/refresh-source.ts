@@ -1,9 +1,12 @@
 import {productIdentityKey} from "./listing-refresh"
-import type {PlatformType, SiteConfig} from "./types"
+import type {Cafe24ListingCursor, PlatformType, SiteConfig} from "./types"
 
 export interface RefreshSourceState {
   platform_key: string
   last_attempted_at: string | null
+  refresh_cursor: Cafe24ListingCursor | null
+  refresh_cycle_started_at: string | null
+  refresh_cycle_degraded: boolean
 }
 
 export interface RefreshWorklistEntry {
@@ -11,6 +14,9 @@ export interface RefreshWorklistEntry {
   platform_type: PlatformType
   product_count: number
   last_attempted_at: string | null
+  refresh_cursor: Cafe24ListingCursor | null
+  refresh_cycle_started_at: string | null
+  refresh_cycle_degraded: boolean
   config: SiteConfig
 }
 
@@ -29,6 +35,12 @@ export interface RefreshRunOutcome {
    * 우리 네트워크가 나쁜 것을 판매처 탓으로 돌리지 않는다.
    */
   unreachable_only?: boolean | null
+  /**
+   * The storefront crawl itself succeeded, but one or more database writes
+   * failed. This is infrastructure noise, not evidence that the source is
+   * unhealthy, so it must not advance the source circuit breaker.
+   */
+  db_partial_only?: boolean | null
 }
 
 export interface RefreshFailureStreak {
@@ -64,10 +76,10 @@ export function computeFailureStreaks(runs: RefreshRunOutcome[]): Map<string, Re
     let failures = 0
     let lastFailedAt: string | null = null
     for (const run of ordered) {
-      if (run.status === "success") break
+      if (run.status === "success" || run.status === "partial") break
       if (run.status !== "failed") continue // running/skipped 는 연쇄를 끊지도 늘리지도 않는다
-      // 닿지 못한 런은 판매처의 실패가 아니다 — 끊지도 늘리지도 않는다.
-      if (run.unreachable_only) continue
+      // 우리 네트워크/DB 문제는 판매처의 실패가 아니다 — 끊지도 늘리지도 않는다.
+      if (run.unreachable_only || run.db_partial_only) continue
       failures += 1
       lastFailedAt ??= run.started_at
     }
@@ -239,6 +251,9 @@ export function buildRefreshWorklist(args: {
       platform_type: config.type,
       product_count: productCount,
       last_attempted_at: states.get(config.key)?.last_attempted_at ?? null,
+      refresh_cursor: states.get(config.key)?.refresh_cursor ?? null,
+      refresh_cycle_started_at: states.get(config.key)?.refresh_cycle_started_at ?? null,
+      refresh_cycle_degraded: states.get(config.key)?.refresh_cycle_degraded ?? false,
       config,
     })
   }
