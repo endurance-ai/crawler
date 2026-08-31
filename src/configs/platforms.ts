@@ -5699,6 +5699,9 @@ const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["sh
 }
 
 const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTextPatterns"]>> = {
+  // EMIS uses (W) for current women-specific products; older products use the
+  // generic (WOMENS)/(MENS)/(UNISEX) tokens handled by GENDER_RULES.
+  emis: {women: [/^\s*\(W\)\s*/i]},
   // 공식 취급처에서 `W.` 품번/상품명은 여성, 일반 RR 상품은 공용으로 분리된다.
   roaringrad: {women: [/^\s*W\./i]},
   // 공식 상품명이 남녀 핏을 `(m)` / `(w)`로 직접 구분한다.
@@ -5720,6 +5723,9 @@ const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTe
 }
 
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
+  // Product details explicitly say "여성용 ...입니다" for (W) products.
+  // Unlabeled products that only say "모델 M 착용" remain unresolved: M is size.
+  "emis",
   // 상세 설명이 `남녀 모두`, `남성모델`/`여성모델` 라벨을 일관되게 제공한다.
   "horlisun",
   "the-nockin",

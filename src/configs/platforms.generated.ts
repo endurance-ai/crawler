@@ -4,8 +4,8 @@
  *
  * Auto-generated shopify/cafe24/imweb sources without a manual config.
  * New onboarding requires KR origin or verified KR-market eligibility; collected sources survive workflow status
- * transitions. Generated 2026-08-26T06:11:36.067Z.
- * Total: 475 (active 452 / disabled 23)
+ * transitions. Generated 2026-08-31T01:33:54.411Z.
+ * Total: 476 (active 453 / disabled 23)
  */
 
 import type {SiteConfig} from "../lib/types"
@@ -8673,5 +8673,26 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
       ],
     },
     notes: "generate-platform-configs.ts — brand_node_id=5867, status=imported, auto-generated",
+  },
+  {
+    key: "emis",
+    name: "EMIS",
+    type: "cafe24",
+    baseUrl: "https://emis.kr",
+    brand: "EMIS",
+    paginate: true,
+    maxPages: 300,
+    crawlDetails: true,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Cat29", cateNo: 29},
+        {name: "Cat141", cateNo: 141},
+        {name: "Cat24", cateNo: 24},
+        {name: "Cat297", cateNo: 297},
+        {name: "Cat167", cateNo: 167},
+      ],
+    },
+    notes: "generate-platform-configs.ts — brand_node_id=5873, status=tech_detected, auto-generated",
   },
 ]
