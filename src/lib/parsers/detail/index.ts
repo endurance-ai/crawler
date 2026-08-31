@@ -135,6 +135,12 @@ export class TaatsDetailParser extends RegistryDetailParser {
   }
 }
 
+// EMIS keeps its textual product details in the first accordion panel. The
+// generic Cafe24 selectors only see image/spec containers on this theme.
+class EmisDetailParser extends BaseDetailParser {
+  protected descriptionSelectors = [".accordion-list:first-child .accordion-content"]
+}
+
 import {TriplestoreDetailParser} from "./triplestore-parser"
 
 const DETAIL_PARSERS: Record<string, () => IDetailParser> = {
@@ -160,6 +166,7 @@ const DETAIL_PARSERS: Record<string, () => IDetailParser> = {
   ojos: () => new OjosDetailParser(),
   goyowear: () => new GoyowearDetailParser(),
   taats: () => new TaatsDetailParser(),
+  emis: () => new EmisDetailParser(),
 }
 
 export function getDetailParser(platformKey: string): IDetailParser {

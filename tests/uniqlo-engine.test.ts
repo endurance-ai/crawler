@@ -15,7 +15,7 @@ import {fileURLToPath} from "node:url"
 
 import {crawlUniqlo, isSafeUniqloImageUrl, parseProducts, parseRateFlag, pickUserAgent,} from "../src/lib/uniqlo-engine"
 import {checkRobots, parseRobotsBody} from "../src/lib/robots-check"
-import {convertToKrw} from "../src/lib/fx"
+import {convertToKrw, fxRateToKrw} from "../src/lib/fx"
 import type {SiteConfig} from "../src/lib/types"
 
 // ─── Fixture loading ──────────────────────────────────
@@ -568,8 +568,14 @@ test("AC-4 import-time FX: USD products convert to integer KRW; unknown currency
     .filter((r): r is NonNullable<typeof r> => r !== null)
 
   assert.equal(converted.length, 3, "expected 3 products after skipping ZZZ")
-  assert.equal(converted[0].price, Math.round(29.9 * 1430)) // 42757
-  assert.equal(converted[1].price, Math.round(19.9 * 1430)) // 28457
-  assert.equal(converted[2].price, Math.round(49.9 * 1430)) // 71357
+  // AC-4가 고정하는 것은 "USD가 정수 KRW로 환산되고 미지원 통화는 드롭된다"이지
+  // 특정 환율값이 아니다. 2026-08-26부터 환율은 런타임 테이블에서 오므로
+  // 숫자를 박아두면 환율이 움직일 때마다 이 테스트가 깨진다.
+  const usdRate = fxRateToKrw("USD")
+  assert.ok(usdRate !== undefined && usdRate > 0, "USD rate must be available")
+  assert.equal(converted[0].price, Math.round(29.9 * usdRate))
+  assert.equal(converted[1].price, Math.round(19.9 * usdRate))
+  assert.equal(converted[2].price, Math.round(49.9 * usdRate))
+  for (const c of converted) assert.ok(Number.isInteger(c.price), "KRW must be a whole number")
   assert.ok(!converted.some((c) => c.name === "Z"), "unknown-currency product must be skipped")
 })

@@ -15,6 +15,7 @@ import {isValidCategory} from "./lib/enums/product-enums"
 import {assertQwenReady} from "./lib/qwen-client"
 import {applyProductQcGate} from "./lib/product-qc/normalization"
 import {resolveProductGenderWithSource} from "./lib/product-gender"
+import {initFxRates} from "./lib/fx"
 import {productToCandidateDbRow} from "./lib/refresh-candidate-import"
 import type {Product} from "./lib/types"
 
@@ -460,6 +461,9 @@ async function processBatch(
 }
 
 async function main(): Promise<void> {
+  // 신규상품 INSERT 도 KRW 환산을 거치므로 수집 시점 환율을 먼저 받는다.
+  await initFxRates()
+
   // 상한을 두지 않는다. 예전에는 Math.min(limit,200) / Math.min(concurrency,4) 로
   // 코드에 박혀 있어 systemd 플래그를 올려도 무시됐고, 워커가 claim 배치 1회만 돌고
   // 끝나 처리량이 ~250건/일에 묶였다 (적체 실측 2026-07-30: discovered 31,901 → 넉 달).

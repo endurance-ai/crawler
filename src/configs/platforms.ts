@@ -1309,10 +1309,14 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "Slam Jam",
     type: "shopify",
     baseUrl: "https://slamjam.com",
-    sourceCurrency: "EUR",
+    // KRW = "한국 마켓을 크롤한다". Shopify Markets 가 KR 마켓을 열어두고 있어
+    // /products.json?country=KR 이 현지 원화가를 직접 준다 (실측 2026-08-26:
+    // Carlson Cut Jeans €117 → ₩161,124). 환산값보다 사이트가 실제로 한국
+    // 고객에게 제시하는 가격이 정확하므로 EUR 크롤 + import 환산을 대체한다.
+    sourceCurrency: "KRW",
     maxPages: 300,
     crawlDelay: 1500,
-    notes: "Slam Jam Milan, 1989-est, streetwear/contemporary multi-brand editorial. ~127 vendors observed 2026-05-07; Nike/OAMC/adidas/Undercover/Puma top. Shopify Markets routes EUR via localization=DE cookie. SPEC-PLATFORM-EXPANSION-007. maxPages bumped 50→100 (2026-05-07).",
+    notes: "Slam Jam Milan, 1989-est, streetwear/contemporary multi-brand editorial. ~127 vendors observed 2026-05-07; Nike/OAMC/adidas/Undercover/Puma top. SPEC-PLATFORM-EXPANSION-007. maxPages bumped 50→100 (2026-05-07). 2026-08-26: sourceCurrency EUR→KRW — 스토어가 KR 마켓을 지원해 country=KR 로 원화가를 직접 받는다(EUR 시절 재고 중 9건이 EUR 금액을 원화로 적재한 채 남아 있었다).",
   },
   {
     key: "antonioli",
@@ -1912,14 +1916,14 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Coats, Jackets", cateNo: 30, gender: ["unisex"]},
-        {name: "Trousers", cateNo: 31, gender: ["unisex"]},
-        {name: "Tops, Shirts", cateNo: 43, gender: ["unisex"]},
-        {name: "Skirts", cateNo: 44, gender: ["unisex"]},
-        {name: "Accessories", cateNo: 46, gender: ["unisex"]},
+        {name: "Coats, Jackets", cateNo: 30, gender: ["men"]},
+        {name: "Trousers", cateNo: 31, gender: ["men"]},
+        {name: "Tops, Shirts", cateNo: 43, gender: ["men"]},
+        {name: "Skirts", cateNo: 44, gender: ["men"]},
+        {name: "Accessories", cateNo: 46, gender: ["men"]},
       ],
     },
-    notes: "dry-run으로 확인된 실제 카테고리 5개(SHOP=24는 상위 all, ARCHIVES는 lookbook이라 제외)",
+    notes: "dry-run으로 확인된 실제 카테고리 5개(SHOP=24는 상위 all, ARCHIVES는 lookbook이라 제외). 2026-08-24: 카테고리 gender 태그가 전부 unisex로 잘못 박혀 있었음 — 실제 DB 17/17건이 men으로 해석되고 상품이 SUIT JACKET/TRENCH COAT/BLOUSON 등 남성 정장류라 men으로 정정.",
   },
   {
     key: "lelivre",
@@ -4772,6 +4776,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         {name: "OUTER", cateNo: 127},
+        {name: "ARCHIVE", cateNo: 45},
         {name: "TOP", cateNo: 129},
         {name: "BOTTOM", cateNo: 130},
         {name: "ACC", cateNo: 131},
@@ -5028,6 +5033,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
+        {name: "SYSTEM ONLINE", cateNo: 24},
         {name: "DIVISION 01", cateNo: 29},
         {name: "COLLAB UNIT", cateNo: 49},
         {name: "DIVISION 02", cateNo: 50},
@@ -5171,6 +5177,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
+        {name: "Shop", cateNo: 24},
         {name: "Outers", cateNo: 25},
         {name: "Tops", cateNo: 27},
         {name: "Bottoms", cateNo: 28},
@@ -5192,6 +5199,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       discovery: "manual",
       categories: [
         {name: "Shop", cateNo: 43},
+        {name: "Archive", cateNo: 56},
       ],
     },
     notes: "batch3 야간 스윕(2026-08-20): 기본 폴백 cateNo 9/13 등이 죽은 값이라 qc_failed 상태였음. 홈페이지 nav + 카테고리별 실제 상품 존재 여부(li.xans-record- 등 표준 셀렉터 카운트)를 전수 실측해 discovery:manual 로 교체. 셀렉터 오버라이드 불필요(표준 폴백 체인 내에서 매칭 확인).",
@@ -5316,6 +5324,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
+        {name: "All wear", cateNo: 32},
         {name: "Book", cateNo: 51},
       ],
     },
@@ -5461,6 +5470,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
+        {name: "SELECTED", cateNo: 63},
         {name: "VINTAGE", cateNo: 64},
         {name: "JEWELLERY", cateNo: 78},
         {name: "OBJECTS", cateNo: 89},
@@ -5468,7 +5478,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
         {name: "EVERYTHING", cateNo: 107},
       ],
     },
-    notes: "batch3 야간 스윕(2026-08-20): 기본 폴백 cateNo 9/13 등이 죽은 값이라 qc_failed 상태였음. 홈페이지 nav + 카테고리별 실제 상품 존재 여부(li.xans-record- 등 표준 셀렉터 카운트)를 전수 실측해 discovery:manual 로 교체. 셀렉터 오버라이드 불필요(표준 폴백 체인 내에서 매칭 확인).",
+    notes: "batch3 야간 스윕(2026-08-20): 기본 폴백 cateNo 9/13 등이 죽은 값이라 qc_failed 상태였음. 홈페이지 nav + 카테고리별 실제 상품 존재 여부(li.xans-record- 등 표준 셀렉터 카운트)를 전수 실측해 discovery:manual 로 교체. 셀렉터 오버라이드 불필요(표준 폴백 체인 내에서 매칭 확인). 2026-08-24 재확인: batch3가 cateNo=63(SELECTED, 5페이지·상품 다수)을 누락시켰던 걸 발견해 복원 — u-co 재크롤이 계속 멈추던 문제와 연관 가능성 있어 원인 후보로도 기록.",
   },
   {
     key: "vvv-en",
@@ -5689,6 +5699,9 @@ const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["sh
 }
 
 const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTextPatterns"]>> = {
+  // EMIS uses (W) for current women-specific products; older products use the
+  // generic (WOMENS)/(MENS)/(UNISEX) tokens handled by GENDER_RULES.
+  emis: {women: [/^\s*\(W\)\s*/i]},
   // 공식 취급처에서 `W.` 품번/상품명은 여성, 일반 RR 상품은 공용으로 분리된다.
   roaringrad: {women: [/^\s*W\./i]},
   // 공식 상품명이 남녀 핏을 `(m)` / `(w)`로 직접 구분한다.
@@ -5710,6 +5723,9 @@ const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTe
 }
 
 const SITE_GENDER_MODEL_DESCRIPTION_SITES = new Set([
+  // Product details explicitly say "여성용 ...입니다" for (W) products.
+  // Unlabeled products that only say "모델 M 착용" remain unresolved: M is size.
+  "emis",
   // 상세 설명이 `남녀 모두`, `남성모델`/`여성모델` 라벨을 일관되게 제공한다.
   "horlisun",
   "the-nockin",

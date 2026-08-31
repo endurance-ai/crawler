@@ -279,9 +279,17 @@ export function inferGenderFromDepartmentTagPrefixes(
 export function inferGenderFromModelDescription(value: unknown): ProductGender | null {
   if (typeof value !== "string" || !value) return null
   const text = value.replace(/<[^>]+>/g, " ")
-  if (/\bunisex(?:\s+(?:fit|item|product))?\b/i.test(text) || /유니섹스|남녀\s*(?:공용|모두)/u.test(text)) {
+  if (
+    /\bunisex(?:\s+(?:fit|item|product))?\b/i.test(text)
+    || /유니섹스|남녀\s*(?:공용|모두)|유니\s*(?:티셔츠|제품|아이템)|누구나\s*착용/u.test(text)
+  ) {
     return "unisex"
   }
+  const explicitMen = /(?:남성용|남자용|남자\s*모델|남자모델)/u.test(text)
+  const explicitWomen = /(?:여성용|여자용|여자\s*모델|여자모델|우먼스\s*라인)/u.test(text)
+  if (explicitMen && explicitWomen) return "unisex"
+  if (explicitMen) return "men"
+  if (explicitWomen) return "women"
   const men = /\b(?:male|man)\s*(?:model\s*)?(?:[:(])/i.test(text)
     || /男性着用モデル|남성\s*모델/u.test(text)
   const women = /\b(?:female|woman)\s*(?:model\s*)?(?:[:(])/i.test(text)

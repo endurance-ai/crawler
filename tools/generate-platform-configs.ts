@@ -82,12 +82,31 @@ const CAFE24_SOURCE_CURRENCY_BY_KEY: Partial<Record<string, SiteConfig["sourceCu
   "en-4821": "USD",
 }
 
-const CAFE24_BASE_URL_BY_KEY: Partial<Record<string, string>> = {
+/**
+ * Per-key baseUrl override, applied ahead of `kr_storefront_url` and the
+ * brand's `homepage_url`. Use when the recorded homepage is not the storefront
+ * we should actually crawl — a dead host, or a foreign-market twin of a
+ * Korean shop.
+ */
+const BASE_URL_BY_KEY: Partial<Record<string, string>> = {
   // The former .shop host no longer has DNS; the KR storefront is live here.
   sideservice: "https://sideservice.store",
   // The m. subdomain serves no TLS at all, so the crawl has been failing since
   // 2026-07-13. The desktop host serves the same catalog and product paths.
   "draw-attention": "https://drawattention.cafe24.com",
+  // The brand runs two imweb shops off one theme: `-global.com` prices in USD,
+  // `.co.kr` in KRW. We were crawling the global one and storing $55 tees as
+  // ₩55 (53 rows, 2026-08-26). Prefer the KR shop — a real won price beats a
+  // converted one. Key keeps its `-global` name so brand_node 2470's existing
+  // product_crawl_status history stays attached.
+  "emostanceclub-global": "https://www.emostanceclub.co.kr",
+  // Same story: misekiseoul.com is the Japan storefront (JSON-LD priceCurrency
+  // JPY, 商品名/販売価格 labels) and misekiseoul.kr is the Korean twin — a
+  // separate Cafe24 mall with its own product_no series but the identical
+  // category tree, pricing in KRW (₩89,000 jersey zip-up). We were crawling
+  // the JP one and storing ¥1,650 socks as ₩1,650 (302 rows, 2026-08-26).
+  // `?shop_no=` does not switch markets here; only the domain does.
+  misekiseoul: "https://misekiseoul.kr",
 }
 
 const CAFE24_MULTI_BRAND_KEYS = new Set(["kamadeva"])
@@ -101,6 +120,25 @@ const CAFE24_SELECTORS_BY_KEY: Partial<Record<string, SiteConfig["selectors"]>> 
 // (tools/backfill-cafe24-category-names.ts's auto-discovered names) below —
 // see buildEntrySource's `cafe24Categories` line.
 const CAFE24_CATEGORIES_BY_KEY: Partial<Record<string, NonNullable<SiteConfig["category"]>["categories"]>> = {
+  // The recorded cateNos (9/13/43/51) are dead: 9 and 13 are board categories,
+  // 43/51 are decorative main-page links, and `list.html?cate_no=` returns an
+  // error for all four — the 2026-08-26 crawl collected 0 products. The live
+  // navigation uses the SEO paths (/category/men/79/ and friends), and the KR
+  // mall we now crawl (see BASE_URL_BY_KEY) exposes the same cateNo tree.
+  //
+  // MEN and WOMEN lead so their gender evidence wins the engine's first-seen
+  // dedup; the remaining branches are cross-cutting merchandising shelves
+  // (archive/collection/collaboration/style) that carry no gender signal, so
+  // they are listed without one rather than being defaulted to unisex.
+  misekiseoul: [
+    {name: "MEN", cateNo: 79, gender: ["men"]},
+    {name: "WOMEN", cateNo: 98, gender: ["women"]},
+    {name: "COLLECTION", cateNo: 155},
+    {name: "COLLABORATION", cateNo: 153},
+    {name: "REI X MISEKI", cateNo: 191},
+    {name: "STYLE", cateNo: 180},
+    {name: "ARCHIVE", cateNo: 194},
+  ],
   // Official navigation exposes separate WOMEN and MEN departments. Use leaf
   // categories so aggregate/new/sale pages cannot erase the gender evidence.
   dunststudio: [
@@ -253,10 +291,12 @@ const IMWEB_DEFAULT_SUBCATEGORY_BY_KEY: Partial<Record<string, string>> = {
   kibata: "jeans",
 }
 
+
 interface CandidateRow {
   brand_node_id: number
   brand_name: string
-  homepage_url: string
+  /** Null when the brand row lost its homepage upstream — see `resolveHomepageUrl`. */
+  homepage_url: string | null
   platform_key: string | null
   platform_type: string
   category_discovery: "manual" | "auto"
@@ -275,9 +315,10 @@ interface GeneratedCandidate extends Omit<CandidateRow, "platform_key" | "platfo
   platform_type: Extract<PlatformType, "shopify" | "cafe24" | "imweb">
 }
 
-export function normalizeHost(url: string): string {
+/** Returns "" for anything unusable, including a null/absent homepage_url. */
+export function normalizeHost(url: string | null | undefined): string {
   try {
-    const h = new URL(url).hostname.toLowerCase()
+    const h = new URL(url!).hostname.toLowerCase()
     return h.startsWith("www.") ? h.slice(4) : h
   } catch {
     return ""
@@ -334,7 +375,11 @@ async function fetchCandidates(): Promise<GeneratedCandidate[]> {
     .select(
       "brand_node_id,brand_name,homepage_url,platform_key,platform_type,category_discovery,categories,status,config_status,detection,kr_eligibility_status,kr_price_currency,kr_storefront_url,wiki",
     )
-    .not("homepage_url", "is", null)
+    // homepage_url NULL 인 행도 가져온다. 예전에는 쿼리에서 걸렀는데, 브랜드
+    // 행의 homepage 가 상류에서 지워지면 이미 잘 돌던 config 가 재생성 때
+    // 조용히 사라졌다 (2026-08-26 실측: innir/fragola/uune 등 6건. innir 는
+    // 사람이 검증한 defaultGender 를 갖고 있어 테스트가 잡아냈지만, 나머지는
+    // 아무 신호 없이 크롤 대상에서 빠진다). 직전 생성물의 baseUrl 로 폴백한다.
     .not("platform_key", "is", null)
     // qc_failed 포함: select-onboard-batch.ts는 tech_detected뿐 아니라
     // qc_failed(재시도 대상, MAX_IMPORT_RETRIES 캡 안)도 선정 후보로 삼는다.
@@ -387,7 +432,7 @@ function buildEntrySource(
     row.kr_eligibility_status === "eligible_storefront" && row.kr_storefront_url
       ? row.kr_storefront_url.replace(/\/$/, "")
       : null
-  const baseUrl = CAFE24_BASE_URL_BY_KEY[row.platform_key] ?? verifiedKrStorefront ?? `https://${host}`
+  const baseUrl = BASE_URL_BY_KEY[row.platform_key] ?? verifiedKrStorefront ?? `https://${host}`
   const currencyUndetected = row.platform_type === "shopify" && shopifyCurrencyResult && !shopifyCurrencyResult.ok
   const disabled =
     DISABLED_KEYS.has(row.platform_key) ||
@@ -461,6 +506,11 @@ function buildEntrySource(
     if (defaultCategory) lines.push(`    defaultCategory: ${JSON.stringify(defaultCategory)},`)
     const defaultSubcategory = IMWEB_DEFAULT_SUBCATEGORY_BY_KEY[row.platform_key]
     if (defaultSubcategory) lines.push(`    defaultSubcategory: ${JSON.stringify(defaultSubcategory)},`)
+    // cafe24 와 동일하게 무조건 켠다. imweb 리스트 위젯은 상품당 썸네일 1장만
+    // 주고 갤러리는 PDP 에만 있다 — 상품당 요청이 1회 늘지만, 초기 수집은
+    // 한 번뿐이고 이미지가 1장이면 대표컷(모델샷) 선별 자체가 불가능하다.
+    // 실측(emostanceclub-global): 1장 → 평균 6장, 해상도도 썸네일→원본.
+    lines.push("    crawlDetails: true,")
   }
   if (disabled) lines.push("    disabled: true,")
   const noteSuffix = currencyUndetected
@@ -495,11 +545,20 @@ async function main() {
   let skipManualKey = 0
   let skipDupHost = 0
   let skipNoKey = 0
+  const carriedHomepages: string[] = []
 
   for (const row of candidates) {
     if (!row.platform_key) {
       skipNoKey++
       continue
+    }
+    // homepage 가 비어도 직전 생성물에 baseUrl 이 있으면 그것으로 이어간다 —
+    // config 가 사라지면 그 사이트는 아무 경고 없이 크롤 대상에서 빠진다.
+    if (!row.homepage_url) {
+      const carried = previousByKey.get(row.platform_key)?.baseUrl
+      if (!carried) continue
+      row.homepage_url = carried
+      carriedHomepages.push(row.platform_key)
     }
     const host = normalizeHost(row.homepage_url)
     if (!host) continue
@@ -577,6 +636,12 @@ export const GENERATED_PLATFORMS: SiteConfig[] = [
 
   console.log(`candidates fetched: ${candidates.length}`)
   console.log(`skip (missing platform_key): ${skipNoKey}`)
+  if (carriedHomepages.length > 0) {
+    console.log(
+      `carried baseUrl from previous generation (homepage_url is NULL upstream): ` +
+        `${carriedHomepages.length} — ${carriedHomepages.join(", ")}`,
+    )
+  }
   console.log(`skip (manual key match): ${skipManualKey}`)
   console.log(`skip (manual host match): ${skipManualHost}`)
   console.log(`skip (duplicate host among candidates): ${skipDupHost}`)

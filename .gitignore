@@ -38,3 +38,6 @@ poc-runs/
 # local-only artifacts
 /bin/lightpanda
 package-lock.json
+
+# 삭제 전 백업 스냅샷 (sql/runbooks/ 가 참조) — 상품 데이터라 커밋하지 않는다
+/local-backup

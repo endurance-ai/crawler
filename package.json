@@ -38,6 +38,7 @@
     "sync:brand-homepage-reviews": "dotenv -e .env -e .env.local -- tsx tools/update-homepage-review-classifications.ts --apply",
     "repair:sculpstore-brand-mapping": "dotenv -e .env -e .env.local -- tsx tools/repair-sculpstore-brand-contamination.ts",
     "scaffold:platform": "tsx tools/scaffold-platform.ts",
+    "fx:refresh": "tsx tools/refresh-fx-snapshot.ts",
     "spike:lightpanda": "dotenv -e .env -e .env.local -- tsx src/spikes/lightpanda-poc.ts",
     "test": "sh -c 'node --test --import tsx ./tests/*.test.ts'",
     "typecheck": "tsc --noEmit"
@@ -47,7 +48,10 @@
     "@supabase/supabase-js": "^2.100.1",
     "ai": "^6.0.222",
     "llm-scraper": "^2.0.0",
+    "onnxruntime-node": "^1.27.0",
     "playwright": "^1.58.2",
+    "sharp": "^0.35.3",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
@@ -57,5 +61,12 @@
     "puppeteer-core": "^25.3.0",
     "tsx": "^4.21.0",
     "typescript": "^5.6.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "onnxruntime-node",
+      "tesseract.js"
+    ]
   }
 }

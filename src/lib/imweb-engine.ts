@@ -21,6 +21,7 @@ import type {CrawlResult, Product, SiteConfig} from "./types"
 import {normalizeObservedPricing} from "./product-pricing"
 import {extractStructuredProduct} from "./parsers/structured-data"
 import {CURRENCY_SYMBOL} from "./fx"
+import {shouldCrawlDetails} from "./platform-config-lifecycle"
 import {
   collectProductImagesFromHtml,
   PRODUCT_IMAGE_COLLECTION_VERSION,
@@ -332,7 +333,8 @@ export async function crawlImweb(config: SiteConfig): Promise<CrawlResult> {
     }
 
     // 3. 상세 보강 (온보딩: availability/images — 서버렌더 JSON-LD, fetch 기반)
-    if (config.crawlDetails) {
+    // cafe24 와 같은 정책을 쓴다 (미설정=켬). shouldCrawlDetails 참조.
+    if (shouldCrawlDetails(config)) {
       console.log(`   상세 크롤: ${products.length}개 (fetch)`)
       for (const product of products) {
         try {
