@@ -5,6 +5,7 @@ import {
   collectProductImagesFromHtml,
   extractShopifyProductImages,
   isProductImageUtilityAsset,
+  isLowResolutionProductVariant,
   mergeProductImages,
   normalizeProductImageUrl,
   sanitizeProductImageFields,
@@ -45,6 +46,9 @@ test("normalizeProductImageUrl rejects utility, template, and non-image assets",
   )
   assert.equal(normalizeProductImageUrl("/images/size-guide.jpg", page), null)
   assert.equal(normalizeProductImageUrl("/web/main/nb03.jpg", page), null)
+  assert.equal(normalizeProductImageUrl("/MD/a/campaign-LOGO.jpg", page), null)
+  assert.equal(normalizeProductImageUrl("/product/txt_naver.gif", page), null)
+  assert.equal(normalizeProductImageUrl("/images/color-swatch-red.png", page), null)
   assert.equal(normalizeProductImageUrl("/web/product/big/img_product_big.gif", page), null)
   assert.equal(normalizeProductImageUrl("${imageUrl}", page), null)
   assert.equal(normalizeProductImageUrl("javascript:alert(1)", page), null)
@@ -99,7 +103,7 @@ test("sanitizeProductImageFields promotes a real candidate over a utility repres
   )
 })
 
-test("collectProductImagesFromHtml uses structured and product-hinted images only", () => {
+test("collectProductImagesFromHtml merges structured and product-hinted gallery images", () => {
   const html = `
     <script type="application/ld+json">{
       "@type":"Product",
@@ -107,6 +111,9 @@ test("collectProductImagesFromHtml uses structured and product-hinted images onl
       "image":["https://cdn.example.com/main.jpg","https://cdn.example.com/back.jpg"]
     }</script>
     <img class="product-gallery" src="/small.jpg" srcset="/medium.jpg 800w, /large.jpg 1600w">
+    <img class="color-swatch" src="/red-swatch.jpg" width="40" height="40">
+    <img id="option-image" src="/option-red.jpg" width="500" height="500">
+    <img class="product-gallery" src="/tiny-gallery.jpg" width="64" height="64">
     <img class="recommended" src="https://cdn.example.com/other-product.jpg">
     <img src="/layout/header.jpg">
   `
@@ -115,7 +122,26 @@ test("collectProductImagesFromHtml uses structured and product-hinted images onl
     [
       "https://cdn.example.com/main.jpg",
       "https://cdn.example.com/back.jpg",
+      "https://shop.example.com/large.jpg",
+      "https://shop.example.com/small.jpg",
     ],
+  )
+})
+
+test("small product variants are retained only when no larger variant exists", () => {
+  const page = "https://shop.example.com/products/1"
+  assert.equal(isLowResolutionProductVariant("/web/product/small/2025/a.jpg", page), true)
+  assert.equal(isLowResolutionProductVariant("/web/product/medium/2025/a.jpg", page), false)
+  assert.deepEqual(
+    collectProductImagesFromHtml(
+      '<img class="product-gallery" src="/web/product/small/2025/a.jpg"><img class="product-gallery" src="/web/product/medium/2025/a.jpg">',
+      page,
+    ),
+    ["https://shop.example.com/web/product/medium/2025/a.jpg"],
+  )
+  assert.deepEqual(
+    collectProductImagesFromHtml('<img class="product-gallery" src="/web/product/small/2025/a.jpg">', page),
+    ["https://shop.example.com/web/product/small/2025/a.jpg"],
   )
 })
 

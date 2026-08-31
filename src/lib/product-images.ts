@@ -3,7 +3,7 @@ import {extractStructuredProduct} from "./parsers/structured-data"
 export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v2"
 
 export const PRODUCT_IMAGE_UTILITY_ASSET_PATTERN =
-  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|img_(?:product_big|404)\.(?:gif|jpe?g|png|webp)(?:$))`
+  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|(?:campaign[-_]?logo|txt[-_]?naver)(?:[/_.-]|$)|(?:color|colour|option)[-_]?(?:swatch|chip)(?:[/_.-]|$)|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|img_(?:product_big|404)\.(?:gif|jpe?g|png|webp)(?:$))`
 const UTILITY_ASSET_RE = new RegExp(PRODUCT_IMAGE_UTILITY_ASSET_PATTERN, "i")
 const NON_IMAGE_EXT_RE = /\.(?:css|html?|js|json|pdf|svg|woff2?)(?:$|[?#])/i
 const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
@@ -82,6 +82,21 @@ export function mergeProductImages(
   return images
 }
 
+/** Cafe24's `small` variant is useful only when no larger product image exists. */
+export function isLowResolutionProductVariant(raw: unknown, pageUrl: string): boolean {
+  if (typeof raw !== "string" || !raw.trim()) return false
+  try {
+    return /\/web\/product\/small(?:\/|$)/i.test(new URL(decodeHtmlEntities(raw.trim()), pageUrl).pathname)
+  } catch {
+    return false
+  }
+}
+
+function dropRedundantLowResolutionVariants(images: string[], pageUrl: string): string[] {
+  if (!images.some((url) => !isLowResolutionProductVariant(url, pageUrl))) return images
+  return images.filter((url) => !isLowResolutionProductVariant(url, pageUrl))
+}
+
 export function sanitizeProductImageFields(input: {
   productUrl: string
   imageUrl?: string | null
@@ -108,6 +123,22 @@ function attr(tag: string, name: string): string | null {
   const quoted = new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i").exec(tag)
   if (quoted) return quoted[2]
   return new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*([^\\s>]+)`, "i").exec(tag)?.[1] ?? null
+}
+
+function isLikelyOptionImageTag(tag: string): boolean {
+  const classOrId = `${attr(tag, "class") ?? ""} ${attr(tag, "id") ?? ""}`
+  if (/(?:swatch|swatches|color-swatch|colour-swatch|color-chip|colour-chip|option-image|option_thumb|colorchip|logo)/i.test(classOrId)) return true
+  if (attr(tag, "data-color") || attr(tag, "data-option") || attr(tag, "role")?.toLowerCase() === "option") return true
+  if (attr(tag, "data-zoom-image") || attr(tag, "data-origin") || attr(tag, "data-original") || attr(tag, "srcset") || attr(tag, "data-srcset")) return false
+  const widthRaw = attr(tag, "width")
+  const heightRaw = attr(tag, "height")
+  const width = Number(widthRaw)
+  const height = Number(heightRaw)
+  if (widthRaw !== null && heightRaw !== null && Number.isFinite(width) && Number.isFinite(height)) {
+    if (width <= 96 || height <= 96) return true
+    if (width === height && width <= 256) return true
+  }
+  return false
 }
 
 function bestSrcsetUrl(value: string): string | null {
@@ -139,12 +170,10 @@ export function collectProductImagesFromHtml(
   // Product JSON-LD / OG belongs to the current PDP. Do not widen an already
   // authoritative pool with arbitrary DOM images from recommendations, global
   // campaigns, or another product card rendered on the same page.
-  if ((structured?.images.length ?? 0) > 0) {
-    return mergeProductImages(existing[0], pageUrl, existing.slice(1), structured?.images)
-  }
   const hinted: string[] = []
   for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
     const tag = match[0]
+    if (isLikelyOptionImageTag(tag)) continue
     if (!/(?:xans-product-(?:image|addimage)|keyImg|product[-_ ]?(?:gallery|images)|(?:gallery|detail|zoom)[-_ ]?(?:image|img)|item[-_ ]?image)/i.test(tag)) continue
     if (/(?:product[-_ ]?(?:list|card)|recommend|related|relation|recent|banner|lookbook|collection|size[-_ ]?(?:chart|guide))/i.test(tag)) continue
     const srcset = attr(tag, "srcset") ?? attr(tag, "data-srcset")
@@ -154,7 +183,14 @@ export function collectProductImagesFromHtml(
       if (value) hinted.push(value)
     }
   }
-  return mergeProductImages(existing[0], pageUrl, existing.slice(1), hinted)
+  // Structured data usually contains the representative image only. Keep it
+  // authoritative for ordering, but also retain explicitly product-owned
+  // gallery images from the page instead of dropping them whenever JSON-LD is
+  // present.
+  return dropRedundantLowResolutionVariants(
+    mergeProductImages(existing[0], pageUrl, existing.slice(1), structured?.images, hinted),
+    pageUrl,
+  )
 }
 
 /** Collect only product-owned gallery/detail DOM nodes; never scan the whole page. */
@@ -182,6 +218,23 @@ export async function collectProductImagesFromPage(
         const images = root instanceof HTMLImageElement ? [root, ...root.querySelectorAll("img")] : [...root.querySelectorAll("img")]
         for (const img of images) {
           if (seenElements.has(img) || img.closest(excluded)) continue
+          const classOrId = `${img.getAttribute("class") || ""} ${img.getAttribute("id") || ""}`
+          if (
+            /(?:swatch|swatches|color-swatch|colour-swatch|color-chip|colour-chip|option-image|option_thumb|colorchip|logo)/i.test(classOrId)
+            || img.hasAttribute("data-color")
+            || img.hasAttribute("data-option")
+            || img.getAttribute("role")?.toLowerCase() === "option"
+          ) continue
+          const hasHighResolutionSource = ["data-zoom-image", "data-origin", "data-original", "srcset", "data-srcset"]
+            .some((name) => !!img.getAttribute(name))
+          if (!hasHighResolutionSource) {
+            const widthRaw = img.getAttribute("width")
+            const heightRaw = img.getAttribute("height")
+            const width = Number(widthRaw)
+            const height = Number(heightRaw)
+            if ((widthRaw !== null && Number.isFinite(width) && width <= 96) || (heightRaw !== null && Number.isFinite(height) && height <= 96)) continue
+            if (widthRaw !== null && heightRaw !== null && Number.isFinite(width) && width === height && width <= 256) continue
+          }
           seenElements.add(img)
           const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || ""
           if (srcset) {
@@ -213,9 +266,13 @@ export async function collectProductImagesFromPage(
     return {values, structuredHtml}
   })
   const structured = extractStructuredProduct(extracted.structuredHtml)
-  return (structured?.images.length ?? 0) > 0
-    ? mergeProductImages(existing[0], page.url(), existing.slice(1), structured?.images)
-    : mergeProductImages(existing[0], page.url(), existing.slice(1), extracted.values)
+  // JSON-LD/OG commonly exposes only one representative image. The scoped DOM
+  // collector can see the rest of the current product gallery, so merge both
+  // sources while keeping the representative image first.
+  return dropRedundantLowResolutionVariants(
+    mergeProductImages(existing[0], page.url(), existing.slice(1), structured?.images, extracted.values),
+    page.url(),
+  )
 }
 
 export function hasExplicitImageExtension(url: string): boolean {
