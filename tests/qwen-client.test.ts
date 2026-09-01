@@ -43,6 +43,11 @@ test("rejects non-loopback Qwen endpoints", () => {
   )
 })
 
+test("defaults to the single 8001 endpoint", () => {
+  const config = loadQwenConfig({})
+  assert.deepEqual(config.baseUrls, ["http://127.0.0.1:8001/v1"])
+})
+
 test("preflight requires every endpoint to expose the configured model", async () => {
   const healthy = await listen((_request, response) => {
     response.writeHead(200, {"content-type": "application/json"})

@@ -2,7 +2,9 @@ import {createOpenAI} from "@ai-sdk/openai"
 import {generateText, Output, type LanguageModelUsage} from "ai"
 import {z} from "zod"
 
-const DEFAULT_BASE_URLS = ["http://127.0.0.1:8001/v1", "http://127.0.0.1:8002/v1"]
+// The local inference setup uses a single SSH-forwarded Qwen server.
+// Additional endpoints remain opt-in through QWEN_BASE_URLS.
+const DEFAULT_BASE_URLS = ["http://127.0.0.1:8001/v1"]
 const DEFAULT_MODEL = "qwen3-vl-30b-awq"
 const CIRCUIT_OPEN_MS = 30_000
 const LOCAL_API_KEY = "local-qwen"
