@@ -13,7 +13,7 @@ Qwen output afterward as a conditional patch.
 
 ```dotenv
 QWEN_ENABLED=true
-QWEN_BASE_URLS=http://127.0.0.1:8001/v1,http://127.0.0.1:8002/v1
+QWEN_BASE_URLS=http://127.0.0.1:8001/v1
 QWEN_MODEL=qwen3-vl-30b-awq
 QWEN_TIMEOUT_MS=45000
 QWEN_MAX_RETRIES=2
@@ -35,7 +35,6 @@ When the inference server is remote, create the tunnel outside systemd:
 ```bash
 ssh -N \
   -L 8001:127.0.0.1:8001 \
-  -L 8002:127.0.0.1:8002 \
   user@qwen-host
 ```
 
@@ -43,7 +42,6 @@ Verify both endpoints before starting a canary:
 
 ```bash
 curl -fsS http://127.0.0.1:8001/v1/models
-curl -fsS http://127.0.0.1:8002/v1/models
 ```
 
 Exercise the crawler provider, strict JSON Schema output, and round-robin routing:
