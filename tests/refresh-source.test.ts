@@ -248,6 +248,31 @@ test("닿지 못한 런은 진짜 실패의 연쇄를 끊지도 않는다", () =
   assert.equal(streaks.get("a")?.failures, 2)
 })
 
+test("DB 쓰기만 부분 실패한 런은 소스 실패 연쇄로 세지 않는다", () => {
+  const streaks = computeFailureStreaks([
+    {
+      platform_key: "a",
+      status: "failed",
+      started_at: "2026-08-02T05:00:00Z",
+      db_partial_only: true,
+    },
+    run("a", "failed", "2026-08-02T04:00:00Z"),
+  ])
+  assert.deepEqual(streaks.get("a"), {failures: 1, lastFailedAt: "2026-08-02T04:00:00Z"})
+})
+
+test("DB 부분 실패 표시는 실제 소스 실패를 숨기지 않는다", () => {
+  const streaks = computeFailureStreaks([
+    {
+      platform_key: "a",
+      status: "failed",
+      started_at: "2026-08-02T05:00:00Z",
+      db_partial_only: false,
+    },
+  ])
+  assert.equal(streaks.get("a")?.failures, 1)
+})
+
 test("성공 기록이 없으면 전체 실패가 연쇄가 된다", () => {
   // 실측 2026-07-29: 연쇄 중인 49개 소스 대부분이 한 번도 성공한 적 없다.
   const streaks = computeFailureStreaks([

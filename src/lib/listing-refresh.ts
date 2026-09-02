@@ -20,6 +20,7 @@ export interface RefreshableRow {
   source_price?: number | null
   source_currency?: string | null
   in_stock: boolean | null
+  last_seen_at?: string | null
 }
 
 export type PriceFields = Pick<RefreshableRow, "price" | "original_price" | "sale_price">
@@ -50,6 +51,24 @@ export interface RefreshDiff {
   missingUrls: string[]
   /** DB 보유분 중 리스트에서 다시 확인된 비율 (0~1). DB 가 비면 1. */
   coverage: number
+}
+
+/** Coverage accumulated across resumable slices in one source cycle. */
+export function refreshCycleCoverage(
+  existing: RefreshableRow[],
+  confirmedUrls: string[],
+  cycleStartedAt: string,
+): number {
+  if (existing.length === 0) return 1
+  const confirmed = new Set(confirmedUrls)
+  const started = Date.parse(cycleStartedAt)
+  const seen = existing.filter((row) => {
+    if (confirmed.has(row.product_url)) return true
+    if (!row.last_seen_at) return false
+    const lastSeen = Date.parse(row.last_seen_at)
+    return !Number.isNaN(lastSeen) && !Number.isNaN(started) && lastSeen >= started
+  }).length
+  return seen / existing.length
 }
 
 /**
@@ -107,8 +126,50 @@ export function toPriceFields(product: Product, sourceCurrency = "KRW"): PriceFi
   }
 }
 
-function toRefreshPriceFields(product: Product, sourceCurrency = "KRW"): RefreshPriceFields | null {
-  return toDbPriceFields(product, sourceCurrency, {requireConfirmed: true})
+/**
+ * Refresh-specific price inference.
+ *
+ * A Cafe24 listing frequently exposes one current selling price without enough
+ * markup to prove whether it is regular or discounted. Existing products
+ * already have a confirmed baseline, so visiting every detail page merely to
+ * rediscover that baseline is wasteful. Confirmed observations still win; an
+ * unknown single price is compared with the stored baseline instead.
+ */
+export function toRefreshPriceFields(
+  product: Product,
+  existing: Pick<RefreshableRow, "price" | "original_price">,
+  sourceCurrency = "KRW",
+): RefreshPriceFields | null {
+  const confirmed = toDbPriceFields(product, sourceCurrency, {requireConfirmed: true})
+  if (confirmed) return confirmed
+
+  const current = toDbPriceFields(product, sourceCurrency)
+  if (!current) return null
+
+  const baseline =
+    typeof existing.original_price === "number" && existing.original_price > 0
+      ? existing.original_price
+      : typeof existing.price === "number" && existing.price > 0
+        ? existing.price
+        : current.price
+
+  if (current.price < baseline) {
+    return {
+      ...current,
+      price: current.price,
+      original_price: baseline,
+      sale_price: current.price,
+    }
+  }
+
+  // Equal means a sale ended. Greater means the storefront raised its regular
+  // price. In both cases the current selling price becomes the new baseline.
+  return {
+    ...current,
+    price: current.price,
+    original_price: current.price,
+    sale_price: null,
+  }
 }
 
 /**
@@ -156,14 +217,13 @@ export function diffListing(args: {
       continue
     }
 
-    const prices = toRefreshPriceFields(product, args.sourceCurrency)
-
     for (const row of targets) {
       // 사라진 것으로 오인되지 않도록 대상 행의 URL 을 전부 본 것으로 표시한다.
       seen.add(row.product_url)
 
       const reasons: string[] = []
       const patch: RefreshPatch = {in_stock: product.inStock}
+      const prices = toRefreshPriceFields(product, row, args.sourceCurrency)
       if (row.in_stock !== product.inStock) {
         reasons.push(product.inStock ? "재입고" : "품절")
       }

@@ -1,21 +1,3 @@
-# 리스트-only 재고/가격 갱신 (일상 배치) — **연구실 배치 서버 프로필**.
-#
-# dev-app EC2 프로필(../kiko-refresh.service)과 다른 점:
-#   · Postgres 가 동거하지 않는다 → 리소스 캡의 존재 이유가 사라졌다.
-#     EC2 의 MemoryMax=1500M / CPUQuota=150% 는 4GB 에서 DB 를 보호하기 위한
-#     것이었다. 여기서는 실측 후 정하고, 근거 없이 그 값을 옮겨오지 않는다.
-#   · DB 가 원격이다 → 왕복 지연이 붙는다 (실측 p50 13ms, 원격 기준).
-#     배치 쓰기가 이미 청킹되어 있어 한 바퀴 last_seen_at 갱신은 ~20초다.
-#   · 사용자/경로/HOME 이 다르다.
-#   · **user unit 이다** (~/.config/systemd/user/). 이 호스트는 sudo 에 비밀번호가
-#     걸려 있고 `loginctl show-user kjk -p Linger` 가 이미 `Linger=yes` 라,
-#     시스템 유닛으로 만들 이유가 없다 — 로그인 없이도 부팅 시 돈다.
-#     그래서 `User=` 가 없고(유저 매니저가 곧 kjk), WantedBy 가 default.target 이다.
-#   · x86 이면 Chrome 채널을 쓸 수 있다 (EC2 는 ARM 이라 chromium 강제였다).
-#
-# 설치 전 반드시 deploy/lab-server-migration.md 의 체크리스트를 볼 것 —
-# 특히 **첫 실행은 --ignore-backoff** 가 필요하다 (서킷브레이커가 EC2 네트워크에서
-# 쌓인 실패 연쇄를 그대로 물려받는다).
 [Unit]
 Description=kiko.ai listing refresh (stock/price only) — lab batch host
 After=network-online.target
@@ -24,66 +6,17 @@ OnSuccess=kiko-refresh-candidates.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/kjk/kiko-crawler
-# corepack/node 가 ~/.local/bin 에 있고 systemd 기본 PATH 에는 없다 — 없으면
-# 래퍼의 `corepack pnpm` 이 command not found 로 죽는다 (실측 2026-07-31).
+WorkingDirectory=/home/kjk/kiko-crawler-runtime
 Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=HOME=/home/kjk
-# env 는 .env / .env.local 을 npm 스크립트의 dotenv 가 읽는다 — EnvironmentFile 불필요.
-ExecStart=/home/kjk/kiko-crawler/scripts/run-refresh.sh --budget-minutes=480 --concurrency=8
-# 예산 480분 + wrapper 오버헤드 여유
-TimeoutStartSec=32400
-# 동시성 8 + 예산 480분 — **서드파티 차단 배포 후 재시도** (2026-08-02).
-#
-# 이력: 8 → 4 되돌림(08-01) → 차단 배포(08-02) → 8 재시도.
-#
-# 되돌렸던 이유는 그대로 유효하다. 병목은 CPU/메모리가 아니라 DNS 다.
-#
-#   concurrency 4 : success 192 / failed 4   → 98%
-#   concurrency 8 : success  70 / failed 17  → 74%
-#
-# 실패 17건 중 **11건이 이전에 잘 되던 소스**다(no categories discovered /
-# fetch failed / robots.txt fetch failed). 어려운 소스를 만난 게 아니라 8이
-# 멀쩡하던 것을 깨고 있었다. 같은 시각 호스트에서:
-#
-#   dig @8.8.8.8 brownsfashion.com  → 1차 timeout, 2차 성공
-#   resolvectl statistics           → 172,243 트랜잭션에 캐시 크기 23
-#
-# 즉 DNS 질의가 통째로 드롭되고 캐시는 사실상 비어 있다. 자원은 여전히 남는다
-# (피크 RSS 4.5GB/62GB · load 1.6/12core). **동시성을 다시 올리려면 CPU 가 아니라
-# 리졸버를 먼저 고쳐야 한다** — 로컬 캐싱 리졸버 또는 resolved 캐시 설정.
-# 실패한 런은 커버리지를 못 올릴 뿐 아니라, 완전성 가드가 걸린 채 applyUpdates 는
-# 계속 돌아 in_stock 이 늘기만 하므로 재고 수치까지 부풀린다.
-#
-# concurrency 4 로 돈 첫 패스: 495분에 237/381 소스, 예산 소진으로 중단.
-# 한 패스 환산 ≈ 13시간이라 480분 예산에 못 들어온다. 원인은 가격 상세 폴백
-# (Step 3b)이 125개 소스에서 발동한 것 — 이전 추정 30.6h 는 폴백 이전 값이었다.
-#
-# 자원은 크게 남았다: 피크 RSS 4.5GB / 62GB · load 1.6 / 12 core · swap 0.
-# 8 이면 ≈6.5시간으로 예산 안에 들어온다. 그래도 메모리는 여유가 크다
-# (선형 증가 가정 시 ~9GB).
-#
-# 왜 지금 다시 8인가 — 서드파티 차단(#77)이 DNS 질의를 절반으로 줄였다:
-#
-#   newrim   39 → 22   horlisun 190 → 89   saengin 237 → 121
-#
-# 차단은 **동시성 상향을 위해서만** 값어치가 있다. 동시성 4 에서는 성공률이
-# 96% → 95% 로 이득이 없었고, 대신 3개 소스가 깨졌다(아래). 그러니 8 에서
-# 효과가 확인되지 않으면 차단째로 걷어내는 것이 맞다.
-#
-# ⚠️ 차단으로 깨진 소스가 남아 있다 (08-02 실측, 배포 시점에 딱 끊긴다):
-#   hwi          488 → 0    (cov 1.00 → 0.00)
-#   pasion       415 → 0    (cov 1.00 → 0.00)
-#   wknd-project  74 → 12   (cov 1.00 → 0.03)
-# 셋 다 완전성 가드가 걸려 오품절 처리는 없었다. 어느 차단 항목(stylesheet /
-# 추적 호스트 / image 타입)이 원인인지는 미특정 — CRAWLER_REQUEST_BLOCKING=off
-# 로 즉시 되돌릴 수 있다.
-#
-# 판정 기준: 한 패스 후 성공률. 90% 아래면 되돌린다 (8은 74%, 4는 96~98%였다).
-# 실패한 런은 커버리지를 못 올릴 뿐 아니라, 가드가 걸린 채 applyUpdates 는 계속
-# 돌아 사라진 상품을 품절 처리하지 못하므로 재고 정확도까지 나빠진다.
-# ⚠️ 리소스 캡은 의도적으로 비워 뒀다. DB 동거가 없으므로 EC2 값을 그대로
-# 옮기면 근거 없이 처리량만 깎는다. 첫 런 관측 후 필요하면 여기에 추가한다.
+Environment=CI=true
+# Production runs use a validated checkout. Code and dependencies are updated
+# explicitly during deployment, never from inside a running batch.
+Environment=BATCH_SKIP_UPDATE=true
+ExecStart=/home/kjk/kiko-crawler-runtime/scripts/run-refresh.sh --budget-minutes=600 --source-slice-minutes=10 --concurrency=6
+# Normal claiming stops at 04:00. Page-boundary draining has 30 minutes, so the
+# 90-minute candidate worker can finish by 06:00 ahead of the 07:00 DB backup.
+TimeoutStartSec=37800
 
 [Install]
 WantedBy=default.target

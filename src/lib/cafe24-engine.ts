@@ -9,12 +9,14 @@
  * 사이트마다 테마가 달라 셀렉터가 조금씩 다를 수 있음 → 폴백 셀렉터로 대응
  */
 
+import {createHash} from "node:crypto"
+
 import {installRequestBlocking} from "./request-blocking"
 import {gotoWithRetry, NavFailureError} from "./nav-retry"
 import {BRAND_NAME_PREFIX_PATTERN} from "./refresh-source"
 import {CURRENCY_SYMBOL, ZERO_DECIMAL_CURRENCIES} from "./fx"
 import {shouldCrawlDetails} from "./platform-config-lifecycle"
-import type {CrawlResult, CurrencyCode, Product, SiteConfig} from "./types"
+import type {Cafe24ListingCursor, CrawlResult, CurrencyCode, Product, SiteConfig} from "./types"
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
 import type {DetailData} from "./parsers/detail/types"
@@ -148,6 +150,23 @@ interface CrawlTiming {
   listWaitMs: number
 }
 
+export function cafe24ListingFingerprint(categoryUrls: string[]): string {
+  return createHash("sha1").update(categoryUrls.join("\n")).digest("hex").slice(0, 16)
+}
+
+export function validCafe24ListingCursor(
+  cursor: Cafe24ListingCursor | undefined,
+  categoryUrls: string[],
+): Cafe24ListingCursor | undefined {
+  if (!cursor || cursor.version !== 1 || cursor.engine !== "cafe24") return undefined
+  if (cursor.configFingerprint !== cafe24ListingFingerprint(categoryUrls)) return undefined
+  if (!Number.isInteger(cursor.categoryIndex) || cursor.categoryIndex < 0 || cursor.categoryIndex >= categoryUrls.length) {
+    return undefined
+  }
+  if (!Number.isInteger(cursor.page) || cursor.page < 1) return undefined
+  return cursor
+}
+
 export function cafe24ManualCategoryUrl(
   baseUrl: string,
   category: {cateNo: number; url?: string},
@@ -268,6 +287,17 @@ export interface CrawlCafe24Options {
    * 소스가 `price_missing_rate≈100` 으로 갱신 성공 이력을 한 번도 못 쌓았다.
    */
   recoverMissingPriceFromDetail?: boolean
+  /**
+   * `unconfirmed` preserves onboarding behavior: every unknown tuple is
+   * checked. `missing-current` is the refresh fast path: a visible single
+   * price is resolved against the stored DB baseline, so only products with no
+   * current price at all need a detail visit.
+   */
+  priceRecoveryMode?: "unconfirmed" | "missing-current"
+  /** Resume point for a previous listing-only slice. */
+  listingCursor?: Cafe24ListingCursor
+  /** Cooperative slice deadline; checked only between listing pages. */
+  listingDeadlineAt?: number
   /** Step 3b 의 소스당 상세 방문 상한. 생략하면 가격 미확정 상품을 전수 확인한다. */
   priceRecoveryLimit?: number
   /**
@@ -281,6 +311,25 @@ export interface CrawlCafe24Options {
    * 타임아웃난다 (.moai/plans/lightpanda-spike-report.md).
    */
   enrichDetailPage?: (page: Cafe24Page, product: Product) => Promise<void>
+}
+
+export function shouldRecoverCafe24Price(
+  product: Pick<Product, "price" | "sourcePrice" | "pricingObservation">,
+  mode: "unconfirmed" | "missing-current",
+): boolean {
+  const unknown =
+    product.pricingObservation?.version !== 2 || product.pricingObservation.state === "unknown"
+  if (!unknown) return false
+  if (mode === "unconfirmed") return true
+  const current = product.sourcePrice ?? product.price
+  return !(typeof current === "number" && Number.isFinite(current) && current > 0)
+}
+
+export function canStartCafe24SliceWork(
+  deadlineAt: number | undefined,
+  now = Date.now(),
+): boolean {
+  return deadlineAt === undefined || now < deadlineAt
 }
 
 /**
@@ -1048,6 +1097,12 @@ async function collectProductsFromPage(
 
 // ─── 카테고리 크롤 (페이지네이션 포함) ────────────────
 
+interface CrawlCategoryResult {
+  products: Product[]
+  complete: boolean
+  nextPage: number | null
+}
+
 async function crawlCategory(
   page: Cafe24Page,
   config: SiteConfig,
@@ -1055,7 +1110,9 @@ async function crawlCategory(
   timing?: CrawlTiming,
   listingOnly = false,
   navAttempts = 3,
-): Promise<Product[]> {
+  startPage = 1,
+  deadlineAt?: number,
+): Promise<CrawlCategoryResult> {
   const allProducts: Product[] = []
   const maxPages = config.maxPages || 10
   const delay = config.crawlDelay || 2000
@@ -1065,7 +1122,7 @@ async function crawlCategory(
   // catch 는 파싱 오류용이고, 여기에 섞이면 다시 조용한 break 가 된다.
   let navFatal: Error | null = null
 
-  for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+  for (let pageNum = startPage; pageNum <= maxPages; pageNum++) {
     const separator = category.url.includes("?") ? "&" : "?"
     const url = pageNum === 1
       ? category.url
@@ -1086,6 +1143,8 @@ async function crawlCategory(
             `리스트 내비 실패 (${category.name}): ${nav.attempts}회 시도 — ${nav.error}`,
             nav.attempts,
           )
+        } else {
+          return {products: allProducts, complete: false, nextPage: pageNum}
         }
         break // 2페이지 이후는 종전대로 여기까지 수집한 것으로 끝낸다
       }
@@ -1119,14 +1178,21 @@ async function crawlCategory(
       // 페이지네이션 비활성이면 첫 페이지만
       if (!config.paginate) break
 
+      if (deadlineAt !== undefined && Date.now() >= deadlineAt && pageNum < maxPages) {
+        return {products: allProducts, complete: false, nextPage: pageNum + 1}
+      }
+
       await new Promise((r) => setTimeout(r, delay))
     } catch {
-      break
+      // Do not advance past a page that was not parsed. The next slice retries
+      // it; treating this as category completion could falsely finalize unseen
+      // products as out of stock.
+      return {products: allProducts, complete: false, nextPage: pageNum}
     }
   }
 
   if (navFatal) throw navFatal
-  return allProducts
+  return {products: allProducts, complete: true, nextPage: null}
 }
 
 // ─── 메인 크롤 함수 ──────────────────────────────────
@@ -1202,12 +1268,28 @@ export async function crawlCafe24(
   // Step 2: 카테고리별 상품 수집
   // 내비게이션 재시도 횟수. 한 번 소진되면 아래 서킷브레이커가 1로 낮춘다.
   let navAttempts = 3
-  for (let i = 0; i < categories.length; i++) {
+  const categoryUrls = categories.map((category) => category.url)
+  const configFingerprint = cafe24ListingFingerprint(categoryUrls)
+  const cursor = validCafe24ListingCursor(options.listingCursor, categoryUrls)
+  const startCategory = cursor?.categoryIndex ?? 0
+  let continuation: Cafe24ListingCursor | undefined
+  let categoriesCompleted = 0
+  for (let i = startCategory; i < categories.length; i++) {
     const cat = categories[i]
     const delay = config.crawlDelay || 2000
 
     try {
-      const products = await crawlCategory(page, config, cat, timing, options.listingOnly, navAttempts)
+      const categoryResult = await crawlCategory(
+        page,
+        config,
+        cat,
+        timing,
+        options.listingOnly,
+        navAttempts,
+        i === startCategory ? cursor?.page ?? 1 : 1,
+        options.listingDeadlineAt,
+      )
+      const products = categoryResult.products
       allProducts.push(...products)
 
       const inStockCount = products.filter((p) => p.inStock).length
@@ -1224,6 +1306,28 @@ export async function crawlCafe24(
 
       if (options.sampleLimit && countUniqueInStockProducts(allProducts) >= options.sampleLimit) {
         console.log(`${tag} POC sampleLimit=${options.sampleLimit} reached; stopping category crawl`)
+        break
+      }
+
+      if (!categoryResult.complete) {
+        continuation = {
+          version: 1,
+          engine: "cafe24",
+          configFingerprint,
+          categoryIndex: i,
+          page: categoryResult.nextPage!,
+        }
+        break
+      }
+      categoriesCompleted += 1
+      if (options.listingDeadlineAt !== undefined && Date.now() >= options.listingDeadlineAt && i + 1 < categories.length) {
+        continuation = {
+          version: 1,
+          engine: "cafe24",
+          configFingerprint,
+          categoryIndex: i + 1,
+          page: 1,
+        }
         break
       }
     } catch (err) {
@@ -1456,8 +1560,9 @@ export async function crawlCafe24(
   }
 
   if (!ranFullDetail && options.recoverMissingPriceFromDetail) {
-    const targets = uniqueProducts.filter(
-      (p) => p.pricingObservation?.version !== 2 || p.pricingObservation.state === "unknown",
+    const recoveryMode = options.priceRecoveryMode ?? "unconfirmed"
+    const targets = uniqueProducts.filter((product) =>
+      shouldRecoverCafe24Price(product, recoveryMode),
     )
     // 기본은 전수 확인이다. 명시적으로 상한을 준 운영 런만 일부를 처리하며,
     // 나머지는 unknown으로 남아 가격 UPDATE 대상이 되지 않는다.
@@ -1467,7 +1572,8 @@ export async function crawlCafe24(
       const recoveryStart = Date.now()
       const CONCURRENCY = options.detailConcurrency ?? 3
       const externalFactory = options.createDetailPage
-      const leases: Cafe24DetailPageLease[] = externalFactory
+      const leases: Cafe24DetailPageLease[] = externalFactory ||
+        !canStartCafe24SliceWork(options.listingDeadlineAt)
         ? []
         : await Promise.all(
             Array.from({length: Math.min(CONCURRENCY, capped.length)}, () =>
@@ -1475,8 +1581,13 @@ export async function crawlCafe24(
             ),
           )
       let recovered = 0
+      let attempted = 0
       try {
         for (let i = 0; i < capped.length; i += CONCURRENCY) {
+          // Listing refresh slices share one wall-clock budget across listing
+          // and price recovery. Once it is spent, keep the remaining prices
+          // unchanged and move on; an already-started batch may drain safely.
+          if (!canStartCafe24SliceWork(options.listingDeadlineAt)) break
           const batch = capped.slice(i, i + CONCURRENCY)
           await Promise.all(
             batch.map(async (product, slot) => {
@@ -1497,14 +1608,15 @@ export async function crawlCafe24(
               }
             }),
           )
+          attempted += batch.length
         }
       } finally {
         await Promise.all(leases.map((lease) => lease.close().catch(() => {})))
       }
-      const skipped = targets.length - capped.length
+      const skipped = targets.length - attempted
       console.log(
-        `${tag} 💰 가격 복구 — ${recovered}/${capped.length}개 회수` +
-          (skipped > 0 ? ` (상한 ${cap} 초과로 ${skipped}개 이번 런 제외)` : "") +
+        `${tag} 💰 가격 복구 — ${recovered}/${attempted}개 회수` +
+          (skipped > 0 ? ` (${skipped}개 상한/조각예산으로 이번 런 제외)` : "") +
           ` · ${Math.round((Date.now() - recoveryStart) / 1000)}초`,
       )
     }
@@ -1596,7 +1708,10 @@ export async function crawlCafe24(
       listWaitMs: timing.listWaitMs,
       detailMs,
       detailNavCount,
+      duplicateProductObservations: Math.max(0, allProducts.length - dedupedAll.length),
+      categoriesCompleted,
     },
+    continuation,
     errors,
     qualityWarnings,
     unreachable,
