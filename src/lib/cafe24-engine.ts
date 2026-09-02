@@ -131,7 +131,7 @@ const CAFE24_LIST_READY_SELECTOR = [
  * AJAX로 늦게 붙인다. 고정 3초 sleep 대신 실제 상품 링크를 기다리면 SSR 목록은 즉시
  * 진행하고 AJAX/빈 페이지는 기존과 같은 최대 3초 경계를 유지한다.
  */
-export async function waitForCafe24ListReady(page: Cafe24Page, timeoutMs = 10000): Promise<void> {
+export async function waitForCafe24ListReady(page: Cafe24Page, timeoutMs = 3000): Promise<void> {
   await page.waitForSelector(CAFE24_LIST_READY_SELECTOR, {timeout: timeoutMs}).catch(() => undefined)
 }
 
