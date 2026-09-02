@@ -1,7 +1,12 @@
 /** 휴면 — 모델컷 선별(macOS 전용). 배선·제약은 `src/select-product-images.ts` 헤더 참조. */
 import {collectProductImagesFromHtml} from "./product-images"
 
-export const IMAGE_SELECTION_VERSION = "mac-vision-v2"
+/**
+ * 플랫폼별로 갈라진다 — macOS(Apple Vision)와 Windows/Linux(로컬 CV, 근사치)는
+ * 판별 방식이 달라 점수가 호환되지 않는다. 버전이 다르면 캐시/재선별 대상이 된다
+ * (`needsImageReselection` 참조).
+ */
+export const IMAGE_SELECTION_VERSION = process.platform === "darwin" ? "mac-vision-v2" : "win-cv-v1"
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
 export type ImageSelectionKind = "model" | "product" | "fallback"

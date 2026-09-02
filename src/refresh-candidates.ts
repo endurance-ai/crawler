@@ -14,7 +14,7 @@ import {createProductCollectionClient, type ProductCollectionClient} from "./lib
 import {isValidCategory} from "./lib/enums/product-enums"
 import {assertQwenReady} from "./lib/qwen-client"
 import {applyProductQcGate} from "./lib/product-qc/normalization"
-import {resolveProductGenderWithSource} from "./lib/product-gender"
+import {resolveProductGenderWithSource, type ProductGender} from "./lib/product-gender"
 import {initFxRates} from "./lib/fx"
 import {productToCandidateDbRow} from "./lib/refresh-candidate-import"
 import type {Product} from "./lib/types"
@@ -134,17 +134,33 @@ async function claimCandidates(
   return (data ?? []) as CandidateRow[]
 }
 
+const BRAND_SCOPE_FALLBACK_CUTOFF = "2026-08-01T00:00:00+09:00"
+
 async function ensureExistingBrand(
   db: ProductCollectionClient,
   candidate: CandidateRow,
-): Promise<void> {
+): Promise<ProductGender[]> {
   const {data, error} = await db
     .from("brand_nodes")
-    .select("id")
+    .select("id,gender_scope,updated_at")
     .eq("id", candidate.matched_brand_node_id)
     .maybeSingle()
   if (error) throw new Error(`brand recheck failed: ${error.message}`)
   if (!data) throw new PermanentCandidateError("matched existing brand no longer exists")
+
+  // brand_nodes contains legacy scopes, so only use a recent, exact single
+  // men/women scope as a refresh fallback. Never turn unisex or multi-gender
+  // scope into a guessed product gender.
+  const scope = Array.isArray(data.gender_scope) ? data.gender_scope : []
+  const updatedAt = typeof data.updated_at === "string" ? data.updated_at : ""
+  if (
+    updatedAt >= BRAND_SCOPE_FALLBACK_CUTOFF
+    && scope.length === 1
+    && (scope[0] === "men" || scope[0] === "women")
+  ) {
+    return [scope[0] as ProductGender]
+  }
+  return []
 }
 
 async function markRejected(
@@ -255,7 +271,7 @@ async function processCandidate(
   if (!config || config.disabled) {
     throw new PermanentCandidateError("source config missing or disabled")
   }
-  await ensureExistingBrand(db, candidate)
+  const brandScopeFallback = await ensureExistingBrand(db, candidate)
 
   // LLM 호출 **전에** 중복을 거른다. 후보 1건 = 상세 크롤 + LLM 1회이므로, 이미
   // products 에 있는 URL 을 그대로 태우면 돈만 쓰고 아무것도 안 하는 호출이 된다.
@@ -294,12 +310,17 @@ async function processCandidate(
   const withGender =
     resolvedGender.gender.length > 0
       ? resolvedGender
-      : config.defaultGender && config.defaultGender.length > 0
-        ? resolveProductGenderWithSource(config.defaultGender, {}, "config_default", {
+      : brandScopeFallback.length > 0
+        ? resolveProductGenderWithSource(brandScopeFallback, {}, "brand_scope", {
             verifiedUnisexDefault: config.verifiedUnisexDefault,
             genderTextPatterns: config.genderTextPatterns,
           })
-        : resolvedGender
+        : config.defaultGender && config.defaultGender.length > 0
+          ? resolveProductGenderWithSource(config.defaultGender, {}, "config_default", {
+            verifiedUnisexDefault: config.verifiedUnisexDefault,
+            genderTextPatterns: config.genderTextPatterns,
+          })
+          : resolvedGender
   if (withGender.gender.length === 0) {
     // PermanentCandidateError 여야 한다 — 일반 Error 면 maxAttempts 까지 같은
     // 후보를 계속 재시도한다. 성별 근거가 없는 건 재시도로 해결되지 않는다.

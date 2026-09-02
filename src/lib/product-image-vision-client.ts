@@ -1,10 +1,16 @@
-/** 휴면 — 모델컷 선별(macOS 전용). 배선·제약은 `src/select-product-images.ts` 헤더 참조. */
+/**
+ * 휴면 — 모델컷 선별. 배선·제약은 `src/select-product-images.ts` 헤더 참조.
+ * macOS 는 Apple Vision 네이티브 바이너리, Windows/Linux 는 로컬 CV 파이프라인
+ * (`product-image-vision-win.ts`, onnxruntime-node+YOLOv8-pose+tesseract.js)을
+ * 쓴다 — 아래 `ProductImageVisionClient` 가 플랫폼별로 위임한다.
+ */
 import {spawn, spawnSync, type ChildProcessWithoutNullStreams} from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as readline from "node:readline"
 
 import type {ImageCandidateAnalysis} from "./product-image-selection"
+import {WinProductImageVisionClient} from "./product-image-vision-win"
 
 interface NativeResult extends ImageCandidateAnalysis {
   id: string
@@ -63,7 +69,7 @@ function ensureNativeBinary(cacheDir: string): string {
   return binary
 }
 
-export class ProductImageVisionClient {
+class MacProductImageVisionClient {
   readonly #child: ChildProcessWithoutNullStreams
   readonly #pending = new Map<string, PendingRequest>()
   readonly #stderr: string[] = []
@@ -125,5 +131,39 @@ export class ProductImageVisionClient {
     await new Promise<void>((resolve) => {
       this.#child.once("exit", () => resolve())
     })
+  }
+}
+
+interface VisionBackend {
+  analyze(input: {
+    path: string
+    url: string
+    byteLength: number
+    mimeType: string
+  }): Promise<ImageCandidateAnalysis>
+  close(): Promise<void>
+}
+
+/** 플랫폼 디스패처. macOS는 네이티브 Vision 바이너리, 그 외는 로컬 CV 파이프라인. */
+export class ProductImageVisionClient implements VisionBackend {
+  readonly #backend: VisionBackend
+
+  constructor(cacheDir: string) {
+    this.#backend = process.platform === "darwin"
+      ? new MacProductImageVisionClient(cacheDir)
+      : new WinProductImageVisionClient()
+  }
+
+  analyze(input: {
+    path: string
+    url: string
+    byteLength: number
+    mimeType: string
+  }): Promise<ImageCandidateAnalysis> {
+    return this.#backend.analyze(input)
+  }
+
+  async close(): Promise<void> {
+    await this.#backend.close()
   }
 }

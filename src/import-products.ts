@@ -51,13 +51,15 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 Crawler product import
 
 Usage:
-  tsx src/import-products.ts [--site=KEY] [--dry-run] [--no-new-brands] [--in-stock-only]
+  tsx src/import-products.ts [--site=KEY] [--dry-run] [--no-new-brands] [--in-stock-only] [--allow-unconfirmed-pricing]
 
 Options:
   --site=KEY        Import only data/KEY-products.json
   --dry-run         Validate and report without writing to the database
   --no-new-brands   Skip products whose brand_node mapping is missing
   --in-stock-only   Import only products currently in stock
+  --allow-unconfirmed-pricing
+                    Treat numeric listing prices without sale evidence as regular prices
   --allow-qwen-deferred
                     Emergency escape hatch: allow DB writes without healthy
                     Qwen endpoints. Automated jobs must not use this flag.
@@ -570,6 +572,7 @@ async function main() {
   // --in-stock-only: 품절(in_stock=false) 상품을 적재에서 제외.
   // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
   const inStockOnly = process.argv.includes("--in-stock-only")
+  const allowUnconfirmedPricing = process.argv.includes("--allow-unconfirmed-pricing")
   const trustedCategory = process.argv.includes("--trusted-category")
 
   // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
@@ -814,12 +817,26 @@ async function main() {
 
     const unconfirmedPricing = raw.filter((product) => !isConfirmedPricing(product))
     if (unconfirmedPricing.length > 0) {
-      console.error(
-        `   ❌ 가격 관측 v2 미확정 ${unconfirmedPricing.length}/${raw.length}건 — ` +
-          `기존 세일가를 지울 수 있어 플랫폼 파일 전체를 적재하지 않습니다. 최신 엔진으로 상세 재크롤하세요.`,
+      if (!allowUnconfirmedPricing) {
+        console.error(
+          `   ❌ 가격 관측 v2 미확정 ${unconfirmedPricing.length}/${raw.length}건 — ` +
+            `기존 세일가를 지울 수 있어 플랫폼 파일 전체를 적재하지 않습니다. 최신 엔진으로 상세 재크롤하세요.`,
+        )
+        totalErrors++
+        continue
+      }
+      const numericPriceCount = unconfirmedPricing.filter((product) =>
+        typeof product.price === "number" && product.price > 0 && product.salePrice == null,
+      ).length
+      console.warn(
+        `   ⚠️ 가격 관측 미확정 ${unconfirmedPricing.length}건 중 ${numericPriceCount}건을 ` +
+          `목록 일반가로 보완 (--allow-unconfirmed-pricing)`,
       )
-      totalErrors++
-      continue
+      for (const product of unconfirmedPricing) {
+        if (typeof product.price === "number" && product.price > 0 && product.salePrice == null) {
+          product.pricingObservation = {state: "regular", source: "listing", version: 2}
+        }
+      }
     }
 
     let priceSkipped = 0

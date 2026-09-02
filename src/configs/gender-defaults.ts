@@ -37,6 +37,16 @@
 import type {ProductGender} from "../lib/product-gender"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // 2026-09-01 user-confirmed from the current brand-node QC batch.
+  ceyesseoul: ["men"],
+  franksupply: ["men"],
+  ctc: ["women"],
+  jungdo: ["women"],
+  fitzray: ["men"],
+  duequa: ["women"],
+  deinet: ["women"],
+  khakipoint: ["women"],
+
   // 공식 취급처의 티셔츠·셔츠 재킷·베스트가 모두 남성으로 명시된다.
   // https://www.musinsa.com/products/6703095
   // https://www.musinsa.com/products/5104828
@@ -445,6 +455,54 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 남성 브랜드로 사람이 직접 확인 (2026-08-19).
   "cozy-tex": ["men"],
 
+  // ── 4차: batch3 cateNo 스윕(2026-08-20) 후 gender_missing 100% 드랍 확인
+  //     (2026-08-24, 기존 적재분 상품명 어휘로 판정) ──────────────
+  sodinkybread: ["women"], // blouse/pleated dress/wrap-skirt/bralette 등, 95건 전량 여성복
+  shopready2wear: ["women"], // DB 4/4 women (shorts/blouse)
+  faezsix: ["women"], // DB 5/5 women (tank-top/pants)
+  nuagehouse: ["women"], // DB 3/3 women (TIP TOE 슈즈 라인)
+  eireve: ["women"], // DB 3/3 women (scarf/cap)
+  "u-co": ["women"], // DB 6/6 women (스타킹/드레스/아우터)
+  shrimps: ["women"], // DB 7/7 women — Shrimps London, 여성 액세서리·백 브랜드
+  "brand-2": ["men"], // 이피알 레이어 — DB 8/8 men (jeans/t-shirt/belt)
+  sideservice: ["men"], // DB 4/4 men (LAUGHS MAN 라인)
+  // 공식 사이트(aromatherapyassociates.com)가 "World's Best Aromatherapy Brand"로
+  // 소개하며 목욕오일/바디크림/디퓨저 등 뷰티·웰니스 제품만 취급 — 의류가 아니라
+  // 원천적으로 성별 무관 카테고리. "Find your perfect wellbeing ritual" 로 전 고객
+  // 대상 명시 (2026-08-24 웹서치 확인).
+  "aromatherapy-associates": ["unisex"],
+  // 공식 소개(Highsnobiety/Wikipedia)가 "unisex approach to clothing, providing
+  // relaxed, witty style to men and women"로 명시 — 여성복 중심으로 시작했으나
+  // 브랜드 자체가 남녀 공용 디자인 철학을 표방함 (2026-08-24 웹서치 확인).
+  hyeinseo: ["unisex"],
+
+  // ── 5차: 전체 low-count 재조사, 웹서치로 재확인 (2026-08-24) ──────
+  // wettag/floa/seygun 은 WebFetch가 렌더링 제약으로 nav 확정을 못했지만
+  // DB 코퍼스가 표본 전량 한쪽 성별(의류 어휘 뚜렷)이라 코퍼스 근거로 추가.
+  wettag: ["women"], // DB 10/10 women (드레스/블라우스/재킷), 웹서치는 미확정
+  "tiles-house": ["women"], // 공식 사이트 확인 — 여성복 전문, MEN 섹션 없음
+  floa: ["women"], // DB 15/15 women (원피스/조거/블루머 등), 웹서치는 미확정
+  parentsarewatching: ["women"], // 공식 사이트 확인 — 여성복 전문(PAW), MEN 섹션 없음
+  seygun: ["men"], // DB 17/17 men (수트재킷/트렌치코트/봄버 등 남성 정장류), 웹서치는 미확정
+  pinoki: ["men"], // 공식 사이트 확인 — 남성 키높이 슈즈 전문, WOMEN 섹션 없음
+  pantrka: ["women"], // 공식 사이트 확인 — "PANTRKA GIRLS" 마케팅, MEN 섹션 없음
+  nousselect: ["women"], // 공식 사이트 확인 — 여성 액세서리 브랜드, MEN 섹션 없음
+  losesleepover: ["women"], // 공식 사이트 확인 — 여성복 전문, MEN 섹션 없음
+  // 공식 About "Collecting what remains, rebuilding for the human body" —
+  // 남녀 대신 "human body"를 명시해 성별 구분 없는 브랜드 철학을 표방
+  // (2026-08-24 웹서치 확인). 실크롤에서 cateNo=24(SYSTEM ONLINE) 카테고리가
+  // batch3 스윕에서 누락됐던 것도 함께 복원함(platforms.ts 참조).
+  karasindustry: ["unisex"],
+  // 덤벨/짐볼/스트레칭매트 등 홈트레이닝 소품 전문 — 의류가 아니라 원천적으로
+  // 성별 무관 카테고리 (aromatherapy-associates와 동일 사유).
+  equa: ["unisex"],
+  // 웹서치 확인 — 다양한 체형을 존중하는 요가/데일리룩 여성 애슬레저 브랜드
+  // (배현·정혜련 공동창업, 망원동) (2026-08-24).
+  dadakarada: ["women"],
+  // 웹서치 확인 — 여성 패션 브랜드로 명시 (2026-08-24, "High Neck Button Top"
+  // 등 실제 판매 상품도 여성 상의류와 일치).
+  neutrosin: ["women"],
+
   // ── 의도적으로 비워둔 사이트 (근거 불충분) ────────────────────
   //
   // 아래는 defaultGender 를 넣지 않는다. 이 사이트 상품은 engine/url/text
@@ -489,6 +547,60 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //   ── 판정 불가 (카테고리는 여성형이나 명시 없음) ──
   //     oheshio        OUTERWEAR/TOP/BOTTOMS/DRESS/BAG/ACC
   //     nuuanu         Shop/Lookbook/About 뿐
+  //
+  //   ── 4차 조사, 웹서치/공식 사이트 방문으로 재확인 (2026-08-24) ──
+  //     temporahaus, en-5363, acontur, brand-3(ttitt.co), htav,
+  //     xtenware, dadgetool          공식 사이트 nav/About 실측 — MEN/WOMEN 구분도
+  //                                  성별 명시도 전혀 없음(순수 유니섹스 구조).
+  //                                  (karasindustry는 이후 6차에서 unisex 확정,
+  //                                  위 목록으로 이동함)
+  //     sinin131                     공식 사이트 nav에 "Ladies" 카테고리가 별도
+  //                                  존재하고 나머지는 공용 — 빈티지 편집샵이라
+  //                                  사이트 레벨 단일값 불가.
+  //     cpfm                         공식 소개 확인 결과 "men's, women's, and
+  //                                  unisex styles" 전부 취급 — 혼성 브랜드,
+  //                                  unisex 기본값을 넣으면 성별 구분 상품까지 덮음.
+  //     ihnomuhnit                   외부 소스가 갈림(Farfetch는 men 카테고리,
+  //                                  타 셀러는 unisex 명시) — 브랜드 자체가 젠더리스
+  //                                  철학을 표방한다는 확증 없어 기각.
+  //     dsptch                       가방/기어 전문 브랜드(의류 아님) — oryany 와
+  //                                  동일 사유로 성별 판정 대상이 아님. 이전에
+  //                                  "Male Side" 매칭은 커넥터 극성 표기였지 의류
+  //                                  성별이 아니었던 오탐 사례.
+  //     neighborhood                 공식 소개가 "women's selection is now
+  //                                  available"라고 명시 — 남성복 중심이나 여성
+  //                                  라인이 실재해 defaultGender:men 을 넣으면
+  //                                  여성 상품이 오염됨.
+  //     unbornsociety, cowboysofhabit
+  //                                  platforms.ts/generated.ts 에 config 자체가
+  //                                  없음(2026-08-24 확인) — defaultGender 를
+  //                                  넣을 대상이 없다. config 복원이 선행돼야 함.
+  //
+  //   ── 6차: 실크롤 대조 + platforms.ts 카테고리 커버리지 점검 (2026-08-24) ──
+  //   batch3 야간 스윕이 카테고리를 손으로 재작성하며 사이트마다 실제 존재하는
+  //   카테고리를 일부 누락시킨 걸 발견 — u-co(cateNo=63 SELECTED, 5페이지),
+  //   karasindustry(cateNo=24 SYSTEM ONLINE), oddkidoutfit(cateNo=24 Shop),
+  //   seasalt(cateNo=32 All wear, 29건), en-5363(cateNo=45)를 platforms.ts 에
+  //   복원함 — gender 문제와 별개로 실제 크롤 커버리지 버그였다.
+  //     oddkidoutfit    KIDS 브랜드(웹서치로 아동복 확정) — men/women/unisex
+  //                     체계 자체가 안 맞는 케이스. gender_missing 게이트가
+  //                     아동복에 성인 성별을 강제하는 구조적 문제라 defaultGender
+  //                     로 해결할 사안이 아님. 별도 kids 처리 필요.
+  //     en-5363         카테고리 복원 후에도 남녀 혼재(Cropped T-shirt/Wide Leg
+  //                     Sweatpants 는 여성향, Biker Jacket/Jeans 는 중성) —
+  //                     여전히 사이트 레벨 단일값 불가.
+  //     eng(MYSTEPHENM) cateNo=75 확인 결과 기존 cateNo=81(VOL.4.5)과 상품명이
+  //                     겹쳐 보여 중복 리스팅 페이지로 추정, 추가 안 함.
+  //     oldequalnew     cateNo=56(Archive) 실제 존재해 복원했으나 캡 등 여전히
+  //                     전량 unisex 어휘 — 성별 근거 없음.
+  //     acontur         cateNo=24/29 도 라이브로 열어봤지만 cateNo=42 와 동일한
+  //                     상품 1개만 나옴 — 실제로 카탈로그가 1개뿐인 것으로 확정.
+  //     fadingmarket    실크롤 68건 확인(29CM/무신사 입점) — 정확한 성별 근거를
+  //                     못 찾아 보류. 후속 조사 필요(가장 큰 미해결 건).
+  //     ceyesseoul, htav, brand-3, xtenware, dadgetool, seasalt, ruby-merlot,
+  //     temporahaus     실크롤로 실제 카탈로그 크기는 확인했으나(각 3~257건)
+  //                     단일 성별 근거가 여전히 불충분하거나(unisex 어휘/혼성)
+  //                     비의류(ruby-merlot 가방)라 defaultGender 미부여 유지.
 }
 
 /** 혼성 사이트에서 공식 상품명 표기가 제공하는 상품 단위 성별 근거. */
