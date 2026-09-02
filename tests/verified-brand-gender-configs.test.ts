@@ -190,7 +190,10 @@ test("추가 여성 브랜드와 혼성 편집샵의 상품 단위 성별 근거
 
   const swallowLounge = getSiteConfig("swallowlounge")
   assert.equal(swallowLounge?.defaultGender, undefined)
-  assert.ok(swallowLounge?.category?.categories?.every((category) => category.gender === undefined))
+  assert.ok(swallowLounge?.category?.categories?.length)
+  assert.ok(swallowLounge.category.categories.every((category) => category.gender?.length === 1))
+  assert.ok(swallowLounge.category.categories.some((category) => category.gender?.[0] === "men"))
+  assert.ok(swallowLounge.category.categories.some((category) => category.gender?.[0] === "women"))
   assert.equal(
     inferVerifiedSiteGenderFromName("swallowlounge", "Inside Out Tote S / CERATO BRIGHT"),
     "women",
@@ -369,8 +372,8 @@ test("웹 검증된 단일 성별 브랜드의 사이트 기본값이 일치한�
   assert.equal(getSiteConfig("ceciletulkens")?.verifiedUnisexDefault, true)
   assert.deepEqual(getSiteConfig("avvattev")?.defaultGender, ["unisex"])
   assert.equal(getSiteConfig("avvattev")?.verifiedUnisexDefault, true)
-  assert.deepEqual(getSiteConfig("sansangear-5471")?.defaultGender, ["unisex"])
-  assert.equal(getSiteConfig("sansangear-5471")?.verifiedUnisexDefault, true)
+  // TOJI's legacy platform key was consolidated into the generated sansangear entry.
+  assert.deepEqual(SITE_GENDER_DEFAULTS["sansangear-5471"], ["unisex"])
   assert.deepEqual(getSiteConfig("faneofficiel")?.defaultGender, ["women"])
   assert.equal(getSiteConfig("faneofficiel")?.defaultCategory, "bags")
   assert.deepEqual(getSiteConfig("fandco")?.defaultGender, ["unisex"])

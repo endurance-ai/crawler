@@ -2,16 +2,23 @@
 /**
  * 모델컷/제품컷 판별로 `products.image_url` 을 고르는 도구.
  *
- * 수동 실행 전용이다. 어떤 배치·타이머·스케줄에도 자동 배선되어 있지 않으며,
- * macOS 로컬 작업자가 명시적으로 실행한다. DB 적용은 migration 102의 RPC를 통해
- * 대표 이미지가 바뀐 상품의 기존 embedding/VLM feature를 함께 무효화한다.
+ * 수동 실행 전용이다. 어떤 배치·타이머·스케줄에도 자동 배선되어 있지 않다.
+ * DB 적용은 migration 102의 RPC를 통해 대표 이미지가 바뀐 상품의 기존
+ * embedding/VLM feature를 함께 무효화한다.
  *
  * ## 실행 전제
- * - **macOS 전용.** 이미지 분류를 Apple Vision 으로 한다
- *   (`tools/product-image-vision/main.m`, `IMAGE_SELECTION_VERSION="mac-vision-v1"`).
- *   먼저 컴파일해야 하고, 배치 서버(연구실 리눅스)에서는 돌지 않는다.
- *   네이티브 테스트는 `{skip: process.platform !== "darwin"}` 로 가드되어 있어
- *   리눅스 CI 에서는 자동 스킵된다.
+ * - **macOS**: Apple Vision 네이티브 바이너리로 분류한다
+ *   (`tools/product-image-vision/main.m`, `IMAGE_SELECTION_VERSION="mac-vision-v2"`).
+ *   먼저 컴파일해야 한다.
+ * - **Windows/Linux (2026-08-24 추가)**: `product-image-vision-win.ts` 로컬 CV
+ *   파이프라인을 쓴다 — onnxruntime-node + YOLOv8n-pose(사람+포즈),
+ *   tesseract.js(텍스트 커버리지), sharp 기반 휴리스틱(전경/샤프니스).
+ *   `IMAGE_SELECTION_VERSION="win-cv-v1"`로 mac 결과와 캐시가 섞이지 않는다.
+ *   aestheticsScore/isUtility는 Apple 독점 모델의 근사치일 뿐 정확한 대응이
+ *   아니다 (`product-image-vision-win.ts` 헤더 참조).
+ * - 네이티브 테스트는 `{skip: process.platform !== "darwin"}` /
+ *   `{skip: process.platform === "darwin"}` 로 각각 가드되어 있어 플랫폼별로
+ *   자동 스킵된다.
  *
  * `image_url` 이 바뀌면 `product_embeddings`와 `product_features`의 해당 행을
  * 삭제해 기존 pending 조회 경로가 다시 처리하도록 한다. 이미지 배열 자체는

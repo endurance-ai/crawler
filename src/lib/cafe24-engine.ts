@@ -57,6 +57,8 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, label: string): Promise
 const DEFAULT_SELECTORS = {
   // 상품 아이템: 가장 흔한 것부터
   productItem: [
+    ".g_item_",
+    ".prd_info",
     'li[id^="anchorBoxId"]',
     "ul.thumbnail > li",
     "ul.prdList > li",
@@ -70,6 +72,7 @@ const DEFAULT_SELECTORS = {
     "div[class*=product] li",     // 범용 폴백
   ],
   productName: [
+    ".p_name_",
     ".name a",
     ".name span",
     ".name",
@@ -84,6 +87,7 @@ const DEFAULT_SELECTORS = {
     "div.img img",        // img alt 폴백 (swallowlounge 등 img에만 상품명이 있는 테마)
   ],
   productPrice: [
+    ".p_info_",
     ".price .sale_price",
     ".price",
     ".prdt-price",         // cafe24 "PC 2.0" 모던 스킨 패턴 (productName과 동일 계열)
@@ -93,6 +97,7 @@ const DEFAULT_SELECTORS = {
     "span.sale_price",
   ],
   productImage: [
+    ".p_Img_ img",
     "img.thumb-img",
     "img.ThumbImage",
     ".thumbnail img",
@@ -882,7 +887,15 @@ async function collectProductsFromPage(
           linkEl = el.querySelector(args.linkSelectors[k])
           if (linkEl) break
         }
-        const href = linkEl ? (linkEl.getAttribute("href") || "") : ""
+        let href = linkEl ? (linkEl.getAttribute("href") || "") : ""
+        // Some Cafe24 skins use a clickable div with location.href in onclick
+        // instead of an anchor. Preserve that product URL as a generic fallback.
+        if (!href) {
+          const clickable = el.querySelector("[onclick*='/product/']") || el
+          const onclick = clickable.getAttribute("onclick") || ""
+          const match = onclick.match(/(?:location\.href|location)\s*=\s*['\"]([^'\"]*\/product\/[^'\"]*)['\"]/i)
+          if (match) href = match[1]
+        }
         const productUrl = href.startsWith("http")
           ? href
           : href ? args.baseUrl + (href.startsWith("/") ? "" : "/") + href : ""
