@@ -64,6 +64,12 @@ export function generatedPlatformType(row: PlatformConfigLifecycleRow): Platform
   ) {
     return "imweb"
   }
+  if (
+    row.platform_type === "custom" &&
+    row.detection?.platform_family === "sixshop"
+  ) {
+    return "sixshop"
+  }
   return null
 }
 
@@ -76,5 +82,5 @@ export function shouldDisableGeneratedConfig(row: PlatformConfigLifecycleRow): b
  * represented as custom and its concrete family lives in detection JSON.
  */
 export function queuePlatformType(type: PlatformType): string {
-  return type === "imweb" ? "custom" : type
+  return type === "imweb" || type === "sixshop" || type === "structured" ? "custom" : type
 }

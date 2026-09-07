@@ -8,6 +8,48 @@
 
 ---
 
+## Daily refresh batch (300k growth plan)
+
+The lab timer runs `scripts/run-refresh-daily.sh`. It creates one immutable
+source manifest, runs fast API/structured sources first, gives Cafe24 a shared
+browser and a longer window, then drains partial/transient sources until the
+04:15 KST deadline. A source is marked `success`, `partial`, or an explicit
+exception; the batch is finalized in `product_refresh_batches`.
+
+The required migration is `kiko.ai-app/database/migrations/110_product_refresh_batches.sql`.
+Apply it before enabling the new unit. Until then, keep the existing unit and
+do not invoke `tools/manage-refresh-batch.ts` against the shared database.
+
+Useful local checks:
+
+```bash
+pnpm typecheck
+node --test --import tsx tests/refresh-batch.test.ts
+pnpm refresh -- --dry-run --type=cafe24
+```
+
+`--batch-id`, `--only-pending`, `--max-attempts`, and `--deadline-at` are safe
+resume controls. Candidate enrichment remains a separate OnSuccess unit and
+uses only the local Qwen endpoint on port 8001.
+
+### Batch result semantics
+
+| Field/status | Meaning | Operational action |
+|---|---|---|
+| `running` | Manifest created and at least one phase is still expected to run | Let the scheduled phases continue; do not start a second batch for the same date |
+| `success` | Every manifest source reached a terminal `success` state before the deadline | Normal completion |
+| `completed_with_exceptions` | All sources reached a terminal state, but one or more are explicit exceptions | Review exception codes; retry only the affected sources |
+| `failed` | One or more sources remain `pending`, `running`, or `partial` at finalization | Treat as incomplete coverage and run a targeted retry |
+| source `pending` | Manifested but not started | Check phase selection, deadline, and worker startup |
+| source `running` | A worker claimed the source but has not closed its run | Reconcile stale runs before retrying |
+| source `partial` | The engine checkpointed a continuation cursor and needs another slice | Resume with `--batch-id` / `--only-pending` |
+| source `success` | Listing completed and DB telemetry was closed successfully | Counted toward coverage |
+| source `exception` | Retry budget exhausted or a non-retryable condition was classified | Inspect `exception_code` (`external_block`, `endpoint_removed`, `config_drift`, `transient_exhausted`, or `db_write_exhausted`) |
+
+The batch row stores expected/success/exception source counts and expected/
+success product counts. Each source row stores attempts, last run id, and the
+exception detail, so the daily report remains queryable after logs rotate.
+
 ## 0. 한 줄 요약
 
 오늘 owner 로컬에서 **손으로** `pnpm crawl` → `pnpm import:products` 2단계를 돌리는 흐름을, **전용 크롤러 EC2(m6i.large, x86_64) 위 systemd timer**가 매일 자동으로 `crawl → validate → import → telemetry → alert` 까지 체이닝하도록 만들고, 그 결과를 새 `crawler.runs` 텔레메트리 테이블(전용 `crawler` 스키마) + `/admin/crawl-runs` 어드민 페이지로 가시화하며, 재크롤 시 사라진 SKU 를 `in_stock=false` 로 안전하게 soft-delete 하는 — **지속 가능 운영 체계**를 설계한다. 크롤러는 별도 인스턴스이므로 DB(dev-app Postgres + PostgREST shim)에는 **네트워크 너머로** 접속한다.

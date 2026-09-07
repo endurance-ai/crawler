@@ -13,7 +13,7 @@ Environment=CI=true
 # Production runs use a validated checkout. Code and dependencies are updated
 # explicitly during deployment, never from inside a running batch.
 Environment=BATCH_SKIP_UPDATE=true
-ExecStart=/home/kjk/kiko-crawler-runtime/scripts/run-refresh.sh --budget-minutes=600 --source-slice-minutes=10 --concurrency=6
+ExecStart=/home/kjk/kiko-crawler-runtime/scripts/run-refresh-daily.sh
 # Normal claiming stops at 04:00. Page-boundary draining has 30 minutes, so the
 # 90-minute candidate worker can finish by 06:00 ahead of the 07:00 DB backup.
 TimeoutStartSec=37800

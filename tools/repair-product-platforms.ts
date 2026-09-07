@@ -69,11 +69,13 @@ async function writePlan(outputPath: string): Promise<void> {
     throw new Error(`plan exists: ${absolute} (use --force to replace)`)
   }
   const products = await loadProducts()
-  const result = buildPlatformRepairPlan(products, PLATFORMS)
+  const from = new Set((flag("from") ?? "").split(",").map((value) => value.trim()).filter(Boolean))
+  const scopedProducts = from.size > 0 ? products.filter((row) => from.has(row.platform)) : products
+  const result = buildPlatformRepairPlan(scopedProducts, PLATFORMS)
   const plan: RepairPlanFile = {
     version: 1,
     generated_at: new Date().toISOString(),
-    product_count: products.length,
+    product_count: scopedProducts.length,
     unchanged: result.unchanged,
     ambiguous_count: result.ambiguous.length,
     unresolved_count: result.unresolved.length,
@@ -83,7 +85,7 @@ async function writePlan(outputPath: string): Promise<void> {
   }
   fs.writeFileSync(absolute, `${JSON.stringify(plan, null, 2)}\n`, {flag: "w"})
   console.log(
-    `plan=${absolute} products=${products.length} changes=${result.changes.length}` +
+    `plan=${absolute} products=${scopedProducts.length} changes=${result.changes.length}` +
       ` ambiguous=${result.ambiguous.length} unresolved=${result.unresolved.length}`,
   )
 }
@@ -149,7 +151,7 @@ async function main(): Promise<void> {
   const applyInput = flag("apply")
   if ((planOutput ? 1 : 0) + (applyInput ? 1 : 0) !== 1) {
     throw new Error(
-      "use exactly one: --plan=/absolute/path.json (read-only) or --apply=/absolute/path.json",
+      "use exactly one: --plan=/absolute/path.json [--from=shopify,cafe24] (read-only) or --apply=/absolute/path.json",
     )
   }
   if (planOutput) await writePlan(planOutput)

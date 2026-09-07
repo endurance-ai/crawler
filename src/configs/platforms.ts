@@ -2047,12 +2047,43 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     defaultGender: ["unisex"],
     notes: "Shopify, /products.json 가격이 이미 KRW(예: 38000) — sourceCurrency 생략(기본값 KRW). 2026-07-06: gender_scope/wiki 미완료라 상품군(반다나/캡 등 액세서리) 기준 unisex로 시드.",
   },
-  // BLOCKED — 아래 3개는 PlatformType(cafe24/shopify/uniqlo/zara/farfetch)에 없는
-  // 미지원 플랫폼이라 SiteConfig 자체를 만들 수 없음(엔진 부재). 신규 파서 구현 필요:
-  //   - MOROA (https://www.moroa.kr) — Sixshop(식스샵)
-  //   - OUR NATION (https://our-nation.com) — Imweb
-  //   - IRO Paris (https://www.iroparis.com) — Salesforce Commerce Cloud(Demandware),
-  //     대형 국제 브랜드라 봇 방어도 강할 가능성
+
+  // ─── 2026-09 legacy generic-platform repair sources ───
+  // These stores were originally imported with products.platform="shopify".
+  // A host-specific config lets repair-product-platforms assign a stable key
+  // and makes the source eligible for listing refresh.
+  {key: "rasario", name: "RASARIO", type: "shopify", baseUrl: "https://therasario.com", brand: "RASARIO", sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "fiorucci", name: "Fiorucci", type: "shopify", baseUrl: "https://fiorucci.com", brand: "Fiorucci", sourceCurrency: "GBP", maxPages: 300, crawlDelay: 1500},
+  {key: "nii-hai", name: "Nii Hai", type: "shopify", baseUrl: "https://niihai.com", brand: "Nii Hai", defaultGender: ["women"], sourceCurrency: "GBP", maxPages: 300, crawlDelay: 1500},
+  {key: "jennie-kwon-designs", name: "Jennie Kwon Designs", type: "shopify", baseUrl: "https://jenniekwondesigns.com", brand: "Jennie Kwon Designs", defaultGender: ["women"], defaultCategory: "jewelry", sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "forte-forte", name: "Forte Forte", type: "shopify", baseUrl: "https://forte-forte.com", brand: "Forte Forte", defaultGender: ["women"], sourceCurrency: "EUR", maxPages: 300, crawlDelay: 1500},
+  {key: "dimito", name: "DIMITO", type: "shopify", baseUrl: "https://dimito.com", brand: "DIMITO", sourceCurrency: "KRW", maxPages: 300, crawlDelay: 1500},
+  {key: "notfound", name: "Notfound", type: "shopify", baseUrl: "https://notfoundco.com", brand: "Notfound", sourceCurrency: "EGP", maxPages: 300, crawlDelay: 1500},
+  {key: "kuon", name: "KUON", type: "shopify", baseUrl: "https://kuon.tokyo", brand: "KUON", defaultGender: ["men"], sourceCurrency: "JPY", maxPages: 300, crawlDelay: 1500},
+  {key: "lalingi", name: "L'Alingi", type: "shopify", baseUrl: "https://lalingi.com", brand: "L'Alingi", defaultGender: ["women"], defaultCategory: "bags", sourceCurrency: "GBP", maxPages: 300, crawlDelay: 1500},
+  {key: "nodaleto", name: "Nodaleto", type: "shopify", baseUrl: "https://nodaleto.com", brand: "Nodaleto", defaultGender: ["women"], sourceCurrency: "EUR", maxPages: 300, crawlDelay: 1500},
+  {key: "wales-bonner", name: "Wales Bonner", type: "shopify", baseUrl: "https://walesbonner.net", brand: "Wales Bonner", sourceCurrency: "GBP", maxPages: 300, crawlDelay: 1500},
+  {key: "feng-system", name: "FENG SYSTEM", type: "shopify", baseUrl: "https://fengsystem.co", brand: "FENG SYSTEM", sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "danse-lente", name: "Danse Lente", type: "shopify", baseUrl: "https://danselente.com", brand: "Danse Lente", defaultGender: ["women"], defaultCategory: "bags", sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "armarex", name: "ARMAREX", type: "shopify", baseUrl: "https://armarex.store", brand: "ARMAREX", sourceCurrency: "GBP", maxPages: 300, crawlDelay: 1500},
+  {key: "howly", name: "Howly", type: "shopify", baseUrl: "https://howly-dog.jp", brand: "Howly", sourceCurrency: "JPY", maxPages: 300, crawlDelay: 1500},
+  {key: "jaden-cho", name: "JADEN CHO", type: "shopify", baseUrl: "https://jaden-cho.com", brand: "JADEN CHO", defaultGender: ["women"], sourceCurrency: "KRW", maxPages: 300, crawlDelay: 1500},
+  {key: "bad-son", name: "BAD SON", type: "shopify", baseUrl: "https://badson.us", brand: "BAD SON", sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "m-hiramatsu", name: "M.Hiramatsu", type: "shopify", baseUrl: "https://mhiramatsu.com", brand: "M.Hiramatsu", defaultGender: ["women"], sourceCurrency: "JPY", maxPages: 300, crawlDelay: 1500},
+  {key: "falmaran", name: "FALMARAN", type: "shopify", baseUrl: "https://falmaran.com", brand: "FALMARAN", sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "schts", name: "schts", type: "shopify", baseUrl: "https://schts.com", brand: "schts", sourceCurrency: "KRW", maxPages: 300, crawlDelay: 1500},
+  {key: "iue-studio", name: "IUE STUDIO", type: "shopify", baseUrl: "https://princssclub.com", brand: "IUE STUDIO", defaultGender: ["women"], sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+  {key: "alexander-digenova", name: "Alexander DiGenova", type: "shopify", baseUrl: "https://alexander-digenova.com", brand: "Alexander DiGenova", defaultGender: ["men"], sourceCurrency: "USD", maxPages: 300, crawlDelay: 1500},
+
+  // No stable public listing API is available for these two sources. Refresh
+  // their existing DB URLs through schema.org Product data; this intentionally
+  // does not discover new URLs or overwrite ambiguous sale prices.
+  {key: "juunj", name: "Juun.J", type: "structured", baseUrl: "https://www.ssfshop.com", brand: "Juun.J", sourceCurrency: "KRW", crawlDetails: false, notes: "SSFShop brand inventory: existing-URL stock/last_seen refresh only"},
+  {key: "psylos1", name: "PSYLOS1", type: "structured", baseUrl: "https://psylos1.com", brand: "PSYLOS1", defaultGender: ["unisex"], sourceCurrency: "KRW", crawlDetails: false, notes: "Next.js headless store: existing-URL stock/last_seen refresh only"},
+
+  // OUR NATION is already supported by the Imweb engine. IRO Paris remains a
+  // separate Demandware onboarding concern and has no products under a missing
+  // refresh platform key.
 
   // ─── 2026-07 브랜드 온보딩 3차 배치 (cafe24, draft — dry-run 후 manual 전환 필요) ───
   {

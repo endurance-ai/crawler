@@ -18,7 +18,10 @@ Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/
 Environment=HOME=/home/kjk
 Environment=CI=true
 Environment=QWEN_ENABLED=true
-Environment=QWEN_BASE_URLS=http://127.0.0.1:8001/v1,http://127.0.0.1:8002/v1
+# Candidate normalization uses the single primary Qwen worker. Requiring 8002
+# made the entire OnSuccess chain fail whenever the optional second worker or
+# its tunnel was absent, even while 8001 was healthy.
+Environment=QWEN_BASE_URLS=http://127.0.0.1:8001/v1
 Environment=QWEN_MODEL=qwen3-vl-30b-awq
 Environment=QWEN_TIMEOUT_MS=45000
 Environment=QWEN_MAX_RETRIES=2

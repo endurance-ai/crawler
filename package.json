@@ -20,6 +20,7 @@
     "brand-crawl": "dotenv -e .env.local -- tsx src/brand-crawl.ts",
     "recrawl": "dotenv -e .env -e .env.local -- tsx src/recrawl-batch.ts",
     "refresh": "dotenv -e .env -e .env.local -- tsx src/refresh-listing.ts",
+    "refresh:batch": "dotenv -e .env -e .env.local -- tsx tools/manage-refresh-batch.ts",
     "refresh:candidates": "dotenv -e .env -e .env.local -- tsx src/refresh-candidates.ts",
     "enrich:products": "dotenv -e .env -e .env.local -- tsx src/enrich-products-file.ts",
     "smoke:qwen": "dotenv -e .env -e .env.local -- tsx tools/qwen-smoke.ts",
