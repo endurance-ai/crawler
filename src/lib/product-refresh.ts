@@ -11,6 +11,23 @@ import type {Cafe24ListingCursor, Product, SiteConfig} from "./types"
 
 export type ProductRefreshClient = SupabaseClient
 
+export interface RefreshBatchSource {
+  batch_id: number
+  platform_key: string
+  platform_type: string
+  product_count: number
+  status: "pending" | "running" | "partial" | "success" | "exception"
+  attempts: number
+  exception_code: string | null
+  exception_message: string | null
+}
+
+export interface RefreshBatch {
+  id: number
+  deadline_at: string
+  status: "running" | "success" | "completed_with_exceptions" | "failed"
+}
+
 const DB_READ_TIMEOUT_MS = 20_000
 const DB_TELEMETRY_TIMEOUT_MS = 10_000
 const DB_AUX_WRITE_TIMEOUT_MS = 20_000
@@ -32,6 +49,131 @@ export async function syncRefreshSources(
     {onConflict: "platform_key"},
   ).abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
   if (error) throw new Error(`refresh source sync failed: ${error.message}`)
+}
+
+export async function loadRefreshBatchSources(
+  db: ProductRefreshClient,
+  batchId: number,
+): Promise<RefreshBatchSource[]> {
+  const {data, error} = await db
+    .from("product_refresh_batch_sources")
+    .select("batch_id,platform_key,platform_type,product_count,status,attempts,exception_code,exception_message")
+    .eq("batch_id", batchId)
+    .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
+  if (error) throw new Error(`refresh batch source load failed: ${error.message}`)
+  return (data ?? []) as RefreshBatchSource[]
+}
+
+export async function markRefreshBatchSourceStarted(
+  db: ProductRefreshClient,
+  input: {batchId: number; platformKey: string; attempts: number},
+): Promise<void> {
+  const {error} = await db
+    .from("product_refresh_batch_sources")
+    .update({status: "running", attempts: input.attempts, exception_code: null, exception_message: null})
+    .eq("batch_id", input.batchId)
+    .eq("platform_key", input.platformKey)
+    .neq("status", "success")
+    .abortSignal(AbortSignal.timeout(DB_TELEMETRY_TIMEOUT_MS))
+  if (error) throw new Error(`refresh batch source start failed: ${error.message}`)
+}
+
+export async function createRefreshBatch(
+  db: ProductRefreshClient,
+  input: {
+    scheduledFor: string
+    deadlineAt: string
+    sources: Array<{platformKey: string; platformType: string; productCount: number}>
+    metrics?: Record<string, unknown>
+  },
+): Promise<number> {
+  const expectedProductCount = input.sources.reduce((sum, source) => sum + source.productCount, 0)
+  const {data, error} = await db
+    .from("product_refresh_batches")
+    .insert({
+      scheduled_for: input.scheduledFor,
+      deadline_at: input.deadlineAt,
+      expected_source_count: input.sources.length,
+      expected_product_count: expectedProductCount,
+      metrics: input.metrics ?? {},
+    })
+    .select("id")
+    .abortSignal(AbortSignal.timeout(DB_TELEMETRY_TIMEOUT_MS))
+    .single()
+  if (error || !data) throw new Error(`refresh batch create failed: ${error?.message ?? "no data"}`)
+  const batchId = Number((data as {id: number}).id)
+  if (input.sources.length > 0) {
+    const {error: sourceError} = await db
+      .from("product_refresh_batch_sources")
+      .insert(input.sources.map((source) => ({
+        batch_id: batchId,
+        platform_key: source.platformKey,
+        platform_type: source.platformType,
+        product_count: source.productCount,
+      })))
+      .abortSignal(AbortSignal.timeout(DB_AUX_WRITE_TIMEOUT_MS))
+    if (sourceError) throw new Error(`refresh batch sources create failed: ${sourceError.message}`)
+  }
+  return batchId
+}
+
+export async function finalizeRefreshBatch(
+  db: ProductRefreshClient,
+  batchId: number,
+): Promise<{status: string; pending: number; success: number; exceptions: number}> {
+  const {data: rows, error: readError} = await db
+    .from("product_refresh_batch_sources")
+    .select("status,product_count")
+    .eq("batch_id", batchId)
+    .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
+  if (readError) throw new Error(`refresh batch finalize load failed: ${readError.message}`)
+  const sourceRows = (rows ?? []) as Array<{status: RefreshBatchSource["status"]; product_count: number}>
+  const pending = sourceRows.filter((row) => row.status === "pending" || row.status === "running" || row.status === "partial").length
+  const success = sourceRows.filter((row) => row.status === "success").length
+  const exceptions = sourceRows.filter((row) => row.status === "exception").length
+  const successProductCount = sourceRows
+    .filter((row) => row.status === "success")
+    .reduce((sum, row) => sum + Number(row.product_count ?? 0), 0)
+  const status = pending > 0 ? "failed" : exceptions > 0 ? "completed_with_exceptions" : "success"
+  const {error} = await db
+    .from("product_refresh_batches")
+    .update({
+      status,
+      ended_at: new Date().toISOString(),
+      success_source_count: success,
+      exception_source_count: exceptions,
+      success_product_count: successProductCount,
+    })
+    .eq("id", batchId)
+    .abortSignal(AbortSignal.timeout(DB_TELEMETRY_TIMEOUT_MS))
+  if (error) throw new Error(`refresh batch finalize failed: ${error.message}`)
+  return {status, pending, success, exceptions}
+}
+
+export async function finishRefreshBatchSource(
+  db: ProductRefreshClient,
+  input: {
+    batchId: number
+    platformKey: string
+    runId?: number
+    status: "partial" | "success" | "exception"
+    exceptionCode?: string | null
+    exceptionMessage?: string | null
+  },
+): Promise<void> {
+  const {error} = await db
+    .from("product_refresh_batch_sources")
+    .update({
+      status: input.status,
+      last_run_id: input.runId ?? null,
+      exception_code: input.exceptionCode ?? null,
+      exception_message: input.exceptionMessage ?? null,
+    })
+    .eq("batch_id", input.batchId)
+    .eq("platform_key", input.platformKey)
+    .neq("status", "success")
+    .abortSignal(AbortSignal.timeout(DB_TELEMETRY_TIMEOUT_MS))
+  if (error) throw new Error(`refresh batch source finish failed: ${error.message}`)
 }
 
 export async function loadRefreshSourceStates(
@@ -216,7 +358,7 @@ export async function loadRefreshProductCounts(
 
 export async function startRefreshRun(
   db: ProductRefreshClient,
-  input: {platformKey: string; command?: string},
+  input: {platformKey: string; command?: string; batchId?: number},
 ): Promise<{id: number; startedAt: number; sourceStateError: string | null}> {
   const startedAt = Date.now()
   const now = new Date(startedAt).toISOString()
@@ -226,6 +368,7 @@ export async function startRefreshRun(
       platform_key: input.platformKey,
       status: "running",
       command: input.command ?? process.argv.join(" "),
+      batch_id: input.batchId ?? null,
     })
     .select("id")
     .abortSignal(AbortSignal.timeout(DB_TELEMETRY_TIMEOUT_MS))

@@ -142,7 +142,15 @@ export interface PricingObservation {
 
 // ─── 사이트 설정 ──────────────────────────────────────
 
-export type PlatformType = "cafe24" | "shopify" | "uniqlo" | "zara" | "farfetch" | "imweb"
+export type PlatformType =
+  | "cafe24"
+  | "shopify"
+  | "uniqlo"
+  | "zara"
+  | "farfetch"
+  | "imweb"
+  | "sixshop"
+  | "structured"
 
 export interface Cafe24ListingCursor {
   version: 1
@@ -319,6 +327,8 @@ export interface SiteConfig {
    * that render `.shop-item` widgets.
    */
   categoryUrls?: string[]
+  /** Sixshop storefront product URL prefix; older themes use /product, newer themes /products. */
+  sixshopProductPath?: "product" | "products"
   /** 비활성화 */
   disabled?: boolean
   /** 메모 */

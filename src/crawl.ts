@@ -30,6 +30,7 @@ import {
   type Cafe24EngineMode,
 } from "./lib/cafe24-engine-selection"
 import {crawlImweb} from "./lib/imweb-engine"
+import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
 import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
@@ -576,6 +577,29 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
   const zaraSites = configs.filter((c) => c.type === "zara")
   const farfetchSites = configs.filter((c) => c.type === "farfetch")
   const imwebSites = configs.filter((c) => c.type === "imweb")
+  const sixshopSites = configs.filter((c) => c.type === "sixshop")
+  const structuredSites = configs.filter((c) => c.type === "structured")
+
+  if (structuredSites.length > 0) {
+    console.warn(
+      `⚠️ structured refresh sources (${structuredSites.map((site) => site.key).join(", ")}) ` +
+        "require existing DB URLs and are supported only by refresh-listing",
+    )
+  }
+
+  // Sixshop — each source launches a browser to discover public catalog API widgets.
+  for (const config of sixshopSites) {
+    try {
+      if (dryRun) {
+        await probeSite(config)
+        continue
+      }
+      const result = await withSiteTimeout(crawlSixshop(config), config.key)
+      results.push(await saveResultAndTrim(outDir, result))
+    } catch (err) {
+      console.error(`❌ ${config.name} 크롤 실패:`, err)
+    }
+  }
 
   // Uniqlo (브라우저 불필요 — fetch 기반 병렬)
   if (uniqloSites.length > 0) {

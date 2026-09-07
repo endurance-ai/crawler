@@ -55,13 +55,21 @@ test("blocked 설정도 삭제하지 않고 generator에 남긴다", () => {
   )
 })
 
-test("custom + imweb detection은 imweb 설정으로 복원한다", () => {
+test("custom detection은 지원되는 구체 엔진 설정으로 복원한다", () => {
   assert.equal(
     generatedPlatformType(
       row({platform_type: "custom", detection: {platform_family: "imweb"}}),
     ),
     "imweb",
   )
+  assert.equal(
+    generatedPlatformType(
+      row({platform_type: "custom", detection: {platform_family: "sixshop"}}),
+    ),
+    "sixshop",
+  )
   assert.equal(generatedPlatformType(row({platform_type: "custom"})), null)
   assert.equal(queuePlatformType("imweb"), "custom")
+  assert.equal(queuePlatformType("sixshop"), "custom")
+  assert.equal(queuePlatformType("structured"), "custom")
 })

@@ -8,7 +8,7 @@
  * directly.
  */
 
-import {chromium} from "playwright"
+import {chromium, type Browser} from "playwright"
 
 import {PLATFORMS, getSiteConfig} from "./configs/platforms"
 import {runAsyncPool} from "./lib/async-pool"
@@ -33,6 +33,9 @@ import {
   loadRefreshProductCounts,
   loadRefreshRunOutcomes,
   loadRefreshSourceStates,
+  loadRefreshBatchSources,
+  markRefreshBatchSourceStarted,
+  finishRefreshBatchSource,
   reconcileStaleRefreshRuns,
   startOrResumeRefreshCycle,
   startRefreshRun,
@@ -45,6 +48,9 @@ import {
   type RefreshWorklistEntry,
 } from "./lib/refresh-source"
 import {crawlShopify} from "./lib/shopify-engine"
+import {isRefreshBatchSourceRunnable} from "./lib/refresh-batch"
+import {crawlSixshop} from "./lib/sixshop-engine"
+import {crawlStructuredExisting} from "./lib/structured-refresh-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
 import {crawlZara} from "./lib/zara-engine"
@@ -59,6 +65,8 @@ const ALL_TYPES: PlatformType[] = [
   "uniqlo",
   "zara",
   "farfetch",
+  "sixshop",
+  "structured",
 ]
 
 interface Flags {
@@ -73,6 +81,10 @@ interface Flags {
   auditPrices: boolean
   priceOnly: boolean
   ignoreBackoff: boolean
+  batchId: number | null
+  onlyPending: boolean
+  maxAttempts: number
+  deadlineAt: number | undefined
 }
 
 function parseFlags(): Flags {
@@ -88,12 +100,17 @@ function parseFlags(): Flags {
     auditPrices: false,
     priceOnly: false,
     ignoreBackoff: false,
+    batchId: null,
+    onlyPending: false,
+    maxAttempts: 2,
+    deadlineAt: undefined,
   }
   for (const arg of process.argv.slice(2)) {
     if (arg === "--dry-run") flags.dryRun = true
     else if (arg === "--audit-prices") flags.auditPrices = true
     else if (arg === "--price-only") flags.priceOnly = true
     else if (arg === "--ignore-backoff") flags.ignoreBackoff = true
+    else if (arg === "--only-pending") flags.onlyPending = true
     else if (arg.startsWith("--budget-minutes=")) flags.budgetMinutes = Number(arg.split("=")[1])
     else if (arg.startsWith("--limit=")) flags.limit = Number(arg.split("=")[1])
     else if (arg.startsWith("--type=")) flags.types = arg.split("=")[1].split(",").filter(Boolean)
@@ -103,6 +120,14 @@ function parseFlags(): Flags {
       flags.concurrency = Math.max(1, Math.floor(Number(arg.split("=")[1]) || 1))
     } else if (arg.startsWith("--source-slice-minutes=")) {
       flags.sourceSliceMinutes = Math.max(1, Number(arg.split("=")[1]) || 10)
+    } else if (arg.startsWith("--batch-id=")) {
+      const value = Number(arg.split("=")[1])
+      flags.batchId = Number.isInteger(value) && value > 0 ? value : null
+    } else if (arg.startsWith("--max-attempts=")) {
+      flags.maxAttempts = Math.max(1, Math.floor(Number(arg.split("=")[1]) || 2))
+    } else if (arg.startsWith("--deadline-at=")) {
+      const value = Date.parse(arg.split("=")[1])
+      flags.deadlineAt = Number.isNaN(value) ? undefined : value
     }
   }
   return flags
@@ -179,7 +204,9 @@ async function fetchExistingRows(
 /** Listing-only crawl through every registered engine. */
 async function crawlListing(
   config: SiteConfig,
+  existingRows: RefreshableRow[] = [],
   options: {cursor?: RefreshWorklistEntry["refresh_cursor"]; deadlineAt?: number} = {},
+  runtime: {cafe24Browser?: Browser} = {},
 ): Promise<CrawlResult> {
   const listingConfig: SiteConfig = {...config, crawlDetails: false, crawlReviews: false}
   switch (config.type) {
@@ -193,8 +220,16 @@ async function crawlListing(
       return crawlZara(listingConfig)
     case "farfetch":
       return crawlFarfetch(listingConfig)
+    case "sixshop":
+      return crawlSixshop(listingConfig)
+    case "structured":
+      return crawlStructuredExisting(
+        listingConfig,
+        existingRows.map((row) => row.product_url),
+      )
     case "cafe24": {
-      const browser = await chromium.launch({headless: true})
+      const browser = runtime.cafe24Browser ?? await chromium.launch({headless: true})
+      const ownsBrowser = !runtime.cafe24Browser
       try {
         const context = await browser.newContext({
           userAgent:
@@ -219,7 +254,7 @@ async function crawlListing(
           listingDeadlineAt: options.deadlineAt,
         })
       } finally {
-        await browser.close()
+        if (ownsBrowser) await browser.close()
       }
     }
   }
@@ -265,6 +300,21 @@ function unknownProducts(crawled: Product[], urls: string[]): Product[] {
   return crawled.filter((product) => unknown.has(product.productUrl))
 }
 
+function refreshExceptionCode(
+  result: CrawlResult,
+  unreachable: string[],
+  status: string,
+): string | null {
+  if (status === "success" || status === "partial") return null
+  if (result.errors.some((error) => /robots|disallow/i.test(error))) return "external_block"
+  if (result.errors.some((error) => /HTTP (404|410)/i.test(error))) return "endpoint_removed"
+  if (result.errors.some((error) => /category|catalog/i.test(error))) return "config_drift"
+  if (unreachable.length > 0 || result.errors.some((error) => /timeout|fetch failed|HTTP (429|5\d\d)/i.test(error))) {
+    return "transient_exhausted"
+  }
+  return "db_write_exhausted"
+}
+
 async function main() {
   // 가격 UPDATE 도 KRW 환산을 거치므로 갱신 시점 환율을 먼저 받는다.
   await initFxRates()
@@ -272,7 +322,11 @@ async function main() {
   const flags = parseFlags()
   const db = createProductCollectionClient()
   const startedAt = Date.now()
-  const budgetMs = flags.budgetMinutes * 60_000
+  const configuredBudgetMs = flags.budgetMinutes * 60_000
+  const budgetMs = flags.deadlineAt
+    ? Math.min(configuredBudgetMs, Math.max(0, flags.deadlineAt - startedAt))
+    : configuredBudgetMs
+  const batchSourceAttempts = new Map<string, number>()
 
   if (!flags.dryRun && !flags.auditPrices) {
     await syncRefreshSources(db, PLATFORMS)
@@ -284,10 +338,36 @@ async function main() {
       console.error(`⚠️ 중단 실행 기록 정리 실패 (계속 진행): ${error}`)
     }
   }
-  const [worklist, brands] = await Promise.all([
+  let [worklist, brands] = await Promise.all([
     fetchWorklist(db, flags.types, flags.ignoreBackoff || flags.auditPrices),
     flags.dryRun || flags.auditPrices ? Promise.resolve([]) : loadExistingBrands(db),
   ])
+
+  if (flags.onlyPending && !flags.batchId) {
+    throw new Error("--only-pending requires --batch-id=<id>")
+  }
+  if (flags.batchId) {
+    const batchSources = await loadRefreshBatchSources(db, flags.batchId)
+    const allowed = new Map(batchSources.map((source) => [source.platform_key, source]))
+    for (const source of batchSources) batchSourceAttempts.set(source.platform_key, source.attempts)
+    const selected = worklist.entries.filter((entry) => {
+      const source = allowed.get(entry.platform_key)
+      return Boolean(
+        source &&
+        isRefreshBatchSourceRunnable(source.status, source.attempts, flags.maxAttempts),
+      )
+    })
+    const selectedKeys = new Set(selected.map((entry) => entry.platform_key))
+    worklist = {
+      entries: selected,
+      skipped: [
+        ...worklist.skipped,
+        ...batchSources
+          .filter((source) => !selectedKeys.has(source.platform_key))
+          .map((source) => `${source.platform_key}:batch-${source.status}`),
+      ],
+    }
+  }
 
   if (flags.auditPrices) {
     const counts = await loadRefreshProductCounts(db)
@@ -383,6 +463,10 @@ async function main() {
   }
 
   const initialSourceCount = entries.length
+  const sharedCafe24Browser = entries.some((entry) => entry.config.type === "cafe24")
+    ? await chromium.launch({headless: true})
+    : undefined
+  try {
   await runAsyncPool(
     entries,
     flags.concurrency,
@@ -397,13 +481,23 @@ async function main() {
         try {
           run = await startRefreshRun(db, {
             platformKey: entry.platform_key,
-            command: flags.priceOnly ? "refresh-listing --price-only" : "refresh-listing",
+          command: flags.priceOnly ? "refresh-listing --price-only" : "refresh-listing",
+          batchId: flags.batchId ?? undefined,
           })
           if (run.sourceStateError) {
             telemetryFailures += 1
             console.error(
               `   ⚠️ ${label} source 시작 상태 기록 실패 (실제 갱신은 계속): ${run.sourceStateError}`,
             )
+          }
+          if (flags.batchId) {
+            const attempts = (batchSourceAttempts.get(entry.platform_key) ?? 0) + 1
+            await markRefreshBatchSourceStarted(db, {
+              batchId: flags.batchId,
+              platformKey: entry.platform_key,
+              attempts,
+            })
+            batchSourceAttempts.set(entry.platform_key, attempts)
           }
         } catch (error) {
           telemetryFailures += 1
@@ -418,13 +512,21 @@ async function main() {
               platformKey: entry.platform_key,
               existingStartedAt: entry.refresh_cycle_started_at,
             })
-        const sliceDeadlineAt = sourceStartedAt + flags.sourceSliceMinutes * 60_000
+        const sliceDeadlineAt = Math.min(
+          sourceStartedAt + flags.sourceSliceMinutes * 60_000,
+          flags.deadlineAt ?? Number.POSITIVE_INFINITY,
+        )
+        const existingPromise = fetchExistingRows(db, entry.platform_key)
+        const listingOptions = {
+          cursor: entry.refresh_cursor,
+          deadlineAt: entry.config.type === "cafe24" ? sliceDeadlineAt : undefined,
+        }
+        const crawlPromise = entry.config.type === "structured"
+          ? existingPromise.then((rows) => crawlListing(entry.config, rows, listingOptions, {cafe24Browser: sharedCafe24Browser}))
+          : crawlListing(entry.config, [], listingOptions, {cafe24Browser: sharedCafe24Browser})
         const [crawlResult, existing] = await Promise.all([
-          crawlListing(entry.config, {
-            cursor: entry.refresh_cursor,
-            deadlineAt: entry.config.type === "cafe24" ? sliceDeadlineAt : undefined,
-          }),
-          fetchExistingRows(db, entry.platform_key),
+          crawlPromise,
+          existingPromise,
         ])
         const crawled = crawlResult.products
         const pricingMetrics = {
@@ -631,6 +733,16 @@ async function main() {
               pricingMetrics.price_unknown_without_current === 0 && pricingMetrics.invalid_price_pairs === 0,
           },
         })
+        if (flags.batchId) {
+          await finishRefreshBatchSource(db, {
+            batchId: flags.batchId,
+            platformKey: entry.platform_key,
+            runId: run?.id,
+            status: crawlResult.continuation ? "partial" : status === "success" ? "success" : "exception",
+            exceptionCode: refreshExceptionCode(crawlResult, unreachable, status),
+            exceptionMessage: failed ? [...crawlResult.errors, ...unreachable].join(" | ") : null,
+          })
+        }
         // Requeue only after the current run record is closed. Appending to the
         // shared ordered array puts resumed work behind every source that has
         // not received its first slice and prevents two workers from running
@@ -650,14 +762,27 @@ async function main() {
             db_partial_only: detail.startsWith("products 조회 실패:"),
           },
         })
+        if (flags.batchId) {
+          await finishRefreshBatchSource(db, {
+            batchId: flags.batchId,
+            platformKey: entry.platform_key,
+            runId: run?.id,
+            status: "exception",
+            exceptionCode: "db_write_exhausted",
+            exceptionMessage: detail,
+          })
+        }
       }
     },
-    () => {
+  () => {
       const withinBudget = Date.now() - startedAt < budgetMs
       if (!withinBudget) budgetStopped = true
       return withinBudget
     },
   )
+  } finally {
+    await sharedCafe24Browser?.close()
+  }
 
   if (budgetStopped) {
     console.log(`\n⏱️ 예산 ${flags.budgetMinutes}분 소진 — ${attempted}개 조각 시도 후 종료`)

@@ -20,9 +20,12 @@ QWEN_MAX_RETRIES=2
 QWEN_CONCURRENCY_PER_ENDPOINT=1
 ```
 
-Only loopback endpoint URLs are accepted. Requests are distributed round-robin,
-each endpoint has its own concurrency limit, and a 30-second circuit opens after
-all attempts fail. Structured calls use strict JSON Schema output.
+Only loopback endpoint URLs are accepted. The scheduled refresh-candidate worker
+uses only the primary `8001` endpoint; `8002` is not a readiness dependency.
+The client still supports an explicitly configured endpoint list for manual
+work, with per-endpoint concurrency and round-robin distribution. A 30-second
+circuit opens after all attempts fail. Structured calls use strict JSON Schema
+output.
 
 `QWEN_ENABLED=false` disables enrichment while leaving crawl/import available.
 Rows that could not be enriched remain canonical (`category=other` where needed)
@@ -38,7 +41,7 @@ ssh -N \
   user@qwen-host
 ```
 
-Verify both endpoints before starting a canary:
+Verify the primary endpoint before starting a canary:
 
 ```bash
 curl -fsS http://127.0.0.1:8001/v1/models
@@ -66,3 +69,7 @@ reached and is always an operational failure.
 
 `enrich:products` remains a manual file preflight tool. Normal production imports
 perform Qwen normalization only after the database upsert succeeds.
+
+The lab systemd unit pins `QWEN_BASE_URLS=http://127.0.0.1:8001/v1`. After
+changing the unit, run `systemctl --user daemon-reload`; the next successful
+listing refresh will trigger the candidate worker through `OnSuccess`.
