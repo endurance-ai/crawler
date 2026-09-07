@@ -1,4 +1,8 @@
 /** Pure brand-node resolution shared by product import paths. */
+export function compactBrandLookupKey(value: string): string {
+  return value.toLocaleLowerCase("en-US").trim().replace(/\s+/g, "")
+}
+
 export function resolveProductBrandNodeIdFromMaps(
   brand: string,
   platform: string,
@@ -15,6 +19,8 @@ export function resolveProductBrandNodeIdFromMaps(
   }
   const exactBrandId = brandIdMap.get(brand.toLocaleLowerCase("en-US"))
   if (exactBrandId !== undefined) return exactBrandId
+  const compactBrandId = brandIdMap.get(`compact:${compactBrandLookupKey(brand)}`)
+  if (compactBrandId !== undefined) return compactBrandId
   if (retailerPlatformKeys.has(platform)) return null
   return null
 }

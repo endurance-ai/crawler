@@ -10,7 +10,10 @@ import * as path from "node:path"
 import * as readline from "node:readline"
 
 import type {ImageCandidateAnalysis} from "./product-image-selection"
-import {WinProductImageVisionClient} from "./product-image-vision-win"
+import {
+  WinProductImageVisionClient,
+  type WinProductImageVisionClientOptions,
+} from "./product-image-vision-win"
 
 interface NativeResult extends ImageCandidateAnalysis {
   id: string
@@ -148,10 +151,10 @@ interface VisionBackend {
 export class ProductImageVisionClient implements VisionBackend {
   readonly #backend: VisionBackend
 
-  constructor(cacheDir: string) {
+  constructor(cacheDir: string, windowsOptions: WinProductImageVisionClientOptions = {}) {
     this.#backend = process.platform === "darwin"
       ? new MacProductImageVisionClient(cacheDir)
-      : new WinProductImageVisionClient()
+      : new WinProductImageVisionClient(windowsOptions)
   }
 
   analyze(input: {

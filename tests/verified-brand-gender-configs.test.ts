@@ -10,7 +10,19 @@ import {getSiteConfig} from "../src/configs/platforms"
 test("8DIVISION의 성별 미구분 상품군을 unisex로 세탁하지 않는다", () => {
   const eightDivision = getSiteConfig("8division")
   assert.ok(eightDivision?.category?.categories?.length)
-  assert.ok(eightDivision.category.categories.every((category) => category.gender === undefined))
+  assert.equal(eightDivision.multiBrand, true)
+  assert.deepEqual(
+    eightDivision.category.categories
+      .filter((category) => category.cateNo === 2770 || category.cateNo === 3463)
+      .map((category) => ({cateNo: category.cateNo, gender: category.gender, url: category.url})),
+    [
+      {cateNo: 2770, gender: ["women"], url: "/product/women.html?cate_no=2770"},
+      {cateNo: 3463, gender: ["men"], url: "/product/men.html?cate_no=3463"},
+    ],
+  )
+  assert.ok(eightDivision.category.categories
+    .filter((category) => category.cateNo !== 2770 && category.cateNo !== 3463)
+    .every((category) => category.gender === undefined))
   assert.equal(eightDivision.defaultGender, undefined)
   assert.notEqual(eightDivision.verifiedUnisexDefault, true)
 })

@@ -556,6 +556,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "8디비전",
     type: "cafe24",
     baseUrl: "https://www.8division.com",
+    // 8DIVISION is an editorial multi-brand shop. Keep vendor brands and
+    // product-level gender evidence instead of using the platform status node.
+    multiBrand: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -564,6 +567,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       categories: [
         // 성별 미구분 상품군이다. 편집샵 자체가 unisex라는 뜻은 아니므로 성별을
         // 채우지 않는다. 상품 단위 근거가 없으면 안전하게 적재에서 제외한다.
+        {name: "WOMEN", cateNo: 2770, gender: ["women"], url: "/product/women.html?cate_no=2770"},
+        {name: "MEN", cateNo: 3463, gender: ["men"], url: "/product/men.html?cate_no=3463"},
         {name: "Top", cateNo: 218}, // 상의
         {name: "Outer", cateNo: 220}, // 아우터
         {name: "Bottom", cateNo: 219}, // 하의

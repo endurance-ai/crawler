@@ -12,6 +12,10 @@ import {
 } from "./product-image-selection"
 import {ProductImageAnalysisCache} from "./product-image-analysis-cache"
 import {ProductImageVisionClient} from "./product-image-vision-client"
+import type {
+  ProductImageCvTiming,
+  WinProductImageVisionClientOptions,
+} from "./product-image-vision-win"
 import {downloadRemoteImage, fetchProductHtml} from "./safe-remote-image"
 import {PRODUCT_IMAGE_COLLECTION_VERSION} from "./product-images"
 
@@ -24,6 +28,21 @@ export interface ProductImageSelectionResult {
   candidates: ImageCandidateAnalysis[]
   detailEnriched: boolean
   errors: string[]
+}
+
+export interface ProductImageCandidateTiming {
+  url: string
+  cacheHit: boolean
+  downloadMs: number
+  analysisMs: number
+  totalMs: number
+  error?: string
+}
+
+export interface LocalProductImageSelectorOptions {
+  ocrWorkerPoolSize?: number
+  onCandidateTiming?: (timing: ProductImageCandidateTiming) => void
+  onCvTiming?: (timing: ProductImageCvTiming) => void
 }
 
 function failedAnalysis(url: string): ImageCandidateAnalysis {
@@ -53,17 +72,33 @@ export class LocalProductImageSelector {
   readonly #tempDir: string
   readonly #globalSlots = new Semaphore(8)
   readonly #hostSlots = new Map<string, Semaphore>()
+  readonly #onCandidateTiming?: (timing: ProductImageCandidateTiming) => void
 
-  constructor(cacheDir: string) {
+  constructor(cacheDir: string, options: LocalProductImageSelectorOptions = {}) {
     this.#cache = new ProductImageAnalysisCache(cacheDir)
-    this.#vision = new ProductImageVisionClient(cacheDir)
+    const visionOptions: WinProductImageVisionClientOptions = {
+      ocrWorkerPoolSize: options.ocrWorkerPoolSize,
+      onTiming: options.onCvTiming,
+    }
+    this.#vision = new ProductImageVisionClient(cacheDir, visionOptions)
     this.#tempDir = path.join(cacheDir, "tmp")
+    this.#onCandidateTiming = options.onCandidateTiming
   }
 
   async #analyze(url: string, force: boolean): Promise<{analysis: ImageCandidateAnalysis; error?: string}> {
+    const startedAt = performance.now()
     if (!force) {
       const cached = this.#cache.get(url)
-      if (cached) return {analysis: cached}
+      if (cached) {
+        this.#onCandidateTiming?.({
+          url,
+          cacheHit: true,
+          downloadMs: 0,
+          analysisMs: 0,
+          totalMs: performance.now() - startedAt,
+        })
+        return {analysis: cached}
+      }
     }
 
     const host = (() => {
@@ -78,20 +113,42 @@ export class LocalProductImageSelector {
     return this.#globalSlots.run(() =>
       hostSlot.run(async () => {
         let downloaded: Awaited<ReturnType<typeof downloadRemoteImage>> | null = null
+        let downloadMs = 0
+        let analysisMs = 0
         try {
+          let phaseStartedAt = performance.now()
           downloaded = await downloadRemoteImage(url, this.#tempDir)
+          downloadMs = performance.now() - phaseStartedAt
+          phaseStartedAt = performance.now()
           const analysis = await this.#vision.analyze({
             path: downloaded.path,
             url,
             byteLength: downloaded.byteLength,
             mimeType: downloaded.mimeType,
           })
+          analysisMs = performance.now() - phaseStartedAt
           this.#cache.put(analysis)
+          this.#onCandidateTiming?.({
+            url,
+            cacheHit: false,
+            downloadMs,
+            analysisMs,
+            totalMs: performance.now() - startedAt,
+          })
           return {analysis}
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          this.#onCandidateTiming?.({
+            url,
+            cacheHit: false,
+            downloadMs,
+            analysisMs,
+            totalMs: performance.now() - startedAt,
+            error: message,
+          })
           return {
             analysis: failedAnalysis(url),
-            error: error instanceof Error ? error.message : String(error),
+            error: message,
           }
         } finally {
           if (downloaded) await fs.unlink(downloaded.path).catch(() => {})

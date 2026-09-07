@@ -13,7 +13,7 @@ import * as ort from "onnxruntime-node"
 import sharp from "sharp"
 import {createScheduler, createWorker, type Scheduler} from "tesseract.js"
 
-const OCR_WORKER_POOL_SIZE = 4
+const DEFAULT_OCR_WORKER_POOL_SIZE = 2
 
 import type {ImageCandidateAnalysis} from "./product-image-selection"
 
@@ -37,6 +37,30 @@ interface Preprocessed {
   padY: number
   width: number
   height: number
+}
+
+export interface ProductImageCvTiming {
+  url: string
+  metadataMs: number
+  preprocessMs: number
+  yoloMs: number
+  foregroundMs: number
+  aestheticsMs: number
+  ocrMs: number
+  totalMs: number
+}
+
+export interface WinProductImageVisionClientOptions {
+  ocrWorkerPoolSize?: number
+  onTiming?: (timing: ProductImageCvTiming) => void
+}
+
+export function resolveOcrWorkerPoolSize(
+  configured = Number(process.env.PRODUCT_IMAGE_OCR_WORKERS),
+): number {
+  return Number.isInteger(configured) && configured >= 1 && configured <= 4
+    ? configured
+    : DEFAULT_OCR_WORKER_POOL_SIZE
 }
 
 function iou(a: Detection["box"], b: Detection["box"]): number {
@@ -247,14 +271,21 @@ async function getSession(): Promise<ort.InferenceSession> {
 export class WinProductImageVisionClient {
   #ocrScheduler: Scheduler | null = null
   #closed = false
+  readonly #ocrWorkerPoolSize: number
+  readonly #onTiming?: (timing: ProductImageCvTiming) => void
 
-  // 인물+포즈/전경/샤프니스는 8-way 세마포어(select-product-image.ts)로 병렬인데
-  // OCR 워커가 1개면 거기서 직렬화된다 — 워커 풀로 맞춘다.
+  constructor(options: WinProductImageVisionClientOptions = {}) {
+    this.#ocrWorkerPoolSize = resolveOcrWorkerPoolSize(options.ocrWorkerPoolSize)
+    this.#onTiming = options.onTiming
+  }
+
+  // 인물+포즈/전경/샤프니스는 8-way 세마포어(select-product-image.ts)로 병렬이다.
+  // OCR은 CPU/RSS의 주 병목이므로 운영 기본은 2개이며 canary에서 1/2/4를 비교한다.
   async #getOcrScheduler(): Promise<Scheduler> {
     if (!this.#ocrScheduler) {
       const scheduler = createScheduler()
       const workers = await Promise.all(
-        Array.from({length: OCR_WORKER_POOL_SIZE}, () => createWorker("eng")),
+        Array.from({length: this.#ocrWorkerPoolSize}, () => createWorker("eng")),
       )
       for (const worker of workers) scheduler.addWorker(worker)
       this.#ocrScheduler = scheduler
@@ -270,11 +301,26 @@ export class WinProductImageVisionClient {
   }): Promise<ImageCandidateAnalysis> {
     if (this.#closed) throw new Error("vision client is closed")
 
+    const startedAt = performance.now()
+    const timing: ProductImageCvTiming = {
+      url: input.url,
+      metadataMs: 0,
+      preprocessMs: 0,
+      yoloMs: 0,
+      foregroundMs: 0,
+      aestheticsMs: 0,
+      ocrMs: 0,
+      totalMs: 0,
+    }
+    let phaseStartedAt = performance.now()
     const metadata = await sharp(input.path, {failOn: "none"}).metadata()
+    timing.metadataMs = performance.now() - phaseStartedAt
     const width = metadata.width ?? 0
     const height = metadata.height ?? 0
     const isAnimated = (metadata.pages ?? 1) > 1
     if (width <= 0 || height <= 0) {
+      timing.totalMs = performance.now() - startedAt
+      this.#onTiming?.(timing)
       return {
         url: input.url,
         width: 0,
@@ -295,9 +341,13 @@ export class WinProductImageVisionClient {
       }
     }
 
+    phaseStartedAt = performance.now()
     const pre = await preprocess(input.path)
+    timing.preprocessMs = performance.now() - phaseStartedAt
+    phaseStartedAt = performance.now()
     const session = await getSession()
     const result = await session.run({images: pre.tensor})
+    timing.yoloMs = performance.now() - phaseStartedAt
     const output = result["output0"].data as Float32Array
     const detections = decode(output, pre)
 
@@ -322,10 +372,15 @@ export class WinProductImageVisionClient {
         })()
       : 1
 
+    phaseStartedAt = performance.now()
     const foreground = await estimateForeground(input.path, width, height)
+    timing.foregroundMs = performance.now() - phaseStartedAt
+    phaseStartedAt = performance.now()
     const aesthetics = await estimateAesthetics(input.path)
+    timing.aestheticsMs = performance.now() - phaseStartedAt
 
     let textCoverage = 0
+    phaseStartedAt = performance.now()
     try {
       const scheduler = await this.#getOcrScheduler()
       // 원본 해상도(수천px)를 그대로 넣으면 OCR이 수십 초씩 걸린다 — 텍스트
@@ -353,6 +408,9 @@ export class WinProductImageVisionClient {
     } catch {
       textCoverage = 0
     }
+    timing.ocrMs = performance.now() - phaseStartedAt
+    timing.totalMs = performance.now() - startedAt
+    this.#onTiming?.(timing)
 
     return {
       url: input.url,

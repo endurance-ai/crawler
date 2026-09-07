@@ -25,6 +25,7 @@ import {sanitizeProductImageFields} from "./lib/product-images"
 import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
 import {
   canUsePlatformBrandFallback,
+  compactBrandLookupKey,
   resolveProductBrandNodeIdFromMaps,
 } from "./lib/brand-node-resolution"
 import {
@@ -423,6 +424,20 @@ async function loadBrandNodes(): Promise<{
       idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
     }
     idMap.set(bn.brand_name.toLowerCase(), bn.id)
+  }
+  // Retailer vendor labels often differ only by presentation whitespace
+  // (e.g. `Just Haus` vs the canonical `JUSTHAUS`). Add compact aliases only
+  // when they are unambiguous, so unrelated brands can never be merged.
+  const compactOwners = new Map<string, number | null>()
+  for (const bn of rows) {
+    for (const raw of [bn.brand_name, bn.brand_name_normalized].filter((value): value is string => Boolean(value))) {
+      const key = compactBrandLookupKey(raw)
+      const current = compactOwners.get(key)
+      compactOwners.set(key, current === undefined ? bn.id : current === bn.id ? current : null)
+    }
+  }
+  for (const [key, id] of compactOwners) {
+    if (id !== null) idMap.set(`compact:${key}`, id)
   }
   console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
   return {rows, idMap}

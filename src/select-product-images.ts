@@ -71,6 +71,7 @@ interface DbProductRow {
   image_selection_version: string | null
   image_selection_candidate_count: number | null
   image_selected_at: string | null
+  product_embeddings?: Array<{product_id: string}> | null
 }
 
 interface SelectionManifestRow {
@@ -443,12 +444,13 @@ const DB_SELECT = [
 async function runDbMode(flags: Flags, selector: LocalProductImageSelector, renderer: RenderedDetailCollector) {
   const db = createDb()
   const site = stringFlag(flags, "site")
-  if (!site && flags.all !== true) throw new Error("--from-db requires --site=<key> or --all")
+  const brandNodeId = intFlag(flags, "brand-node-id", 0)
+  if (!site && !brandNodeId && flags.all !== true) throw new Error("--from-db requires --site=<key>, --brand-node-id=<id>, or --all")
   const limit = intFlag(flags, "limit", Number.MAX_SAFE_INTEGER)
   const pageSize = Math.min(500, limit)
   const dataDir = path.join(process.cwd(), "data")
   const runId = new Date().toISOString().replace(/[:.]/g, "-")
-  const label = site ?? "all"
+  const label = site ?? (brandNodeId > 0 ? `brand-${brandNodeId}` : "all")
   const reportBase = path.join(dataDir, `${label}-db-image-selection-${runId}`)
   await fsp.mkdir(dataDir, {recursive: true})
 
@@ -458,8 +460,14 @@ async function runDbMode(flags: Flags, selector: LocalProductImageSelector, rend
   const reportRows: SelectionManifestRow[] = []
   const totals = {processed: 0, changed: 0, model: 0, product: 0, fallback: 0, errors: 0}
   while (processed < limit) {
-    let query = db.from("products").select(DB_SELECT).order("id").range(offset, offset + pageSize - 1)
+    let query = db.from("products").select(
+      flags["pending-embeddings"] === true
+        ? `${DB_SELECT}, product_embeddings(product_id)`
+        : DB_SELECT,
+    ).order("id").range(offset, offset + pageSize - 1)
     if (site) query = query.eq("platform", site)
+    if (brandNodeId > 0) query = query.eq("brand_node_id", brandNodeId)
+    if (flags["pending-embeddings"] === true) query = query.is("product_embeddings", "null")
     const {data, error} = await query
     if (error) throw new Error(`failed to fetch products: ${error.message}`)
     const rows = (data ?? []) as unknown as DbProductRow[]
@@ -639,7 +647,9 @@ Product representative-image selection (macOS 15+ / Apple Vision)
 
   pnpm select:product-images --site=<key> [--limit=N] [--dry-run] [--force]
   pnpm select:product-images --from-db --site=<key> [--apply] [--limit=N]
+  pnpm select:product-images --from-db --brand-node-id=<id> [--apply] [--limit=N]
   pnpm select:product-images --from-db --all [--apply] [--limit=N]
+  pnpm select:product-images --from-db --all --pending-embeddings [--apply] [--limit=N]
   pnpm select:product-images --from-db --all --utility-only [--apply] [--force]
   pnpm select:product-images --site=<key> --rollback=<manifest.jsonl>
   pnpm select:product-images --from-db --apply --rollback=<manifest.jsonl>
@@ -648,6 +658,7 @@ Options:
   --no-detail             analyze existing imageUrl/images only
   --no-browser-fallback   use static detail HTML only
   --utility-only          process only rows containing known UI/icon assets
+  --pending-embeddings    process only products without a product_embeddings row
   --concurrency=N         product concurrency, default 2 and maximum 4
 `)
     return

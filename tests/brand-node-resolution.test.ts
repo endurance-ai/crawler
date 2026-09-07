@@ -22,6 +22,14 @@ test("retailer products resolve by their exact product brand", () => {
   )
 })
 
+test("retailer products resolve safe compact brand aliases", () => {
+  const aliases = new Map([["compact:justhaus", 5209]])
+  assert.equal(
+    resolveProductBrandNodeIdFromMaps("Just Haus", "sculpstore", aliases, platformIds, retailers),
+    5209,
+  )
+})
+
 test("retailer products never fall back to the retailer's historical platform mapping", () => {
   assert.equal(
     resolveProductBrandNodeIdFromMaps("UNKNOWN LABEL", "sculpstore", brandIds, platformIds, retailers),
