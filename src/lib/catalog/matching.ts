@@ -26,7 +26,7 @@ function tokens(value: string): Set<string> {
 }
 
 function colorCompatible(a: string | null | undefined, b: string | null | undefined): boolean {
-  return !a || !b || normalizeText(a) === normalizeText(b)
+  return Boolean(a && b && normalizeText(a) === normalizeText(b))
 }
 
 function identifiersByKind(input: CatalogMatchInput, kind: ProductIdentifier["kind"]): ProductIdentifier[] {
@@ -52,6 +52,14 @@ function exactEvidence(a: CatalogMatchInput, b: CatalogMatchInput): {kind: strin
 export function decideCatalogMatch(a: CatalogMatchInput, b: CatalogMatchInput): CatalogMatchDecision {
   if (normalizeText(a.brandKey) !== normalizeText(b.brandKey)) {
     return {status: "reject", confidence: 1, reason: "brand_conflict", evidence: {}}
+  }
+  if (!a.colorKey || !b.colorKey) {
+    return {
+      status: "review",
+      confidence: 0,
+      reason: "color_evidence_missing",
+      evidence: {a: a.colorKey ?? null, b: b.colorKey ?? null},
+    }
   }
   if (!colorCompatible(a.colorKey, b.colorKey)) {
     return {status: "reject", confidence: 1, reason: "color_conflict", evidence: {a: a.colorKey, b: b.colorKey}}
