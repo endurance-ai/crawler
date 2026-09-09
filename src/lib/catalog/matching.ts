@@ -17,8 +17,94 @@ export interface CatalogMatchDecision {
   evidence: Record<string, unknown>
 }
 
+export interface CrossShopMatchInput extends CatalogMatchInput {
+  platform: string
+  productUrl: string
+  imageEmbedding?: number[] | null
+}
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
+}
+
+function hostname(value: string): string | null {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, "")
+  } catch {
+    return null
+  }
+}
+
+export function extractSourceProductTokens(value: string): string[] {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return []
+  }
+  const candidates = [
+    url.searchParams.get("product_no"),
+    url.searchParams.get("productNo"),
+    ...url.pathname.split("/"),
+  ]
+  return [...new Set(candidates
+    .map((candidate) => (candidate ?? "").trim().toUpperCase())
+    .filter((candidate) => /^\d{5,}$/.test(candidate) || /^(?=.*[A-Z])(?=.*\d)[A-Z\d_-]{8,}$/.test(candidate)))]
+}
+
+export function cosineDistance(a: number[] | null | undefined, b: number[] | null | undefined): number | null {
+  if (!a || !b || a.length === 0 || a.length !== b.length) return null
+  let dot = 0
+  let normA = 0
+  let normB = 0
+  for (let index = 0; index < a.length; index++) {
+    dot += a[index] * b[index]
+    normA += a[index] * a[index]
+    normB += b[index] * b[index]
+  }
+  if (normA === 0 || normB === 0) return null
+  return 1 - dot / (Math.sqrt(normA) * Math.sqrt(normB))
+}
+
+/**
+ * Conservative matcher for a domestic official brand shop and a retailer.
+ * Bulk execution is intentionally not implied by this pure decision: callers
+ * must explicitly provide the pair until the production precision gate passes.
+ */
+export function decideCrossShopMatch(a: CrossShopMatchInput, b: CrossShopMatchInput): CatalogMatchDecision {
+  if (normalizeText(a.brandKey) !== normalizeText(b.brandKey)) {
+    return {status: "reject", confidence: 1, reason: "brand_conflict", evidence: {}}
+  }
+  if (a.platform === b.platform) {
+    return {status: "reject", confidence: 1, reason: "same_platform", evidence: {platform: a.platform}}
+  }
+  const hostA = hostname(a.productUrl)
+  const hostB = hostname(b.productUrl)
+  if (!hostA || !hostB || hostA === hostB) {
+    return {status: "reject", confidence: 1, reason: "not_cross_shop", evidence: {hostA, hostB}}
+  }
+  if (!a.colorKey || !b.colorKey) {
+    return {status: "review", confidence: 0, reason: "color_evidence_missing", evidence: {}}
+  }
+  if (!colorCompatible(a.colorKey, b.colorKey)) {
+    return {status: "reject", confidence: 1, reason: "color_conflict", evidence: {a: a.colorKey, b: b.colorKey}}
+  }
+  const sameName = normalizeText(a.name) === normalizeText(b.name)
+  const sameCategory = Boolean(a.category && b.category && normalizeText(a.category) === normalizeText(b.category))
+  if (!sameName || !sameCategory) {
+    return {status: "reject", confidence: 1, reason: "product_description_conflict", evidence: {sameName, sameCategory}}
+  }
+
+  const tokensA = extractSourceProductTokens(a.productUrl)
+  const tokensB = new Set(extractSourceProductTokens(b.productUrl))
+  const sharedSourceToken = tokensA.find((token) => tokensB.has(token)) ?? null
+  const imageDistance = cosineDistance(a.imageEmbedding, b.imageEmbedding)
+  const imageExact = imageDistance !== null && imageDistance <= 0.01
+  const evidence = {sharedSourceToken, imageDistance, sameName, sameCategory, hostA, hostB}
+  if (sharedSourceToken && imageExact) {
+    return {status: "auto", confidence: 0.999, reason: "cross_shop_source_token_and_image_exact", evidence}
+  }
+  return {status: "review", confidence: imageExact || sharedSourceToken ? 0.95 : 0.7, reason: "cross_shop_corroboration_missing", evidence}
 }
 
 function tokens(value: string): Set<string> {
