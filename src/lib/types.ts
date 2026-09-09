@@ -99,6 +99,10 @@ export interface Product {
   sizeInfo?: string
   tags?: string[]
   productCode?: string
+  /** Structured identity evidence emitted by the crawler boundary. */
+  identifiers?: import("./catalog/types").ProductIdentifier[]
+  /** Variant/offer observations; legacy engines expose a single default entry. */
+  variants?: import("./catalog/types").CrawledVariantOffer[]
   /** 원본 통화 ISO 코드 (해외 사이트용, 기본 KRW). price 필드는 KRW 환산값 */
   sourceCurrency?: CurrencyCode
   /** 원본 통화 기준 가격 (환산 전) */
@@ -205,6 +209,8 @@ export interface SiteConfig {
   name: string
   /** 플랫폼 타입 */
   type: PlatformType
+  /** Meaning and scope of productCode for catalog identity resolution. */
+  identifierProfile?: import("./catalog/identifiers").IdentifierProfile
   /** 사이트 기본 URL */
   baseUrl: string
   /** 단일브랜드 자사몰의 하우스 브랜드명 (DOM에서 브랜드 추출 실패 시 폴백) */

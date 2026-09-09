@@ -12,6 +12,7 @@
   "scripts": {
     "crawl": "dotenv -e .env -e .env.local -- tsx src/crawl.ts",
     "import:products": "dotenv -e .env -e .env.local -- tsx src/import-products.ts",
+    "sync:catalog": "dotenv -e .env -e .env.local -- tsx src/sync-catalog.ts",
     "import:attributes": "dotenv -e .env -- tsx src/import-attributes.ts",
     "import:brand-nodes": "dotenv -e .env -- tsx src/import-brand-nodes.ts",
     "probe:reviews": "dotenv -e .env -- tsx src/probe-reviews.ts",
