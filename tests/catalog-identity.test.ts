@@ -29,6 +29,14 @@ test("same trusted identifier auto-matches while color conflict rejects", () => 
   assert.equal(decideCatalogMatch(a, {...b, colorKey: "white"}).status, "reject")
 })
 
+test("trusted identifier without color evidence never auto-matches", () => {
+  const a = {brandKey: "uniqlo", name: "Crew Neck T-Shirt", identifiers: [id("model_id", "E422992-000", "uniqlo")]}
+  const b = {brandKey: "uniqlo", name: "크루넥T", identifiers: [id("model_id", "E422992-000", "uniqlo")]}
+  const result = decideCatalogMatch(a, b)
+  assert.equal(result.status, "review")
+  assert.equal(result.reason, "color_evidence_missing")
+})
+
 test("same merchant SKU from different namespaces does not auto-match", () => {
   const a = {brandKey: "acme", name: "Logo Tee", identifiers: [id("model_id", "SKU-1", "shop-a")]}
   const b = {brandKey: "acme", name: "Logo Tee", identifiers: [id("model_id", "SKU-1", "shop-b")]}
