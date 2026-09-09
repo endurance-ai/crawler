@@ -3,11 +3,13 @@
  *
  * This command is intentionally safe for legacy crawls: source rows default
  * to stable singletons. Exact identifier + canonical color matching is only
- * enabled for an explicitly verified `--product-code` via `--auto-match`;
- * ordinary refreshes preserve an already trusted match.
+ * enabled for an explicitly verified `--product-code` via `--auto-match`.
+ * Domestic official-shop/retailer matching is pair-scoped and requires
+ * shared source-product and image evidence. Ordinary refreshes preserve both.
  */
 import {createClient} from "@supabase/supabase-js"
 import {identifierProfileFor, makeIdentifier} from "./lib/catalog/identifiers"
+import {decideCrossShopMatch, extractSourceProductTokens, type CatalogMatchDecision} from "./lib/catalog/matching"
 import type {ProductIdentifier} from "./lib/catalog/types"
 
 type SourceRow = {
@@ -29,6 +31,7 @@ type SourceRow = {
   size_info: string | null
   last_seen_at: string | null
   primary_color?: string | null
+  image_embedding?: number[] | null
 }
 
 type SyncOutcome = {
@@ -48,13 +51,26 @@ const arg = (name: string): string | null => {
 }
 const dryRun = process.argv.includes("--dry-run")
 const autoMatch = process.argv.includes("--auto-match")
+const crossShopAutoMatch = process.argv.includes("--cross-shop-auto-match")
 const limit = Number(arg("limit") ?? "0") || 0
 const platform = arg("platform")
 const productCode = arg("product-code")
+const productId = arg("product-id")
+const sourceProductId = arg("source-product-id")
+const candidateProductId = arg("candidate-product-id")
 if (autoMatch && !productCode) {
   throw new Error("--auto-match requires --product-code=<verified-code>; bulk auto matching stays disabled until precision is approved")
 }
+if (crossShopAutoMatch && (!sourceProductId || !candidateProductId || sourceProductId === candidateProductId)) {
+  throw new Error("--cross-shop-auto-match requires two distinct --source-product-id and --candidate-product-id values")
+}
+if (crossShopAutoMatch && (platform || productCode || productId || limit > 0)) {
+  throw new Error("cross-shop matching is pair-scoped; do not combine it with --platform, --product-code, --product-id, or --limit")
+}
 const now = () => new Date().toISOString()
+
+let crossShopDecision: CatalogMatchDecision | null = null
+let crossShopIdentity: {productKey: string; variantKey: string; colorKey: string} | null = null
 
 function normalizeKey(value: string): string {
   return value.normalize("NFKC").toUpperCase().replace(/[^\p{L}\p{N}]+/gu, "")
@@ -86,6 +102,8 @@ async function fetchRows(): Promise<SourceRow[]> {
       .range(from, from + pageSize - 1)
     if (platform) query = query.eq("platform", platform)
     if (productCode) query = query.eq("product_code", productCode)
+    if (productId) query = query.eq("id", productId)
+    if (crossShopAutoMatch) query = query.in("id", [sourceProductId!, candidateProductId!])
     const {data, error} = await query
     if (error) throw error
     rows.push(...((data ?? []) as SourceRow[]))
@@ -107,7 +125,28 @@ async function fetchRows(): Promise<SourceRow[]> {
     ]))
     for (const row of batch) row.primary_color = colors.get(String(row.id)) ?? null
   }
+  if (crossShopAutoMatch && selected.length > 0) {
+    const {data, error} = await db
+      .from("product_embeddings")
+      .select("product_id,embedding")
+      .in("product_id", selected.map((row) => row.id))
+    if (error) throw error
+    const embeddings = new Map((data ?? []).map((entry) => [String(entry.product_id), parseEmbedding(entry.embedding)]))
+    for (const row of selected) row.image_embedding = embeddings.get(String(row.id)) ?? null
+  }
   return selected
+}
+
+function parseEmbedding(value: unknown): number[] | null {
+  if (Array.isArray(value)) {
+    const parsed = value.map(Number)
+    return parsed.every(Number.isFinite) ? parsed : null
+  }
+  if (typeof value !== "string") return null
+  const trimmed = value.trim().replace(/^\[/, "").replace(/\]$/, "")
+  if (!trimmed) return null
+  const parsed = trimmed.split(",").map(Number)
+  return parsed.every(Number.isFinite) ? parsed : null
 }
 
 async function syncRow(row: SourceRow): Promise<SyncOutcome> {
@@ -124,6 +163,7 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
       })
     : null
   let trusted = trustedIdentity(row, identifier)
+  if (crossShopIdentity) trusted = crossShopIdentity
   let targetExisted = false
   let existingTargetVariantId: number | string | null = null
 
@@ -174,9 +214,11 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
 
   // A regular singleton refresh must never undo a trusted match made by a
   // separately approved matching run.
-  const preserveTrustedTarget = !trusted && previousTarget?.identity_key?.startsWith("trusted:")
+  const preserveTrustedTarget = !trusted && (
+    previousTarget?.identity_key?.startsWith("trusted:") || previousTarget?.identity_key?.startsWith("cross-shop:")
+  )
   const identityKey = trusted?.productKey ?? singletonProductKey
-  const seed = trusted ? "trusted_identifier_color" : "source_singleton"
+  const seed = crossShopIdentity ? "cross_shop_composite" : trusted ? "trusted_identifier_color" : "source_singleton"
 
   let catalogProduct: {id: number | string}
   let variant: {id: number | string}
@@ -292,15 +334,15 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
       source_product_id: row.id,
       candidate_variant_id: variant.id,
       status: "auto",
-      confidence: identifier?.kind === "gtin" ? 1 : 0.995,
-      reason: "trusted_identifier_and_color_exact",
-      evidence: {
-        identifier_kind: identifier?.kind,
-        identifier_value: identifier?.normalized,
-        identifier_namespace: identifier?.namespace,
-        color_key: trusted?.colorKey,
-      },
-      matcher_version: "catalog-exact-v1",
+      confidence: crossShopDecision?.confidence ?? (identifier?.kind === "gtin" ? 1 : 0.995),
+      reason: crossShopDecision?.reason ?? "trusted_identifier_and_color_exact",
+      evidence: crossShopDecision?.evidence ?? {
+          identifier_kind: identifier?.kind,
+          identifier_value: identifier?.normalized,
+          identifier_namespace: identifier?.namespace,
+          color_key: trusted?.colorKey,
+        },
+      matcher_version: crossShopDecision ? "catalog-cross-shop-v1" : "catalog-exact-v1",
     })
     if (decisionError) throw decisionError
   }
@@ -310,6 +352,40 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
 
 async function main(): Promise<void> {
   const rows = await fetchRows()
+  if (crossShopAutoMatch) {
+    if (rows.length !== 2 || !rows.some((row) => String(row.id) === sourceProductId) || !rows.some((row) => String(row.id) === candidateProductId)) {
+      throw new Error("both cross-shop source products must exist")
+    }
+    const [left, right] = [sourceProductId!, candidateProductId!].map((id) => rows.find((row) => String(row.id) === id)!)
+    crossShopDecision = decideCrossShopMatch({
+      brandKey: String(left.brand_node_id ?? left.brand), name: left.name, category: left.category,
+      colorKey: left.primary_color, platform: left.platform, productUrl: left.product_url, imageEmbedding: left.image_embedding,
+    }, {
+      brandKey: String(right.brand_node_id ?? right.brand), name: right.name, category: right.category,
+      colorKey: right.primary_color, platform: right.platform, productUrl: right.product_url, imageEmbedding: right.image_embedding,
+    })
+    crossShopDecision = {
+      ...crossShopDecision,
+      evidence: {
+        ...crossShopDecision.evidence,
+        sourceProductIds: [left.id, right.id],
+        platforms: [left.platform, right.platform],
+        colorKey: left.primary_color,
+        category: left.category,
+      },
+    }
+    console.log(`cross-shop decision: ${crossShopDecision.status} (${crossShopDecision.reason})`, crossShopDecision.evidence)
+    if (crossShopDecision.status !== "auto") {
+      if (!dryRun) throw new Error("cross-shop pair did not meet the automatic-match evidence gate; rerun with --dry-run to inspect")
+      return
+    }
+    const sharedToken = String(crossShopDecision.evidence.sharedSourceToken ?? extractSourceProductTokens(left.product_url)[0])
+    const brandKey = String(left.brand_node_id ?? normalizeKey(left.brand))
+    const productKey = `cross-shop:${brandKey}:${normalizeKey(left.name)}:${normalizeKey(left.category ?? "")}:${sharedToken}`
+    const colorKey = normalizeKey(left.primary_color ?? "")
+    crossShopIdentity = {productKey, variantKey: `${productKey}:color:${colorKey}`, colorKey}
+    rows.sort((a, b) => String(a.id) === sourceProductId ? -1 : String(b.id) === sourceProductId ? 1 : 0)
+  }
   console.log(`catalog sync: ${rows.length} source products${dryRun ? " (dry-run)" : ""}`)
   let synced = 0
   let eligible = 0
@@ -321,7 +397,7 @@ async function main(): Promise<void> {
     synced++
     if (synced % 100 === 0 || synced === rows.length) console.log(`  ${synced}/${rows.length}`)
   }
-  console.log(`catalog identity: eligible=${eligible} attached_to_existing=${matched} auto_match=${autoMatch}`)
+  console.log(`catalog identity: eligible=${eligible} attached_to_existing=${matched} auto_match=${autoMatch || crossShopAutoMatch}`)
 }
 
 main().catch((error) => {

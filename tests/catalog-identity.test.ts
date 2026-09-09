@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {decideCatalogMatch} from "../src/lib/catalog/matching"
+import {decideCatalogMatch, decideCrossShopMatch, extractSourceProductTokens} from "../src/lib/catalog/matching"
 import {identifierProfileFor, isValidGtin, makeIdentifier} from "../src/lib/catalog/identifiers"
 
 const id = (kind: "gtin" | "model_id", value: string, namespace = "test") => makeIdentifier(kind, value, {
@@ -49,4 +49,42 @@ test("strong-looking title candidate is review-only", () => {
     {brandKey: "acme", name: "Heavy Cotton Logo T Shirt", category: "top"},
   )
   assert.equal(result.status, "review")
+})
+
+test("domestic official shop and retailer auto-match only with shared source token and image", () => {
+  const base = {
+    brandKey: "innir",
+    name: "251 Aged Crewneck Sweater (Beige)",
+    category: "knitwear",
+    colorKey: "BEIGE",
+    imageEmbedding: [0.2, 0.4, 0.8],
+  }
+  const result = decideCrossShopMatch(
+    {...base, platform: "innir", productUrl: "https://innir.net/product/item/46790/category/3167"},
+    {...base, platform: "8division", productUrl: "https://8division.com/product/detail.html?product_no=46790"},
+  )
+  assert.equal(result.status, "auto")
+  assert.equal(result.reason, "cross_shop_source_token_and_image_exact")
+})
+
+test("same title and color do not auto-match without both corroborators", () => {
+  const base = {brandKey: "acme", name: "DRIP TEE", category: "tops", colorKey: "BLACK"}
+  const result = decideCrossShopMatch(
+    {...base, platform: "official", productUrl: "https://official.test/p/B0030669FA706", imageEmbedding: [1, 0]},
+    {...base, platform: "retailer", productUrl: "https://retailer.test/p/B0030556FA582", imageEmbedding: [0, 1]},
+  )
+  assert.equal(result.status, "review")
+})
+
+test("cross-shop matcher rejects color conflicts and same host", () => {
+  const base = {brandKey: "innir", name: "Sweater", category: "knitwear", colorKey: "BEIGE", imageEmbedding: [1, 0]}
+  assert.equal(decideCrossShopMatch(
+    {...base, platform: "innir", productUrl: "https://innir.net/p/46790"},
+    {...base, colorKey: "BLACK", platform: "8division", productUrl: "https://8division.com/p/46790"},
+  ).reason, "color_conflict")
+  assert.equal(decideCrossShopMatch(
+    {...base, platform: "legacy-a", productUrl: "https://innir.net/p/46790"},
+    {...base, platform: "legacy-b", productUrl: "https://www.innir.net/p/46790"},
+  ).reason, "not_cross_shop")
+  assert.deepEqual(extractSourceProductTokens("https://shop.test/p/24?product_no=46790"), ["46790"])
 })

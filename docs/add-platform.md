@@ -120,6 +120,20 @@ The bridge creates singleton catalog products/variants and offers keyed by
 `platform + sourceProductKey + sourceVariantKey`. A later matcher may merge
 those singletons without rewriting or deleting the original `products` rows.
 
+For a verified domestic official-shop/retailer pair, first inspect the
+pair-scoped decision and then apply the same command without `--dry-run`:
+
+```bash
+pnpm match:catalog-pair -- --source-product-id=<official-id> --candidate-product-id=<retailer-id> --dry-run
+pnpm match:catalog-pair -- --source-product-id=<official-id> --candidate-product-id=<retailer-id>
+```
+
+This path requires the same brand, normalized name, canonical category and VLM
+color across different shops, plus both a shared high-entropy source product
+token and near-identical image embeddings. Title/color/category alone remains
+review-only. Bulk cross-shop matching stays disabled until its labeled
+precision gate is approved.
+
 - The validation gate (`src/lib/core/product-validator.ts`, REQ-CRAWLER-001)
   freezes the **current** output shape. A new platform must emit products
   that pass `ProductSchema` unchanged — it does not introduce new fields.
