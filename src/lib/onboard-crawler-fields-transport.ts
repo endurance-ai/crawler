@@ -43,6 +43,8 @@ const METADATA_KEYS = [
   "imageSelection",
   "sizeInfo",
   "productCode",
+  "identifiers",
+  "variants",
   "llmEnrichedAt",
   "llmModel",
   "llmInputHash",

@@ -95,6 +95,31 @@ npm run typecheck # exit 0 (the new stub + wiring must typecheck)
 
 ## Guardrails
 
+### Catalog identity contract
+
+Every crawler output can be wrapped with `envelopeFromProduct(product, config)`
+to produce the shared `CrawledProductEnvelope`. The envelope keeps the source
+listing intact while carrying optional identifier evidence and color/size
+variants for the central catalog matcher. Existing engines use one `default`
+variant; Shopify-like engines should emit one entry per source variant.
+
+Configure the meaning of `productCode` with `identifierProfile` on the platform
+config. Use `model_id` only when the code is a verified brand-level model
+identifier; use `source_item_id` for opaque merchant/platform IDs. Unknown
+codes remain evidence only and must not drive automatic merges.
+
+After the additive catalog migration is deployed, run the idempotent bridge for
+legacy rows before enabling matching:
+
+```bash
+pnpm sync:catalog -- --dry-run
+pnpm sync:catalog -- --platform=uniqlo
+```
+
+The bridge creates singleton catalog products/variants and offers keyed by
+`platform + sourceProductKey + sourceVariantKey`. A later matcher may merge
+those singletons without rewriting or deleting the original `products` rows.
+
 - The validation gate (`src/lib/core/product-validator.ts`, REQ-CRAWLER-001)
   freezes the **current** output shape. A new platform must emit products
   that pass `ProductSchema` unchanged — it does not introduce new fields.
