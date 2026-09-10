@@ -21,6 +21,7 @@ export interface CrossShopMatchInput extends CatalogMatchInput {
   platform: string
   productUrl: string
   imageEmbedding?: number[] | null
+  imageReady?: boolean
 }
 
 function normalizeText(value: string | null | undefined): string {
@@ -63,7 +64,7 @@ export function cosineDistance(a: number[] | null | undefined, b: number[] | nul
     normB += b[index] * b[index]
   }
   if (normA === 0 || normB === 0) return null
-  return 1 - dot / (Math.sqrt(normA) * Math.sqrt(normB))
+  return Math.max(0, Math.min(2, 1 - dot / (Math.sqrt(normA) * Math.sqrt(normB))))
 }
 
 /**
@@ -88,6 +89,14 @@ export function decideCrossShopMatch(a: CrossShopMatchInput, b: CrossShopMatchIn
   }
   if (!colorCompatible(a.colorKey, b.colorKey)) {
     return {status: "reject", confidence: 1, reason: "color_conflict", evidence: {a: a.colorKey, b: b.colorKey}}
+  }
+  if (a.imageReady === false || b.imageReady === false) {
+    return {
+      status: "review",
+      confidence: 0,
+      reason: "pending_image_selection",
+      evidence: {a: a.imageReady ?? null, b: b.imageReady ?? null},
+    }
   }
   const sameName = normalizeText(a.name) === normalizeText(b.name)
   const sameCategory = Boolean(a.category && b.category && normalizeText(a.category) === normalizeText(b.category))
