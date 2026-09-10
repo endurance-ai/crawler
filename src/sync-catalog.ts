@@ -32,6 +32,8 @@ type SourceRow = {
   last_seen_at: string | null
   primary_color?: string | null
   image_embedding?: number[] | null
+  image_selection_version: string | null
+  image_selected_at: string | null
 }
 
 type SyncOutcome = {
@@ -97,7 +99,7 @@ async function fetchRows(): Promise<SourceRow[]> {
   for (let from = 0; ; from += pageSize) {
     let query = db
       .from("products")
-      .select("id,brand_node_id,brand,name,category,platform,product_code,product_url,image_url,price,original_price,sale_price,source_price,source_currency,in_stock,size_info,last_seen_at")
+      .select("id,brand_node_id,brand,name,category,platform,product_code,product_url,image_url,price,original_price,sale_price,source_price,source_currency,in_stock,size_info,last_seen_at,image_selection_version,image_selected_at")
       .order("id", {ascending: true})
       .range(from, from + pageSize - 1)
     if (platform) query = query.eq("platform", platform)
@@ -360,9 +362,11 @@ async function main(): Promise<void> {
     crossShopDecision = decideCrossShopMatch({
       brandKey: String(left.brand_node_id ?? left.brand), name: left.name, category: left.category,
       colorKey: left.primary_color, platform: left.platform, productUrl: left.product_url, imageEmbedding: left.image_embedding,
+      imageReady: Boolean(left.image_selection_version && left.image_selected_at),
     }, {
       brandKey: String(right.brand_node_id ?? right.brand), name: right.name, category: right.category,
       colorKey: right.primary_color, platform: right.platform, productUrl: right.product_url, imageEmbedding: right.image_embedding,
+      imageReady: Boolean(right.image_selection_version && right.image_selected_at),
     })
     crossShopDecision = {
       ...crossShopDecision,

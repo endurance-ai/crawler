@@ -181,7 +181,12 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
   → npm run crawl -- --site=<key> --detail --include-out-of-stock  (온보딩 기본=상세+품절포함)
   → import-products --no-new-brands --site=<key>                   (validation_reject/스키마 확인)
   → embed_batch_devapp.py --download-workers 8                     (재실행으로 커버리지 수렴)
+  → pnpm match:catalog-cross-shop -- --platform=<key> --apply       (대표이미지+임베딩 완료 후 교차몰 매칭)
 ```
+
+교차몰 매처는 양쪽 상품의 대표이미지 선정 메타데이터와 해당 이미지 임베딩이
+모두 준비된 경우만 자동 병합한다. 아직 준비되지 않은 상품은 실패가 아니라
+pending으로 남으며, 이미지 선정·재임베딩 후 같은 명령을 실행하면 다시 평가된다.
 
 ## 자주 밟는 함정
 - psql이 PATH에 없음 → `"/c/Program Files/PostgreSQL/16/bin/psql.exe"` 전체 경로.

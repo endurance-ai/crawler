@@ -88,3 +88,16 @@ test("cross-shop matcher rejects color conflicts and same host", () => {
   ).reason, "not_cross_shop")
   assert.deepEqual(extractSourceProductTokens("https://shop.test/p/24?product_no=46790"), ["46790"])
 })
+
+test("cross-shop image evidence waits for representative image selection", () => {
+  const base = {
+    brandKey: "innir", name: "Sweater", category: "knitwear", colorKey: "BEIGE",
+    imageEmbedding: [1, 0],
+  }
+  const result = decideCrossShopMatch(
+    {...base, imageReady: false, platform: "innir", productUrl: "https://innir.net/p/46790"},
+    {...base, imageReady: true, platform: "8division", productUrl: "https://8division.com/p/46790"},
+  )
+  assert.equal(result.status, "review")
+  assert.equal(result.reason, "pending_image_selection")
+})

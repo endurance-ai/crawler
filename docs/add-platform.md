@@ -134,6 +134,20 @@ token and near-identical image embeddings. Title/color/category alone remains
 review-only. Bulk cross-shop matching stays disabled until its labeled
 precision gate is approved.
 
+After representative-image selection and embedding have completed, run the
+incremental matcher for the crawled platform:
+
+```bash
+pnpm match:catalog-cross-shop -- --platform=<platform-key>
+pnpm match:catalog-cross-shop -- --platform=<platform-key> --apply
+```
+
+The required order is `crawl -> import -> representative image selection ->
+embedding -> catalog matching`. If either side has no
+`image_selection_version` or `image_selected_at`, the pair is counted as
+`pendingImageSelection` and is neither rejected nor merged. Regenerate the
+embedding after representative-image changes and rerun this idempotent stage.
+
 - The validation gate (`src/lib/core/product-validator.ts`, REQ-CRAWLER-001)
   freezes the **current** output shape. A new platform must emit products
   that pass `ProductSchema` unchanged — it does not introduce new fields.
