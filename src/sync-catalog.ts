@@ -58,6 +58,8 @@ const limit = Number(arg("limit") ?? "0") || 0
 const platform = arg("platform")
 const productCode = arg("product-code")
 const productId = arg("product-id")
+const productIds = (arg("product-ids") ?? "").split(",").map((value) => value.trim()).filter(Boolean)
+const forceSingleton = process.argv.includes("--force-singleton")
 const sourceProductId = arg("source-product-id")
 const candidateProductId = arg("candidate-product-id")
 if (autoMatch && !productCode) {
@@ -68,6 +70,9 @@ if (crossShopAutoMatch && (!sourceProductId || !candidateProductId || sourceProd
 }
 if (crossShopAutoMatch && (platform || productCode || productId || limit > 0)) {
   throw new Error("cross-shop matching is pair-scoped; do not combine it with --platform, --product-code, --product-id, or --limit")
+}
+if (forceSingleton && (autoMatch || crossShopAutoMatch)) {
+  throw new Error("--force-singleton cannot be combined with an automatic match mode")
 }
 const now = () => new Date().toISOString()
 
@@ -105,6 +110,7 @@ async function fetchRows(): Promise<SourceRow[]> {
     if (platform) query = query.eq("platform", platform)
     if (productCode) query = query.eq("product_code", productCode)
     if (productId) query = query.eq("id", productId)
+    if (productIds.length > 0) query = query.in("id", productIds)
     if (crossShopAutoMatch) query = query.in("id", [sourceProductId!, candidateProductId!])
     const {data, error} = await query
     if (error) throw error
@@ -216,7 +222,7 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
 
   // A regular singleton refresh must never undo a trusted match made by a
   // separately approved matching run.
-  const preserveTrustedTarget = !trusted && (
+  const preserveTrustedTarget = !forceSingleton && !trusted && (
     previousTarget?.identity_key?.startsWith("trusted:") || previousTarget?.identity_key?.startsWith("cross-shop:")
   )
   const identityKey = trusted?.productKey ?? singletonProductKey
@@ -242,6 +248,8 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
           ? {seed, identifier_kind: identifier?.kind, identifier_namespace: identifier?.namespace}
           : {seed, source_product_id: row.id},
         updated_at: now(),
+        status: "active",
+        merged_into_id: null,
       }, {onConflict: "identity_key"})
       .select("id")
       .single()
@@ -259,6 +267,8 @@ async function syncRow(row: SourceRow): Promise<SyncOutcome> {
         identity_key: variantKey,
         metadata: {seed},
         updated_at: now(),
+        status: "active",
+        merged_into_id: null,
       }, {onConflict: "identity_key"})
       .select("id")
       .single()

@@ -228,6 +228,10 @@ async function runPool<T>(items: T[], concurrency: number, worker: (item: T) => 
 async function main(): Promise<void> {
   const discovered = await discoverCandidates()
   const selected = limit > 0 ? discovered.pairs.slice(0, limit) : discovered.pairs
+  const pending = selected.filter(({official, retailer}) => !(
+    official.canonical_variant_id
+    && String(official.canonical_variant_id) === String(retailer.canonical_variant_id)
+  ))
   console.log(JSON.stringify({
     mode: apply ? "apply" : "dry-run", targetPlatform, preliminary: discovered.preliminary,
     missingColorOrConflict: discovered.missingColor,
@@ -241,8 +245,8 @@ async function main(): Promise<void> {
     console.log(`${pair.official.id}\t${pair.retailer.id}\t${pair.official.brand}\t${pair.official.platform}->${pair.retailer.platform}\t${pair.sharedSourceToken}\t${pair.imageDistance}`)
   }
   if (!apply) return
-  await runPool(selected, 3, applyPair)
-  console.log(`applied=${selected.length}`)
+  await runPool(pending, 3, applyPair)
+  console.log(`applied=${pending.length}`)
 }
 
 main().catch((error) => {

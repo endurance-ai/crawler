@@ -10,6 +10,7 @@
 Description=kiko.ai refresh candidate LLM enrichment — lab batch host
 After=network-online.target kiko-refresh.service
 Wants=network-online.target
+OnSuccess=kiko-catalog-pipeline.service
 
 [Service]
 Type=oneshot

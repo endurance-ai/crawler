@@ -15,6 +15,8 @@
     "sync:catalog": "dotenv -e .env -e .env.local -- tsx src/sync-catalog.ts",
     "match:catalog-pair": "dotenv -e .env -e .env.local -- tsx src/sync-catalog.ts --cross-shop-auto-match",
     "match:catalog-cross-shop": "dotenv -e .env -e .env.local -- tsx src/match-catalog-cross-shop.ts",
+    "catalog:pipeline": "dotenv -e .env -e .env.local -- tsx src/catalog-pipeline.ts",
+    "enrich:product-features": "dotenv -e .env -e .env.local -- tsx src/enrich-product-features.ts",
     "import:attributes": "dotenv -e .env -- tsx src/import-attributes.ts",
     "import:brand-nodes": "dotenv -e .env -- tsx src/import-brand-nodes.ts",
     "probe:reviews": "dotenv -e .env -- tsx src/probe-reviews.ts",

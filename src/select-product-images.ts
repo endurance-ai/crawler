@@ -443,7 +443,10 @@ const DB_SELECT = [
 async function runDbMode(flags: Flags, selector: LocalProductImageSelector, renderer: RenderedDetailCollector) {
   const db = createDb()
   const site = stringFlag(flags, "site")
-  if (!site && flags.all !== true) throw new Error("--from-db requires --site=<key> or --all")
+  const productIds = (stringFlag(flags, "product-ids") ?? "").split(",").map((id) => id.trim()).filter(Boolean)
+  if (!site && productIds.length === 0 && flags.all !== true) {
+    throw new Error("--from-db requires --site=<key>, --product-ids=<ids>, or --all")
+  }
   const limit = intFlag(flags, "limit", Number.MAX_SAFE_INTEGER)
   const pageSize = Math.min(500, limit)
   const dataDir = path.join(process.cwd(), "data")
@@ -460,6 +463,7 @@ async function runDbMode(flags: Flags, selector: LocalProductImageSelector, rend
   while (processed < limit) {
     let query = db.from("products").select(DB_SELECT).order("id").range(offset, offset + pageSize - 1)
     if (site) query = query.eq("platform", site)
+    if (productIds.length > 0) query = query.in("id", productIds)
     const {data, error} = await query
     if (error) throw new Error(`failed to fetch products: ${error.message}`)
     const rows = (data ?? []) as unknown as DbProductRow[]
@@ -640,6 +644,7 @@ Product representative-image selection (macOS 15+ / Apple Vision)
   pnpm select:product-images --site=<key> [--limit=N] [--dry-run] [--force]
   pnpm select:product-images --from-db --site=<key> [--apply] [--limit=N]
   pnpm select:product-images --from-db --all [--apply] [--limit=N]
+  pnpm select:product-images --from-db --product-ids=<id1,id2> [--apply]
   pnpm select:product-images --from-db --all --utility-only [--apply] [--force]
   pnpm select:product-images --site=<key> --rollback=<manifest.jsonl>
   pnpm select:product-images --from-db --apply --rollback=<manifest.jsonl>
