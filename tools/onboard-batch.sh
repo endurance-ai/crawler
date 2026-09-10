@@ -184,6 +184,15 @@ for c in $(seq "$START" "$END"); do
   INVALID_FOUND=$(grep -oE "processed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
   INVALID_FIXED=$(grep -oE "changed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
 
+  # Product writes enqueue durable catalog jobs in Postgres. Drain exactly the
+  # platforms accepted by this chunk after every import, so local onboarding
+  # reaches representative image -> features -> embedding -> matching without
+  # a separate operator command.
+  PIPELINE_KEYS=$(node -e 'try{console.log(require(require("path").resolve(process.argv[1])).join(","))}catch(e){console.log("")}' "$PASSKEYS_JSON")
+  if [ -n "$PIPELINE_KEYS" ]; then
+    $PNPM catalog:pipeline -- --drain --platforms="$PIPELINE_KEYS"
+  fi
+
   echo "$c,$ENGINE,$PASS,$ROWS,$OK,$NET,$INVALID_FOUND,$INVALID_FIXED" >> "$TALLY"
   echo "CHUNK $c DONE: pass=$PASS crawled=$ROWS import=$OK net=$NET guardrail(found=$INVALID_FOUND fixed=$INVALID_FIXED) (DB $AFTER)"
 done

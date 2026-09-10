@@ -258,6 +258,7 @@ export async function generateQwenObject<T>(options: {
   schema: z.ZodType<T>
   system: string
   prompt: string
+  imageUrl?: string
   temperature?: number
 }): Promise<QwenObjectResult<T>> {
   const result = await runWithQwen(async ({model, abortSignal}) => {
@@ -265,7 +266,17 @@ export async function generateQwenObject<T>(options: {
       model,
       output: Output.object({schema: options.schema}),
       system: options.system,
-      prompt: options.prompt,
+      ...(options.imageUrl
+        ? {
+            messages: [{
+              role: "user" as const,
+              content: [
+                {type: "text" as const, text: options.prompt},
+                {type: "image" as const, image: new URL(options.imageUrl)},
+              ],
+            }],
+          }
+        : {prompt: options.prompt}),
       temperature: options.temperature ?? 0,
       maxRetries: 0,
       abortSignal,

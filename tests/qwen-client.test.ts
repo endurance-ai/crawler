@@ -245,3 +245,36 @@ test("sends the Qwen model and strict json_schema to the local chat endpoint", a
     await close(server)
   }
 })
+
+test("sends an image URL as multimodal content when requested", async () => {
+  let requestBody: any
+  const {server, baseUrl} = await listen((request, response) => {
+    let body = ""
+    request.setEncoding("utf8")
+    request.on("data", (chunk) => (body += chunk))
+    request.on("end", () => {
+      requestBody = JSON.parse(body)
+      response.writeHead(200, {"content-type": "application/json"})
+      response.end(JSON.stringify({
+        id: "chatcmpl-vision", object: "chat.completion", created: 1,
+        model: "qwen3-vl-30b-awq",
+        choices: [{index: 0, message: {role: "assistant", content: '{"color":"BLACK"}'}, finish_reason: "stop"}],
+        usage: {prompt_tokens: 2, completion_tokens: 1, total_tokens: 3},
+      }))
+    })
+  })
+  process.env.QWEN_BASE_URLS = baseUrl
+  process.env.QWEN_MAX_RETRIES = "0"
+  try {
+    await generateQwenObject({
+      schema: z.object({color: z.literal("BLACK")}),
+      system: "Inspect.", prompt: "product", imageUrl: "https://cdn.example.com/product.jpg",
+    })
+    assert.deepEqual(requestBody.messages[1].content, [
+      {type: "text", text: "product"},
+      {type: "image_url", image_url: {url: "https://cdn.example.com/product.jpg"}},
+    ])
+  } finally {
+    await close(server)
+  }
+})

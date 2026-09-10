@@ -184,6 +184,22 @@ SELECT * FROM product_embedding_coverage WHERE platform='<key>';  -- 플랫폼�
   → pnpm match:catalog-cross-shop -- --platform=<key> --apply       (대표이미지+임베딩 완료 후 교차몰 매칭)
 ```
 
+운영에서는 위 후처리를 각각 실행하지 않는다. 상품 INSERT나 동일성/이미지 필드 변경은
+DB의 `product_catalog_jobs`에 자동 등록되고, 로컬 `onboard-batch.sh`와 연구실 서버의
+refresh OnSuccess 체인이 모두 아래 동일한 멱등 워커를 호출한다.
+
+```bash
+pnpm catalog:pipeline -- --drain --platforms=<key1,key2>
+```
+
+`CATALOG_MATCH_MODE`은 기본 `shadow`다. 검수 표본이 정밀도 기준을 통과한 뒤 운영
+환경을 `CATALOG_MATCH_MODE=apply`로 전환한다. 전환 시 shadow 기간에 준비된 상품은
+플랫폼별 `pnpm match:catalog-cross-shop -- --platform=<key> --apply`를 한 번 실행한다.
+
+워커는 대표 이미지 선정 → Qwen3-VL `product_features` → FashionSigLIP 임베딩 →
+교차몰 매칭 순으로 처리한다. 가격·재고만 바뀐 refresh는 큐를 만들지 않는다. 실패한
+상품은 singleton으로 남고 최대 3회 재시도 후 격리되며 `--drain`으로 다시 점검할 수 있다.
+
 교차몰 매처는 양쪽 상품의 대표이미지 선정 메타데이터와 해당 이미지 임베딩이
 모두 준비된 경우만 자동 병합한다. 아직 준비되지 않은 상품은 실패가 아니라
 pending으로 남으며, 이미지 선정·재임베딩 후 같은 명령을 실행하면 다시 평가된다.

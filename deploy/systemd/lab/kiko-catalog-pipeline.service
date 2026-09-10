@@ -1,0 +1,26 @@
+[Unit]
+Description=kiko.ai product catalog derivation and cross-shop matching
+After=network-online.target kiko-refresh-candidates.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kjk/kiko-crawler-runtime
+Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/home/kjk
+Environment=CI=true
+Environment=BATCH_SKIP_UPDATE=true
+Environment=QWEN_ENABLED=true
+Environment=QWEN_BASE_URLS=http://127.0.0.1:8001/v1
+Environment=QWEN_MODEL=qwen3-vl-30b-awq
+Environment=QWEN_TIMEOUT_MS=45000
+Environment=QWEN_MAX_RETRIES=2
+Environment=QWEN_CONCURRENCY_PER_ENDPOINT=1
+Environment=AI_SERVER_DIR=/home/kjk/ai-server
+# Change to apply only after the shadow precision gate is approved.
+Environment=CATALOG_MATCH_MODE=shadow
+ExecStart=/bin/bash /home/kjk/kiko-crawler-runtime/scripts/run-catalog-pipeline.sh
+TimeoutStartSec=14400
+
+[Install]
+WantedBy=default.target
