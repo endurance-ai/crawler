@@ -3,8 +3,11 @@ import {emit} from "../core/observability"
 import {resolveSubcategory} from "../subcategory-classifier"
 import {matchesAny, normalizeForMatch} from "../text-match"
 import {normalizeGenderToken, resolveProductGenderWithSource, type GenderSource} from "../product-gender"
+import {isNonFashionProductName} from "../product-scope"
 
-export type ProductQcAction = "keep" | "auto_fix" | "review" | "reject"
+export {isNonFashionProductName} from "../product-scope"
+
+export type ProductQcAction = "keep" | "auto_fix" | "review" | "reject" | "out_of_scope"
 
 export interface ProductQcFieldChange {
   field: "category" | "subcategory" | "gender"
@@ -59,6 +62,10 @@ export interface ProductQcOptions {
   genderTextPatterns?: {men?: RegExp[]; women?: RegExp[]; unisex?: RegExp[]}
   /** Do not duplicate QC stats/events when writing repeated crawl checkpoints. */
   recordReport?: boolean
+  /** Canonical categories outside the service scope for this site. */
+  outOfScopeCategories?: readonly string[]
+  /** Exclude out-of-scope products from the returned write set. */
+  excludeOutOfScope?: boolean
 }
 
 export interface ProductQcResult<T extends ProductQcInput = ProductQcInput> {
@@ -75,6 +82,7 @@ export interface ProductQcStats {
   autoFixed: number
   review: number
   rejected: number
+  outOfScope: number
   byReason: Record<string, number>
   samples: Record<string, string[]>
 }
@@ -386,7 +394,7 @@ function skuOf(product: ProductQcInput): string {
 function record(site: string, result: ProductQcResult): void {
   let stat = qcReport.get(site)
   if (!stat) {
-    stat = {total: 0, kept: 0, autoFixed: 0, review: 0, rejected: 0, byReason: {}, samples: {}}
+    stat = {total: 0, kept: 0, autoFixed: 0, review: 0, rejected: 0, outOfScope: 0, byReason: {}, samples: {}}
     qcReport.set(site, stat)
   }
   stat.total += 1
@@ -394,6 +402,7 @@ function record(site: string, result: ProductQcResult): void {
   if (result.action === "auto_fix") stat.autoFixed += 1
   if (result.action === "review") stat.review += 1
   if (result.action === "reject") stat.rejected += 1
+  if (result.action === "out_of_scope") stat.outOfScope += 1
 
   for (const reason of result.reasons) {
     stat.byReason[reason] = (stat.byReason[reason] || 0) + 1
@@ -428,6 +437,9 @@ function normalizeCategoryField(
   needsReview: boolean
 } {
   const raw = typeof product.category === "string" ? product.category.trim() : ""
+  if (isNonFashionProductName(product.name)) {
+    return {value: "other", reason: "category_non_fashion_name", confidence: 0.99, needsReview: false}
+  }
   const inferred = inferCategoryFromText(product.name)
   const priorityInferred = inferPriorityCategoryFromText(product.name)
 
@@ -650,7 +662,19 @@ export function normalizeProductTextFields<T extends ProductQcInput>(
   }
 
   const confidence = confidences.length > 0 ? Math.min(...confidences) : 1
-  const action: ProductQcAction = needsReview ? "review" : changes.length > 0 ? "auto_fix" : "keep"
+  const outOfScopeByName = isNonFashionProductName(product.name)
+  const outOfScopeByCategory = typeof next.category === "string" &&
+    options.outOfScopeCategories?.includes(next.category) === true
+  const outOfScope = outOfScopeByName || outOfScopeByCategory
+  if (outOfScopeByName) reasons.push("product_name_out_of_scope")
+  if (outOfScopeByCategory) reasons.push("category_out_of_scope")
+  const action: ProductQcAction = outOfScope
+    ? "out_of_scope"
+    : needsReview
+      ? "review"
+      : changes.length > 0
+        ? "auto_fix"
+        : "keep"
 
   return {
     action,
@@ -674,8 +698,10 @@ export function applyProductQcGate<T extends ProductQcInput>(
     const result = normalizeProductTextFields(product, options)
     if (options.recordReport !== false) record(site, result)
 
-    if (result.action === "review" || result.action === "reject") {
-      const firstReason = result.reasons[0] ?? "product_qc_uncertain"
+    if (result.action === "review" || result.action === "reject" || result.action === "out_of_scope") {
+      const firstReason = result.action === "out_of_scope"
+        ? result.reasons.find((reason) => reason.endsWith("out_of_scope")) ?? "product_out_of_scope"
+        : result.reasons[0] ?? "product_qc_uncertain"
       if (options.recordReport !== false) {
         emit({
           kind: "product_qc_review",
@@ -687,13 +713,21 @@ export function applyProductQcGate<T extends ProductQcInput>(
           changes: result.changes,
         })
       }
-      continue
+      if (result.action !== "out_of_scope" || options.excludeOutOfScope === true) continue
     }
 
     accepted.push(result.product)
   }
 
   return accepted
+}
+
+/** Filter only business-scope exclusions without dropping ordinary QC reviews. */
+export function filterOutOfScopeProducts<T extends ProductQcInput>(
+  products: T[],
+  options: Pick<ProductQcOptions, "outOfScopeCategories" | "trustedCategory" | "verifiedUnisexDefault" | "kidsGenderNoisePatterns" | "genderTextPatterns">,
+): T[] {
+  return products.filter((product) => normalizeProductTextFields(product, options).action !== "out_of_scope")
 }
 
 export function getProductQcReport(): Map<string, ProductQcStats> {

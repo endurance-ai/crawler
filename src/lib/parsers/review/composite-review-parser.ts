@@ -21,6 +21,8 @@ export class CompositeReviewParser implements IReviewParser {
 
   async parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData> {
     const currentUrl = page.url()
+    let partial: ReviewData | null = null
+    const errors: string[] = []
 
     for (const strategy of this.strategies) {
       if (page.url() !== currentUrl) {
@@ -28,10 +30,26 @@ export class CompositeReviewParser implements IReviewParser {
         await page.waitForTimeout(1000)
       }
 
-      const result = await strategy.parse(page, maxReviews)
-      if (result.reviews.length > 0) return result
+      try {
+        const result = await strategy.parse(page, maxReviews)
+        if (result.reviewCollection.status === "succeeded" || result.reviewCollection.status === "not_requested") return result
+        if (result.reviewCollection.status === "partial" && !partial) partial = result
+        if (result.reviewCollection.error) errors.push(result.reviewCollection.error)
+      } catch {
+        errors.push("review strategy failed")
+      }
     }
 
-    return { reviewCount: 0, reviews: [] }
+    if (partial) return partial
+    return {
+      reviewCount: 0,
+      reviews: [],
+      reviewCollection: {
+        status: "failed",
+        observedAt: null,
+        confirmedEmpty: false,
+        error: errors.join("; ") || "no review strategy succeeded",
+      },
+    }
   }
 }

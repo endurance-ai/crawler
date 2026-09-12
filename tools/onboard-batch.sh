@@ -50,11 +50,10 @@
 #                          (product_features), gender from the crawler's
 #                          resolveProductGenderWithSource, description is dropped.
 #
-# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (QC + LLM
-# category/subcategory classify, reading the same variant back
-# via ONBOARD_VARIANT) -> import-products.ts (upsert) -> reclassify-categories.ts
-# --only-invalid (guardrail: fixes any row that still has a non-canonical
-# category, regardless of cause — cheap, always safe to run).
+# Each chunk: crawl (--variants, detail) -> onboard-classify.ts (deterministic QC
+# and category/color recovery, reading the same variant back via ONBOARD_VARIANT)
+# -> import-products.ts (verified pricing/Qwen preparation, then conditional save)
+# -> reclassify-categories.ts --only-invalid (canonical taxonomy guardrail).
 #
 # Resumable: if out-root/chunk-N/products.jsonl already exists, crawl is skipped
 # for that chunk (so a killed run can restart with the same --start).
@@ -83,7 +82,7 @@ while [ $# -gt 0 ]; do
     --product-limit) PRODUCT_LIMIT="$2"; shift 2 ;;
     --pool-limit) POOL_LIMIT="$2"; shift 2 ;;
     --import-flags) IMPORT_FLAGS="$2"; shift 2 ;;
-    *) echo "unknown arg: $1" >&2; exit 1 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
@@ -146,14 +145,19 @@ for c in $(seq "$START" "$END"); do
   CRAWL_VARIANTS="existing"
   if [ "$VARIANTS" = "hybrid" ]; then CRAWL_VARIANTS="existing,hybrid"; fi
 
-  if [ -s "$OUT_ROOT/chunk-$c/products.jsonl" ]; then
+  CRAWL_INPUT_HASH=$(node tools/pipeline-artifact.mjs input-hash "$CHUNK_JSON" "$ENGINE" "$VARIANTS" "$PRODUCT_LIMIT" "$POOL_LIMIT" true)
+  CRAWL_STAMP="$TMP_DIR/chunk-$c-artifact.json"
+  if [ -s "$OUT_ROOT/chunk-$c/products.jsonl" ] && node tools/pipeline-artifact.mjs check "$CRAWL_STAMP" "$OUT_ROOT/chunk-$c/products.jsonl" "$CRAWL_INPUT_HASH"; then
     echo "chunk $c crawl SKIPPED (existing $(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl") rows)"
   else
+    if [ -f "$OUT_ROOT/chunk-$c/products.jsonl" ]; then
+      mv "$OUT_ROOT/chunk-$c/products.jsonl" "$OUT_ROOT/chunk-$c/products.previous-$$.jsonl"
+    fi
     CRAWLER_CAFE24_ENGINE="$ENGINE" POC_UNSAFE_SCALE=1 POC_EXTRA_BRANDS="$CHUNK_JSON" \
       $PNPM tsx tools/product-extraction-poc.ts \
       --brands="$KEYS" --variants="$CRAWL_VARIANTS" --limit="$PRODUCT_LIMIT" --pool-limit="$POOL_LIMIT" \
-      --include-out-of-stock \
-      --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
+      --include-out-of-stock --out-root="$OUT_ROOT" --run-id="chunk-$c" > "$OUT_ROOT/chunk-$c.log" 2>&1
+    node tools/pipeline-artifact.mjs record "$CRAWL_STAMP" "$OUT_ROOT/chunk-$c/products.jsonl" "$CRAWL_INPUT_HASH"
   fi
   ROWS=$(wc -l < "$OUT_ROOT/chunk-$c/products.jsonl" 2>/dev/null || echo 0)
   echo "chunk $c crawl done: $ROWS rows"
@@ -166,13 +170,22 @@ for c in $(seq "$START" "$END"); do
   PASS=$(node -e 'try{console.log(require(require("path").resolve(process.argv[1])).length)}catch(e){console.log(0)}' "$PASSKEYS_JSON")
 
   BEFORE=$(DB_COUNT)
-  : > "$OUT_ROOT/import-chunk-$c.log"
-  OK=0
-  for KEY in $(node -e 'try{require(require("path").resolve(process.argv[1])).forEach(k=>console.log(k))}catch(e){}' "$PASSKEYS_JSON"); do
-    R=$($PNPM tsx src/import-products.ts --site="$KEY" $IMPORT_FLAGS 2>&1 | grep -oE "[0-9]+개 성공" | grep -oE "[0-9]+" | tail -1)
-    OK=$((OK + ${R:-0}))
-    echo "$KEY -> ${R:-0}" >> "$OUT_ROOT/import-chunk-$c.log"
-  done
+  REPORT="$TMP_DIR/chunk-$c-report.json"
+  # Every child gets a fresh report path. QC passkeys select inputs only;
+  # completion comes from both child exit codes and validated import reports.
+  IMPORT_CODE=0
+  $PNPM tsx tools/run-pipeline-import.ts --keys-file="$PASSKEYS_JSON" \
+    --expected-configs="$CHUNK_JSON" --report="$REPORT" -- $IMPORT_FLAGS \
+    > "$OUT_ROOT/import-chunk-$c.log" 2>&1 || IMPORT_CODE=$?
+  if [ ! -s "$REPORT" ]; then
+    echo "chunk $c import report missing — $OUT_ROOT/import-chunk-$c.log" >&2
+    exit 1
+  fi
+  OK=$(node --import tsx tools/pipeline-report.ts count "$REPORT" applied)
+  if [ "$IMPORT_CODE" -ne 0 ]; then
+    echo "chunk $c incomplete imports — $REPORT" >&2
+    exit 1
+  fi
   AFTER=$(DB_COUNT)
   NET=$((AFTER - BEFORE))
 
@@ -180,7 +193,11 @@ for c in $(seq "$START" "$END"); do
   # cause (stale cache upsert, LLM output drift, etc). Idempotent and cheap —
   # only touches rows actually out of taxonomy.
   GUARD_LOG="$OUT_ROOT/guardrail-chunk-$c.log"
-  $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1 || true
+  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1; then
+    echo "chunk $c guardrail failed; Qwen/tunnel or DB error — $GUARD_LOG" >&2
+    node --import tsx tools/pipeline-report.ts fail "$REPORT" guardrail
+    exit 1
+  fi
   INVALID_FOUND=$(grep -oE "processed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
   INVALID_FIXED=$(grep -oE "changed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
 

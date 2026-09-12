@@ -295,11 +295,6 @@ function minutes(ms: number): string {
   return `${Math.round(ms / 60_000)}분`
 }
 
-function unknownProducts(crawled: Product[], urls: string[]): Product[] {
-  const unknown = new Set(urls)
-  return crawled.filter((product) => unknown.has(product.productUrl))
-}
-
 function refreshExceptionCode(
   result: CrawlResult,
   unreachable: string[],
@@ -591,15 +586,17 @@ async function main() {
               diff.confirmedUrls,
               new Date().toISOString(),
             )
-        let queued = {discovered: 0, brandUnmatched: 0}
+        let queued = {inserted: 0, updated: 0, unchanged: 0, stale: 0, conflicted: 0, rematched: 0, brandUnmatched: 0}
         let candidateError: string | null = null
         if (!flags.auditPrices && !flags.priceOnly) {
           try {
             queued = await enqueueRefreshCandidates(db, {
-              products: unknownProducts(crawled, diff.unknownUrls),
+              products: crawled,
+              unknownUrls: diff.unknownUrls,
               config: entry.config,
               brands,
             })
+            if (queued.conflicted > 0) candidateFailures += 1
           } catch (error) {
             candidateFailures += 1
             candidateError = error instanceof Error ? error.message : String(error)
@@ -658,7 +655,7 @@ async function main() {
 
         priceChanged += priceN
         stockChanged += stockN + missingStockN
-        candidateTotal += queued.discovered
+        candidateTotal += queued.inserted
         brandUnmatchedTotal += queued.brandUnmatched
         writeFailures += applied.failed
         lastSeenFailures += seen.failed
@@ -667,11 +664,11 @@ async function main() {
         // unreachable 은 failed 로 친다(성공이 아니므로 last_succeeded_at 을 올리면
         // 안 된다). 다만 백오프 사다리는 metrics.unreachable_only 를 보고 건너뛴다.
         const failed =
-          applied.failed > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
+          applied.failed > 0 || seen.failed > 0 || candidateError !== null || queued.conflicted > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
         const unreachableOnly =
           unreachable.length > 0 && applied.failed === 0 && seen.failed === 0 && crawlResult.errors.length === 0
         const dbPartialOnly =
-          applied.failed > 0 && crawlResult.errors.length === 0 && unreachable.length === 0
+          (applied.failed > 0 || seen.failed > 0 || candidateError !== null || queued.conflicted > 0) && crawlResult.errors.length === 0 && unreachable.length === 0
         const status = failed
           ? "failed"
           : crawlResult.continuation
@@ -684,7 +681,7 @@ async function main() {
             ` · 변경 ${diff.updates.length + missingStockN}` +
             `(가격 ${priceN}, 재고 ${stockN + missingStockN})` +
             ` · 생존확인 ${seen.ok}` +
-            ` · LLM후보 ${queued.discovered} · 브랜드불일치 ${queued.brandUnmatched}` +
+            ` · 신규후보 ${queued.inserted} · 후보갱신 ${queued.updated} · 후보충돌 ${queued.conflicted} · 관측브랜드불일치 ${queued.brandUnmatched}` +
             (qualityWarnings.length > 0 ? ` · ⚠️ ${qualityWarnings.join("; ")}` : "") +
             ` · 세일 ${pricingMetrics.sale_detected} · 가격미확정 ${pricingMetrics.price_unknown}` +
             ` · ${minutes(Date.now() - (run?.startedAt ?? sourceStartedAt))}`,
@@ -697,6 +694,9 @@ async function main() {
                 ...crawlResult.errors,
                 ...unreachable,
                 applied.failed > 0 ? `update failures=${applied.failed}` : "",
+                seen.failed > 0 ? `last_seen failures=${seen.failed}` : "",
+                candidateError ? "candidate observation write failed" : "",
+                queued.conflicted > 0 ? `candidate observation conflicts=${queued.conflicted}` : "",
               ]
                 .filter(Boolean)
                 .join(" | ")
@@ -708,7 +708,12 @@ async function main() {
             last_seen_touched: seen.ok,
             price_changed: priceN,
             stock_changed: stockN + missingStockN,
-            candidates: queued.discovered,
+            candidates: queued.inserted,
+            candidate_observation_updated: queued.updated,
+            candidate_observation_unchanged: queued.unchanged,
+            candidate_observation_stale: queued.stale,
+            candidate_observation_conflicted: queued.conflicted,
+            candidate_rematched: queued.rematched,
             brand_unmatched: queued.brandUnmatched,
             coverage: Number(cycleCoverage.toFixed(3)),
             slice_coverage: Number(diff.coverage.toFixed(3)),
@@ -800,6 +805,7 @@ async function main() {
   if (failures.length > 0) {
     console.log(`   ⚠️ 실패 ${failures.length}개: ${failures.slice(0, 5).join(" | ")}`)
   }
+  if (failures.length > 0 || writeFailures > 0 || lastSeenFailures > 0 || candidateFailures > 0 || telemetryFailures > 0) process.exitCode = 1
 }
 
 main().catch((error) => {

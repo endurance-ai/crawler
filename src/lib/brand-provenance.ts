@@ -28,6 +28,25 @@ export interface ProductBrandConfig {
   multiBrand?: boolean
 }
 
+/** Verified retailer-specific aliases; never fuzzy-match arbitrary labels. */
+const PLATFORM_BRAND_ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  slowsteadyclub: {
+    "FRESH SERVICE PRODUCT": "FRESH SERVICE",
+    "GRAPHPAPER BASIC": "Graphpaper",
+    "GRAPHPAPER COLLECTION": "Graphpaper",
+    FCE: "F/ce",
+    TSS: "ts(s)",
+    "ADIEV PARIS": "Adieu Paris",
+    "ANDERSEN ANDERSEN": "Andersen-Andersen",
+    "TEN-C": "Ten C",
+  },
+}
+
+export function canonicalizePlatformBrand(brand: string, platform: string): string {
+  const trimmed = brand.trim()
+  return PLATFORM_BRAND_ALIASES[platform]?.[trimmed] ?? trimmed
+}
+
 /**
  * 크롤 결과에 저장할 브랜드를 한 곳에서 결정한다.
  *

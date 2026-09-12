@@ -9,19 +9,17 @@
 
 import * as fs from "fs"
 import * as path from "path"
+import {pathToFileURL} from "node:url"
+import {initFxRates} from "./lib/fx"
 import {createClient} from "@supabase/supabase-js"
+import {chromium, type Browser} from "playwright"
 // @MX:NOTE: Import-time USD→KRW conversion for caches whose source
 // currency is non-KRW (currently Uniqlo US). Cache stores native USD;
 // only the DB upsert payload sees post-conversion KRW.
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
-import {isConfirmedPricing, toDbPriceFields} from "./lib/product-pricing"
-import {initFxRates} from "./lib/fx"
-import {applyValidationGate} from "./lib/core/validation-gate"
-import {applyProductQcGate, getProductQcReport} from "./lib/product-qc/normalization"
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
 import {inferVerifiedSiteGenderFromName, SITE_GENDER_DEFAULTS} from "./configs/gender-defaults"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
-import {sanitizeProductImageFields} from "./lib/product-images"
 import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
 import {
   canUsePlatformBrandFallback,
@@ -29,234 +27,57 @@ import {
 } from "./lib/brand-node-resolution"
 import {
   isTrustedBrandSource,
-  partitionUnknownBrands,
-  recordUnknownBrand,
   resolveProductBrand,
   type UnknownBrandEntry,
 } from "./lib/brand-provenance"
-import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
-import {emit} from "./lib/core/observability"
-import {isValidCategory, isValidSubcategory, type Category} from "./lib/enums/product-enums"
-import {
-  buildQwenNormalizationPatch,
-  classifyProductWithQwen,
-  needsQwenNormalization,
-  qwenNormalizationInputHash,
-  type ProductNormalizationInput,
-} from "./lib/product-qwen-normalization"
-import {assertQwenReady, QwenDisabledError, QwenUnavailableError} from "./lib/qwen-client"
+import {resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
+import {classifyProductWithQwen} from "./lib/product-qwen-normalization"
+import {assertQwenReady} from "./lib/qwen-client"
+import {recoverCafe24CandidateDetailPricing} from "./lib/candidate-detail-pricing"
+import {runProductImport, type ProductImportFile} from "./lib/import-products-orchestrator"
+import {prepareProductForImport} from "./lib/prepare-product-for-import"
+import {addPipelineError, createPipelineReport, finalizePipelineReport, pipelineExitCode, writePipelineReport} from "./lib/pipeline-report"
+import {toDecimalId, type BrandResolution, type PreparedProductWriteResult} from "./lib/pipeline-integrity-types"
+import type {Product} from "./lib/types"
+import {validateProduct} from "./lib/core/product-validator"
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`
 Crawler product import
 
 Usage:
-  tsx src/import-products.ts [--site=KEY] [--dry-run] [--no-new-brands] [--in-stock-only] [--allow-unconfirmed-pricing]
+  tsx src/import-products.ts [--site=KEY] [--dry-run] [--no-new-brands] [--in-stock-only]
 
 Options:
   --site=KEY        Import only data/KEY-products.json
   --dry-run         Validate and report without writing to the database
   --no-new-brands   Skip products whose brand_node mapping is missing
   --in-stock-only   Import only products currently in stock
+  --report=PATH     Write the structured pipeline result to PATH
+  --trusted-category
+                    Preserve trusted canonical categories during preparation
   --allow-unconfirmed-pricing
-                    Treat numeric listing prices without sale evidence as regular prices
+                    Obsolete and rejected: pricing evidence is required
   --allow-qwen-deferred
-                    Emergency escape hatch: allow DB writes without healthy
-                    Qwen endpoints. Automated jobs must not use this flag.
+                    Obsolete and rejected: failed normalization can never be
+                    treated as a completed product import.
   --help, -h        Show this help and exit
 `)
   process.exit(0)
 }
 
-/**
- * 성별 출처 신뢰도 순위 (dedup merge 용).
- *
- * config_default 가 url/text 아래인 것이 핵심 — 카테고리가 교차하는 사이트
- * (yearsago 등)에서 여성 라인 상품은 "상의" 행에서 사이트 기본값(men)을,
- * "Women" 행에서 카테고리 유래 women 을 받는다. 동순위였다면 union 이 되어
- * ['men','women'] 로 남녀 양쪽에 노출된다.
- *
- * brand_scope 는 없다 — 2026-08 회귀에서 브랜드 스코프 폴백을 복원하지 않았다
- * (src/lib/product-gender.ts 헤더). 과거 행이 그 값을 들고 있으면 rank 0 이 되어
- * 다른 모든 출처에 진다.
- */
-const GENDER_SOURCE_RANK: Record<string, number> = {
-  engine: 5,
-  url: 4,
-  text: 3,
-  llm: 2,
-  config_default: 1,
-}
-
 const dbUrl = process.env.DB_URL
 const dbToken = process.env.DB_TOKEN
 
-if (!dbUrl || !dbToken) {
-  console.error("❌ DB_URL, DB_TOKEN 환경변수 필요")
-  console.error("   .env.local에서 로드하려면: npx dotenv -e .env.local -- npx tsx scripts/import-products.ts")
-  process.exit(1)
-}
-
-const db = createClient(dbUrl, dbToken)
+const db = createClient(dbUrl ?? "http://missing.invalid", dbToken ?? "missing")
 const RETAILER_PLATFORM_KEYS = new Set(
   PLATFORMS.filter((platform) => platform.multiBrand).map((platform) => platform.key),
 )
 
-interface CrawledReview {
-  text: string
-  author: string
-  date: string
-  photoUrls: string[]
-  body: {
-    height: string | null
-    weight: string | null
-    usualSize: string | null
-    purchasedSize: string | null
-    bodyType: string | null
-  } | null
-}
-
-interface CrawledProduct {
-  brand: string
-  name: string
-  category?: string
-  /** men/women/unisex. 비어 있으면 적재하지 않는다 (src/lib/product-gender.ts). */
-  gender?: string[]
-  genderSource?: string
-  price: number | null
-  originalPrice?: number | null
-  salePrice?: number | null
-  priceFormatted: string
-  imageUrl: string
-  sourceImageUrl?: string
-  productUrl: string
-  inStock: boolean
-  platform: string
-  crawledAt: string
-  // 상세 페이지 데이터
-  material?: string
-  subcategory?: string
-  images?: string[]
-  sizeInfo?: string
-  tags?: string[]
-  productCode?: string
-  /** Source currency (KRW default; "USD" for Uniqlo US cache) */
-  sourceCurrency?: "USD" | "EUR" | "GBP" | "KRW"
-  sourcePrice?: number
-  pricingObservation?: {
-    state: "sale" | "regular" | "unknown"
-    source: "variant" | "api" | "listing" | "detail"
-    version: 2
-  }
-  llmEnrichedAt?: string
-  llmModel?: string
-  llmInputHash?: string
-  // 리뷰 데이터
-  reviewCount?: number
-  reviews?: CrawledReview[]
-}
-
-interface QwenImportStats {
-  targeted: number
-  succeeded: number
-  unchanged: number
-  unavailable: number
-  failed: number
-  schemaFailed: number
-  raceSkipped: number
-}
-
-function emptyQwenImportStats(): QwenImportStats {
-  return {
-    targeted: 0,
-    succeeded: 0,
-    unchanged: 0,
-    unavailable: 0,
-    failed: 0,
-    schemaFailed: 0,
-    raceSkipped: 0,
-  }
-}
-
-function writeJsonCheckpoint(filePath: string, products: readonly CrawledProduct[]): void {
+function writeJsonCheckpoint(filePath: string, products: readonly Product[]): void {
   const tmp = `${filePath}.tmp`
   fs.writeFileSync(tmp, JSON.stringify(products, null, 2), "utf-8")
   fs.renameSync(tmp, filePath)
-}
-
-async function normalizePersistedRows(
-  rows: Array<{
-    product_url: string
-    name: string
-    brand: string
-    category: string
-    subcategory: string | null
-    tags: string[] | null
-    updated_at: string
-  }>,
-  fileProducts: CrawledProduct[],
-  stats: QwenImportStats,
-): Promise<boolean> {
-  let checkpointChanged = false
-  await Promise.all(rows.map(async (row) => {
-    const input: ProductNormalizationInput = {
-      productUrl: row.product_url,
-      name: row.name,
-      brand: row.brand,
-      category: row.category,
-      subcategory: row.subcategory,
-      tags: row.tags,
-    }
-    if (!needsQwenNormalization(input)) return
-    stats.targeted++
-
-    try {
-      const prediction = await classifyProductWithQwen(input)
-      const patch = buildQwenNormalizationPatch(input, prediction.value)
-      if (!patch) {
-        stats.unchanged++
-        return
-      }
-
-      const normalizedAt = new Date().toISOString()
-      const {data, error} = await db
-        .from("products")
-        .update({...patch, updated_at: normalizedAt})
-        .eq("product_url", row.product_url)
-        .eq("updated_at", row.updated_at)
-        .select("id")
-        .maybeSingle()
-      if (error) throw error
-      if (!data) {
-        stats.raceSkipped++
-        return
-      }
-
-      for (const product of fileProducts) {
-        if (product.productUrl !== row.product_url) continue
-        product.category = patch.category
-        product.subcategory = patch.subcategory ?? undefined
-        product.llmEnrichedAt = normalizedAt
-        product.llmModel = prediction.model
-        product.llmInputHash = qwenNormalizationInputHash({
-          ...input,
-          category: patch.category,
-          subcategory: patch.subcategory,
-        })
-        checkpointChanged = true
-      }
-      stats.succeeded++
-    } catch (error) {
-      if (error instanceof QwenDisabledError || error instanceof QwenUnavailableError) {
-        stats.unavailable++
-      } else if (/zod|schema|validation|object generated/i.test(error instanceof Error ? `${error.name}: ${error.message}` : String(error))) {
-        stats.schemaFailed++
-      } else {
-        stats.failed++
-      }
-    }
-  }))
-  return checkpointChanged
 }
 
 // ─── Brand resolution (SPEC-BRAND-NODE-001 PR-Y) ───────────────
@@ -281,20 +102,22 @@ interface BrandNodeRow {
 // 있으면 그걸로 resolve, 없으면 brand_nodes 를 brand_name 으로 매칭해 폴백한다.
 async function resolveBrandNodeId(platform: string, brandName: string | null): Promise<number | null> {
   if (canUsePlatformBrandFallback(platform, RETAILER_PLATFORM_KEYS)) {
-    const {data: statusRow} = await db
+    const {data: statusRow, error} = await db
       .from("product_crawl_status")
       .select("brand_node_id")
       .eq("platform_key", platform)
       .maybeSingle()
+    if (error) throw new Error("product status brand lookup failed")
     if (statusRow) return (statusRow as {brand_node_id: number}).brand_node_id
   }
 
   if (brandName) {
-    const {data: node} = await db
+    const {data: node, error} = await db
       .from("brand_nodes")
       .select("id")
       .ilike("brand_name", brandName)
       .maybeSingle()
+    if (error) throw new Error("product status brand lookup failed")
     if (node) return (node as {id: number}).id
   }
   return null
@@ -313,12 +136,16 @@ const MIN_QC_PASS_RATE = 0.5
 async function syncProductCrawlStatus(
   platform: string,
   brandName: string | null,
-  result: {inserted: number; errors: number; total: number; qcPassRate: number},
+  result: {inserted: number; errors: number; total: number; qcPassRate: number; outOfScope: number},
 ): Promise<void> {
   const brandNodeId = await resolveBrandNodeId(platform, brandName)
   if (!brandNodeId) return
 
-  const inserted = result.errors === 0 && result.inserted > 0
+  // A source can legitimately contain only products outside Kiko's scope.
+  // Treat that as a completed import rather than a low-yield retry condition.
+  if (result.total === 0 && result.errors === 0 && result.outOfScope === 0) return
+  const scopeOnly = result.errors === 0 && result.inserted === 0 && result.total === result.outOfScope && result.outOfScope > 0
+  const inserted = result.errors === 0 && (result.inserted > 0 || scopeOnly)
   const lowYield = result.qcPassRate < MIN_QC_PASS_RATE
   const success = inserted && !lowYield
   const status = success ? "imported" : "qc_failed"
@@ -334,7 +161,7 @@ async function syncProductCrawlStatus(
   // config 가 생성되지 않았다 → 그 브랜드는 refresh 워크리스트에 못 들어가 가격·재고가
   // 영구 미갱신 (실측 2026-07-30: 47개 브랜드 / 재고 5,505건).
   const config = getSiteConfig(platform)
-  await db.from("product_crawl_status").upsert(
+  const {error: statusError} = await db.from("product_crawl_status").upsert(
     {
       brand_node_id: brandNodeId,
       status,
@@ -345,19 +172,21 @@ async function syncProductCrawlStatus(
             config_status: config.disabled ? "blocked" : "ready",
           }
         : {}),
-      imported_at: success ? new Date().toISOString() : null,
+      ...(success ? {imported_at: new Date().toISOString()} : {}),
       qc_summary: {
         rows_total: result.total,
         rows_upserted: result.inserted,
+        rows_out_of_scope: result.outOfScope,
         errors: result.errors,
         qc_pass_rate: Math.round(result.qcPassRate * 1000) / 1000,
       },
-      last_error: inserted && lowYield ? `low QC pass rate: ${(result.qcPassRate * 100).toFixed(1)}%` : null,
+      last_error: inserted && lowYield ? `low QC pass rate: ${(result.qcPassRate * 100).toFixed(1)}%` : result.errors > 0 ? `import incomplete: errors=${result.errors}` : null,
     },
     {onConflict: "brand_node_id"},
   )
+  if (statusError) throw new Error("product crawl status update failed")
 
-  await db.from("product_crawl_runs").insert({
+  const {error: runError} = await db.from("product_crawl_runs").insert({
     brand_node_id: brandNodeId,
     stage: "import",
     status: success ? "success" : "failed",
@@ -366,6 +195,7 @@ async function syncProductCrawlStatus(
     command: `import-products --site=${platform}`,
     metrics: {rows_total: result.total, rows_upserted: result.inserted, errors: result.errors},
   })
+  if (runError) throw new Error("product crawl run insert failed")
 }
 
 function normalizeBrand(s: string): string {
@@ -402,20 +232,26 @@ async function loadBrandNodes(): Promise<{
   // 신규 분류는 primary_style_node_id FK → style_nodes 테이블 join 으로 얻음.
   const PAGE = 1000
   const rows: BrandNodeRow[] = []
-  let offset = 0
+  let afterId = 0
   for (;;) {
-    const {data, error} = await db
+    let query = db
       .from("brand_nodes")
       .select("id, brand_name, brand_name_normalized")
-      .range(offset, offset + PAGE - 1)
+      .order("id", {ascending: true})
+      .limit(PAGE)
+    if (afterId > 0) query = query.gt("id", afterId)
+    const {data, error} = await query
     if (error) {
-      console.warn("⚠️ brand_nodes 조회 실패:", error.message)
-      break
+      throw new Error("brand_nodes lookup failed")
     }
     if (!data?.length) break
-    rows.push(...(data as BrandNodeRow[]))
+    const page = data as BrandNodeRow[]
+    if (page.some((row) => !Number.isSafeInteger(row.id) || row.id <= afterId)) {
+      throw new Error("brand_nodes returned unsafe or unstable IDs")
+    }
+    rows.push(...page)
+    afterId = page[page.length - 1].id
     if (data.length < PAGE) break
-    offset += PAGE
   }
 
   for (const bn of rows) {
@@ -431,15 +267,17 @@ async function loadBrandNodes(): Promise<{
 async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
   const out = new Map<string, number>()
   const PAGE = 1000
-  let offset = 0
+  let afterId = 0
   for (;;) {
-    const {data, error} = await db
+    let query = db
       .from("product_crawl_status")
       .select("platform_key, brand_node_id")
-      .range(offset, offset + PAGE - 1)
+      .order("brand_node_id", {ascending: true})
+      .limit(PAGE)
+    if (afterId > 0) query = query.gt("brand_node_id", afterId)
+    const {data, error} = await query
     if (error) {
-      console.warn("⚠️ product_crawl_status 조회 실패:", error.message)
-      return out
+      throw new Error("product_crawl_status lookup failed")
     }
     if (!data?.length) break
     for (const row of data) {
@@ -448,11 +286,15 @@ async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
       if (
         platformKey &&
         typeof brandNodeId === "number" &&
+        Number.isSafeInteger(brandNodeId) &&
         canUsePlatformBrandFallback(platformKey, RETAILER_PLATFORM_KEYS)
       ) out.set(platformKey, brandNodeId)
+      if (typeof brandNodeId !== "number" || !Number.isSafeInteger(brandNodeId) || brandNodeId <= afterId) {
+        throw new Error("product_crawl_status returned unsafe or unstable IDs")
+      }
+      afterId = brandNodeId
     }
     if (data.length < PAGE) break
-    offset += PAGE
   }
   return out
 }
@@ -550,708 +392,200 @@ async function resolveUnknownBrands(
   return {inserted, aliasFlagged, failed}
 }
 
+export function prepareImportInputProducts(input: unknown[], platform: string, config: NonNullable<ReturnType<typeof getSiteConfig>>): Product[] {
+  const byUrl = new Map<string, Product>()
+  for (const candidate of input) {
+    if (!candidate || typeof candidate !== "object") throw new Error(`${platform} product entry must be an object`)
+    const raw = candidate as Record<string, unknown>
+    const rawUrl = typeof raw.productUrl === "string" ? raw.productUrl : ""
+    const productUrl = config.type === "cafe24" ? canonicalizeCafe24ProductUrl(rawUrl) : rawUrl
+    const evidence = {
+      name: typeof raw.name === "string" ? raw.name : undefined,
+      category: typeof raw.category === "string" ? raw.category : undefined,
+      subcategory: typeof raw.subcategory === "string" ? raw.subcategory : undefined,
+      tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
+      productUrl,
+    }
+    let resolved = resolveProductGenderWithSource(raw.gender, evidence, (raw.genderSource as GenderSource | undefined) ?? "engine", {
+      kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
+      verifiedUnisexDefault: config.verifiedUnisexDefault || SITE_GENDER_DEFAULTS[platform]?.includes("unisex"),
+      genderTextPatterns: config.genderTextPatterns,
+    })
+    const verifiedNameGender = typeof raw.name === "string" ? inferVerifiedSiteGenderFromName(platform, raw.name) : null
+    if (!resolved.conflict && verifiedNameGender && (resolved.gender.length === 0 || resolved.source === "config_default")) {
+      resolved = resolveProductGenderWithSource([verifiedNameGender], evidence, "text", {
+        kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
+        verifiedUnisexDefault: config.verifiedUnisexDefault,
+        genderTextPatterns: config.genderTextPatterns,
+      })
+    }
+    const siteDefault = config.defaultGender ?? SITE_GENDER_DEFAULTS[platform] ?? []
+    if (!resolved.conflict && resolved.gender.length === 0 && siteDefault.length > 0) {
+      resolved = resolveProductGenderWithSource(siteDefault, evidence, "config_default", {
+        kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
+        verifiedUnisexDefault: config.verifiedUnisexDefault,
+        genderTextPatterns: config.genderTextPatterns,
+      })
+    }
+    const normalized = {...raw, productUrl, ...(resolved.gender.length > 0 ? {gender: resolved.gender, genderSource: resolved.source} : {})}
+    const validation = validateProduct(normalized)
+    if (!validation.ok) throw new Error(`${platform} product validation failed at ${validation.failedField}: ${validation.message}`)
+    const prior = byUrl.get(productUrl)
+    const nextObserved = Date.parse(validation.value.detailFetchedAt ?? validation.value.crawledAt)
+    const priorObserved = prior ? Date.parse(prior.detailFetchedAt ?? prior.crawledAt) : Number.NEGATIVE_INFINITY
+    if (!prior || nextObserved >= priorObserved) byUrl.set(productUrl, validation.value)
+  }
+  return [...byUrl.values()]
+}
+
 async function main() {
-  // 환율은 적재 시점 기준이다. toDbPriceFields → convertToKrw 가 첫 상품을
-  // 만나기 전에 한 번 받아둔다 (실패해도 커밋된 스냅샷으로 계속 진행).
-  await initFxRates()
+  const dryRun = process.argv.includes("--dry-run")
+  const reportPath = process.argv.find((arg) => arg.startsWith("--report="))?.slice("--report=".length)
+  if (process.argv.includes("--allow-qwen-deferred")) {
+    throw new Error("--allow-qwen-deferred is obsolete; restore Qwen and retry the failed normalization")
+  }
+  if (process.argv.includes("--allow-unconfirmed-pricing")) {
+    throw new Error("--allow-unconfirmed-pricing is obsolete; confirmed pricing evidence is required")
+  }
+  if (!dbUrl || !dbToken) throw new Error("DB_URL and DB_TOKEN are required")
 
   const dataDir = path.join(process.cwd(), "data")
-
-  if (!fs.existsSync(dataDir)) {
-    console.error(`❌ data/ 디렉토리 없음. 먼저 크롤러 실행: npx tsx scripts/crawl.ts --help`)
-    process.exit(1)
+  const siteArg = process.argv.find((arg) => arg.startsWith("--site="))?.slice("--site=".length)
+  const targetSites = siteArg ? new Set(siteArg.split(",").filter(Boolean)) : null
+  const filenames = fs.readdirSync(dataDir).filter((file) => file.endsWith("-products.json"))
+    .filter((file) => !targetSites || targetSites.has(file.replace("-products.json", "")))
+    .sort()
+  if (filenames.length === 0) throw new Error("no product files selected")
+  if (targetSites) {
+    const selected = new Set(filenames.map((file) => file.replace("-products.json", "")))
+    const missing = [...targetSites].filter((site) => !selected.has(site))
+    if (missing.length > 0) throw new Error(`selected product files missing: ${missing.join(",")}`)
   }
 
-  // --site 플래그 파싱
-  const siteArg = process.argv.find((a) => a.startsWith("--site="))
-  const targetSites = siteArg ? siteArg.split("=")[1].split(",") : null
+  const sourceByFile = new Map<string, Product[]>()
+  const files: ProductImportFile[] = filenames.map((file) => {
+    const platform = file.replace("-products.json", "")
+    const registeredConfig = getSiteConfig(platform)
+    if (!registeredConfig) throw new Error(`platform config missing: ${platform}`)
+    const config = process.argv.includes("--trusted-category")
+      ? {...registeredConfig, trustedCategory: true}
+      : registeredConfig
+    const parsed: unknown = JSON.parse(fs.readFileSync(path.join(dataDir, file), "utf8"))
+    if (!Array.isArray(parsed)) throw new Error(`${file} JSON must contain a product array`)
+    const products = prepareImportInputProducts(parsed, platform, config)
+    const sample = products[0]
+    if (sample && ["USD", "EUR", "GBP"].includes(sample.sourceCurrency ?? "") && typeof sample.price === "number" && sample.price > 5000) {
+      throw new Error(`${file} appears to contain legacy KRW-converted prices; re-crawl before importing`)
+    }
+    sourceByFile.set(file, products)
+    return {platform, file, products: process.argv.includes("--in-stock-only") ? products.filter((product) => product.inStock) : products, config}
+  })
 
-  // --no-new-brands: 미등록 brand를 brand_nodes에 INSERT하지 않고 해당 상품도 적재 제외
-  const noNewBrands = process.argv.includes("--no-new-brands")
-
-  // --in-stock-only: 품절(in_stock=false) 상품을 적재에서 제외.
-  // 크롤러가 이미 품절을 거르지만, import 단계에서도 명시적으로 보장한다.
-  const inStockOnly = process.argv.includes("--in-stock-only")
-  const allowUnconfirmedPricing = process.argv.includes("--allow-unconfirmed-pricing")
-  const trustedCategory = process.argv.includes("--trusted-category")
-
-  // --dry-run: DB upsert 없이 플랫폼별 적재 예정 건수만 출력.
-  const dryRun = process.argv.includes("--dry-run")
-  const allowQwenDeferred = process.argv.includes("--allow-qwen-deferred")
-
-  // data/ 내 *-products.json 파일 찾기
-  const files = fs.readdirSync(dataDir)
-    .filter((f) => f.endsWith("-products.json"))
-    .filter((f) => {
-      if (!targetSites) return true
-      const platform = f.replace("-products.json", "")
-      return targetSites.includes(platform)
-    })
-
-  if (files.length === 0) {
-    console.error("❌ 적재할 파일 없음")
-    process.exit(1)
-  }
-
-  // HARD operational gate: category/subcategory normalization is part of a
-  // production import. Verify every SSH-forwarded endpoint before the first DB
-  // mutation so an absent tunnel cannot silently become deferred=N.
-  if (!dryRun && !allowQwenDeferred) {
-    console.log("🤖 Qwen 사전 점검: 모든 엔드포인트와 모델 확인 중...")
-    const ready = await assertQwenReady()
-    console.log(
-      `   ✅ Qwen 준비 완료: ${ready.map(({endpoint, model}) => `${endpoint} (${model})`).join(", ")}\n`,
-    )
-  } else if (!dryRun) {
-    console.warn("⚠️  --allow-qwen-deferred 사용: Qwen 정규화 누락을 명시적으로 허용합니다.")
-  }
-
-  console.log(`📦 ${files.length}개 파일 적재 시작\n`)
-
-  // ── brand_nodes 로드 (id_map — legacy style_node text 컬럼 062에서 drop) ─
+  // All selected files have crossed the local schema boundary before the first
+  // database read or mutation. This keeps malformed input failures reportable.
   const {rows: brandRows, idMap: brandIdMap} = await loadBrandNodes()
-  const platformBrandIdMap = await loadPlatformBrandNodeMap()
+  const platformBrandMap = await loadPlatformBrandNodeMap()
 
-  // ── Pre-scan: 모든 파일에서 unique brand 문자열 수집 ──────
-  // 미존재 brand 는 한 번에 resolve (fuzzy + insert + alias_candidate enqueue).
-  // 파일 JSON 은 캐시해서 main loop 에서 재사용 (디스크 IO 1회).
-  const fileCache = new Map<string, CrawledProduct[]>()
-  // brand → {대표 platform, 신뢰 출처 여부}. 신뢰 판정 근거는
-  // `lib/brand-provenance.ts` 헤더 참조 (편집샵 브랜드 오염 방지).
-  const unknownBrands = new Map<string, UnknownBrandEntry>()
-
-  for (const file of files) {
-    const platform = file.replace("-products.json", "")
-    const config = getSiteConfig(platform)
-    const filePath = path.join(dataDir, file)
-    let raw: CrawledProduct[]
-    try {
-      raw = JSON.parse(fs.readFileSync(filePath, "utf-8"))
-    } catch {
-      continue // main loop 에서 에러 처리
-    }
-    fileCache.set(file, raw)
-
-    for (const p of raw) {
-      const brand = resolveProductBrand(p.brand, config)
-      if (!brand) continue
-      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-      if (brandNodeId === null) {
-        recordUnknownBrand(
-          unknownBrands,
-          brand,
-          platform,
-          isTrustedBrandSource({
-            selfBranded: false,
-            configBrand: config?.brand,
-            multiBrand: config?.multiBrand,
-          }),
-        )
-      }
-    }
+  if (!dryRun) {
+    await initFxRates()
+    await assertQwenReady()
   }
-
-  if (unknownBrands.size > 0) {
-    if (noNewBrands) {
-      console.log(`⚠️  미등록 brand ${unknownBrands.size}개 발견 — --no-new-brands 모드: INSERT 건너뜀, 해당 상품 적재 제외`)
-      console.log(`   제외 브랜드: ${[...unknownBrands.keys()].slice(0, 10).join(", ")}${unknownBrands.size > 10 ? ` 외 ${unknownBrands.size - 10}개` : ""}\n`)
-    } else {
-      // provenance 가드: 신뢰 출처(단일브랜드 자사몰)의 미등록 brand 만 자동 생성한다.
-      // 편집샵/비신뢰 출처는 INSERT 하지 않고 상품을 격리한다 — brandNodeId 가 계속
-      // null 이라 main loop 가 알아서 제외한다.
-      const {insertable, blocked} = partitionUnknownBrands(unknownBrands)
-      if (blocked.length > 0) {
-        console.log(
-          `⛔ 미등록 brand ${blocked.length}개 — 멀티브랜드/비신뢰 출처: 자동 INSERT 제외(상품 격리)`,
-        )
-        console.log(
-          `   격리 브랜드: ${blocked.slice(0, 10).join(", ")}${blocked.length > 10 ? ` 외 ${blocked.length - 10}개` : ""}`,
-        )
-      }
-      if (insertable.length > 0) {
-        console.log(`🆕 미등록 brand ${insertable.length}개(신뢰 출처) — 자동 INSERT + alias 검사`)
-        const resolveResult = await resolveUnknownBrands(insertable, brandRows, brandIdMap)
-        console.log(
-          `   ✅ inserted=${resolveResult.inserted}, alias_candidate=${resolveResult.aliasFlagged}, failed=${resolveResult.failed}\n`,
-        )
-      }
-    }
-  }
-
-  let totalInserted = 0
-  let totalErrors = 0
-  let totalReviews = 0
-  /** P0 계측: 플랫폼별 성별 해결 수율. 하단 요약에서 저수율 사이트를 뽑는다. */
-  const genderYield: Array<{platform: string; resolved: number; total: number}> = []
-
-  for (const file of files) {
-    const platform = file.replace("-products.json", "")
-    const config = getSiteConfig(platform)
-    const filePath = path.join(dataDir, file)
-
-    const cached = fileCache.get(file)
-    if (!cached) {
-      // Pre-scan 단계에서 파싱 실패한 파일.
-      console.error(`   ❌ ${file} JSON 파싱 실패 (pre-scan)`)
-      totalErrors++
-      continue
-    }
-    const rawAll: CrawledProduct[] = cached
-
-    // ── 성별 결의 (2026-08 크롤러 회귀) ────────────────────────────
-    //
-    // 여기 한 번만 수행하고 아래 row mapper 는 결과를 읽기만 한다.
-    // 브랜드 스코프 폴백은 복원하지 않았다 — 근거는 engine/url/text/
-    // config_default 4단뿐이다 (src/lib/product-gender.ts 헤더 참조).
-    const genderSourceCounts: Record<string, number> = {}
-    // Direct/re-detected crawlers can produce a valid platform key before it is
-    // promoted into PLATFORMS. Keep the separately human-verified fallback map
-    // effective for those artifacts as well.
-    const siteDefaultGender = config?.defaultGender ?? SITE_GENDER_DEFAULTS[platform] ?? []
-    const verifiedUnisexDefault = config?.verifiedUnisexDefault
-      || SITE_GENDER_DEFAULTS[platform]?.includes("unisex")
-    const rawWithGender: CrawledProduct[] = rawAll.map((p) => {
-      const evidence = {
-        name: p.name,
-        category: p.category,
-        subcategory: p.subcategory,
-        tags: p.tags,
-        productUrl: p.productUrl,
-      }
-      let resolved = resolveProductGenderWithSource(
-        p.gender,
-        evidence,
-        (p.genderSource as GenderSource | undefined) ?? "engine",
-        {
-          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-          verifiedUnisexDefault,
-          genderTextPatterns: config?.genderTextPatterns,
-        },
-      )
-      // Some mixed storefronts encode the official department only in their
-      // product naming convention. Treat this as product-level text evidence,
-      // above the site default but below URL/engine evidence.
-      const verifiedNameGender = inferVerifiedSiteGenderFromName(platform, p.name)
-      if (
-        !resolved.conflict
-        && verifiedNameGender
-        && (resolved.gender.length === 0 || resolved.source === "config_default")
-      ) {
-        resolved = resolveProductGenderWithSource([verifiedNameGender], evidence, "text", {
-          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-          verifiedUnisexDefault,
-          genderTextPatterns: config?.genderTextPatterns,
-        })
-      }
-      // 엔진이 사이트 기본값을 찍지 않은 캐시(구 크롤 JSON, 또는 기본값을
-      // 소비하지 않는 엔진)를 위해 import 시점에도 같은 폴백을 적용한다.
-      // config_default 는 어차피 최하위 rank 라 url/text 를 이기지 못하므로
-      // 엔진이 찍었든 여기서 찍었든 결과 순위는 동일하다.
-      if (resolved.gender.length === 0 && !resolved.conflict && siteDefaultGender.length > 0) {
-        resolved = resolveProductGenderWithSource(siteDefaultGender, evidence, "config_default", {
-          kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-          verifiedUnisexDefault,
-          genderTextPatterns: config?.genderTextPatterns,
-        })
-      }
-      genderSourceCounts[resolved.source ?? "unresolved"] = (genderSourceCounts[resolved.source ?? "unresolved"] ?? 0) + 1
-      if (resolved.conflict) {
-        emit({
-          kind: "gender_source_conflict",
-          site: platform,
-          sku: p.productUrl,
-          urlGender: resolved.conflict.url,
-          textGender: resolved.conflict.text,
-        })
-      }
-      return resolved.gender.length > 0
-        ? {...p, gender: resolved.gender, genderSource: resolved.source ?? undefined}
-        : p
-    })
-
-    // SPEC-ARCH-CRAWLER-001 REQ-CRAWLER-001/002: validate every parsed
-    // product before the DB upsert. Valid products pass through
-    // byte-identical into the existing .map(); invalid ones are excluded
-    // + a structured reject event is emitted (does not crash the import
-    // on a single bad record). Flag OFF (CRAWLER_VALIDATION_ENABLED=
-    // false) → exact legacy behavior (no gate, all products imported).
-    const qcRaw = applyProductQcGate(rawWithGender, platform, {
-      trustedCategory: trustedCategory || config?.type === "shopify" || config?.trustedCategory === true,
-      kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
-      verifiedUnisexDefault: config?.verifiedUnisexDefault,
-    })
-    const raw: CrawledProduct[] = applyValidationGate(qcRaw, platform)
-    console.log(`📄 ${file} — ${raw.length}개 상품`)
-
-    {
-      const resolvedCount = rawAll.length - (genderSourceCounts["unresolved"] ?? 0)
-      const pct = rawAll.length > 0 ? ((resolvedCount / rawAll.length) * 100).toFixed(1) : "0.0"
-      const hist = Object.entries(genderSourceCounts)
-        .sort((a, b) => b[1] - a[1])
-        .map(([s, n]) => `${s}=${n}`)
-        .join(" ")
-      console.log(`   🚻 gender 해결: ${resolvedCount}/${rawAll.length} (${pct}%) — ${hist}`)
-      genderYield.push({platform, resolved: resolvedCount, total: rawAll.length})
-    }
-
-    // SPEC-005 P1 review 2026-05-06: detect stale Shopify caches that
-    // were generated BEFORE the engine native-currency unification.
-    // Old caches stored `price` already converted to KRW (e.g. £100 →
-    // 175000). If the first sample has sourceCurrency in {USD, EUR, GBP}
-    // AND a `price` value implausibly large for that currency (> 5000),
-    // it almost certainly is the old format. Refuse to import to avoid
-    // double conversion silently inflating Supabase prices.
-    if (raw.length > 0) {
-      const sample = raw[0] as unknown as Record<string, unknown>
-      const sc = typeof sample.sourceCurrency === "string" ? sample.sourceCurrency : undefined
-      const sp = typeof sample.price === "number" ? sample.price : null
-      if (sc && (sc === "USD" || sc === "EUR" || sc === "GBP") && sp !== null && sp > 5000) {
-        console.error(
-          `   ❌ ${file} appears to be in legacy KRW-converted format (sourceCurrency=${sc}, price=${sp}). ` +
-            `Re-crawl this platform with the current Shopify engine before importing. Skipping.`,
-        )
-        totalErrors++
-        continue
-      }
-    }
-
-    const unconfirmedPricing = raw.filter((product) => !isConfirmedPricing(product))
-    if (unconfirmedPricing.length > 0) {
-      if (!allowUnconfirmedPricing) {
-        console.error(
-          `   ❌ 가격 관측 v2 미확정 ${unconfirmedPricing.length}/${raw.length}건 — ` +
-            `기존 세일가를 지울 수 있어 플랫폼 파일 전체를 적재하지 않습니다. 최신 엔진으로 상세 재크롤하세요.`,
-        )
-        totalErrors++
-        continue
-      }
-      const numericPriceCount = unconfirmedPricing.filter((product) =>
-        typeof product.price === "number" && product.price > 0 && product.salePrice == null,
-      ).length
-      console.warn(
-        `   ⚠️ 가격 관측 미확정 ${unconfirmedPricing.length}건 중 ${numericPriceCount}건을 ` +
-          `목록 일반가로 보완 (--allow-unconfirmed-pricing)`,
-      )
-      for (const product of unconfirmedPricing) {
-        if (typeof product.price === "number" && product.price > 0 && product.salePrice == null) {
-          product.pricingObservation = {state: "regular", source: "listing", version: 2}
-        }
-      }
-    }
-
-    let priceSkipped = 0
-    let genderSkipped = 0
-    let imageSkipped = 0
-    const priceSkipSamples: string[] = []
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows = raw.map((p: any) => {
-      const brand = resolveProductBrand(p.brand, config)
-      const rawProductUrl = (p.productUrl as string) || ""
-      const productUrl = config?.type === "cafe24"
-        ? canonicalizeCafe24ProductUrl(rawProductUrl)
-        : rawProductUrl
-      const brandNodeId = resolveProductBrandNodeId(brand, platform, brandIdMap, platformBrandIdMap)
-
-      // brand NOT NULL — DB 제약상 빈 문자열은 통과하지만, 엔진의 spec-라벨
-      // 누출 가드(cafe24-engine.ts)가 오염된 값을 걸러내고 brand=""로 넘기는
-      // 경우 여기서 적재 자체를 스킵한다. "브랜드 없음"으로
-      // 잘못 적재되는 것보다 재크롤 때까지 보류하는 편이 안전하다.
-      if (!brand) return null
-      // 성별이 **정확히 하나**가 아니면 적재하지 않는다. 미확인을 unisex 로
-      // 채우면 검색 RPC (p.gender && ARRAY[p_gender,'unisex'])가 남녀 양쪽에
-      // 노출시켜 여성 상품이 남성 검색으로 샌다 — src/lib/product-gender.ts 참조.
-      // 다중값도 같은 결과를 내므로 함께 막는다: migration 105 의
-      // chk_products_gender_required 가 cardinality(gender)=1 을 요구하고,
-      // 이 가드가 없으면 그 CHECK 이 INSERT 를 전량 거부한다 (099 color 사고 패턴).
-      const gender = cleanGenderScope(p.gender)
-      if (gender.length !== 1) {
-        genderSkipped++
-        return null
-      }
-      // --no-new-brands: 미등록 brand 상품 적재 제외
-      if (noNewBrands && brandNodeId === null) return null
-      // --in-stock-only: 품절 상품 적재 제외
-      if (inStockOnly && p.inStock === false) return null
-      // product_no 추출
-      const pnoMatch = productUrl.match(/product_no=(\d+)/) ?? productUrl.match(/\/product\/[^/]+\/(\d+)(?:\/|$)/)
-      const productNo = pnoMatch ? parseInt(pnoMatch[1], 10) : null
-
-      const sourceCurrency = (p.sourceCurrency as string | undefined) ?? "KRW"
-      const prices = toDbPriceFields(p, sourceCurrency, {requireConfirmed: true})
-      if (prices === null) {
-        priceSkipped += 1
-        if (priceSkipSamples.length < 3) {
-          priceSkipSamples.push((p.name as string) || productUrl || "(unnamed)")
-        }
-        return null
-      }
-
-      const category: Category = isValidCategory(p.category) ? p.category : "other"
-      const rawSubcategory = typeof p.subcategory === "string" ? p.subcategory.trim() : ""
-      const subcategory = rawSubcategory && isValidSubcategory(rawSubcategory, category)
-        ? rawSubcategory
-        : null
-
-      const sanitizedImages = sanitizeProductImageFields({
-        productUrl,
-        imageUrl: p.imageUrl as string | undefined,
-        sourceImageUrl: p.sourceImageUrl as string | undefined,
-        images: p.images as string[] | undefined,
+  let browser: Browser | null = null
+  const result = await runProductImport(files, {
+    mode: dryRun ? "dry_run" : "apply",
+    noNewBrands: process.argv.includes("--no-new-brands"),
+  }, {
+    resolveBrand: (product, config): BrandResolution => {
+      const brand = resolveProductBrand(product.brand, config).trim()
+      if (!brand) return {status: "quarantined", brand: "", reason: "brand_missing"}
+      const id = resolveProductBrandNodeId(brand, config.key, brandIdMap, platformBrandMap)
+      if (id !== null) return {status: "existing", brand, brandNodeId: toDecimalId(id)}
+      return isTrustedBrandSource({selfBranded: false, configBrand: config.brand, multiBrand: config.multiBrand})
+        ? {status: "would_create", brand}
+        : {status: "quarantined", brand, reason: "untrusted_unknown_brand"}
+    },
+    getExistingProduct: async (productUrl) => {
+      const {data, error} = await db.from("products").select("id,product_url,updated_at,crawled_at,last_seen_at").eq("product_url", productUrl).maybeSingle()
+      if (error) throw new Error("existing product lookup failed")
+      if (!data) return null
+      const row = data as {id: string | number; product_url: string; updated_at: string; crawled_at: string | null; last_seen_at: string | null}
+      const observations = [row.crawled_at, row.last_seen_at].filter((value): value is string => typeof value === "string")
+      const observedAt = observations.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null
+      return {id: toDecimalId(row.id), productUrl: row.product_url, updatedAt: row.updated_at, observedAt}
+    },
+    createBrand: async (resolution, config) => {
+      const created = await resolveUnknownBrands([{raw: resolution.brand, platform: config.key}], brandRows, brandIdMap)
+      if (created.failed > 0) throw new Error("brand creation failed")
+      const id = resolveProductBrandNodeId(resolution.brand, config.key, brandIdMap, platformBrandMap)
+      if (id === null) throw new Error("created brand mapping missing")
+      return {status: "existing", brand: resolution.brand, brandNodeId: toDecimalId(id)}
+    },
+    prepare: prepareProductForImport,
+    prepareDependencies: {
+      normalize: async (input) => {
+        const response = await classifyProductWithQwen(input)
+        return {...response.value, model: response.model}
+      },
+      recoverDetailPricing: async (product) => {
+        browser ??= await chromium.launch({headless: true})
+        const page = await browser.newPage()
+        try {
+          await page.goto(product.productUrl, {waitUntil: "domcontentloaded", timeout: 15000})
+          return await recoverCafe24CandidateDetailPricing(product, page)
+        } finally { await page.close() }
+      },
+    },
+    writePrepared: async (rows) => {
+      const {data, error} = await db.rpc("upsert_prepared_products", {p_rows: rows})
+      if (error) throw new Error("prepared product RPC failed")
+      return data as PreparedProductWriteResult[]
+    },
+    replaceReviews: async (input) => {
+      const {data, error} = await db.rpc("replace_product_reviews", {
+        p_product_id: input.productId, p_observed_at: input.observedAt, p_reviews: input.reviews,
       })
-      if (!sanitizedImages) {
-        imageSkipped += 1
-        return null
-      }
-
-      return {
-        brand,
-        name: p.name as string,
-        category,
-        ...prices,
-        product_no: productNo,
-        image_url: sanitizedImages.imageUrl,
-        source_image_url: sanitizedImages.sourceImageUrl,
-        product_url: productUrl,
-        in_stock: p.inStock as boolean,
-        platform: (p.platform as string) || platform,
-        brand_node_id: brandNodeId,
-        gender,
-        gender_source: (p.genderSource as string | undefined) ?? null,
-        // products.style_node 컬럼은 migration 081 (2026-06)에서 DROP — payload에서 제외.
-        crawled_at: p.crawledAt as string,
-        // material drop (migration 079, 2026-05-20) — 0% fill; extraction logic kept for future revival
-        subcategory,
-        // Kept out of the products upsert below and merged atomically through
-        // merge_product_images. A listing-only crawl must never erase richer
-        // detail images collected by an earlier run.
-        images: sanitizedImages.images,
-        size_info: p.sizeInfo?.slice(0, 2000) || null,
-        tags: p.tags?.slice(0, 50) || null,
-        product_code: p.productCode?.slice(0, 100) || null,
-        last_seen_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-    }).filter((r): r is NonNullable<typeof r> => r !== null)
-    if (priceSkipped > 0) {
-      console.log(
-        `   ⚠️  ${priceSkipped} product(s) skipped due to missing/invalid price: ${priceSkipSamples.join(", ")}`,
-      )
-    }
-    if (genderSkipped > 0) {
-      console.log(`   ⚠️  ${genderSkipped} product(s) skipped — gender unresolved`)
-    }
-    if (imageSkipped > 0) {
-      console.log(`   ⚠️  ${imageSkipped} product(s) skipped — no usable product image`)
-    }
-
-    // Dedup by product_url — Postgres rejects ON CONFLICT batches that
-    // contain the same conflict key twice ("cannot affect row a second
-    // time"). ZARA in particular surfaces the same product across
-    // multiple category landings (e.g. new-in + outerwear + dresses),
-    // so the raw cache can carry a product_url 10+ times.
-    //
-    // Merge strategy (SPEC-005 P1 review 2026-05-06): instead of last-
-    // wins, prefer non-null values when merging — sale_price, original_
-    // price, material, etc. from any duplicate row carry over.
-    type Row = (typeof rows)[number]
-    const merge = (a: Row, b: Row): Row => {
-      const pickRicher = <K extends keyof Row>(key: K): Row[K] => {
-        const av = a[key]
-        const bv = b[key]
-        // Prefer non-null/non-empty
-        if (bv === null || bv === undefined || bv === "") return av
-        if (av === null || av === undefined || av === "") return bv
-        return bv  // both non-null: take the later occurrence
-      }
-      // 성별은 pickRicher(나중 것 우선)로 병합하면 안 된다. 같은 상품이 여러
-      // 카테고리 랜딩에 걸릴 때 한쪽은 카테고리 유래 women, 다른 쪽은 사이트
-      // 기본값 men 을 들고 오는데, 그대로 두면 union 이 되어 ['men','women'] 이
-      // 되고 검색 RPC 에서 남녀 양쪽에 노출된다 — 브랜드 폴백과 똑같은 세탁이다.
-      // 대신 출처 신뢰도가 높은 쪽을 채택하고, 동순위인데 값이 다르면 판정 불가로
-      // 보고 이벤트만 남긴다. resolveProductGenderWithSource 와 같은 순서.
-      const genderWinner = (() => {
-        const ga = Array.isArray(a.gender) ? a.gender : []
-        const gb = Array.isArray(b.gender) ? b.gender : []
-        if (ga.length === 0) return {gender: gb, gender_source: b.gender_source}
-        if (gb.length === 0) return {gender: ga, gender_source: a.gender_source}
-
-        const ra = GENDER_SOURCE_RANK[a.gender_source ?? ""] ?? 0
-        const rb = GENDER_SOURCE_RANK[b.gender_source ?? ""] ?? 0
-        if (ra !== rb) {
-          return ra > rb
-            ? {gender: ga, gender_source: a.gender_source}
-            : {gender: gb, gender_source: b.gender_source}
-        }
-        if (ga.join() === gb.join()) return {gender: ga, gender_source: a.gender_source}
-
-        emit({
-          kind: "gender_merge_conflict",
-          site: platform,
-          sku: b.product_url,
-          genders: [ga.join("+"), gb.join("+")],
-        })
-        return {gender: ga, gender_source: a.gender_source}
-      })()
-
-      return {
-        ...b,
-        // 가격은 하나의 coherent tuple이다. 필드를 개별 병합하면 regular 행의
-        // price와 sale 행의 sale_price가 섞여 운영 DB의 모순 조합이 된다.
-        ...(a.sale_price !== null && b.sale_price === null
-          ? {
-              price: a.price,
-              original_price: a.original_price,
-              sale_price: a.sale_price,
-              source_price: a.source_price,
-              source_currency: a.source_currency,
-            }
-          : {
-              price: b.price,
-              original_price: b.original_price,
-              sale_price: b.sale_price,
-              source_price: b.source_price,
-              source_currency: b.source_currency,
-            }),
-        category: pickRicher("category"),
-        subcategory: pickRicher("subcategory"),
-        gender: genderWinner.gender,
-        gender_source: genderWinner.gender_source,
-      }
-    }
-    const dedupedByUrl = new Map<string, Row>()
-    for (const r of rows) {
-      const existing = dedupedByUrl.get(r.product_url)
-      dedupedByUrl.set(r.product_url, existing ? merge(existing, r) : r)
-    }
-    const beforeDedup = rows.length
-    const deduped = [...dedupedByUrl.values()]
-    if (beforeDedup !== deduped.length) {
-      console.log(`   🧹 dedup: ${beforeDedup} → ${deduped.length} (${beforeDedup - deduped.length} duplicate product_url merged)`)
-    }
-
-    if (dryRun) {
-      console.log(`   🔍 dry-run: ${deduped.length}건 적재 예정 (DB 쓰기 없음)\n`)
-      totalInserted += deduped.length
-      continue
-    }
-
-    // 50개씩 배치 upsert
-    const BATCH = 50
-    let inserted = 0
-    let errors = 0
-    const qwenStats = emptyQwenImportStats()
-
-    for (let i = 0; i < deduped.length; i += BATCH) {
-      const batch = deduped.slice(i, i + BATCH)
-      const productRows = batch.map(({images: _images, ...row}) => row)
-      const imageUpdates = batch
-        .filter((row) => row.images.length > 0)
-        .map((row) => ({product_url: row.product_url, images: row.images}))
-      const {error} = await db.from("products").upsert(productRows, {
-        onConflict: "product_url",
-        ignoreDuplicates: false,
+      if (error) throw new Error("review replacement RPC failed")
+      return data as {outcome: "applied" | "unchanged" | "stale" | "missing"; product_id: string; review_count: number}
+    },
+    writeCheckpoint: ({file, productUrl, normalization}) => {
+      if (!file) return
+      const products = sourceByFile.get(file)
+      const target = products?.find((product) => product.productUrl === productUrl)
+      if (!products || !target) throw new Error("checkpoint product missing")
+      target.normalization = normalization
+      writeJsonCheckpoint(path.join(dataDir, file), products)
+    },
+    syncStatus: async ({platform, status, counts}) => {
+      const file = files.find((entry) => entry.platform === platform)
+      const dominantBrand = file?.products.find((product) => product.brand.trim())?.brand ?? null
+      await syncProductCrawlStatus(platform, dominantBrand, {
+        inserted: (counts.inserted ?? 0) + (counts.updated ?? 0) + (counts.unchanged ?? 0),
+        errors: status === "success" ? 0 : counts.failed ?? 1,
+        total: counts.input ?? 0,
+        qcPassRate: (counts.input ?? 0) > 0 ? ((counts.input ?? 0) - (counts.qc_failed ?? 0)) / (counts.input ?? 1) : 1,
+        outOfScope: counts.policy_excluded ?? 0,
       })
-
-      if (error) {
-        console.error(`   ❌ 배치 ${i}-${i + batch.length} 실패:`, error.message)
-        errors++
-      } else {
-        const qwenFailuresBefore =
-          qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
-        const checkpointChanged = await normalizePersistedRows(batch, rawAll, qwenStats)
-        if (checkpointChanged) writeJsonCheckpoint(filePath, rawAll)
-        const qwenFailuresAfter =
-          qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
-        if (!allowQwenDeferred && qwenFailuresAfter > qwenFailuresBefore) {
-          throw new Error(
-            `Qwen normalization failed during ${platform}; import stopped before false completion ` +
-              `(unavailable=${qwenStats.unavailable}, failed=${qwenStats.failed}, ` +
-              `schema_failed=${qwenStats.schemaFailed})`,
-          )
-        }
-        const {error: imageError} = imageUpdates.length > 0
-          ? await db.rpc("merge_product_images", {updates: imageUpdates})
-          : {error: null}
-        if (imageError) {
-          console.error(`   ❌ 이미지 병합 ${i}-${i + batch.length} 실패:`, imageError.message)
-          errors++
-        } else {
-          inserted += batch.length
-          process.stdout.write(`\r   💾 ${inserted}/${deduped.length}`)
-        }
-      }
-    }
-
-    console.log(`\r   ✅ ${inserted}/${deduped.length} 적재 (에러 ${errors}건)`)
-    // `unchanged`는 Qwen 호출이 성공했지만 수정할 필드가 없었던 정상 결과다.
-    // 이를 deferred로 합치면 미처리처럼 보이므로 실제 미해결 오류만 별도 집계한다.
-    const unresolved = qwenStats.unavailable + qwenStats.failed + qwenStats.schemaFailed
-    console.log(
-      `   🤖 Qwen target=${qwenStats.targeted} success=${qwenStats.succeeded}` +
-        ` unchanged=${qwenStats.unchanged} unavailable=${qwenStats.unavailable}` +
-        ` failed=${qwenStats.failed} unresolved=${unresolved}` +
-        ` schema_failed=${qwenStats.schemaFailed}` +
-        ` race_skip=${qwenStats.raceSkipped}`,
-    )
-    // 단일브랜드 자사몰: 파일의 대표 브랜드명으로 brand_node 해석 폴백에 사용
-    const dominantBrand =
-      resolveProductBrand(rawAll.find((p) => (p.brand as string | undefined)?.trim())?.brand, config) || null
-    const qcPassRate = rawAll.length > 0 ? raw.length / rawAll.length : 1
-    await syncProductCrawlStatus(platform, dominantBrand, {inserted, errors, total: deduped.length, qcPassRate})
-    totalInserted += inserted
-    totalErrors += errors
-
-    // === 리뷰 import ===
-    const productsWithReviews = raw.filter(
-      (p) => p.reviews && p.reviews.length > 0
-    )
-    if (productsWithReviews.length > 0) {
-      console.log(`   📝 리뷰 있는 상품 ${productsWithReviews.length}개 처리 중...`)
-
-      // product_url → product_id 매핑 조회 (30개씩 배치 — URL 길이 제한 방지)
-      const urls = productsWithReviews.map((p) => p.productUrl)
-      const URL_BATCH = 30
-      const urlToId = new Map<string, string>()
-      let lookupFailed = false
-
-      for (let i = 0; i < urls.length; i += URL_BATCH) {
-        const batch = urls.slice(i, i + URL_BATCH)
-        const {data, error: lookupErr} = await db
-          .from("products")
-          .select("id, product_url")
-          .in("product_url", batch)
-
-        if (lookupErr) {
-          console.error(`   ❌ product_id 조회 실패 (${i}-${i + batch.length}):`, lookupErr.message)
-          lookupFailed = true
-          break
-        }
-        if (data) {
-          for (const p of data) urlToId.set(p.product_url, p.id)
-        }
-      }
-
-      if (!lookupFailed && urlToId.size > 0) {
-
-        // 리뷰 행 구성
-        const reviewRows: Array<{
-          product_id: string
-          text: string | null
-          author: string | null
-          review_date: string | null
-          photo_urls: string[]
-          body_info: Record<string, unknown> | null
-        }> = []
-
-        for (const p of productsWithReviews) {
-          const productId = urlToId.get(p.productUrl)
-          if (!productId || !p.reviews) continue
-
-          for (const r of p.reviews) {
-            reviewRows.push({
-              product_id: productId,
-              text: r.text?.slice(0, 5000) || null,
-              author: r.author?.slice(0, 100) || null,
-              review_date: r.date || null,
-              photo_urls: r.photoUrls || [],
-              body_info: r.body || null,
-            })
-          }
-        }
-
-        // 기존 리뷰 삭제 후 재삽입 (중복 방지)
-        const productIds = [...new Set(reviewRows.map((r) => r.product_id))]
-        if (productIds.length > 0) {
-          await db
-            .from("product_reviews")
-            .delete()
-            .in("product_id", productIds)
-        }
-
-        // 50개씩 배치 insert
-        let reviewInserted = 0
-        for (let i = 0; i < reviewRows.length; i += BATCH) {
-          const batch = reviewRows.slice(i, i + BATCH)
-          const {error: revErr} = await db
-            .from("product_reviews")
-            .insert(batch)
-
-          if (revErr) {
-            console.error(`   ❌ 리뷰 배치 ${i}-${i + batch.length} 실패:`, revErr.message)
-          } else {
-            reviewInserted += batch.length
-          }
-        }
-        console.log(`   📝 리뷰 ${reviewInserted}/${reviewRows.length}건 적재`)
-        totalReviews += reviewInserted
-
-        // products 테이블에 review_count 업데이트
-        for (const p of productsWithReviews) {
-          const productId = urlToId.get(p.productUrl)
-          if (!productId) continue
-
-          await db
-            .from("products")
-            .update({ review_count: (p.reviews || []).length })
-            .eq("id", productId)
-        }
-      }
-    }
-  }
-
-  console.log("\n" + "═".repeat(50))
-  console.log(`🏁 전체 적재 완료: ${totalInserted}개 성공, ${totalErrors}건 에러`)
-
-  // ── P0 계측: 성별 해결 수율 요약 ────────────────────────────────
-  if (genderYield.length > 0) {
-    const grandTotal = genderYield.reduce((s, g) => s + g.total, 0)
-    const grandResolved = genderYield.reduce((s, g) => s + g.resolved, 0)
-    const grandPct = grandTotal > 0 ? ((grandResolved / grandTotal) * 100).toFixed(1) : "0.0"
-    console.log(`\n🚻 gender 수율 전체: ${grandResolved}/${grandTotal} (${grandPct}%)`)
-
-    const low = genderYield
-      .filter((g) => g.total > 0 && g.resolved / g.total < 0.5)
-      .sort((a, b) => a.resolved / a.total - b.resolved / b.total)
-    if (low.length > 0) {
-      console.log(`⚠️ 수율 50% 미만 플랫폼 ${low.length}개 (defaultGender 필요):`)
-      for (const g of low) {
-        const pct = ((g.resolved / g.total) * 100).toFixed(1)
-        console.log(`   ${g.platform}: ${g.resolved}/${g.total} (${pct}%)`)
-      }
-    }
-  }
-  printProductQcReport()
-  if (totalReviews > 0) {
-    console.log(`📝 리뷰 적재: ${totalReviews}건`)
-  }
-  console.log("═".repeat(50))
+    },
+  }).finally(async () => { if (browser) await browser.close() })
+  if (reportPath) await writePipelineReport(reportPath, result.report)
+  const c = result.report.counts
+  console.log(`Import ${result.report.status}: input=${c.input ?? 0} inserted=${c.inserted ?? 0} updated=${c.updated ?? 0} unchanged=${c.unchanged ?? 0} excluded=${c.policy_excluded ?? 0} failed=${c.failed ?? 0} pending=${c.pending ?? 0}`)
+  process.exitCode = pipelineExitCode(result.report)
 }
 
-function printProductQcReport() {
-  const report = getProductQcReport()
-  if (report.size === 0) return
-
-  console.log("\n" + "-".repeat(50))
-  console.log("Product QC summary")
-  console.log("-".repeat(50))
-  for (const [site, stat] of report) {
-    const reasons = Object.entries(stat.byReason)
-      .sort((a, b) => b[1] - a[1])
-      .map(([reason, count]) => `${reason}=${count}`)
-      .join(", ")
-    console.log(
-      `[${site}] total=${stat.total}, keep=${stat.kept}, auto_fix=${stat.autoFixed}, review=${stat.review}, reject=${stat.rejected}`,
-    )
-    if (reasons) console.log(`   reasons: ${reasons}`)
-    for (const [reason, skus] of Object.entries(stat.samples)) {
-      if (skus.length === 0) continue
-      console.log(`   ${reason} samples:`)
-      for (const sku of skus) console.log(`     - ${sku}`)
-    }
+async function handleMainError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(message)
+  const reportPath = process.argv.find((arg) => arg.startsWith("--report="))?.slice("--report=".length)
+  if (reportPath) {
+    const report = createPipelineReport({mode: process.argv.includes("--dry-run") ? "dry_run" : "apply"})
+    report.counts = {input: 0, inserted: 0, updated: 0, unchanged: 0, policy_excluded: 0, failed: 1, pending: 0}
+    addPipelineError(report, {stage: "setup", code: "invalid_setup", message, retryable: false})
+    await writePipelineReport(reportPath, finalizePipelineReport(report, {status: "failed"})).catch(() => {})
   }
+  process.exitCode = /required|selected|config|directory|JSON|obsolete/i.test(message) ? 2 : 1
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error)
-  process.exitCode = 1
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
+  main().catch(handleMainError)
+}

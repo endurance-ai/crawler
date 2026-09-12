@@ -1,4 +1,5 @@
 import {productIdentityKey} from "./listing-refresh"
+import {toDecimalId, type ProductRefreshObservation} from "./pipeline-integrity-types"
 import type {Cafe24ListingCursor, PlatformType, SiteConfig} from "./types"
 
 export interface RefreshSourceState {
@@ -161,13 +162,7 @@ export interface BrandLookupRow {
   brand_name_normalized: string | null
 }
 
-export interface RefreshCandidateInput {
-  platform_key: string
-  identity_key: string
-  product_url: string
-  raw_product: Record<string, unknown>
-  detected_brand: string | null
-  matched_brand_node_id: number | null
+export interface RefreshCandidateInput extends ProductRefreshObservation {
   status: "discovered" | "brand_unmatched"
 }
 
@@ -442,7 +437,8 @@ export function buildRefreshCandidateInputs(
       product_url: product.productUrl,
       raw_product: product,
       detected_brand: detectedBrand || null,
-      matched_brand_node_id: matched?.id ?? null,
+      matched_brand_node_id: matched ? toDecimalId(matched.id) : null,
+      raw_observed_at: typeof product.crawledAt === "string" && Number.isFinite(Date.parse(product.crawledAt)) ? product.crawledAt : null,
       status: matched ? "discovered" : "brand_unmatched",
     })
   }

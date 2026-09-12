@@ -28,7 +28,7 @@
 #   3. poc 는 cafe24/shopify 만 지원한다 (zara/uniqlo 4키 12,432행이 대상 밖).
 #   src/crawl.ts 경로는 셋 다 해당 없다.
 #
-# 종료 코드: 0 = 정상, 2 = 게이트/스테이지 실패로 중단, 1 = 사용법/치명 오류.
+# 종료 코드: 0 = 정상, 1 = 게이트/스테이지 실패, 2 = 사용법/파일 설정 오류.
 set -uo pipefail
 
 KEYS=""
@@ -148,6 +148,10 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
     mv "$PRODUCTS_FILE" "$KEY_DIR/prev-products.json"
     log "  옛 산출물 격리 → $KEY_DIR/prev-products.json"
   fi
+  if ! have "$KEY_DIR/crawl.done" crawl; then
+    # New crawl invalidates downstream completion, including forced-only crawl.
+    rm -f "$KEY_DIR/import.done" "$KEY_DIR/import-report.json" "$KEY_DIR/import-artifact.json" "$KEY_DIR/embed.done"
+  fi
 
   # ── 2. crawl ──
   if have "$KEY_DIR/crawl.done" crawl; then
@@ -186,7 +190,7 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
     touch "$KEY_DIR/crawl.done"
   fi
   CRAWLED_ROWS=$(count_rows "$PRODUCTS_FILE")
-  log "  크롤 $CRAWLED_ROWS행"
+  log "  크롤 ${CRAWLED_ROWS}행"
 
   # ── 4. gate: import 직전 차단 게이트 ──
   # 여기를 넘기면 upsert 는 되돌릴 수 없다.
@@ -204,30 +208,37 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
     FAILED_KEYS="$FAILED_KEYS $KEY"; continue
   fi
 
-  # ── 5. import + post-persist Qwen ──
+  # ── 5. verified Qwen preparation + conditional import ──
   # --in-stock-only 를 쓰지 않는다: --include-out-of-stock 으로 품절을 일부러
   #   가져왔는데 여기서 걸러내면 방금 만든 구멍을 그대로 재생산한다.
   # --no-new-brands 도 쓰지 않는다: 코호트의 brand_nodes 커버리지 99.9%는 6/22
   #   import 가 이 플래그 없이 만든 결과라, 빼는 쪽이 원래 동작이다.
-  if have "$KEY_DIR/import.done" import; then
-    log "4/7 import+Qwen — 스킵 (마커 존재)"
+  IMPORT_REPORT="$KEY_DIR/import-report.json"
+  if have "$KEY_DIR/import.done" import && node tools/pipeline-artifact.mjs check "$KEY_DIR/import-artifact.json" "$PRODUCTS_FILE" "$KEY" && node --import tsx tools/pipeline-report.ts check "$IMPORT_REPORT" "$KEY"; then
+    log "4/7 import+Qwen — 스킵 (완료 report 검증됨)"
   else
     log "4/7 import+Qwen — pnpm import:products --site=$KEY"
-    $PNPM tsx src/import-products.ts --site="$KEY" > "$KEY_DIR/import.log" 2>&1
+    rm -f "$IMPORT_REPORT" "$KEY_DIR/import.done"
+    $PNPM tsx src/import-products.ts --site="$KEY" --report="$IMPORT_REPORT" > "$KEY_DIR/import.log" 2>&1
     if [ $? -ne 0 ]; then
       log "  ✖ import 실패 — $KEY_DIR/import.log"
       FAILED_KEYS="$FAILED_KEYS $KEY"; continue
     fi
+    if ! node --import tsx tools/pipeline-report.ts check "$IMPORT_REPORT" "$KEY"; then
+      log "  ✖ import 완료 report 없음/실패 — $IMPORT_REPORT"
+      FAILED_KEYS="$FAILED_KEYS $KEY"; continue
+    fi
+    # Import may add verified normalization checkpoints to this same file.
+    node tools/pipeline-artifact.mjs record "$KEY_DIR/import-artifact.json" "$PRODUCTS_FILE" "$KEY" || {
+      log "  ✖ import artifact 기록 실패"; FAILED_KEYS="$FAILED_KEYS $KEY"; continue; }
     touch "$KEY_DIR/import.done"
   fi
-  IMPORT_OK=$(grep -oE "[0-9]+개 성공" "$KEY_DIR/import.log" | grep -oE "[0-9]+" | tail -1)
-  IMPORT_OK=${IMPORT_OK:-0}
-  QWEN_SUCCESS=$(grep -oE "Qwen target=[0-9]+ success=[0-9]+" "$KEY_DIR/import.log" | grep -oE "success=[0-9]+" | grep -oE "[0-9]+" | tail -1)
-  QWEN_SUCCESS=${QWEN_SUCCESS:-0}
+  IMPORT_OK=$(node --import tsx tools/pipeline-report.ts count "$IMPORT_REPORT" applied)
+  QWEN_SUCCESS=$(node --import tsx tools/pipeline-report.ts count "$IMPORT_REPORT" normalization_succeeded)
   log "  적재 ${IMPORT_OK}건"
 
   # ── 6. gate-import: QC 통과율 붕괴는 캠페인 전체 중단 신호 ──
-  if grep -q "qc_failed로 기록" "$KEY_DIR/import.log"; then
+  if [ "$(node --import tsx tools/pipeline-report.ts count "$IMPORT_REPORT" qc_failed)" -gt 0 ]; then
     log "  🛑 QC 통과율이 MIN_QC_PASS_RATE 미만 — 공유 회귀 의심, 캠페인 전체 중단"
     FAILED_KEYS="$FAILED_KEYS $KEY"; STOP_CAMPAIGN=1; continue
   fi
@@ -288,6 +299,6 @@ if [ -n "$FAILED_KEYS" ]; then
   echo "실패/건너뜀:$FAILED_KEYS"
   echo "재실행하면 완료된 스테이지는 건너뛰고 이어서 돈다."
 fi
-[ "$STOP_CAMPAIGN" -eq 1 ] && { echo "🛑 캠페인 중단 — 원인을 해결하기 전에는 다음 배치를 돌리지 말 것"; exit 2; }
-[ -n "$FAILED_KEYS" ] && exit 2
+[ "$STOP_CAMPAIGN" -eq 1 ] && { echo "🛑 캠페인 중단 — 원인을 해결하기 전에는 다음 배치를 돌리지 말 것"; exit 1; }
+[ -n "$FAILED_KEYS" ] && exit 1
 exit 0

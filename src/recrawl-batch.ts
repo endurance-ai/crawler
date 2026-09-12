@@ -37,16 +37,18 @@
  *   - 리포 레지스트리(platforms.ts + platforms.generated.ts)에 config 가 없는 키와
  *     poc 미지원 타입(imweb 등)은 스킵하고 요약에 집계한다 (영속화/지원 갭 가시화).
  *
- * 종료 코드: 0 = 정상(예산/큐 소진 포함), 2 = 연속 실패 청크 중단, 1 = 치명 오류.
+ * 종료 코드: 0 = 정상(예산/큐 소진 포함), 1 = 일부/전체 실패, 2 = CLI 설정 오류.
  */
 
 import {spawn} from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import {fileURLToPath} from "node:url"
+import {randomUUID} from "node:crypto"
 
 import {getSiteConfig} from "./configs/platforms"
 import type {SiteConfig} from "./lib/types"
+import {assessPipelineChild, readPipelineReport} from "./lib/pipeline-report"
 import {
   createProductCollectionClient,
   startProductRun,
@@ -85,7 +87,7 @@ function parseFlags(): Flags {
     const n = Number(v)
     if (!Number.isFinite(n) || n < 0) {
       console.error(`invalid --${key}=${v}`)
-      process.exit(1)
+      process.exit(2)
     }
     return n
   }
@@ -138,6 +140,7 @@ async function fetchWorklist(
       )
       .not("platform_key", "is", null)
       .order("updated_at", {ascending: true, nullsFirst: true})
+      .order("brand_node_id", {ascending: true})
       .range(offset, offset + PAGE - 1)
     if (error) throw new Error(`worklist 조회 실패: ${error.message}`)
     const page = (data ?? []) as WorklistEntry[]
@@ -242,15 +245,21 @@ function runChunk(args: {
         // 재수집 대상은 이미 등록된 브랜드다. 신규 brand_node 생성은 막되,
         // 품절 행도 기존 상품과 함께 upsert하도록 --in-stock-only는 사용하지 않는다.
         "--import-flags",
-        "--no-new-brands --allow-qwen-deferred",
+        "--no-new-brands",
       ],
-      {cwd: REPO_ROOT, stdio: "inherit", env: process.env},
+      {cwd: REPO_ROOT, stdio: "inherit", env: process.env, detached: true},
     )
     let timedOut = false
+    const killGroup = (signal: NodeJS.Signals) => {
+      if (!child.pid) return
+      try { process.kill(-child.pid, signal) } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+      }
+    }
     const timer = setTimeout(() => {
       timedOut = true
-      child.kill("SIGTERM")
-      setTimeout(() => child.kill("SIGKILL"), 30_000).unref()
+      killGroup("SIGTERM")
+      setTimeout(() => killGroup("SIGKILL"), 30_000).unref()
     }, args.timeoutMs)
     child.on("close", (code) => {
       clearTimeout(timer)
@@ -279,19 +288,6 @@ function readTallyRow(outRoot: string, chunkIndex: number): {brandsPass: number;
     }
   }
   return null
-}
-
-/** 청크 내에서 import 까지 도달하지 못한 키 목록 (passkeys 파일과의 차집합). */
-function failedKeysOfChunk(outRoot: string, chunkIndex: number, chunkKeys: string[]): string[] {
-  const passPath = path.join(REPO_ROOT, outRoot, "_chunks", `chunk-${chunkIndex}-passkeys.json`)
-  let passed: string[] = []
-  try {
-    passed = JSON.parse(fs.readFileSync(passPath, "utf-8")) as string[]
-  } catch {
-    // passkeys 파일 없음/손상 = 청크 전체가 crawl/classify 단계에서 실패
-  }
-  const passedSet = new Set(passed)
-  return chunkKeys.filter((k) => !passedSet.has(k))
 }
 
 /** crawl/classify 단계 실패 브랜드의 status 를 touch — updated_at 이 밀려 큐 맨 뒤로
@@ -383,7 +379,7 @@ async function main() {
   // 이 순서대로 청크를 자른다. out-root 는 런마다 새로 만들어 이전 런의 크롤
   // 캐시(청크 스킵)와 섞이지 않게 한다.
   const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12)
-  const outRoot = path.join("poc-runs", `recrawl-${stamp}`)
+  const outRoot = path.join("poc-runs", `recrawl-${stamp}-${randomUUID()}`)
   fs.mkdirSync(path.join(REPO_ROOT, outRoot), {recursive: true})
   const configsPath = path.join(REPO_ROOT, outRoot, "worklist-configs.json")
   fs.writeFileSync(configsPath, JSON.stringify(entries.map((e) => e.config), null, 2), "utf-8")
@@ -396,6 +392,7 @@ async function main() {
   let crawledTotal = 0
   const failedBrands: string[] = []
   let consecutiveFailedChunks = 0
+  let failedChunks = 0
   let stopReason = "큐 소진"
 
   for (let c = 0; c < totalChunks; c++) {
@@ -424,13 +421,15 @@ async function main() {
     brandsAttempted += chunkKeys.length
 
     const tally = readTallyRow(outRoot, c)
-    const brandsPass = tally?.brandsPass ?? 0
-    const importOk = tally?.importOk ?? 0
+    const chunkReport = await readPipelineReport(path.join(REPO_ROOT, outRoot, "_chunks", `chunk-${c}-report.json`)).catch(() => null)
+    const assessment = assessPipelineChild(chunkReport, res.code, chunkKeys)
+    const importOk = assessment.applied
     importOkTotal += importOk
     crawledTotal += tally?.crawled ?? 0
 
-    const chunkFailed = res.code !== 0 || brandsPass === 0
+    const chunkFailed = !assessment.success || res.timedOut
     if (chunkFailed) {
+      failedChunks++
       consecutiveFailedChunks++
       const detail = res.timedOut
         ? `chunk timeout ${flags.chunkTimeoutMinutes}m`
@@ -440,15 +439,15 @@ async function main() {
       consecutiveFailedChunks = 0
     }
 
-    // import 까지 못 간 브랜드 → status touch (큐 뒤로 순환) + run 기록
-    const failed = failedKeysOfChunk(outRoot, c, chunkKeys)
+    // Actual import outcomes determine completion, including partial failures.
+    const failed = res.timedOut ? chunkKeys : assessment.failedPlatforms
     failedBrands.push(...failed)
     if (failed.length > 0) {
       await recordFailedBrands(
         db,
         byKey,
         failed,
-        res.timedOut ? `chunk ${c} timeout` : `chunk ${c} crawl/classify 미통과`,
+        res.timedOut ? `chunk ${c} timeout` : `chunk ${c} import report incomplete`,
       )
     }
   }
@@ -481,7 +480,7 @@ async function main() {
     ],
   )
 
-  process.exit(aborted ? 2 : 0)
+  process.exit(failedChunks > 0 ? 1 : 0)
 }
 
 main().catch(async (e) => {

@@ -163,7 +163,7 @@ test("신규상품 후보는 미등록 브랜드를 brand_unmatched로 격리한
   assert.deepEqual(
     rows.map((row) => [row.status, row.matched_brand_node_id]),
     [
-      ["discovered", 11],
+      ["discovered", "11"],
       ["brand_unmatched", null],
     ],
   )
@@ -186,7 +186,7 @@ test("멀티브랜드 상품의 vendor가 source fallback brand보다 우선한�
     ],
   )
 
-  assert.equal(rows[0].matched_brand_node_id, 10)
+  assert.equal(rows[0].matched_brand_node_id, "10")
   assert.equal(rows[0].detected_brand, "Maison Margiela")
 })
 
@@ -205,7 +205,7 @@ test("단일브랜드 자사몰은 DOM 오인식 brand보다 config.brand가 우
     [{id: 30, brand_name: "House Operator", brand_name_normalized: "houseoperator"}],
   )
 
-  assert.equal(rows[0].matched_brand_node_id, 30)
+  assert.equal(rows[0].matched_brand_node_id, "30")
   assert.equal(rows[0].detected_brand, "House Operator")
 })
 
@@ -271,6 +271,14 @@ test("DB 부분 실패 표시는 실제 소스 실패를 숨기지 않는다", (
     },
   ])
   assert.equal(streaks.get("a")?.failures, 1)
+})
+
+test("부분 완료는 소스가 정상 응답했다는 뜻이므로 이전 실패 연쇄를 끊는다", () => {
+  const streaks = computeFailureStreaks([
+    run("a", "partial", "2026-08-02T05:00:00Z"),
+    run("a", "failed", "2026-08-02T04:00:00Z"),
+  ])
+  assert.equal(streaks.has("a"), false)
 })
 
 test("성공 기록이 없으면 전체 실패가 연쇄가 된다", () => {
@@ -467,7 +475,7 @@ test("havati 같은 편집샵은 상품명 프리픽스로 기존 브랜드에 �
   assert.deepEqual(
     rows.map((row) => [row.detected_brand, row.status, row.matched_brand_node_id]),
     [
-      ["HORLISUN", "discovered", 77],
+      ["HORLISUN", "discovered", "77"],
       // 엔진이 브랜드를 못 뽑은 상품은 종전대로 파킹 — 자동 생성하지 않는다
       [null, "brand_unmatched", null],
     ],

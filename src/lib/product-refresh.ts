@@ -2,11 +2,13 @@ import type {SupabaseClient} from "@supabase/supabase-js"
 
 import {
   buildRefreshCandidateInputs,
+  candidateIdentity,
   uniqueRefreshConfigs,
   type BrandLookupRow,
   type RefreshRunOutcome,
   type RefreshSourceState,
 } from "./refresh-source"
+import {toDecimalId, type ProductRefreshObservationResult} from "./pipeline-integrity-types"
 import type {Cafe24ListingCursor, Product, SiteConfig} from "./types"
 
 export type ProductRefreshClient = SupabaseClient
@@ -505,15 +507,22 @@ export async function loadExistingBrands(
 ): Promise<BrandLookupRow[]> {
   const rows: BrandLookupRow[] = []
   const pageSize = 1000
-  for (let offset = 0; ; offset += pageSize) {
+  let cursor = "0"
+  for (;;) {
     const {data, error} = await db
       .from("brand_nodes")
       .select("id,brand_name,brand_name_normalized")
+      .gt("id", cursor)
       .order("id", {ascending: true})
-      .range(offset, offset + pageSize - 1)
+      .limit(pageSize)
       .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
     if (error) throw new Error(`brand lookup load failed: ${error.message}`)
     const page = (data ?? []) as BrandLookupRow[]
+    for (const row of page) {
+      const next = toDecimalId(row.id)
+      if (BigInt(next) <= BigInt(cursor)) throw new Error("brand lookup cursor did not advance")
+      cursor = next
+    }
     rows.push(...page)
     if (page.length < pageSize) break
   }
@@ -526,31 +535,59 @@ export async function enqueueRefreshCandidates(
     products: Product[]
     config: SiteConfig
     brands: BrandLookupRow[]
+    unknownUrls?: string[]
   },
-): Promise<{discovered: number; brandUnmatched: number}> {
+): Promise<ProductRefreshObservationResult & {brandUnmatched: number}> {
+  let products = input.products
+  if (input.unknownUrls) {
+    // Retryable legacy candidates may already reference products. Keep their
+    // observations fresh without creating a candidate for every existing SKU.
+    const unfinished = new Set<string>()
+    let cursor = "0"
+    for (;;) {
+      const {data, error} = await db.from("product_refresh_candidates")
+        .select("id,identity_key").eq("platform_key", input.config.key)
+        .not("status", "in", "(imported,rejected)")
+        .gt("id", cursor).order("id", {ascending: true}).limit(1000)
+        .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
+      if (error) throw new Error("unfinished candidate lookup failed")
+      const page = (data ?? []) as Array<{id: string | number; identity_key: string}>
+      for (const row of page) unfinished.add(row.identity_key)
+      if (page.length < 1000) break
+      const next = toDecimalId(page[page.length - 1].id)
+      if (BigInt(next) <= BigInt(cursor)) throw new Error("candidate pagination did not advance")
+      cursor = next
+    }
+    const unknown = new Set(input.unknownUrls)
+    products = products.filter((product) => unknown.has(product.productUrl) || unfinished.has(candidateIdentity(input.config.key, product.productUrl)))
+  }
   const rows = buildRefreshCandidateInputs(
-    input.products as Array<Product & Record<string, unknown>>,
+    products as Array<Product & Record<string, unknown>>,
     input.config,
     input.brands,
   )
-  if (rows.length === 0) return {discovered: 0, brandUnmatched: 0}
+  const result: ProductRefreshObservationResult & {brandUnmatched: number} = {
+    inserted: 0, updated: 0, unchanged: 0, stale: 0, conflicted: 0, rematched: 0,
+    brandUnmatched: rows.filter((row) => row.matched_brand_node_id === null).length,
+  }
+  if (rows.length === 0) return result
   // 한 번에 보내면 큰 소스에서 nginx 413 이 난다. 실측 2026-08-01: browns 는
   // 크롤 자체는 807초 동안 정상이었는데 이 upsert 에서 매번 죽어 **후보가 한 건도
   // 적재된 적이 없었다**(0건). 런이 failed 로 끝나니 완전성 가드도 성공 이력을
   // 못 쌓아, 재고 7,426건이 갱신 없이 방치됐다.
   for (const chunk of chunkRowsByJsonSize(rows)) {
-    const {error} = await db
-      .from("product_refresh_candidates")
-      .upsert(chunk, {
-        onConflict: "platform_key,identity_key",
-        ignoreDuplicates: true,
-      })
+    const {data, error} = await db
+      .rpc("upsert_product_refresh_observations", {p_rows: chunk.map(({status: _status, ...row}) => row)})
       .abortSignal(AbortSignal.timeout(DB_CANDIDATE_TIMEOUT_MS))
-    // upsert 는 ignoreDuplicates 라 다음 정기 refresh가 같은 후보를 다시 보내도 안전하다.
-    if (error) throw new Error(`refresh candidate enqueue failed: ${error.message}`)
+    if (error) throw new Error("refresh candidate observation write failed")
+    let accounted = 0
+    for (const field of ["inserted", "updated", "unchanged", "stale", "conflicted", "rematched"] as const) {
+      const count = data?.[field]
+      if (!Number.isSafeInteger(count) || count < 0) throw new Error("invalid candidate observation result")
+      result[field] += count
+      if (field !== "rematched") accounted += count
+    }
+    if (accounted !== chunk.length || data.rematched > data.updated) throw new Error("incomplete candidate observation accounting")
   }
-  return {
-    discovered: rows.filter((row) => row.status === "discovered").length,
-    brandUnmatched: rows.filter((row) => row.status === "brand_unmatched").length,
-  }
+  return result
 }

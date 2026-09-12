@@ -69,6 +69,66 @@ test("selected representative-image metadata passes without reshaping", () => {
   if (r.ok) assert.deepEqual(r.value, p)
 })
 
+test("valid pipeline provenance passes without reshaping", () => {
+  const p = {
+    ...(golden[0] as Record<string, unknown>),
+    normalization: {
+      status: "unchanged",
+      inputHash: "sha256",
+      policyVersion: "2026-09",
+      model: "qwen",
+      completedAt: "2026-09-12T00:00:00.000Z",
+      category: "tops",
+      subcategory: null,
+    },
+    reviewCollection: {
+      status: "succeeded",
+      observedAt: "2026-09-12T00:00:00.000Z",
+      confirmedEmpty: true,
+    },
+  }
+  const r = validateProduct(p)
+  assert.equal(r.ok, true)
+  if (r.ok) assert.deepEqual(r.value, p)
+})
+
+test("legacy products without provenance remain valid and unverified", () => {
+  const p = {...(golden[0] as Record<string, unknown>), llmInputHash: "legacy", reviews: []}
+  const r = validateProduct(p)
+  assert.equal(r.ok, true)
+  if (r.ok) {
+    assert.equal(r.value.normalization, undefined)
+    assert.equal(r.value.reviewCollection, undefined)
+  }
+})
+
+test("malformed pipeline provenance is rejected when present", () => {
+  const malformedNormalization = {
+    ...(golden[0] as Record<string, unknown>),
+    normalization: {
+      status: "succeeded",
+      inputHash: "hash",
+      policyVersion: "v1",
+      model: null,
+      completedAt: null,
+      category: "tops",
+      subcategory: null,
+      error: {code: "bad", message: "bad", retryable: "yes"},
+    },
+  }
+  const first = validateProduct(malformedNormalization)
+  assert.equal(first.ok, false)
+  if (!first.ok) assert.equal(first.failedField, "normalization.error.retryable")
+
+  const malformedReviews = {
+    ...(golden[0] as Record<string, unknown>),
+    reviewCollection: {status: "succeeded", observedAt: null, confirmedEmpty: "yes"},
+  }
+  const second = validateProduct(malformedReviews)
+  assert.equal(second.ok, false)
+  if (!second.ok) assert.equal(second.failedField, "reviewCollection.confirmedEmpty")
+})
+
 test("product with empty category is rejected (policy A exception — migration 091)", () => {
   const noCategory = {
     brand: "X",

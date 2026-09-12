@@ -44,7 +44,7 @@ export interface ProductQcReviewEvent {
   kind: "product_qc_review"
   site: string
   sku: string
-  action: "review" | "reject"
+  action: "review" | "reject" | "out_of_scope"
   reason: string
   confidence: number
   changes: unknown[]

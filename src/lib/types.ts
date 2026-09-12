@@ -3,6 +3,7 @@
  */
 
 import type {GenderSource} from "./product-gender"
+import type {NormalizationResult, ReviewCollection} from "./pipeline-integrity-types"
 
 // ─── 통화 ─────────────────────────────────────────────
 
@@ -121,6 +122,8 @@ export interface Product {
   llmModel?: string
   /** 보강 입력이 달라졌는지 판정하는 SHA-256 체크포인트. */
   llmInputHash?: string
+  /** Verified normalization provenance. Legacy llm* fields do not imply this. */
+  normalization?: NormalizationResult
   // ── 리뷰 데이터 (Phase 3) ──
   reviewCount?: number
   reviews?: Array<{
@@ -136,6 +139,8 @@ export interface Product {
       bodyType: string | null
     } | null
   }>
+  /** Explicit review snapshot provenance; absence remains unverified legacy data. */
+  reviewCollection?: ReviewCollection
 }
 
 export interface PricingObservation {
@@ -248,6 +253,8 @@ export interface SiteConfig {
    * heuristics. Canonical category folding still applies.
    */
   trustedCategory?: boolean
+  /** Canonical categories outside the service scope for this site. */
+  outOfScopeCategories?: string[]
   /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
   /**

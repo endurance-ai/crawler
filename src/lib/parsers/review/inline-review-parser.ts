@@ -11,7 +11,11 @@ import {BODY_INFO_PATTERNS} from "../../body-info-extractor"
 
 export class InlineReviewParser implements IReviewParser {
   async parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData> {
-    const result: ReviewData = { reviewCount: 0, reviews: [] }
+    const result: ReviewData = {
+      reviewCount: 0,
+      reviews: [],
+      reviewCollection: {status: "failed", observedAt: null, confirmedEmpty: false},
+    }
 
     try {
       // 인라인 리뷰 링크 수집 (/article/review/...)
@@ -29,27 +33,42 @@ export class InlineReviewParser implements IReviewParser {
         return urls
       }, maxReviews)
 
-      if (inlineReviewUrls.length === 0) return result
+      if (inlineReviewUrls.length === 0) {
+        result.reviewCollection.error = "inline review source not found"
+        return result
+      }
 
       const baseUrl = new URL(page.url()).origin
-      result.reviews = await this.parseInlineReviewDetails(page, baseUrl, inlineReviewUrls)
+      const parsed = await this.parseInlineReviewDetails(page, baseUrl, inlineReviewUrls)
+      result.reviews = parsed.reviews
       result.reviewCount = result.reviews.length
+      result.reviewCollection = {
+        status: parsed.failures === 0 ? "succeeded" : "partial",
+        observedAt: new Date().toISOString(),
+        confirmedEmpty: false,
+        ...(parsed.failures > 0 ? {error: `${parsed.failures} inline review detail(s) failed`} : {}),
+      }
     } catch (err) {
       console.warn(`   ⚠️ Inline 리뷰 파싱 실패: ${(err as Error).message}`)
+      result.reviewCollection.error = "inline review parsing failed"
     }
 
     return result
   }
 
   /** 인라인 리뷰 링크를 직접 방문하여 리뷰 데이터 추출 */
-  private async parseInlineReviewDetails(page: Cafe24Page, baseUrl: string, urls: string[]): Promise<Review[]> {
+  private async parseInlineReviewDetails(page: Cafe24Page, baseUrl: string, urls: string[]): Promise<{reviews: Review[]; failures: number}> {
     const reviews: Review[] = []
+    let failures = 0
     const patterns = BODY_INFO_PATTERNS
 
     for (const rawUrl of urls) {
       try {
         const fullUrl = rawUrl.startsWith("http") ? rawUrl : baseUrl + rawUrl
-        if (!fullUrl.startsWith("https://") && !fullUrl.startsWith("http://")) continue
+        if (!fullUrl.startsWith("https://") && !fullUrl.startsWith("http://")) {
+          failures++
+          continue
+        }
 
         await page.goto(fullUrl, { waitUntil: "domcontentloaded", timeout: 10000 })
         await page.waitForTimeout(1500)
@@ -109,10 +128,10 @@ export class InlineReviewParser implements IReviewParser {
           })
         }
       } catch {
-        // 개별 리뷰 접근 실패 시 스킵
+        failures++
       }
     }
 
-    return reviews
+    return {reviews, failures}
   }
 }
