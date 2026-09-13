@@ -52,6 +52,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.83",
     "@supabase/supabase-js": "^2.100.1",
+    "@tesseract.js-data/eng": "1.0.0",
     "ai": "^6.0.222",
     "llm-scraper": "^2.0.0",
     "onnxruntime-node": "^1.27.0",
