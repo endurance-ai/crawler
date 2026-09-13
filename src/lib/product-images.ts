@@ -3,7 +3,7 @@ import {extractStructuredProduct} from "./parsers/structured-data"
 export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v2"
 
 export const PRODUCT_IMAGE_UTILITY_ASSET_PATTERN =
-  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|(?:campaign[-_]?logo|txt[-_]?naver)(?:[/_.-]|$)|(?:color|colour|option)[-_]?(?:swatch|chip)(?:[/_.-]|$)|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|img_(?:product_big|404)\.(?:gif|jpe?g|png|webp)(?:$))`
+  String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|(?:campaign[-_]?logo|txt[-_]?naver)(?:[/_.-]|$)|(?:color|colour|option)[-_]?(?:swatch|chip)(?:[/_.-]|$)|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|(?:img_(?:product_(?:tiny|small|medium|big)|404)|empty_thumb)\.(?:gif|jpe?g|png|webp)(?:$))`
 const UTILITY_ASSET_RE = new RegExp(PRODUCT_IMAGE_UTILITY_ASSET_PATTERN, "i")
 const NON_IMAGE_EXT_RE = /\.(?:css|html?|js|json|pdf|svg|woff2?)(?:$|[?#])/i
 const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
