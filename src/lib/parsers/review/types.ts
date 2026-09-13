@@ -1,4 +1,5 @@
 import type {Cafe24Page} from "../../cafe24-page"
+import type {ReviewCollection} from "../../pipeline-integrity-types"
 
 export interface ReviewerBody {
   height: string | null
@@ -19,6 +20,7 @@ export interface Review {
 export interface ReviewData {
   reviewCount: number
   reviews: Review[]
+  reviewCollection: ReviewCollection
 }
 
 export interface IReviewParser {

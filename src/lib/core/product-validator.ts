@@ -51,6 +51,26 @@ import {GENDER_SOURCE_VALUES, PRODUCT_GENDER_VALUES} from "../product-gender.js"
 /** 현재 출력 detail 필드 패턴: 부재(undefined) / null / 임의 문자열 모두 수용. */
 const optionalStringOrNull = z.string().nullish()
 
+const NormalizationResultSchema = z.object({
+  status: z.enum(["not_required", "succeeded", "unchanged", "failed"]),
+  inputHash: z.string(),
+  policyVersion: z.string(),
+  model: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  category: z.string(),
+  subcategory: z.string().nullable(),
+  error: z
+    .object({code: z.string(), message: z.string(), retryable: z.boolean()})
+    .optional(),
+})
+
+const ReviewCollectionSchema = z.object({
+  status: z.enum(["not_requested", "succeeded", "partial", "failed"]),
+  observedAt: z.string().nullable(),
+  confirmedEmpty: z.boolean(),
+  error: z.string().optional(),
+})
+
 /**
  * 현재 `Product` 출력 형태를 박제한 Zod 스키마.
  *
@@ -103,9 +123,11 @@ export const ProductSchema = z
     productCode: optionalStringOrNull,
     sourceCurrency: z.enum(["USD", "EUR", "GBP", "KRW"]).optional(),
     sourcePrice: z.number().optional(),
+    normalization: NormalizationResultSchema.optional(),
     // ── 리뷰 데이터 (선택) ──
     reviewCount: z.number().optional(),
     reviews: z.array(z.unknown()).optional(),
+    reviewCollection: ReviewCollectionSchema.optional(),
   })
   // 알 수 없는 추가 키를 보존 — 게이트는 출력을 축소/변형하지 않는다.
   .passthrough()

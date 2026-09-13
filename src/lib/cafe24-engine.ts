@@ -20,7 +20,7 @@ import type {Cafe24ListingCursor, CrawlResult, CurrencyCode, Product, SiteConfig
 import type {Cafe24DetailPageLease, Cafe24Page} from "./cafe24-page"
 import type {IDetailParser} from "./parsers/detail"
 import type {DetailData} from "./parsers/detail/types"
-import type {IReviewParser} from "./parsers/review"
+import type {IReviewParser, ReviewData} from "./parsers/review"
 import {
   collectProductImagesFromPage,
   PRODUCT_IMAGE_COLLECTION_VERSION,
@@ -1197,6 +1197,14 @@ async function crawlCategory(
 
 // ─── 메인 크롤 함수 ──────────────────────────────────
 
+/** Apply only authoritative complete snapshots; partial/failed attempts retain prior reviews. */
+export function applyCafe24ReviewData(product: Product, reviewData: ReviewData): void {
+  product.reviewCollection = reviewData.reviewCollection
+  if (reviewData.reviewCollection.status !== "succeeded") return
+  product.reviewCount = reviewData.reviewCount
+  product.reviews = reviewData.reviews
+}
+
 export async function crawlCafe24(
   page: Cafe24Page,
   config: SiteConfig,
@@ -1636,7 +1644,20 @@ export async function crawlCafe24(
   }
 
   // ── Step 4: 리뷰 크롤링 (파서 주입) ──
-  if (config.crawlReviews && reviewParser) {
+  for (const product of uniqueProducts) {
+    product.reviewCollection = {status: "not_requested", observedAt: null, confirmedEmpty: false}
+  }
+
+  if (config.crawlReviews && !reviewParser) {
+    for (const product of uniqueProducts) {
+      product.reviewCollection = {
+        status: "failed",
+        observedAt: null,
+        confirmedEmpty: false,
+        error: "review parser unavailable",
+      }
+    }
+  } else if (config.crawlReviews && reviewParser) {
     console.log(`\n${tag} 💬 리뷰 크롤링 시작 — ${uniqueProducts.length}개 상품`)
     let reviewCount = 0
     let withReviews = 0
@@ -1648,12 +1669,11 @@ export async function crawlCafe24(
         await page.waitForTimeout(500)
 
         const reviewData = await reviewParser.parse(page, 10)
+        applyCafe24ReviewData(product, reviewData)
 
         reviewCount++
-        if (reviewData.reviewCount > 0 || reviewData.reviews.length > 0) {
-          product.reviewCount = reviewData.reviewCount || reviewData.reviews.length
-          product.reviews = reviewData.reviews
-          withReviews++
+        if (reviewData.reviewCollection.status === "succeeded") {
+          if (reviewData.reviewCount > 0 || reviewData.reviews.length > 0) withReviews++
           console.log(
             `${tag}    💬 [${reviewCount}/${uniqueProducts.length}] ${(product.name || "").slice(0, 35)}` +
             ` → 리뷰 ${product.reviewCount}건 (추출: ${reviewData.reviews.length}건)`
@@ -1661,6 +1681,12 @@ export async function crawlCafe24(
         }
       } catch {
         reviewCount++
+        product.reviewCollection = {
+          status: "failed",
+          observedAt: null,
+          confirmedEmpty: false,
+          error: "review collection failed",
+        }
       }
 
       await new Promise((r) => setTimeout(r, reviewDelay))

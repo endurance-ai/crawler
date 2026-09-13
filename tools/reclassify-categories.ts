@@ -26,6 +26,7 @@ import {z} from "zod"
 import {CATEGORIES, buildEnumReference, isValidCategory, isValidSubcategory, type Category} from "../src/lib/enums/product-enums"
 import {assertQwenReady, generateQwenObject} from "../src/lib/qwen-client"
 import {classifyShopifyCategory} from "../src/lib/shopify-category-classifier"
+import {toDecimalId} from "../src/lib/pipeline-integrity-types"
 
 const args = process.argv.slice(2)
 const DRY = args.includes("--dry-run")
@@ -110,7 +111,10 @@ async function main() {
   }
   let lastId = START_ID
   let processed = 0
+  let planned = 0
   let changed = 0
+  let conflicted = 0
+  let failed = 0
   const newDist: Record<string, number> = {}
   const samples: string[] = []
 
@@ -121,8 +125,8 @@ async function main() {
     // re-querying the same filter naturally drains to empty. Safe to run after
     // every onboarding import regardless of DB size (only touches broken rows).
     let q = ONLY_INVALID
-      ? db.from("products").select("id,name,category,subcategory,brand,product_url,tags").not("category", "in", `(${CATEGORIES.join(",")})`).limit(pageLimit)
-      : db.from("products").select("id,name,category,subcategory,brand,product_url,tags").order("id", {ascending: true}).limit(pageLimit)
+      ? db.from("products").select("id,updated_at,platform,name,category,subcategory,brand,product_url,tags").not("category", "in", `(${CATEGORIES.join(",")})`).limit(pageLimit)
+      : db.from("products").select("id,updated_at,platform,name,category,subcategory,brand,product_url,tags").order("id", {ascending: true}).limit(pageLimit)
     if (!ONLY_INVALID && lastId) q = q.gt("id", lastId)
     if (ONLY_OTHER) q = q.eq("category", "other")
     if (IN_STOCK_ONLY) q = q.eq("in_stock", true)
@@ -134,6 +138,7 @@ async function main() {
       return
     }
     if (!data || data.length === 0) break
+    const rows = data.map((row) => ({...row, id: toDecimalId(row.id)}))
 
     // 1. Deterministic pass — keyword classifier on the product name. High
     //    precision on clear tokens (sweater→knitwear, sunglasses→eyewear,
@@ -141,7 +146,7 @@ async function main() {
     const preds: Record<string, {category: Category; subcategory: string | null}> = {}
     const llmRows: {id: string; name: string; hint: string; brand: string; url: string; tags: string[]}[] = []
     let detCount = 0
-    for (const r of data) {
+    for (const r of rows) {
       const tags = Array.isArray(r.tags) ? r.tags.filter((tag): tag is string => typeof tag === "string") : []
       // Rows already classified as `other` include genuine homeware, beauty,
       // books and editorial entries. The deterministic Shopify classifier is
@@ -174,46 +179,63 @@ async function main() {
     await mapWithConcurrency(batchTasks, CONCURRENCY)
 
     // apply / report
-    const updates: {id: string; category: Category; subcategory: string | null}[] = []
-    for (const r of data) {
+    const updates: {id: string; updatedAt: string; platform: string; oldCategory: string;
+      oldSubcategory: string | null; category: Category; subcategory: string | null}[] = []
+    for (const r of rows) {
       const p = preds[r.id]
       processed++
-      if (!p) continue
+      if (!p) {
+        if (!DRY && ONLY_INVALID) {
+          failed++
+          console.error(`classification missing (#${r.id}): invalid row was not classified`)
+        }
+        continue
+      }
       newDist[p.category] = (newDist[p.category] || 0) + 1
       if (p.category !== r.category || (p.subcategory ?? null) !== (r.subcategory ?? null)) {
-        changed++
-        updates.push({id: r.id, category: p.category, subcategory: p.subcategory})
+        planned++
+        updates.push({id: r.id, updatedAt: r.updated_at, platform: r.platform,
+          oldCategory: r.category, oldSubcategory: r.subcategory ?? null,
+          category: p.category, subcategory: p.subcategory})
         if (samples.length < 30) samples.push(`  "${(r.category || "").slice(0, 28)}" | ${(r.name || "").slice(0, 34)} → ${p.category}/${p.subcategory ?? "-"}`)
       }
     }
 
     if (!DRY && updates.length) {
-      // group by (category, subcategory) then PATCH id-chunks
-      const groups: Record<string, {category: Category; subcategory: string | null; ids: string[]}> = {}
       for (const u of updates) {
-        const key = `${u.category}||${u.subcategory ?? ""}`
-        ;(groups[key] ||= {category: u.category, subcategory: u.subcategory, ids: []}).ids.push(u.id)
+        let update = db.from("products")
+          .update({category: u.category, subcategory: u.subcategory, updated_at: new Date().toISOString()})
+          .eq("id", u.id).eq("platform", u.platform).eq("updated_at", u.updatedAt)
+          .eq("category", u.oldCategory)
+        update = u.oldSubcategory === null
+          ? update.is("subcategory", null)
+          : update.eq("subcategory", u.oldSubcategory)
+        const {data: updated, error: uerr} = await update.select("id")
+        if (uerr) {
+          failed++
+          console.error(`update error (#${u.id} ${u.category}/${u.subcategory}):`, uerr.message)
+        } else if (updated?.length !== 1) {
+          conflicted++
+          console.error(`update conflict (#${u.id}): source row changed`)
+        } else changed++
       }
-      for (const g of Object.values(groups)) {
-        for (let c = 0; c < g.ids.length; c += 100) {
-          const chunk = g.ids.slice(c, c + 100)
-          const {error: uerr} = await db.from("products").update({category: g.category, subcategory: g.subcategory}).in("id", chunk)
-          if (uerr) console.error(`update error (${g.category}/${g.subcategory}):`, uerr.message)
-        }
-      }
+      if (failed > 0 || conflicted > 0) throw new Error(`guardrail writes incomplete: failed=${failed} conflicted=${conflicted}`)
+    } else if (DRY) {
+      changed += updates.length
     }
+    if (!DRY && failed > 0) throw new Error(`guardrail incomplete: failed=${failed} conflicted=${conflicted}`)
 
-    lastId = data[data.length - 1].id
-    console.log(`  page done · processed=${processed} changed=${changed} · det=${detCount} llm=${llmRows.length} · lastId=${lastId} · model=${qwenModel} · LLM tokens in=${usage.i} out=${usage.o}`)
+    lastId = rows[rows.length - 1].id
+    console.log(`  page done · processed=${processed} planned=${planned} changed=${changed} conflicted=${conflicted} failed=${failed} · det=${detCount} llm=${llmRows.length} · lastId=${lastId} · model=${qwenModel} · LLM tokens in=${usage.i} out=${usage.o}`)
 
     if (LIMIT && processed >= LIMIT) break
-    if (data.length < PAGE) break
+    if (rows.length < PAGE) break
     // ONLY_INVALID + DRY never shrinks the result set (no writes) — one pass is enough.
     if ((ONLY_INVALID || ONLY_OTHER) && DRY) break
   }
 
   console.log(`\n=== DONE ${DRY ? "(DRY-RUN, no writes)" : "(LIVE)"} ===`)
-  console.log(`processed=${processed} changed=${changed} · model=${qwenModel} · LLM tokens in=${usage.i} out=${usage.o}`)
+  console.log(`processed=${processed} planned=${planned} changed=${changed} conflicted=${conflicted} failed=${failed} · model=${qwenModel} · LLM tokens in=${usage.i} out=${usage.o}`)
   console.log("new family distribution:")
   Object.entries(newDist).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => console.log(`  ${k}: ${v}`))
   console.log("\nsample old→new (changed):")

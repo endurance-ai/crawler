@@ -4,11 +4,9 @@
  * 2026-08-03 크롤러 회귀. 2026-07-29 에 gender 를 VLM(product_features)으로
  * 이관했으나 성능이 나오지 않아 되돌린다. color 는 VLM 에 그대로 둔다.
  *
- * 회귀하면서 **브랜드 스코프 폴백은 복원하지 않았다** — 삭제 전에도 최하위
- * 근거였고 `['unisex']`·다중값은 이미 거부됐지만, 단일값이면서 틀린
- * brand_nodes.gender_scope(예: id=844 womenswear 인데 unisex) 가 상품으로
- * 조용히 전파되는 유일한 경로였다. 감사 도구도 수정 UI 도 없어 신뢰할 근거가
- * 못 된다. 근거 순위는 engine → url → text → config_default 4단이다.
+ * brand_nodes.gender_scope 는 상품 근거와 사이트 기본값이 모두 없을 때만 쓴다.
+ * 검증된 단일 men/women 값만 허용하고 unisex·다중값은 미확인으로 남겨,
+ * 불명확한 브랜드 범위가 남녀 검색 양쪽으로 전파되지 않게 한다.
  */
 import {matchesAny, normalizeForMatch} from "./text-match"
 
@@ -39,8 +37,8 @@ export function cleanGenderScope(value: unknown): ProductGender[] {
 // 로 적재하면 여성 상품이 남성 검색 결과로 새어 나간다. gender 가 어디서
 // 왔는지를 products.gender_source 에 남겨 이 구분을 사후에도 검증 가능하게 한다.
 //
-// `brand_scope` 는 write-path 에서 더 이상 생산하지 않지만(위 헤더 참조) 값은
-// 남겨둔다 — 2026-07 이전 행들이 이 출처를 들고 있어 읽기 측이 파싱해야 한다.
+// `brand_scope` 는 검증된 단일 men/women 브랜드의 최후 fallback 과 과거 행에서
+// 사용한다. 혼성/unisex scope 는 이 출처로 새로 쓰지 않는다.
 // migration 095(products_gender_source_chk)의 allow-list 와 일치해야 한다.
 
 export const GENDER_SOURCE_VALUES = [
@@ -49,8 +47,8 @@ export const GENDER_SOURCE_VALUES = [
   "url",
   "text",
   "config_default",
-  // 읽기 전용 (과거 행)
   "brand_scope",
+  // 읽기 전용 (과거 행)
   "llm",
   // 093 이전 행 / 교정 스크립트
   "legacy_backfill",
@@ -88,6 +86,8 @@ export interface GenderResolution {
 }
 
 export interface GenderResolutionOptions {
+  /** Verified brand_nodes scope; only a single men/women value may be inherited. */
+  brandGenderScope?: unknown
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
@@ -368,7 +368,8 @@ function singleEvidence(gender: ProductGender[]): ProductGender[] {
  *          두 부서에 함께 올린 상품인지 판정한다 → unisex
  *   5. 3·4 가 서로 다르면 미확인 (추측하지 않음)
  *   6. 사이트 전역 defaultGender (productGenderSource === "config_default")
- *   7. 미확인 — 호출자가 적재에서 제외한다
+ *   7. 단일 men/women 브랜드 scope
+ *   8. 미확인 — 호출자가 적재에서 제외한다
  */
 export function resolveProductGenderWithSource(
   productGender: unknown,
@@ -474,6 +475,11 @@ export function resolveProductGenderWithSource(
     )
       ? {gender: fromProduct, source: "config_default"}
       : {gender: [], source: null}
+  }
+
+  const brandScope = cleanGenderScope(options.brandGenderScope)
+  if (brandScope.length === 1 && brandScope[0] !== "unisex") {
+    return {gender: brandScope, source: "brand_scope"}
   }
 
   return {gender: [], source: null}

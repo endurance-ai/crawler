@@ -8,6 +8,10 @@ import type {IReviewParser, ReviewData} from "./types"
  */
 export class NoopReviewParser implements IReviewParser {
   async parse(_page: Cafe24Page, _maxReviews: number): Promise<ReviewData> {
-    return { reviewCount: 0, reviews: [] }
+    return {
+      reviewCount: 0,
+      reviews: [],
+      reviewCollection: {status: "not_requested", observedAt: null, confirmedEmpty: false},
+    }
   }
 }

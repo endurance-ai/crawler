@@ -41,7 +41,9 @@ const product = (over: Partial<Product> = {}): Product =>
   }) as unknown as Product
 
 const row = (over: Partial<RefreshableRow> = {}): RefreshableRow => ({
+  id: "1",
   product_url: "https://x/p/1",
+  updated_at: "2026-07-18T00:00:00Z",
   price: 10000,
   original_price: 10000,
   sale_price: null,
@@ -89,6 +91,16 @@ test("diffListing: 품절 전이를 잡는다", () => {
   assert.equal(diff.updates.length, 1)
   assert.equal(diff.updates[0].patch.in_stock, false)
   assert.ok(diff.updates[0].reasons.includes("품절"))
+  assert.equal(diff.updates[0].id, "1")
+  assert.equal(diff.updates[0].expectedUpdatedAt, "2026-07-18T00:00:00Z")
+})
+
+test("diffListing: an older observation cannot overwrite a newer stored snapshot", () => {
+  const diff = diffListing({crawled: [product({inStock: false,
+    crawledAt: "2026-07-19T00:00:00Z"})], existing: [row({in_stock: true,
+    crawled_at: "2026-07-20T00:00:00Z"})], markMissingOutOfStock: false})
+  assert.equal(diff.updates.length, 0)
+  assert.deepEqual(diff.confirmedUrls, ["https://x/p/1"])
 })
 
 test("diffListing: 가격 변동을 잡고 세 컬럼을 함께 쓴다", () => {

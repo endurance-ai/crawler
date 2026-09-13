@@ -13,7 +13,10 @@ import type {Product} from "./types"
 
 /** DB products 행 중 갱신이 건드리는 컬럼만. */
 export interface RefreshableRow {
+  id: string
   product_url: string
+  updated_at: string
+  crawled_at?: string | null
   price: number | null
   original_price: number | null
   sale_price: number | null
@@ -30,7 +33,10 @@ export type RefreshPriceFields = PriceFields & {source_price: number; source_cur
 export type RefreshPatch = Partial<RefreshPriceFields> & {in_stock: boolean}
 
 export interface RefreshUpdate {
+  id: string
   productUrl: string
+  expectedUpdatedAt: string
+  observedAt: string
   patch: RefreshPatch
   /** 사람이 읽는 변경 사유 — 요약 로그용. */
   reasons: string[]
@@ -222,6 +228,14 @@ export function diffListing(args: {
       seen.add(row.product_url)
 
       const reasons: string[] = []
+      const observedAt = product.detailFetchedAt ?? product.crawledAt
+      const observedMs = Date.parse(observedAt)
+      const storedMs = Math.max(
+        row.crawled_at ? Date.parse(row.crawled_at) : Number.NEGATIVE_INFINITY,
+        row.last_seen_at ? Date.parse(row.last_seen_at) : Number.NEGATIVE_INFINITY,
+      )
+      // Never let a delayed listing snapshot overwrite a more recent detail/listing write.
+      if (!Number.isFinite(observedMs) || observedMs < storedMs) continue
       const patch: RefreshPatch = {in_stock: product.inStock}
       const prices = toRefreshPriceFields(product, row, args.sourceCurrency)
       if (row.in_stock !== product.inStock) {
@@ -249,7 +263,8 @@ export function diffListing(args: {
 
       if (reasons.length > 0 || patch.price !== undefined) {
         // UPDATE 는 product_url 로 행을 찾으므로 크롤 URL 이 아니라 DB 에 저장된 URL 을 쓴다.
-        updates.push({productUrl: row.product_url, patch, reasons})
+        updates.push({id: row.id, productUrl: row.product_url,
+          expectedUpdatedAt: row.updated_at, observedAt, patch, reasons})
       }
     }
   }
@@ -267,7 +282,8 @@ export function diffListing(args: {
     for (const url of missingUrls) {
       const row = byUrl.get(url)
       if (row?.in_stock === false) continue // 이미 품절 — 쓸 것 없음
-      updates.push({productUrl: url, patch: {in_stock: false}, reasons: ["리스트에서 사라짐 → 품절"]})
+      updates.push({id: row!.id, productUrl: url, expectedUpdatedAt: row!.updated_at,
+        observedAt: new Date().toISOString(), patch: {in_stock: false}, reasons: ["리스트에서 사라짐 → 품절"]})
     }
   }
 

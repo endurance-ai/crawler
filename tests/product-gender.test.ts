@@ -67,13 +67,21 @@ test("명시적 모델 라벨은 한쪽/양쪽 착용을 구분하고 일반 문
 // 검색 RPC 가 `p.gender && ARRAY[p_gender,'unisex']` 로 그 상품을 남성·여성
 // 양쪽 결과에 노출시킨다 (= 남성 검색에 여성복이 뜸).
 //
-// 2026-08 회귀에서 브랜드 스코프 폴백은 복원하지 않았다 — 근거는
-// engine/url/text/config_default 4단뿐이다.
+// 브랜드 스코프는 검증된 단일 men/women 값만 마지막 fallback 으로 허용한다.
 
 test("unisex 세탁: 신호가 전혀 없으면 미확인으로 떨어진다", () => {
   const r = resolveProductGenderWithSource([], {name: "Signature Wool Coat"})
   assert.deepEqual(r.gender, [])
   assert.equal(r.source, null)
+})
+
+test("single-gender brand scope is a fallback but unisex and mixed scopes are not", () => {
+  assert.deepEqual(resolveProductGenderWithSource([], {name: "Signature Coat"}, "engine",
+    {brandGenderScope: ["women"]}), {gender: ["women"], source: "brand_scope"})
+  assert.deepEqual(resolveProductGenderWithSource([], {name: "Signature Coat"}, "engine",
+    {brandGenderScope: ["unisex"]}), {gender: [], source: null})
+  assert.deepEqual(resolveProductGenderWithSource([], {name: "Signature Coat"}, "engine",
+    {brandGenderScope: ["men", "women"]}), {gender: [], source: null})
 })
 
 test("unisex 는 명시적 신호가 있을 때만 부여된다", () => {
@@ -82,10 +90,7 @@ test("unisex 는 명시적 신호가 있을 때만 부여된다", () => {
   assert.equal(r.source, "text")
 })
 
-test("브랜드 스코프 폴백은 존재하지 않는다", () => {
-  // 예전 시그니처는 (productGender, brandGenderScope, evidence, source) 였고
-  // 2번째 인자로 브랜드 스코프가 들어와 최후 폴백으로 쓰였다. 지금 2번째 인자는
-  // evidence 이므로, 브랜드 스코프처럼 생긴 값을 넘겨도 성별이 생기지 않는다.
+test("브랜드 스코프는 명시적인 옵션 없이는 추론되지 않는다", () => {
   const r = resolveProductGenderWithSource([], {} as never)
   assert.deepEqual(r.gender, [])
   assert.equal(r.source, null)
@@ -93,7 +98,7 @@ test("브랜드 스코프 폴백은 존재하지 않는다", () => {
 
 // ─── 우선순위 ────────────────────────────────────────────────────────────
 
-test("우선순위: engine > url > text > config_default > 미확인", () => {
+test("우선순위: engine > url > text > config_default > brand_scope > 미확인", () => {
   // 1. 엔진 값이 최우선 (URL/텍스트가 반대여도)
   assert.deepEqual(
     resolveProductGenderWithSource(["women"], {name: "MEN'S COAT", productUrl: "https://x.com/men/1"}),

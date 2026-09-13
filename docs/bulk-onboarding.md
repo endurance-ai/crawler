@@ -23,7 +23,8 @@ tools/onboard-batch.sh  ── 청크 단위(기본 20개)로 반복 ──┐
   │      → data/<key>-products.json  (import 스키마)
   │
   ├─ 3. import (src/import-products.ts --site=<key>)
-  │      canonical DB upsert → local Qwen best-effort 조건부 보강
+  │      confirmed pricing + verified brand + local Qwen 정규화
+  │      → prepared RPC (Qwen 실패 시 미적재)
   │
   └─ 4. guardrail (tools/reclassify-categories.ts --only-invalid)
          비canonical category가 남아있으면 규칙+local Qwen으로 수정
@@ -36,6 +37,8 @@ tools/onboard-batch.sh  ── 청크 단위(기본 20개)로 반복 ──┐
 크롤 파이프라인의 모든 분류기(QC의 `normalization.ts`, 규칙기반 `shopify-category-classifier.ts`,
 Qwen 정규화 스키마(`product-qwen-normalization.ts`)는 이 파일의 `CATEGORIES`/`SUBCATEGORIES`를 참조한다 —
 taxonomy를 바꿀 땐 이 파일부터 고친다 (§5 참조).
+
+Import 완료는 Qwen 정상 응답과 prepared write 결과를 포함한 pipeline report로만 판단한다. `--report=<path>`를 항상 전달하고 `failed`/`pending` 또는 exit 1을 완료로 기록하지 않는다. `--allow-qwen-deferred`는 폐기된 옵션이며 신규 상품을 완료 처리할 수 없다. 실제 운영 순서와 중단·복구 절차는 [pipeline integrity runbook](../../kikoai/kikoai-handoff/pipeline-integrity/rollout-runbook.md)을 따른다.
 
 ---
 
@@ -107,9 +110,10 @@ tools/onboard-batch.sh --configs /tmp/batch.json \
 `products.jsonl` 에서 통째로 빠졌다. 노출은 `in_stock` 이 이미 막으므로(검색 RPC 는
 `in_stock=true` 만 본다) 담아두는 쪽이 재입고 복구를 리스팅 갱신만으로 끝낼 수 있다.
 
-**⚠️ `--out-root`는 배치마다 다른 값을 써라.** 같은 out-root를 재사용하면 이전 배치의
-`chunk-N/products.jsonl`이 남아있어 크롤이 "이미 있음"으로 스킵되고 엉뚱한 청크의 브랜드가
-섞일 수 있다 (실제로 발생한 버그 — §4 참조).
+배치별 고유 `--out-root`를 권장한다. 같은 경로를 재사용할 때는 단순 파일 존재가 아니라
+`pipeline-artifact.mjs`가 기록한 input hash(config, engine, variant, limit, stock flag)와 artifact
+SHA-256이 모두 일치해야 crawl cache를 재사용한다. 하나라도 다르면 기존 파일을 격리하고 다시
+생성한다.
 
 ### 2-3. 결과 확인
 
@@ -119,8 +123,8 @@ tools/onboard-batch.sh --configs /tmp/batch.json \
 
 ### 2-4. 중단 후 재개
 
-같은 `--out-root`로 같은 `--start`를 다시 실행하면, 이미 크롤된 청크(`products.jsonl` 존재)는
-자동 스킵하고 이어서 진행한다.
+같은 `--out-root`로 같은 `--start`를 다시 실행하면, artifact stamp가 현재 입력과 파일에
+일치하는 청크만 자동 스킵한다. config/flag가 달라졌거나 파일 내용이 바뀌면 재크롤한다.
 
 ---
 
@@ -170,8 +174,8 @@ npx dotenv -e .env.local -- npx tsx tools/reclassify-categories.ts --only-invali
 3. **워크트리에 출력 디렉토리 부재**: 새 git worktree는 `poc-runs/`, `data/`가 없어 크롤 직후
    파일 쓰기가 조용히 실패(0 rows)할 수 있다. → `onboard-batch.sh`가 실행 시작 시 항상
    `mkdir -p`로 방어.
-4. **out-root 재사용 충돌** (§2-2 경고): 다른 배치가 같은 `chunk-N` 이름을 재사용하면 잔여
-   파일 때문에 크롤이 스킵되고 엉뚱한 브랜드 결과가 섞인다.
+4. **out-root 재사용 충돌** (§2-2): 현재 wrapper는 input/artifact hash stamp로 잔여 파일 재사용을
+   막는다. stamp 파일을 수동 복사하거나 산출물과 따로 이동하지 말고, 배치별 고유 경로를 유지한다.
 5. **규칙기반 분류기는 영어 패턴만 매칭**: `classifyShopifyCategory`의 `TYPE_TO_CATEGORY`는 영어
    정규식뿐이라, 한글 전용 상품명(자사몰 특유)은 자주 `other`로 떨어진다. import 후 Qwen 보강이 이걸 잡아준다 —
    `--only-invalid` 가드레일은 `other`를 "이미 유효한 canonical 값"으로 보고 건드리지 않으므로,

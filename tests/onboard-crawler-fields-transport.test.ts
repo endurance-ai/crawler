@@ -32,8 +32,22 @@ test("non-transformed crawler fields survive the POC boundary", () => {
     llmEnrichedAt: "2026-08-10T00:00:03.000Z",
     llmModel: "qwen",
     llmInputHash: "abc",
+    normalization: {
+      status: "succeeded",
+      inputHash: "abc",
+      policyVersion: "2026-09",
+      model: "qwen",
+      completedAt: "2026-08-10T00:00:03.000Z",
+      category: "tops",
+      subcategory: "shirts",
+    },
     reviewCount: 1,
     reviews: [{text: "good", author: null, date: null, photoUrls: [], body: null}],
+    reviewCollection: {
+      status: "succeeded",
+      observedAt: "2026-08-10T00:00:04.000Z",
+      confirmedEmpty: false,
+    },
   } satisfies Product
 
   const poc = crawlerFieldsToPoc(product)
@@ -41,6 +55,21 @@ test("non-transformed crawler fields survive the POC boundary", () => {
   assert.equal(poc.crawler_metadata.brand, "CRAWLER BRAND")
   assert.equal(poc.crawler_metadata.productCode, "P-1")
   assert.deepEqual(poc.crawler_metadata.reviews, product.reviews)
+  assert.deepEqual(poc.crawler_metadata.normalization, product.normalization)
+  assert.deepEqual(poc.crawler_metadata.reviewCollection, product.reviewCollection)
+})
+
+test("legacy metadata has no inferred provenance", () => {
+  const legacy = {
+    llmEnrichedAt: "2026-01-01T00:00:00.000Z",
+    llmModel: "legacy-model",
+    llmInputHash: "legacy-hash",
+    reviews: [],
+  }
+  const restored = crawlerFieldsFromPoc({crawler_metadata: legacy})
+  assert.equal(restored.normalization, undefined)
+  assert.equal(restored.reviewCollection, undefined)
+  assert.deepEqual(restored.reviews, [])
 })
 
 test("Product metadata key coverage is compile-time exhaustive", () => {

@@ -1,5 +1,9 @@
 # 크롤러 지속 운영 아키텍처 (operations)
 
+> 2026-09-12 pipeline-integrity 배포와 복구 절차는 [`../../kikoai/kikoai-handoff/pipeline-integrity/rollout-runbook.md`](../../kikoai/kikoai-handoff/pipeline-integrity/rollout-runbook.md)를 따른다. 아래의 과거 설계보다 새 런북의 prepared write, candidate lease/revision, Qwen hard gate, structured report 규칙이 우선한다.
+>
+> 현재 wrapper는 crawl 입력 hash와 artifact SHA-256 stamp가 모두 맞을 때만 cache를 재사용하고, 새 crawl은 과거 import/report/embedding marker를 무효화한다. Candidate의 `--max-age-hours`는 claim뿐 아니라 checkpoint/publish에서도 유지·재검증된다. Manifest recovery는 기본 dry-run이며 실제 변경은 `--apply`가 필요하고, apply 결과는 finding마다 유효한 manifest-bound checkpoint에 atomic하게 기록된다.
+
 > 작성일: 2026-05-22
 > 상태: 설계(미구현) — 본 문서는 **설계/아키텍처 문서**다. systemd unit / SQL migration / admin 코드 / CI yaml 은 본문 안의 스니펫으로만 존재하며, 실제 산출물은 승인 후 별도 작업에서 만든다.
 > 실행 환경(owner 확정): 크롤러는 **전용 m6i.large (2 vCPU / 8 GB RAM, x86_64), ap-northeast-2(Seoul), 24/7 상시 가동** EC2 인스턴스에서 돈다. dev-app(t4g.large) 와는 **별도 인스턴스**다. 비용은 고려 대상이 아니며, RAM 헤드룸 + x86 네이티브 Chrome 을 위해 선택됐다.

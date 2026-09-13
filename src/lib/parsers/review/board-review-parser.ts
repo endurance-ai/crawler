@@ -14,7 +14,11 @@ import {BODY_INFO_PATTERNS} from "../../body-info-extractor"
 
 export class BoardReviewParser implements IReviewParser {
   async parse(page: Cafe24Page, maxReviews: number): Promise<ReviewData> {
-    const result: ReviewData = { reviewCount: 0, reviews: [] }
+    const result: ReviewData = {
+      reviewCount: 0,
+      reviews: [],
+      reviewCollection: {status: "failed", observedAt: null, confirmedEmpty: false},
+    }
 
     try {
       // 1) 리뷰 보드 링크 + 리뷰 수 추출
@@ -22,6 +26,7 @@ export class BoardReviewParser implements IReviewParser {
         const links = Array.from(document.querySelectorAll("a"))
         let boardUrl: string | null = null
         let count = 0
+        let countObserved = false
 
         for (const link of links) {
           const href = link.getAttribute("href") || ""
@@ -31,7 +36,10 @@ export class BoardReviewParser implements IReviewParser {
           if (href.includes("/board/product/list.html") && href.includes("link_product_no")) {
             boardUrl = href
             const numMatch = text.match(/(\d+)/)
-            if (numMatch) count = parseInt(numMatch[1], 10)
+            if (numMatch) {
+              count = parseInt(numMatch[1], 10)
+              countObserved = true
+            }
             break
           }
         }
@@ -43,6 +51,7 @@ export class BoardReviewParser implements IReviewParser {
             const match = text.match(/(?:리뷰|후기|review)\s*(\d+)/i)
             if (match) {
               count = parseInt(match[1], 10)
+              countObserved = true
               if (!boardUrl) {
                 const href = link.getAttribute("href") || ""
                 if (href.includes("board")) boardUrl = href
@@ -64,12 +73,15 @@ export class BoardReviewParser implements IReviewParser {
           }
         }
 
-        return { boardUrl, count }
+        return { boardUrl, count, countObserved }
       })
 
       result.reviewCount = boardInfo.count
 
-      if (!boardInfo.boardUrl) return result
+      if (!boardInfo.boardUrl) {
+        result.reviewCollection.error = "review board source not found"
+        return result
+      }
 
       // 2) 보드 페이지로 이동 (URL 검증)
       const boardUrl = boardInfo.boardUrl.startsWith("http")
@@ -77,6 +89,7 @@ export class BoardReviewParser implements IReviewParser {
         : new URL(boardInfo.boardUrl, page.url()).href
 
       if (!boardUrl.startsWith("https://") && !boardUrl.startsWith("http://")) {
+        result.reviewCollection.error = "invalid review board URL"
         return result
       }
 
@@ -84,20 +97,33 @@ export class BoardReviewParser implements IReviewParser {
       await page.waitForTimeout(2000)
 
       // 3) 테이블 기반 리뷰 파싱 + 상세 페이지에서 체형 정보 수집
-      result.reviews = await this.parseBoardReviewsWithDetail(page, boardUrl, maxReviews)
+      const parsed = await this.parseBoardReviewsWithDetail(page, boardUrl, maxReviews)
+      result.reviews = parsed.reviews
 
       if (result.reviewCount === 0 && result.reviews.length > 0) {
         result.reviewCount = result.reviews.length
       }
+      const confirmedEmpty = parsed.failures === 0 && boardInfo.countObserved &&
+        result.reviewCount === 0 && result.reviews.length === 0
+      const emptyWithoutEvidence = parsed.failures === 0 && !confirmedEmpty && result.reviews.length === 0
+      result.reviewCollection = emptyWithoutEvidence
+        ? {status: "failed", observedAt: null, confirmedEmpty: false, error: "review board returned no authoritative count or rows"}
+        : {
+            status: parsed.failures === 0 ? "succeeded" : "partial",
+            observedAt: new Date().toISOString(),
+            confirmedEmpty,
+            ...(parsed.failures > 0 ? {error: `${parsed.failures} review detail(s) failed`} : {}),
+          }
     } catch (err) {
       console.warn(`   ⚠️ Board 리뷰 파싱 실패: ${(err as Error).message}`)
+      result.reviewCollection.error = "review board parsing failed"
     }
 
     return result
   }
 
   /** 보드 페이지에서 리뷰 기본 정보 + 상세 링크 추출 후, 상세 페이지에서 체형 정보 수집 */
-  private async parseBoardReviewsWithDetail(page: Cafe24Page, boardUrl: string, max: number): Promise<Review[]> {
+  private async parseBoardReviewsWithDetail(page: Cafe24Page, boardUrl: string, max: number): Promise<{reviews: Review[]; failures: number}> {
     // Step 1: 보드 목록에서 기본 정보 + 상세 링크 추출
     const rawReviews = await page.evaluate((maxReviews) => {
       const rows = document.querySelectorAll("table tr")
@@ -157,6 +183,7 @@ export class BoardReviewParser implements IReviewParser {
     // Step 2: 상세 페이지 방문하여 체형 정보 + 전체 본문 수집
     const baseUrl = new URL(boardUrl).origin
     const reviews: Review[] = []
+    let failures = 0
     const patterns = BODY_INFO_PATTERNS
 
     for (const raw of rawReviews) {
@@ -166,11 +193,13 @@ export class BoardReviewParser implements IReviewParser {
       if (raw.detailUrl) {
         try {
           const detailUrl = raw.detailUrl.startsWith("http") ? raw.detailUrl : baseUrl + raw.detailUrl
-          if (!detailUrl.startsWith("https://") && !detailUrl.startsWith("http://")) continue
-          await page.goto(detailUrl, { waitUntil: "domcontentloaded", timeout: 10000 })
-          await page.waitForTimeout(1500)
+          if (!detailUrl.startsWith("https://") && !detailUrl.startsWith("http://")) {
+            failures++
+          } else {
+            await page.goto(detailUrl, { waitUntil: "domcontentloaded", timeout: 10000 })
+            await page.waitForTimeout(1500)
 
-          const detail = await page.evaluate((p) => {
+            const detail = await page.evaluate((p) => {
             const text = (document.body.textContent || "")
 
             // 체형 정보 추출 (BODY_INFO_PATTERNS 사용)
@@ -196,14 +225,15 @@ export class BoardReviewParser implements IReviewParser {
               } : null,
               content: content.slice(0, 1000),
             }
-          }, patterns)
+            }, patterns)
 
-          if (detail.body) body = detail.body as ReviewerBody
-          if (detail.content && detail.content.length > raw.text.length) {
-            fullText = detail.content
+            if (detail.body) body = detail.body as ReviewerBody
+            if (detail.content && detail.content.length > raw.text.length) {
+              fullText = detail.content
+            }
           }
         } catch {
-          // 상세 페이지 접근 실패 시 기본 정보만 사용
+          failures++
         }
       }
 
@@ -216,6 +246,6 @@ export class BoardReviewParser implements IReviewParser {
       })
     }
 
-    return reviews
+    return {reviews, failures}
   }
 }

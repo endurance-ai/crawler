@@ -1,13 +1,13 @@
 #!/usr/bin/env npx tsx
 /**
- * 재수집으로 대표 이미지가 바뀐 행의 product_embeddings 만 삭제한다.
+ * 재수집으로 대표 이미지가 바뀐 행을 DB의 조건부 임베딩 무효화 RPC에 넘긴다.
  *
  *   # 1) 크롤 전 스냅샷 (재수집 드라이버의 스테이지 1)
  *   pnpm invalidate:embeddings -- --platform=kith --snapshot=data/recollect/run-1/kith/images-before.jsonl
  *
  *   # 2) import 후 비교 (기본 dry-run)
  *   pnpm invalidate:embeddings -- --platform=kith --before=data/recollect/run-1/kith/images-before.jsonl
- *   #    확인 후 실제 삭제
+ *   #    확인 후 실제 무효화
  *   pnpm invalidate:embeddings -- --platform=kith --before=... --apply
  *
  * 스냅샷은 반드시 **크롤 전**에 떠야 한다. products 의 upsert 는 행을 제자리에서
@@ -15,7 +15,7 @@
  * 대신 비교해서도 안 된다 — DB 에 실제로 앉는 값은 QC 게이트/검증 게이트와
  * import 의 product_url dedup 머지를 거친 결과라 JSON 과 다를 수 있다.
  *
- * 삭제 후에는 kiko.ai-app/scripts/aws/embed_products.py 를 돌리면 된다.
+ * 무효화 후에는 kiko.ai-app/scripts/aws/embed_products.py 를 돌리면 된다.
  * 그쪽 pending 판정이 "product_embeddings 행 없음" 안티조인이라, 지운 행이
  * 자동으로 재임베딩 대상이 된다.
  *
@@ -33,9 +33,10 @@ import {
   diffImageSnapshots,
   type ImageSnapshotRow,
 } from "../src/lib/embedding-invalidation"
+import {invalidateStaleProductEmbeddings} from "../src/lib/embedding-invalidation-rpc"
 
 const PAGE_SIZE = 1000
-const DELETE_BATCH = 500
+const INVALIDATION_BATCH = 500
 
 interface Flags {
   platform: string
@@ -179,16 +180,17 @@ async function main(): Promise<void> {
     return
   }
 
-  let deleted = 0
-  for (let i = 0; i < summary.invalidateIds.length; i += DELETE_BATCH) {
-    const batch = summary.invalidateIds.slice(i, i + DELETE_BATCH)
-    const {error} = await client.from("product_embeddings").delete().in("product_id", batch)
-    if (error) throw new Error(`product_embeddings 삭제 실패: ${error.message}`)
-    deleted += batch.length
-    console.log(`   🗑️  ${deleted}/${summary.invalidateIds.length}`)
+  const outcomes = {invalidated: 0, current: 0, missing: 0}
+  for (let i = 0; i < summary.invalidateIds.length; i += INVALIDATION_BATCH) {
+    const batch = summary.invalidateIds.slice(i, i + INVALIDATION_BATCH)
+    const results = await invalidateStaleProductEmbeddings(client, batch)
+    for (const result of results) outcomes[result.outcome] += 1
+    const accounted = outcomes.invalidated + outcomes.current + outcomes.missing
+    console.log(`   ♻️  ${accounted}/${summary.invalidateIds.length}`)
   }
   console.log(
-    `\n✅ ${deleted}행 무효화 완료 — kiko.ai-app/scripts/aws/embed_products.py 를 돌리면 재임베딩된다`,
+    `\n✅ 임베딩 확인 완료 — invalidated=${outcomes.invalidated} current=${outcomes.current} missing=${outcomes.missing}` +
+      ` — kiko.ai-app/scripts/aws/embed_products.py 를 돌리면 재임베딩된다`,
   )
 }
 

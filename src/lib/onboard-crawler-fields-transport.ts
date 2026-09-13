@@ -48,8 +48,10 @@ const METADATA_KEYS = [
   "llmEnrichedAt",
   "llmModel",
   "llmInputHash",
+  "normalization",
   "reviewCount",
   "reviews",
+  "reviewCollection",
 ] as const satisfies readonly MetadataProductKey[]
 
 type MissingMetadataKey = Exclude<MetadataProductKey, typeof METADATA_KEYS[number]>
