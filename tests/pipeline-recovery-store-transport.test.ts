@@ -4,6 +4,7 @@ import {createClient} from "@supabase/supabase-js"
 
 import {SupabaseRecoveryStore} from "../src/lib/pipeline-recovery-store"
 import type {RecoveryCandidate} from "../src/lib/pipeline-recovery"
+import type {AuditProduct} from "../src/lib/pipeline-audit"
 
 function response(value: unknown): Response {
   return new Response(JSON.stringify(value), {status: 200, headers: {"content-type": "application/json"}})
@@ -60,4 +61,31 @@ test("brand verification exhausts stable decimal-ID pages beyond PostgREST's fir
   assert.equal(result.length, 1001)
   assert.equal(result[1000].id, brands[1000].id)
   assert.deepEqual(cursors, [null, brands[499].id, brands[999].id])
+})
+
+test("nullable review_count uses an is.null CAS filter", async () => {
+  let requestUrl: URL | undefined
+  const fetch: typeof globalThis.fetch = async (input) => {
+    requestUrl = new URL(typeof input === "string" || input instanceof URL ? input : input.url)
+    return response([{id: "42"}])
+  }
+  const db = createClient("http://postgrest.test", "test-key", {global: {fetch}})
+  const current: AuditProduct = {id: "42", product_url: "https://shop.example/p/42", platform: "shop",
+    brand: "Brand", brand_node_id: null, updated_at: "2026-09-12T00:00:00Z",
+    price: 10, original_price: 10, sale_price: null, in_stock: true, image_url: null,
+    image_revision: "1", review_count: null, reviews_observed_at: null}
+  assert.equal(await new SupabaseRecoveryStore(db).updateProduct(current, {review_count: 0}), true)
+  assert.equal(requestUrl?.searchParams.get("review_count"), "is.null")
+})
+
+test("embedding invalidation uses the v2 RPC and validates its ordered result", async () => {
+  let body: Record<string, unknown> | undefined
+  const fetch: typeof globalThis.fetch = async (_input, init) => {
+    body = JSON.parse(String(init?.body)) as Record<string, unknown>
+    return response([{id: "9007199254740993", outcome: "invalidated"}])
+  }
+  const db = createClient("http://postgrest.test", "test-key", {global: {fetch}})
+  const outcome = await new SupabaseRecoveryStore(db).invalidateEmbedding("9007199254740993")
+  assert.equal(outcome, "invalidated")
+  assert.deepEqual(body, {p_product_ids: ["9007199254740993"]})
 })

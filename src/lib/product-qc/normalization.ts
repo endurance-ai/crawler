@@ -52,6 +52,8 @@ export interface ProductQcInput {
  * 강제돼도 subcategory 는 freeform 이고, canonical 계약은 여전히 지켜야 한다.
  */
 export interface ProductQcOptions {
+  /** Existing brand's verified single-gender scope, used only as the last safe fallback. */
+  brandGenderScope?: unknown
   /** 입력 category 가 신뢰 가능한 출처(LLM 보강)에서 왔는가. 기본 false. */
   trustedCategory?: boolean
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
@@ -562,6 +564,7 @@ function normalizeGenderField(product: ProductQcInput, options: ProductQcOptions
       kidsGenderNoisePatterns: options.kidsGenderNoisePatterns,
       verifiedUnisexDefault: options.verifiedUnisexDefault,
       genderTextPatterns: options.genderTextPatterns,
+      brandGenderScope: options.brandGenderScope,
     },
   )
 

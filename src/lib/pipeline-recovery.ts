@@ -17,7 +17,7 @@ export interface RecoveryStore {
   readBrands(): Promise<AuditBrand[]>
   countReviews(productId: string): Promise<number>
   readEmbedding(productId: string): Promise<AuditEmbedding | null>
-  deleteEmbedding(current: AuditEmbedding): Promise<boolean>
+  invalidateEmbedding(productId: string): Promise<"invalidated" | "current" | "missing">
 }
 
 export type RecoveryOutcome = "planned" | "applied" | "unchanged" | "conflicted" | "failed" | "deferred"
@@ -228,9 +228,7 @@ async function repairBrand(
   if (current && typeof proposed === "string" && current.brand_node_id === proposed &&
       EXPECTED_PRODUCT_KEYS.filter((key) => !["brand_node_id","updated_at", ...(approvedReviewCount !== undefined ? ["review_count"] : [])].includes(key))
         .every((key) => pipelineAuditHash(current[key]) === pipelineAuditHash(finding.expected[key]))) {
-    if (approvedReviewCount === undefined || (current.review_count ?? 0) === approvedReviewCount) {
-      return result(finding, "unchanged")
-    }
+    return result(finding, "unchanged")
   }
   if (!current || !exactExpected(current as unknown as Record<string, unknown>, finding.expected, EXPECTED_PRODUCT_KEYS)) {
     return result(finding, "conflicted", current ? "product_changed" : "product_missing")
@@ -295,8 +293,10 @@ async function regenerateEmbedding(store: RecoveryStore, finding: PipelineAuditF
   if (!expectedEmbedding || pipelineAuditHash(current) !== pipelineAuditHash(expectedEmbedding)) {
     return result(finding, "conflicted", "embedding_changed")
   }
-  const applied = await store.deleteEmbedding(current)
-  return result(finding, applied ? "applied" : "conflicted", applied ? undefined : "embedding_race")
+  const outcome = await store.invalidateEmbedding(finding.id)
+  if (outcome === "invalidated") return result(finding, "applied")
+  if (outcome === "current" || outcome === "missing") return result(finding, "unchanged")
+  return result(finding, "failed", "embedding_invalidation_unknown")
 }
 
 export async function runPipelineRecovery(options: {

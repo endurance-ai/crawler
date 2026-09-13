@@ -74,11 +74,12 @@ class FakeStore implements RecoveryStore {
   async readBrands() { return structuredClone(this.brands) }
   async countReviews() { return this.reviewCount }
   async readEmbedding(id: string) { return this.embedding?.product_id === id ? structuredClone(this.embedding) : null }
-  async deleteEmbedding(current: AuditEmbedding) {
+  async invalidateEmbedding(id: string): Promise<"invalidated" | "current" | "missing"> {
     this.writes.push("embedding")
-    if (this.race || !this.embedding || pipelineAuditHash(this.embedding) !== pipelineAuditHash(current)) return false
+    if (this.race) return "current"
+    if (!this.embedding || this.embedding.product_id !== id) return "missing"
     this.embedding = null
-    return true
+    return "invalidated"
   }
 }
 
@@ -158,7 +159,7 @@ test("review repair and embedding invalidation preserve raced state", async () =
   })
   const raced = new FakeStore()
   raced.race = true
-  assert.equal((await runPipelineRecovery({manifest: manifest([embeddingFinding]), store: raced, apply: true})).results[0].code, "embedding_race")
+  assert.equal((await runPipelineRecovery({manifest: manifest([embeddingFinding]), store: raced, apply: true})).results[0].outcome, "unchanged")
   assert.deepEqual(raced.embedding, embedding)
   const applied = new FakeStore()
   assert.equal((await runPipelineRecovery({manifest: manifest([embeddingFinding]), store: applied, apply: true})).results[0].outcome, "applied")
@@ -208,6 +209,10 @@ test("checkpoint persistence failure stops before the next mutation", async () =
   assert.deepEqual(store.writes, ["product"])
   assert.equal(store.product?.brand_node_id, "3")
   assert.equal(store.product?.review_count, 9)
+
+  const resumed = await runPipelineRecovery({manifest: audit, store, apply: true})
+  assert.deepEqual(resumed.results.map((item) => item.outcome), ["unchanged", "applied"])
+  assert.equal(store.product?.review_count, 2)
 })
 
 test("CLI validates the default checkpoint and output collisions before database setup", async () => {

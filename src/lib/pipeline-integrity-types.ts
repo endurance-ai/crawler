@@ -27,7 +27,7 @@ export interface ReviewCollection {
 }
 
 export type BrandResolution =
-  | {status: "existing"; brand: string; brandNodeId: string}
+  | {status: "existing"; brand: string; brandNodeId: string; genderScope?: string[] | null}
   | {status: "would_create"; brand: string}
   | {status: "quarantined"; brand: string; reason: string}
 
@@ -38,6 +38,7 @@ export interface PipelineError {
   retryable: boolean
   platform?: string
   productUrl?: string
+  candidateId?: string
 }
 
 export interface PipelineStageReport {

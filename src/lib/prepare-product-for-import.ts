@@ -136,24 +136,18 @@ export async function prepareProductForImport(
     catch { return failure(product, "pricing", "detail_pricing_failed", "detail pricing recovery failed", true) }
   }
   if (!isConfirmedPricing(product)) return failure(product, "pricing", "pricing_unverified", "confirmed pricing v2 is required", true)
-
-  const qcOptions = {
+  const observedAt = product.detailFetchedAt ?? input.observedAt
+  if (!isIsoTimestamp(observedAt)) return failure(product, "validation", "observed_at_invalid", "detail observation must be an ISO timestamp", false)
+  const baseQcOptions = {
     trustedCategory: input.config.type === "shopify" || input.config.trustedCategory === true,
     verifiedUnisexDefault: input.config.verifiedUnisexDefault,
     genderTextPatterns: input.config.genderTextPatterns,
     kidsGenderNoisePatterns: input.config.kidsGenderNoisePatterns,
     outOfScopeCategories: input.config.outOfScopeCategories,
   }
-  if (filterOutOfScopeProducts([product], qcOptions).length === 0) {
+  if (filterOutOfScopeProducts([product], baseQcOptions).length === 0) {
     return {status: "policy_excluded", code: "product_out_of_scope", product}
   }
-  const canonicalized = applyProductQcGate([product], input.config.key, {
-    ...qcOptions,
-    excludeOutOfScope: true,
-    recordReport: false,
-  })
-  if (canonicalized.length !== 1) return failure(product, "validation", "product_validation_failed", "product failed initial taxonomy validation", false)
-  product = canonicalized[0]
 
   const houseBrand = resolveProductBrand(product.brand, input.config)
   const canonicalBrand = canonicalizePlatformBrand(houseBrand, input.config.key)
@@ -174,8 +168,20 @@ export async function prepareProductForImport(
   if (brandResolution.status === "existing" && !/^[1-9]\d*$/.test(brandResolution.brandNodeId)) {
     return failure(product, "brand", "brand_node_id_invalid", "existing brand node ID must be a positive decimal string", false)
   }
-
   product.brand = brandResolution.brand
+
+  const qcOptions = {
+    ...baseQcOptions,
+    brandGenderScope: brandResolution.status === "existing" ? brandResolution.genderScope : undefined,
+  }
+  const canonicalized = applyProductQcGate([product], input.config.key, {
+    ...qcOptions,
+    excludeOutOfScope: true,
+    recordReport: false,
+  })
+  if (canonicalized.length !== 1) return failure(product, "validation", "product_validation_failed", "product failed initial taxonomy validation", false)
+  product = canonicalized[0]
+
   const normalization = await normalizeProductForImport({
     productUrl: product.productUrl,
     name: product.name,
@@ -205,6 +211,7 @@ export async function prepareProductForImport(
 
   const accepted = applyProductQcGate([product], input.config.key, {
     trustedCategory: true, verifiedUnisexDefault: input.config.verifiedUnisexDefault,
+    brandGenderScope: brandResolution.status === "existing" ? brandResolution.genderScope : undefined,
     genderTextPatterns: input.config.genderTextPatterns, kidsGenderNoisePatterns: input.config.kidsGenderNoisePatterns,
     outOfScopeCategories: input.config.outOfScopeCategories, excludeOutOfScope: true, recordReport: false,
   })
@@ -232,7 +239,7 @@ export async function prepareProductForImport(
     ...prices, product_url: product.productUrl, image_url: product.imageUrl,
     source_image_url: product.sourceImageUrl ?? product.imageUrl, images: product.images ?? null,
     in_stock: product.inStock, platform: input.config.key, brand_node_id: brandResolution.brandNodeId,
-    gender: product.gender, gender_source: product.genderSource ?? null, crawled_at: input.observedAt,
+    gender: product.gender, gender_source: product.genderSource ?? null, crawled_at: observedAt,
     tags: product.tags?.slice(0, 50) ?? null, size_info: product.sizeInfo?.slice(0, 2000) ?? null,
     product_code: product.productCode?.slice(0, 100) ?? null,
   }
@@ -241,7 +248,7 @@ export async function prepareProductForImport(
     normalization: {status: normalization.status, input_hash: normalization.inputHash,
       policy_version: normalization.policyVersion, model: normalization.model, completed_at: normalization.completedAt},
     pricing_observation: product.pricingObservation as PreparedProductWrite["pricing_observation"],
-    observed_at: input.observedAt, expected_updated_at: input.expectedUpdatedAt,
+    observed_at: observedAt, expected_updated_at: input.expectedUpdatedAt,
   }
   return {status: "prepared", prepared, product, normalization, brandResolution}
 }

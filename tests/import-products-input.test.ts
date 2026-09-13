@@ -26,3 +26,12 @@ test("canonical duplicate identity keeps the newest coherent observation", () =>
   assert.equal(result[0].name, "New")
   assert.equal(result[0].inStock, false)
 })
+
+test("input boundary preserves the verified single-gender brand scope fallback", () => {
+  const [resolved] = prepareImportInputProducts([product({gender: []})], "shop", config,
+    (brand) => brand === "House" ? ["women"] : undefined)
+  assert.deepEqual(resolved.gender, ["women"])
+  assert.equal(resolved.genderSource, "brand_scope")
+  assert.throws(() => prepareImportInputProducts([product({gender: []})], "shop", config,
+    () => ["unisex"]), /validation failed/)
+})

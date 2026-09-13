@@ -156,11 +156,30 @@ test("Cafe24 detail adapter applies structured fixture pricing without mutating 
       detailPriceText: "", descFirstLine: "Cotton shirt", descText: "Cotton shirt", categoryNames: ["TOP"],
     }),
   } as unknown as Cafe24Page
-  const recovered = await recoverCafe24CandidateDetailPricing(source, page)
+  const recovered = await recoverCafe24CandidateDetailPricing(source, page,
+    () => "2026-09-12T01:02:03.456Z")
   assert.equal(source.pricingObservation?.state, "unknown")
   assert.equal(recovered.pricingObservation?.state, "sale")
   assert.equal(recovered.price, 80_000)
   assert.equal(recovered.originalPrice, 100_000)
+  assert.equal(recovered.detailFetchedAt, "2026-09-12T01:02:03.456Z")
+})
+
+test("detail recovery timestamp becomes the prepared observation timestamp", async () => {
+  const cafe = {...config, key: "cafe", type: "cafe24" as const}
+  const result = await prepareProductForImport({product: product({platform: "cafe",
+    pricingObservation: {state: "unknown", source: "listing", version: 2}}), config: cafe,
+    observedAt: "2026-09-12T00:00:00Z", expectedUpdatedAt: null}, {
+    resolveBrand: existingBrand,
+    recoverDetailPricing: async (value) => ({...value, detailFetchedAt: "2026-09-12T01:02:03.456Z",
+      pricingObservation: {state: "regular", source: "detail", version: 2}, price: 100_000,
+      originalPrice: 100_000, salePrice: null, sourcePrice: 100_000}),
+  })
+  assert.equal(result.status, "prepared")
+  if (result.status === "prepared") {
+    assert.equal(result.prepared.observed_at, "2026-09-12T01:02:03.456Z")
+    assert.equal(result.prepared.product.crawled_at, "2026-09-12T01:02:03.456Z")
+  }
 })
 
 test("rejects malformed Qwen responses instead of stamping unchanged", async () => {

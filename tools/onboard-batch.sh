@@ -188,15 +188,20 @@ for c in $(seq "$START" "$END"); do
   fi
   AFTER=$(DB_COUNT)
   NET=$((AFTER - BEFORE))
+  PIPELINE_KEYS=$(node -e 'try{console.log(require(require("path").resolve(process.argv[1])).join(","))}catch(e){console.log("")}' "$PASSKEYS_JSON")
 
   # Guardrail: fix any row left with a non-canonical category, regardless of
   # cause (stale cache upsert, LLM output drift, etc). Idempotent and cheap —
   # only touches rows actually out of taxonomy.
   GUARD_LOG="$OUT_ROOT/guardrail-chunk-$c.log"
-  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$GUARD_LOG" 2>&1; then
-    echo "chunk $c guardrail failed; Qwen/tunnel or DB error — $GUARD_LOG" >&2
-    node --import tsx tools/pipeline-report.ts fail "$REPORT" guardrail
-    exit 1
+  if [ -n "$PIPELINE_KEYS" ]; then
+    if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid --platform="$PIPELINE_KEYS" > "$GUARD_LOG" 2>&1; then
+      echo "chunk $c guardrail failed; Qwen/tunnel or DB error — $GUARD_LOG" >&2
+      node --import tsx tools/pipeline-report.ts fail "$REPORT" guardrail
+      exit 1
+    fi
+  else
+    echo "processed=0 planned=0 changed=0 conflicted=0 failed=0" > "$GUARD_LOG"
   fi
   INVALID_FOUND=$(grep -oE "processed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
   INVALID_FIXED=$(grep -oE "changed=[0-9]+" "$GUARD_LOG" | head -1 | grep -oE "[0-9]+" || echo 0)
@@ -205,7 +210,6 @@ for c in $(seq "$START" "$END"); do
   # platforms accepted by this chunk after every import, so local onboarding
   # reaches representative image -> features -> embedding -> matching without
   # a separate operator command.
-  PIPELINE_KEYS=$(node -e 'try{console.log(require(require("path").resolve(process.argv[1])).join(","))}catch(e){console.log("")}' "$PASSKEYS_JSON")
   if [ -n "$PIPELINE_KEYS" ]; then
     $PNPM catalog:pipeline -- --drain --platforms="$PIPELINE_KEYS"
   fi

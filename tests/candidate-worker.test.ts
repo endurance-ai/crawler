@@ -36,8 +36,9 @@ function fakeRepository(rows = [candidate()]): CandidateRepository & {calls: str
     async heartbeat(id, token) { calls.push(`heartbeat:${id}:${token}`); return true },
     async checkpoint(id, token, revision) { calls.push(`checkpoint:${id}:${token}:${revision}`); return "ready" },
     async finish(id, token, revision, outcome) { calls.push(`finish:${id}:${token}:${revision}:${outcome}`); return outcome },
-    async publish(id, token, revision) { calls.push(`publish:${id}:${token}:${revision}`); return {outcome: "imported", product_id: "91"} },
+    async publish(id, token, revision) { calls.push(`publish:${id}:${token}:${revision}`); return {outcome: "imported", product_id: "91", write_outcome: "inserted"} },
     async currentProduct() { return null },
+    async brandGenderScope() { return null },
     async publishNormalization() { throw new Error("unused") },
   }
 }
@@ -57,7 +58,7 @@ test("repository passes every claim filter into SQL RPC", async () => {
 test("normalization publish serializes frozen category and subcategory parameters", async () => {
   const calls: Array<{name: string; args: Record<string, unknown>}> = []
   const db = {rpc(name: string, args: Record<string, unknown>) {
-    calls.push({name, args}); return Promise.resolve({data: {outcome: "imported", product_id: "91"}, error: null})
+    calls.push({name, args}); return Promise.resolve({data: {outcome: "imported", product_id: "91", write_outcome: "updated"}, error: null})
   }, from() { throw new Error("unused") }}
   await createCandidateRepository(db).publishNormalization({candidateId: "7", token: "token", revision: "4",
     productId: "91", expectedUpdatedAt: "2026-09-12T01:02:03.123456Z", normalization: prepared.normalization,
@@ -66,6 +67,12 @@ test("normalization publish serializes frozen category and subcategory parameter
     p_id: "7", p_token: "token", p_expected_revision: "4", p_product_id: "91",
     p_expected_updated_at: "2026-09-12T01:02:03.123456Z", p_normalization: prepared.normalization,
     p_category: "clothing", p_subcategory: "tops"}})
+})
+
+test("repository rejects imported results that omit the write outcome", async () => {
+  const db = {rpc() { return Promise.resolve({data: {outcome: "imported", product_id: "91"}, error: null}) },
+    from() { throw new Error("unused") }}
+  await assert.rejects(createCandidateRepository(db).publish("1", "token", "1"), /invalid response/)
 })
 
 test("repository rejects rounded numeric IDs from claim RPC", async () => {
@@ -79,8 +86,10 @@ test("dry-run converts safe PostgREST numeric IDs without precision loss", async
     processing_token: null, lease_expires_at: null}
   const query: Record<string, unknown> = {}
   const predicates: string[] = []
+  let selected = ""
   for (const method of ["select", "eq", "gte", "lt", "or", "order", "limit"])
     query[method] = () => query
+  query.select = (columns: string) => { selected = columns; return query }
   query.or = (predicate: string) => { predicates.push(predicate); return query }
   query.then = (resolve: (value: unknown) => void) => resolve({data: [listed], error: null})
   const repository = createCandidateRepository({rpc() { throw new Error("unused") }, from() { return query }})
@@ -88,6 +97,8 @@ test("dry-run converts safe PostgREST numeric IDs without precision loss", async
   assert.equal(rows[0].id, "42")
   assert.equal(rows[0].observation_revision, "3")
   assert.equal(rows[0].matched_brand_node_id, "7")
+  assert.match(selected, /brand_nodes!inner\(wiki\)/)
+  assert(predicates.includes("wiki->>origin_country.ilike.KR"))
   assert(predicates.includes("status.in.(discovered,failed),and(status.in.(enriching,ready),or(processing_token.is.null,lease_expires_at.lte.now()))"))
 })
 
@@ -104,6 +115,8 @@ test("fresh identical listing cannot reuse an expired detail checkpoint", async 
     observed_at: new Date(now - 60_000).toISOString()}}, 24, now), true)
   assert.equal(canReuseCandidateCheckpoint({...row, enriched_product: {...row.enriched_product!,
     observed_at: "invalid"}}, 24, now), false)
+  assert.equal(canReuseCandidateCheckpoint({...row, raw_product: {...raw, brand: "Raw alias changed"},
+    enriched_product: {...row.enriched_product!, observed_at: new Date(now - 60_000).toISOString()}}, 24, now), true)
   let prepares = 0
   const result = await runCandidateWorker(options, {repository: fakeRepository([row]),
     checkpointReusable: (value) => canReuseCandidateCheckpoint(value, 24, now),
@@ -111,6 +124,7 @@ test("fresh identical listing cannot reuse an expired detail checkpoint", async 
     setInterval: () => 1, clearInterval: () => {}})
   assert.equal(prepares, 1)
   assert.equal(result.imported, 1)
+  assert.equal(result.inserted, 1)
 })
 
 test("dry-run lists only and performs no claim, Qwen, heartbeat, or writes", async () => {
@@ -153,6 +167,8 @@ test("preparation failure is finished as retry and never imported", async () => 
     setInterval: () => 1, clearInterval: () => {}})
   assert.equal(result.failed, 1)
   assert.equal(result.imported, 0)
+  assert.deepEqual(result.errors.map(({candidateId, code}) => ({candidateId, code})),
+    [{candidateId: "9007199254740993", code: "pricing_unverified"}])
   assert(repository.calls.includes("finish:9007199254740993:token-a:3:retry"))
 })
 
@@ -164,7 +180,7 @@ test("cached checkpoint is re-checkpointed after claim restores ready before pub
   repository.publish = async () => {
     assert.equal(state, "ready")
     repository.calls.push("publish:cached")
-    return {outcome: "imported", product_id: "91"}
+    return {outcome: "imported", product_id: "91", write_outcome: "inserted"}
   }
   let prepares = 0
   const result = await runCandidateWorker(options, {repository,
@@ -176,17 +192,18 @@ test("cached checkpoint is re-checkpointed after claim restores ready before pub
   assert(repository.calls.includes("checkpoint:cached"))
 })
 
-test("budget exhaustion releases every unprocessed claim", async () => {
+test("budget exhaustion is checked before claiming so no lease needs release", async () => {
   const repository = fakeRepository([candidate(), candidate({id: "2", processing_token: "token-b"})])
   let ticks = 0
   const result = await runCandidateWorker({...options, budgetMs: 1}, {repository,
     prepare: async () => ({status: "prepared", prepared}), checkpointReusable: () => false,
     now: () => ticks++ === 0 ? 0 : 2, setInterval: () => 1, clearInterval: () => {}})
-  assert.equal(result.released, 2)
-  assert(repository.calls.includes("finish:2:token-b:3:release"))
+  assert.equal(result.claimed, 0)
+  assert.equal(result.released, 0)
+  assert.equal(repository.calls.includes("claim"), false)
 })
 
-test("release accounting follows actual stale and lost-claim outcomes", async () => {
+test("an expired budget does not claim rows that could become abandoned", async () => {
   const repository = fakeRepository([candidate(), candidate({id: "2", processing_token: "token-b"})])
   repository.finish = async (id) => id === "2" ? "lost_claim" : "stale"
   let ticks = 0
@@ -194,8 +211,38 @@ test("release accounting follows actual stale and lost-claim outcomes", async ()
     prepare: async () => ({status: "prepared", prepared}), checkpointReusable: () => false,
     now: () => ticks++ === 0 ? 0 : 2, setInterval: () => 1, clearInterval: () => {}})
   assert.equal(result.released, 0)
-  assert.equal(result.stale, 1)
-  assert.equal(result.lostClaim, 1)
+  assert.equal(result.stale, 0)
+  assert.equal(result.lostClaim, 0)
+  assert.equal(repository.calls.length, 0)
+})
+
+test("budget expiry releases claims that were not started by the worker pool", async () => {
+  const repository = fakeRepository([candidate({id: "1"}), candidate({id: "2", processing_token: "token-b"})])
+  let ticks = 0
+  const result = await runCandidateWorker({...options, concurrency: 1, budgetMs: 1}, {repository,
+    prepare: async () => ({status: "prepared", prepared}), checkpointReusable: () => false,
+    now: () => ticks++ < 3 ? 0 : 2, setInterval: () => 1, clearInterval: () => {}})
+  assert.equal(result.inserted, 1)
+  assert.equal(result.released, 1)
+  assert(repository.calls.includes("finish:2:token-b:3:release"))
+})
+
+test("claim batches match concurrency and all claimed work starts together", async () => {
+  const rows = [candidate({id: "1"}), candidate({id: "2"}), candidate({id: "3"})]
+  const repository = fakeRepository(rows)
+  let active = 0
+  let peak = 0
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const run = runCandidateWorker({...options, concurrency: 3}, {repository,
+    prepare: async () => { active++; peak = Math.max(peak, active); await gate; active--
+      return {status: "prepared", prepared} }, checkpointReusable: () => false,
+    setInterval: () => 1, clearInterval: () => {}})
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(peak, 3)
+  release()
+  const result = await run
+  assert.equal(result.inserted, 3)
 })
 
 test("existing product conflict uses normalization-only CAS and preserves current fields", async () => {
@@ -208,7 +255,7 @@ test("existing product conflict uses normalization-only CAS and preserves curren
     assert.equal(input.category, "clothing")
     assert.equal(input.subcategory, "tops")
     assert.deepEqual(Object.keys(input).sort(), ["candidateId", "category", "expectedUpdatedAt", "normalization", "productId", "revision", "subcategory", "token"])
-    return {outcome: "imported", product_id: "91"}
+    return {outcome: "imported", product_id: "91", write_outcome: "updated"}
   }
   const result = await runCandidateWorker(options, {repository,
     prepare: async () => ({status: "prepared", prepared}), checkpointReusable: () => true,
@@ -217,6 +264,7 @@ test("existing product conflict uses normalization-only CAS and preserves curren
       return {normalization: prepared.normalization, category: "clothing", subcategory: "tops"}
     }, setInterval: () => 1, clearInterval: () => {}})
   assert.equal(result.imported, 1)
+  assert.equal(result.updated, 1)
 })
 
 test("dry-run entrypoint fails closed on missing DB setup without starting external work", () => {

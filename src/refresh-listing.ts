@@ -52,6 +52,7 @@ import {isRefreshBatchSourceRunnable} from "./lib/refresh-batch"
 import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlStructuredExisting} from "./lib/structured-refresh-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
+import {toDecimalId} from "./lib/pipeline-integrity-types"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
 import {crawlZara} from "./lib/zara-engine"
 
@@ -180,7 +181,7 @@ async function fetchExistingRows(
     const {data, error} = await db
       .from("products")
       .select(
-        "product_url, price, original_price, sale_price, source_price, source_currency, in_stock,last_seen_at",
+        "id,product_url,updated_at,crawled_at,price,original_price,sale_price,source_price,source_currency,in_stock,last_seen_at",
       )
       .eq("platform", platformKey)
       // ORDER BY 없는 LIMIT/OFFSET 은 페이지 간 행 순서가 보장되지 않아 누락이 생긴다.
@@ -194,7 +195,9 @@ async function fetchExistingRows(
       .range(offset, offset + pageSize - 1)
       .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
     if (error) throw new Error(`products 조회 실패: ${error.message}`)
-    const page = (data ?? []) as RefreshableRow[]
+    const page = (data ?? []).map((row) => ({...row,
+      id: toDecimalId((row as {id: string | number | bigint}).id),
+    })) as RefreshableRow[]
     rows.push(...page)
     if (page.length < pageSize) break
   }
@@ -276,14 +279,17 @@ async function applyUpdates(
       ok += 1
       continue
     }
-    const {error} = await db
+    const {data, error} = await db
       .from("products")
-      .update({...payload, updated_at: new Date().toISOString()})
+      .update({...payload, crawled_at: update.observedAt, updated_at: new Date().toISOString()})
+      .eq("id", update.id)
       .eq("product_url", update.productUrl)
+      .eq("updated_at", update.expectedUpdatedAt)
+      .select("id")
       .abortSignal(AbortSignal.timeout(DB_PRIMARY_WRITE_TIMEOUT_MS))
-    if (error) {
+    if (error || data?.length !== 1) {
       failed += 1
-      if (failed <= 3) console.error(`   ❌ update 실패 ${update.productUrl}: ${error.message}`)
+      if (failed <= 3) console.error(`   ❌ update 실패 ${update.productUrl}: ${error?.message ?? "CAS conflict"}`)
     } else {
       ok += 1
     }

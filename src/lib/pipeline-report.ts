@@ -87,7 +87,8 @@ function validErrors(value: unknown): value is PipelineError[] {
     typeof error.stage === "string" && typeof error.code === "string" &&
     typeof error.message === "string" && typeof error.retryable === "boolean" &&
     (error.platform === undefined || typeof error.platform === "string") &&
-    (error.productUrl === undefined || typeof error.productUrl === "string"))
+    (error.productUrl === undefined || typeof error.productUrl === "string") &&
+    (error.candidateId === undefined || typeof error.candidateId === "string"))
 }
 
 export function validatePipelineReport(value: unknown): asserts value is PipelineReport {

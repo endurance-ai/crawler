@@ -6,9 +6,11 @@ import type {Product} from "./types"
 export async function recoverCafe24CandidateDetailPricing(
   product: Product,
   page: Cafe24Page,
+  now: () => string = () => new Date().toISOString(),
 ): Promise<Product> {
   const recovered = {...product}
   const detail = await extractCafe24DetailFallbacks(page)
   applyCafe24DetailFallbacks(recovered, detail)
+  recovered.detailFetchedAt = now()
   return recovered
 }

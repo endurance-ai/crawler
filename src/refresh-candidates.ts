@@ -34,7 +34,7 @@ function booleanFlag(name: string): boolean {
 
 async function mainV2(): Promise<void> {
   if (booleanFlag("help")) {
-    console.log("Usage: refresh-candidates [--dry-run] [--limit=N] [--country=CC] [--platform=KEY] [--in-stock-only] [--max-attempts=N] [--max-age-hours=N] [--budget-minutes=N] [--report=FILE]")
+    console.log("Usage: refresh-candidates [--dry-run] [--limit=N] [--concurrency=N] [--country=CC] [--platform=KEY] [--in-stock-only] [--max-attempts=N] [--max-age-hours=N] [--budget-minutes=N] [--report=FILE]")
     return
   }
   const dryRun = booleanFlag("dry-run")
@@ -76,6 +76,7 @@ async function mainV2(): Promise<void> {
   }
   try {
     const result = await runCandidateWorker({...filters, mode: dryRun ? "dry_run" : "apply",
+      concurrency: Math.max(1, intFlag("concurrency", 4)),
       budgetMs: Math.max(0, intFlag("budget-minutes", 15)) * 60_000, signal: controller.signal}, {repository,
       checkpointReusable: (candidate) => canReuseCandidateCheckpoint(candidate, filters.maxAgeHours),
       prepare: async (candidate) => withPage(candidate, async (page, product) => {
@@ -97,8 +98,10 @@ async function mainV2(): Promise<void> {
         const result = await prepareProductForImport({product, config,
           observedAt: candidate.raw_observed_at ?? "", expectedUpdatedAt: null,
           normalizationCheckpoint: checkpoint}, {
-          resolveBrand: () => ({status: "existing", brand: candidate.detected_brand ?? product.brand,
-            brandNodeId: candidate.matched_brand_node_id ?? ""}),
+          resolveBrand: async () => ({status: "existing", brand: candidate.detected_brand ?? product.brand,
+            brandNodeId: candidate.matched_brand_node_id ?? "",
+            genderScope: candidate.matched_brand_node_id
+              ? await repository.brandGenderScope(candidate.matched_brand_node_id) : null}),
           recoverDetailPricing: async (value) => { await navigate(); return recoverCafe24CandidateDetailPricing(value, page) },
           normalize: async (input) => { await navigate(); const enriched = await enrichProductWithLlm(page, {...product, ...input,
             subcategory: input.subcategory ?? undefined, tags: input.tags ?? undefined}, config, {navigate: false})
@@ -125,12 +128,16 @@ async function mainV2(): Promise<void> {
           policy_version: normalized.policyVersion, model: normalized.model, completed_at: normalized.completedAt},
           category: normalized.category, subcategory: normalized.subcategory}
       })})
-    console.log(`candidate-v2 ${JSON.stringify(result)}`)
+    console.log(`candidate-v2 ${JSON.stringify({...result, errors: result.errors.length})}`)
+    for (const error of result.errors) addPipelineError(report, error)
     report.counts = {input: dryRun ? result.listed : result.claimed, planned: result.listed,
-      inserted: result.imported, failed: result.failed + result.conflicted + result.stale + result.lostClaim + result.rejected + result.released}
-    report.stages.candidates = {status: report.counts.failed > 0 ? "partial" : "success", counts: {...report.counts}}
-    report.files.push({platform: filters.platform ?? "all", status: report.counts.failed > 0 ? "partial" : "success",
-      counts: {...report.counts}, errors: []})
+      inserted: result.inserted, updated: result.updated, unchanged: result.unchanged,
+      failed: result.failed + result.conflicted + result.stale + result.lostClaim + result.rejected,
+      pending: result.released}
+    const incomplete = report.counts.failed > 0 || report.counts.pending > 0
+    report.stages.candidates = {status: incomplete ? "partial" : "success", counts: {...report.counts}}
+    report.files.push({platform: filters.platform ?? "all", status: incomplete ? "partial" : "success",
+      counts: {...report.counts}, errors: [...report.errors]})
     const finalReport = finalizePipelineReport(report)
     if (reportPath) await writePipelineReport(reportPath, finalReport)
     process.exitCode = pipelineExitCode(finalReport)

@@ -10,7 +10,9 @@ export interface CandidateFilters {
 }
 
 export type FinishOutcome = "retry" | "rejected" | "awaiting_observation" | "release" | "stale"
-export type PublishResult = {outcome: "imported" | "conflicted" | "rejected" | "stale" | "lost_claim"; product_id: string | null; code?: string}
+export type PublishResult =
+  | {outcome: "imported"; product_id: string; write_outcome: "inserted" | "updated" | "unchanged"; code?: string}
+  | {outcome: "conflicted" | "rejected" | "stale" | "lost_claim"; product_id: string | null; code?: string}
 
 export interface CurrentProductSnapshot {
   id: string
@@ -30,6 +32,7 @@ export interface CandidateRepository {
   finish(id: string, token: string, revision: string, outcome: FinishOutcome, error?: {code: string; message: string}, maxAttempts?: number): Promise<string>
   publish(id: string, token: string, revision: string): Promise<PublishResult>
   currentProduct(id: string): Promise<CurrentProductSnapshot | null>
+  brandGenderScope(id: string): Promise<string[] | null>
   publishNormalization(input: {candidateId: string; token: string; revision: string; productId: string; expectedUpdatedAt: string; normalization: PreparedProductWrite["normalization"]; category: string; subcategory: string | null}): Promise<PublishResult>
 }
 
@@ -72,7 +75,10 @@ function publishResult(value: unknown): PublishResult {
   const row = value as Record<string, unknown> | null
   if (!row || !["imported", "conflicted", "rejected", "stale", "lost_claim"].includes(String(row.outcome)) ||
     !(row.product_id === null || decimal(row.product_id)) ||
-    (row.outcome === "imported" && !decimal(row.product_id))) throw new Error("publish returned an invalid response")
+    (row.outcome === "imported" && (!decimal(row.product_id) ||
+      !["inserted", "updated", "unchanged"].includes(String(row.write_outcome))))) {
+    throw new Error("publish returned an invalid response")
+  }
   return row as PublishResult
 }
 
@@ -88,14 +94,14 @@ export function createCandidateRepository(db: RpcDb): CandidateRepository {
         throw new Error("invalid origin country filter")
       const oldest = new Date(Date.now() - filters.maxAgeHours * 3_600_000).toISOString()
       let query = db.from("product_refresh_candidates")
-        .select("*,product_refresh_sources!inner(enabled),brand_nodes!inner(origin_country,country)")
+        .select("*,product_refresh_sources!inner(enabled),brand_nodes!inner(wiki)")
         .eq("product_refresh_sources.enabled", true).gte("raw_observed_at", oldest)
         .lt("attempt_count", filters.maxAttempts)
         .or("next_attempt_at.is.null,next_attempt_at.lte.now()")
         .or("status.in.(discovered,failed),and(status.in.(enriching,ready),or(processing_token.is.null,lease_expires_at.lte.now()))")
         .order("first_seen_at", {ascending: true}).order("id", {ascending: true}).limit(filters.limit)
       if (filters.platform) query = query.eq("platform_key", filters.platform)
-      if (filters.originCountry) query = query.or(`origin_country.ilike.${filters.originCountry},and(origin_country.is.null,country.ilike.${filters.originCountry})`, {referencedTable: "brand_nodes"})
+      if (filters.originCountry) query = query.or(`wiki->>origin_country.ilike.${filters.originCountry}`, {referencedTable: "brand_nodes"})
       if (filters.inStockOnly) query = query.or("raw_product->>inStock.eq.true,raw_product->>in_stock.eq.true")
       const {data, error} = await query
       rpcError("candidate dry-run listing", error)
@@ -148,6 +154,17 @@ export function createCandidateRepository(db: RpcDb): CandidateRepository {
         throw new Error("current product lookup returned an invalid response")
       }
       return {...row, id} as CurrentProductSnapshot
+    },
+    async brandGenderScope(id) {
+      const {data, error} = await db.from("brand_nodes").select("gender_scope").eq("id", id).maybeSingle()
+      rpcError("brand gender scope lookup", error)
+      if (!data) return null
+      const scope = (data as {gender_scope?: unknown}).gender_scope
+      if (!Array.isArray(scope) || !scope.every((value) =>
+        value === "men" || value === "women" || value === "unisex")) {
+        throw new Error("brand gender scope lookup returned an invalid response")
+      }
+      return scope
     },
     async publishNormalization(input) {
       return publishResult(await rpc("publish_product_refresh_candidate_normalization", {

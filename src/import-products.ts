@@ -30,7 +30,7 @@ import {
   resolveProductBrand,
   type UnknownBrandEntry,
 } from "./lib/brand-provenance"
-import {resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
+import {cleanGenderScope, resolveProductGenderWithSource, type GenderSource} from "./lib/product-gender"
 import {classifyProductWithQwen} from "./lib/product-qwen-normalization"
 import {assertQwenReady} from "./lib/qwen-client"
 import {recoverCafe24CandidateDetailPricing} from "./lib/candidate-detail-pricing"
@@ -224,8 +224,10 @@ function trigramSimilarity(a: string, b: string): number {
 async function loadBrandNodes(): Promise<{
   rows: BrandNodeRow[]
   idMap: Map<string, number>
+  genderById: Map<number, string[]>
 }> {
   const idMap = new Map<string, number>()
+  const genderById = new Map<number, string[]>()
 
   // PostgREST default 1000 row limit — paginate to fetch all brand_nodes (~2,100 rows).
   // 062 마이그 이후 brand_nodes.style_node legacy text 컬럼 제거됨.
@@ -236,7 +238,7 @@ async function loadBrandNodes(): Promise<{
   for (;;) {
     let query = db
       .from("brand_nodes")
-      .select("id, brand_name, brand_name_normalized")
+      .select("id, brand_name, brand_name_normalized, gender_scope")
       .order("id", {ascending: true})
       .limit(PAGE)
     if (afterId > 0) query = query.gt("id", afterId)
@@ -259,9 +261,11 @@ async function loadBrandNodes(): Promise<{
       idMap.set(bn.brand_name_normalized.toLowerCase(), bn.id)
     }
     idMap.set(bn.brand_name.toLowerCase(), bn.id)
+    const scope = cleanGenderScope(bn.gender_scope)
+    if (scope.length === 1 && scope[0] !== "unisex") genderById.set(bn.id, scope)
   }
-  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size})`)
-  return {rows, idMap}
+  console.log(`🏷️ brand_nodes ${rows.length}개 로드 (id_map=${idMap.size}, single_gender_scope=${genderById.size})`)
+  return {rows, idMap, genderById}
 }
 
 async function loadPlatformBrandNodeMap(): Promise<Map<string, number>> {
@@ -392,7 +396,9 @@ async function resolveUnknownBrands(
   return {inserted, aliasFlagged, failed}
 }
 
-export function prepareImportInputProducts(input: unknown[], platform: string, config: NonNullable<ReturnType<typeof getSiteConfig>>): Product[] {
+export function prepareImportInputProducts(input: unknown[], platform: string,
+  config: NonNullable<ReturnType<typeof getSiteConfig>>,
+  brandGenderScope: (brand: string) => string[] | undefined = () => undefined): Product[] {
   const byUrl = new Map<string, Product>()
   for (const candidate of input) {
     if (!candidate || typeof candidate !== "object") throw new Error(`${platform} product entry must be an object`)
@@ -410,6 +416,7 @@ export function prepareImportInputProducts(input: unknown[], platform: string, c
       kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
       verifiedUnisexDefault: config.verifiedUnisexDefault || SITE_GENDER_DEFAULTS[platform]?.includes("unisex"),
       genderTextPatterns: config.genderTextPatterns,
+      brandGenderScope: brandGenderScope(typeof raw.brand === "string" ? raw.brand : config.brand ?? ""),
     })
     const verifiedNameGender = typeof raw.name === "string" ? inferVerifiedSiteGenderFromName(platform, raw.name) : null
     if (!resolved.conflict && verifiedNameGender && (resolved.gender.length === 0 || resolved.source === "config_default")) {
@@ -417,6 +424,7 @@ export function prepareImportInputProducts(input: unknown[], platform: string, c
         kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
         verifiedUnisexDefault: config.verifiedUnisexDefault,
         genderTextPatterns: config.genderTextPatterns,
+        brandGenderScope: brandGenderScope(typeof raw.brand === "string" ? raw.brand : config.brand ?? ""),
       })
     }
     const siteDefault = config.defaultGender ?? SITE_GENDER_DEFAULTS[platform] ?? []
@@ -425,6 +433,7 @@ export function prepareImportInputProducts(input: unknown[], platform: string, c
         kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
         verifiedUnisexDefault: config.verifiedUnisexDefault,
         genderTextPatterns: config.genderTextPatterns,
+        brandGenderScope: brandGenderScope(typeof raw.brand === "string" ? raw.brand : config.brand ?? ""),
       })
     }
     const normalized = {...raw, productUrl, ...(resolved.gender.length > 0 ? {gender: resolved.gender, genderSource: resolved.source} : {})}
@@ -462,6 +471,8 @@ async function main() {
     if (missing.length > 0) throw new Error(`selected product files missing: ${missing.join(",")}`)
   }
 
+  const {rows: brandRows, idMap: brandIdMap, genderById: brandGenderById} = await loadBrandNodes()
+  const platformBrandMap = await loadPlatformBrandNodeMap()
   const sourceByFile = new Map<string, Product[]>()
   const files: ProductImportFile[] = filenames.map((file) => {
     const platform = file.replace("-products.json", "")
@@ -472,7 +483,11 @@ async function main() {
       : registeredConfig
     const parsed: unknown = JSON.parse(fs.readFileSync(path.join(dataDir, file), "utf8"))
     if (!Array.isArray(parsed)) throw new Error(`${file} JSON must contain a product array`)
-    const products = prepareImportInputProducts(parsed, platform, config)
+    const products = prepareImportInputProducts(parsed, platform, config, (brand) => {
+      const canonical = resolveProductBrand(brand, config).trim()
+      const id = resolveProductBrandNodeId(canonical, platform, brandIdMap, platformBrandMap)
+      return id === null ? undefined : brandGenderById.get(id)
+    })
     const sample = products[0]
     if (sample && ["USD", "EUR", "GBP"].includes(sample.sourceCurrency ?? "") && typeof sample.price === "number" && sample.price > 5000) {
       throw new Error(`${file} appears to contain legacy KRW-converted prices; re-crawl before importing`)
@@ -483,9 +498,6 @@ async function main() {
 
   // All selected files have crossed the local schema boundary before the first
   // database read or mutation. This keeps malformed input failures reportable.
-  const {rows: brandRows, idMap: brandIdMap} = await loadBrandNodes()
-  const platformBrandMap = await loadPlatformBrandNodeMap()
-
   if (!dryRun) {
     await initFxRates()
     await assertQwenReady()
@@ -499,7 +511,8 @@ async function main() {
       const brand = resolveProductBrand(product.brand, config).trim()
       if (!brand) return {status: "quarantined", brand: "", reason: "brand_missing"}
       const id = resolveProductBrandNodeId(brand, config.key, brandIdMap, platformBrandMap)
-      if (id !== null) return {status: "existing", brand, brandNodeId: toDecimalId(id)}
+      if (id !== null) return {status: "existing", brand, brandNodeId: toDecimalId(id),
+        genderScope: brandGenderById.get(id) ?? null}
       return isTrustedBrandSource({selfBranded: false, configBrand: config.brand, multiBrand: config.multiBrand})
         ? {status: "would_create", brand}
         : {status: "quarantined", brand, reason: "untrusted_unknown_brand"}

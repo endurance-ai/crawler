@@ -2,6 +2,7 @@ import type {SupabaseClient} from "@supabase/supabase-js"
 import {auditDecimalId, type AuditBrand, type AuditEmbedding, type AuditProduct} from "./pipeline-audit"
 import {readAuditPages} from "./pipeline-audit-reader"
 import type {RecoveryCandidate, RecoveryStore} from "./pipeline-recovery"
+import {invalidateStaleProductEmbeddings} from "./embedding-invalidation-rpc"
 
 interface FilterBuilder {
   eq(column: string, value: unknown): FilterBuilder
@@ -85,8 +86,8 @@ export class SupabaseRecoveryStore implements RecoveryStore {
     let query = this.db.from("products").update(patch)
       .eq("id", current.id).eq("product_url", current.product_url)
       .eq("brand", current.brand).eq("updated_at", current.updated_at)
-      .eq("in_stock", current.in_stock).eq("image_revision", current.image_revision)
-      .eq("review_count", current.review_count ?? 0) as unknown as FilterBuilder
+      .eq("in_stock", current.in_stock).eq("image_revision", current.image_revision) as unknown as FilterBuilder
+    query = nullableFilter(query, "review_count", current.review_count)
     for (const [column, value] of [
       ["platform", current.platform], ["brand_node_id", current.brand_node_id],
       ["price", current.price], ["original_price", current.original_price],
@@ -131,15 +132,8 @@ export class SupabaseRecoveryStore implements RecoveryStore {
     } as AuditEmbedding
   }
 
-  async deleteEmbedding(current: AuditEmbedding): Promise<boolean> {
-    let query = this.db.from("product_embeddings").delete()
-      .eq("product_id", current.product_id)
-      .eq("embedded_at", current.embedded_at)
-      .eq("embedding_model", current.embedding_model) as unknown as FilterBuilder
-    query = nullableFilter(query, "source_image_url", current.source_image_url)
-    query = nullableFilter(query, "source_image_revision", current.source_image_revision)
-    const {data, error} = await query.select("product_id")
-    if (error) throw new Error("Embedding conditional delete failed")
-    return data?.length === 1
+  async invalidateEmbedding(productId: string): Promise<"invalidated" | "current" | "missing"> {
+    const [result] = await invalidateStaleProductEmbeddings(this.db, [productId])
+    return result!.outcome
   }
 }

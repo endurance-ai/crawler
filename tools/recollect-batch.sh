@@ -245,15 +245,18 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
 
   # ── 7. guardrail + verify ──
   log "5/7 guardrail — 비canonical category 정리"
-  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid > "$KEY_DIR/guardrail.log" 2>&1; then
+  if ! $PNPM tsx tools/reclassify-categories.ts --only-invalid --platform="$KEY" > "$KEY_DIR/guardrail.log" 2>&1; then
     log "  ❌ guardrail 실패(Qwen/SSH tunnel 또는 DB 오류) — 완료 마커를 만들지 않음"
     FAILED_KEYS="$FAILED_KEYS $KEY"; continue
   fi
 
   log "6/7 verify — 사후 지표"
-  $PNPM tsx tools/recollect-metrics.ts \
+  if ! $PNPM tsx tools/recollect-metrics.ts \
     --platform="$KEY" --before="$BEFORE_JSON" --untouched-since="$BATCH_START" --out="$AFTER_JSON" \
-    > "$KEY_DIR/after.log" 2>&1
+    > "$KEY_DIR/after.log" 2>&1; then
+    log "  ✖ 사후 검증 실패 — $KEY_DIR/after.log"
+    FAILED_KEYS="$FAILED_KEYS $KEY"; continue
+  fi
   tail -26 "$KEY_DIR/after.log"
   $PNPM tsx tools/check-onboard-anomalies.ts --platforms="$KEY" > "$KEY_DIR/anomalies.log" 2>&1 || {
     log "  ⚠️  이상치 리포트가 발견 사항을 보고했다 — $KEY_DIR/anomalies.log"; }
@@ -273,11 +276,13 @@ for KEY in $(echo "$KEYS" | tr ',' ' '); do
       EMBED_CODE=$?
       tail -10 "$KEY_DIR/embeddings.log"
       if [ "$EMBED_CODE" -eq 3 ]; then
-        log "  ⚠️  변경 비율이 경보 임계 초과 — 적용 보류, 샘플 확인 필요 (적재 자체는 완료됨)"
+        log "  ⚠️  변경 비율이 경보 임계 초과 — 적용 보류, 샘플 확인 필요"
+        if [ "$APPLY_EMBEDDINGS" -eq 1 ]; then FAILED_KEYS="$FAILED_KEYS $KEY"; continue; fi
       elif [ "$EMBED_CODE" -ne 0 ]; then
-        log "  ⚠️  임베딩 무효화 실패 — $KEY_DIR/embeddings.log"
+        log "  ✖ 임베딩 무효화 실패 — $KEY_DIR/embeddings.log"
+        if [ "$APPLY_EMBEDDINGS" -eq 1 ]; then FAILED_KEYS="$FAILED_KEYS $KEY"; continue; fi
       else
-        touch "$KEY_DIR/embed.done"
+        [ "$APPLY_EMBEDDINGS" -eq 1 ] && touch "$KEY_DIR/embed.done"
       fi
     fi
   fi
