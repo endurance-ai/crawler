@@ -259,11 +259,27 @@ async function main(): Promise<void> {
               })),
             })
             if (error) {
-              failed += successful.length
-              console.error(`   RPC failed: ${error.message}`)
-              continue
-            }
-            if (typeof applied === "number" && applied !== successful.length) {
+              if (!error.message.includes("permission denied for table product_embeddings")) {
+                failed += successful.length
+                console.error(`   RPC failed: ${error.message}`)
+                continue
+              }
+              const {data: repaired, error: repairError} = await db.rpc("repair_product_image_assets_v2", {
+                repairs: successful.map((item) => ({
+                  id: String(item.row.id), before_url: item.row.image_url,
+                  replacement_url: item.images[0], source_image_url: item.row.source_image_url ?? item.images[0],
+                  images: item.images, bad_urls: [], mark_out_of_stock: false,
+                })),
+              })
+              if (repairError) {
+                failed += successful.length
+                console.error(`   repair RPC failed: ${repairError.message}`)
+                continue
+              }
+              for (const result of Array.isArray(repaired) ? repaired : []) {
+                if (result?.outcome === "applied") appliedIds.add(Number(result.id))
+              }
+            } else if (typeof applied === "number" && applied !== successful.length) {
               console.warn(`   optimistic apply skipped ${successful.length - applied}/${successful.length} rows`)
               const {data: verified, error: verifyError} = await db
                 .from("products")
@@ -277,7 +293,7 @@ async function main(): Promise<void> {
                   row.image_url === expected.get(row.id)
                 ) appliedIds.add(row.id)
               }
-            } else {
+            } else if (!error) {
               for (const item of successful) appliedIds.add(item.row.id)
             }
           }

@@ -50,6 +50,7 @@ test("normalizeProductImageUrl rejects utility, template, and non-image assets",
   assert.equal(normalizeProductImageUrl("/product/txt_naver.gif", page), null)
   assert.equal(normalizeProductImageUrl("/images/color-swatch-red.png", page), null)
   assert.equal(normalizeProductImageUrl("/web/product/big/img_product_big.gif", page), null)
+  assert.equal(normalizeProductImageUrl("https://fragola.kr/moa/img/default/empty_thumb.png", page), null)
   assert.equal(normalizeProductImageUrl("${imageUrl}", page), null)
   assert.equal(normalizeProductImageUrl("javascript:alert(1)", page), null)
   assert.equal(normalizeProductImageUrl("/assets/product?id=1", page), "https://shop.example.com/assets/product?id=1")
