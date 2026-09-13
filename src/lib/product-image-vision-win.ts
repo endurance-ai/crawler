@@ -10,10 +10,19 @@
  * 섞이지 않는다.
  */
 import * as ort from "onnxruntime-node"
+import {createRequire} from "node:module"
+import * as path from "node:path"
 import sharp from "sharp"
 import {createScheduler, createWorker, type Scheduler} from "tesseract.js"
 
 const OCR_WORKER_POOL_SIZE = 4
+const OCR_INITIALIZATION_TIMEOUT_MS = 30_000
+const OCR_JOB_TIMEOUT_MS = 30_000
+const require = createRequire(import.meta.url)
+const OCR_LANGUAGE_PATH = path.join(
+  path.dirname(require.resolve("@tesseract.js-data/eng")),
+  "4.0.0_best_int",
+)
 
 import type {ImageCandidateAnalysis} from "./product-image-selection"
 
@@ -37,6 +46,37 @@ interface Preprocessed {
   padY: number
   width: number
   height: number
+}
+
+interface PoseAnalysis {
+  humanConfidence: number
+  humanAreaRatio: number
+  humanCenterDistance: number
+  poseJointCount: number
+}
+
+export interface WinProductImageVisionOperations {
+  detectPeople?: (imagePath: string) => Promise<PoseAnalysis>
+  detectTextCoverage?: (imagePath: string, width: number, height: number) => Promise<number>
+  close?: () => Promise<void>
+}
+
+export interface WinProductImageVisionOptions {
+  operations?: WinProductImageVisionOperations
+  ocrInitializationTimeoutMs?: number
+  ocrJobTimeoutMs?: number
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+  })
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
 }
 
 function iou(a: Detection["box"], b: Detection["box"]): number {
@@ -244,22 +284,141 @@ async function getSession(): Promise<ort.InferenceSession> {
   return sharedSession
 }
 
+async function detectPeople(imagePath: string): Promise<PoseAnalysis> {
+  const pre = await preprocess(imagePath)
+  const session = await getSession()
+  const result = await session.run({images: pre.tensor})
+  const output = result["output0"].data as Float32Array
+  const detections = decode(output, pre)
+
+  let humanConfidence = 0
+  let poseJointCount = 0
+  let largest: Detection | null = null
+  for (const det of detections) {
+    humanConfidence = Math.max(humanConfidence, det.confidence)
+    poseJointCount = Math.max(poseJointCount, det.keypointConfCount)
+    if (!largest || det.box.width * det.box.height > largest.box.width * largest.box.height) {
+      largest = det
+    }
+  }
+  const humanAreaRatio = largest
+    ? (largest.box.width * largest.box.height) / (pre.width * pre.height)
+    : 0
+  const humanCenterDistance = largest
+    ? (() => {
+        const cx = (largest.box.x + largest.box.width / 2) / pre.width
+        const cy = (largest.box.y + largest.box.height / 2) / pre.height
+        const dx = cx - 0.5
+        const dy = cy - 0.5
+        return Math.min(1, Math.sqrt(dx * dx + dy * dy) / Math.sqrt(0.5))
+      })()
+    : 1
+
+  return {humanConfidence, humanAreaRatio, humanCenterDistance, poseJointCount}
+}
+
 export class WinProductImageVisionClient {
   #ocrScheduler: Scheduler | null = null
+  #ocrSchedulerPromise: Promise<Scheduler> | null = null
+  #ocrInitializationCleanup: Promise<void> | null = null
   #closed = false
+  readonly #operations: WinProductImageVisionOperations
+  readonly #ocrInitializationTimeoutMs: number
+  readonly #ocrJobTimeoutMs: number
+
+  constructor(options: WinProductImageVisionOptions = {}) {
+    this.#operations = options.operations ?? {}
+    this.#ocrInitializationTimeoutMs = options.ocrInitializationTimeoutMs ?? OCR_INITIALIZATION_TIMEOUT_MS
+    this.#ocrJobTimeoutMs = options.ocrJobTimeoutMs ?? OCR_JOB_TIMEOUT_MS
+  }
 
   // 인물+포즈/전경/샤프니스는 8-way 세마포어(select-product-image.ts)로 병렬인데
   // OCR 워커가 1개면 거기서 직렬화된다 — 워커 풀로 맞춘다.
   async #getOcrScheduler(): Promise<Scheduler> {
-    if (!this.#ocrScheduler) {
+    if (this.#ocrScheduler) return this.#ocrScheduler
+    if (this.#ocrSchedulerPromise) return this.#ocrSchedulerPromise
+
+    this.#ocrSchedulerPromise = (async () => {
       const scheduler = createScheduler()
-      const workers = await Promise.all(
-        Array.from({length: OCR_WORKER_POOL_SIZE}, () => createWorker("eng")),
-      )
-      for (const worker of workers) scheduler.addWorker(worker)
-      this.#ocrScheduler = scheduler
+      let cancelled = false
+      let workers: Array<ReturnType<typeof createWorker>> = []
+      try {
+        workers = Array.from({length: OCR_WORKER_POOL_SIZE}, () =>
+          createWorker("eng", undefined, {
+            cacheMethod: "none",
+            gzip: true,
+            langPath: OCR_LANGUAGE_PATH,
+          }).then(async (worker) => {
+            if (cancelled || this.#closed) {
+              await worker.terminate()
+              throw new Error("vision client is closed")
+            }
+            scheduler.addWorker(worker)
+            return worker
+          }),
+        )
+        await withTimeout(
+          Promise.all(workers),
+          this.#ocrInitializationTimeoutMs,
+          "OCR worker initialization",
+        )
+        if (this.#closed) throw new Error("vision client is closed")
+        this.#ocrScheduler = scheduler
+        return scheduler
+      } catch (error) {
+        cancelled = true
+        await scheduler.terminate()
+        const cleanup = Promise.allSettled(workers)
+          .then(() => scheduler.terminate())
+          .then(() => undefined)
+        this.#ocrInitializationCleanup = cleanup
+        void cleanup.then(
+          () => {
+            if (this.#ocrInitializationCleanup === cleanup) this.#ocrInitializationCleanup = null
+          },
+          () => {
+            if (this.#ocrInitializationCleanup === cleanup) this.#ocrInitializationCleanup = null
+          },
+        )
+        throw error
+      } finally {
+        this.#ocrSchedulerPromise = null
+      }
+    })()
+    return this.#ocrSchedulerPromise
+  }
+
+  async #resetOcrScheduler(): Promise<void> {
+    const scheduler = this.#ocrScheduler
+    this.#ocrScheduler = null
+    if (scheduler) await scheduler.terminate()
+  }
+
+  async #detectTextCoverage(imagePath: string, width: number, height: number): Promise<number> {
+    const scheduler = await this.#getOcrScheduler()
+    // 원본 해상도(수천px)를 그대로 넣으면 OCR이 수십 초씩 걸린다 — 텍스트
+    // 커버리지는 근사치면 충분하므로 축소본으로 대체한다.
+    const OCR_MAX_DIM = 1200
+    const ocrScale = Math.min(1, OCR_MAX_DIM / Math.max(width, height))
+    const ocrBuffer = await sharp(imagePath, {failOn: "none"})
+      .rotate()
+      .resize(Math.round(width * ocrScale), Math.round(height * ocrScale))
+      .toBuffer()
+    const {data} = await scheduler.addJob("recognize", ocrBuffer)
+    const area = Math.round(width * ocrScale) * Math.round(height * ocrScale)
+    let textCoverage = 0
+    for (const block of data.blocks ?? []) {
+      for (const paragraph of block.paragraphs ?? []) {
+        for (const line of paragraph.lines ?? []) {
+          for (const word of line.words ?? []) {
+            const bbox = word.bbox
+            if (!bbox) continue
+            textCoverage += (bbox.x1 - bbox.x0) * (bbox.y1 - bbox.y0)
+          }
+        }
+      }
     }
-    return this.#ocrScheduler
+    return area > 0 ? Math.min(1, textCoverage / area) : 0
   }
 
   async analyze(input: {
@@ -295,62 +454,23 @@ export class WinProductImageVisionClient {
       }
     }
 
-    const pre = await preprocess(input.path)
-    const session = await getSession()
-    const result = await session.run({images: pre.tensor})
-    const output = result["output0"].data as Float32Array
-    const detections = decode(output, pre)
-
-    let humanConfidence = 0
-    let poseJointCount = 0
-    let largest: Detection | null = null
-    for (const det of detections) {
-      humanConfidence = Math.max(humanConfidence, det.confidence)
-      poseJointCount = Math.max(poseJointCount, det.keypointConfCount)
-      if (!largest || det.box.width * det.box.height > largest.box.width * largest.box.height) {
-        largest = det
-      }
-    }
-    const humanAreaRatio = largest ? (largest.box.width * largest.box.height) / (width * height) : 0
-    const humanCenterDistance = largest
-      ? (() => {
-          const cx = (largest!.box.x + largest!.box.width / 2) / width
-          const cy = (largest!.box.y + largest!.box.height / 2) / height
-          const dx = cx - 0.5
-          const dy = cy - 0.5
-          return Math.min(1, Math.sqrt(dx * dx + dy * dy) / Math.sqrt(0.5))
-        })()
-      : 1
+    const pose = await (this.#operations.detectPeople ?? detectPeople)(input.path)
 
     const foreground = await estimateForeground(input.path, width, height)
     const aesthetics = await estimateAesthetics(input.path)
 
     let textCoverage = 0
     try {
-      const scheduler = await this.#getOcrScheduler()
-      // 원본 해상도(수천px)를 그대로 넣으면 OCR이 수십 초씩 걸린다 — 텍스트
-      // 커버리지는 근사치면 충분하므로 축소본으로 대체한다.
-      const OCR_MAX_DIM = 1200
-      const ocrScale = Math.min(1, OCR_MAX_DIM / Math.max(width, height))
-      const ocrBuffer = await sharp(input.path, {failOn: "none"})
-        .rotate()
-        .resize(Math.round(width * ocrScale), Math.round(height * ocrScale))
-        .toBuffer()
-      const {data} = await scheduler.addJob("recognize", ocrBuffer)
-      const area = Math.round(width * ocrScale) * Math.round(height * ocrScale)
-      for (const block of data.blocks ?? []) {
-        for (const paragraph of block.paragraphs ?? []) {
-          for (const line of paragraph.lines ?? []) {
-            for (const word of line.words ?? []) {
-              const bbox = word.bbox
-              if (!bbox) continue
-              textCoverage += (bbox.x1 - bbox.x0) * (bbox.y1 - bbox.y0)
-            }
-          }
-        }
-      }
-      textCoverage = area > 0 ? Math.min(1, textCoverage / area) : 0
+      const operation = this.#operations.detectTextCoverage
+        ?? ((imagePath: string, imageWidth: number, imageHeight: number) =>
+          this.#detectTextCoverage(imagePath, imageWidth, imageHeight))
+      textCoverage = await withTimeout(
+        operation(input.path, width, height),
+        this.#ocrJobTimeoutMs,
+        "OCR analysis",
+      )
     } catch {
+      await this.#resetOcrScheduler()
       textCoverage = 0
     }
 
@@ -365,10 +485,10 @@ export class WinProductImageVisionClient {
       isUtility: aesthetics.isUtility || textCoverage > 0.5,
       aestheticsScore: aesthetics.score,
       textCoverage,
-      humanConfidence,
-      humanAreaRatio,
-      humanCenterDistance,
-      poseJointCount,
+      humanConfidence: pose.humanConfidence,
+      humanAreaRatio: pose.humanAreaRatio,
+      humanCenterDistance: pose.humanCenterDistance,
+      poseJointCount: pose.poseJointCount,
       foregroundAreaRatio: foreground.areaRatio,
       foregroundCenterDistance: foreground.centerDistance,
     }
@@ -376,9 +496,16 @@ export class WinProductImageVisionClient {
 
   async close(): Promise<void> {
     this.#closed = true
-    if (this.#ocrScheduler) {
-      await this.#ocrScheduler.terminate()
-      this.#ocrScheduler = null
+    const initialization = this.#ocrSchedulerPromise?.catch(() => undefined)
+    await this.#resetOcrScheduler()
+    const cleanup = this.#ocrInitializationCleanup
+    if (initialization || cleanup) {
+      await withTimeout(
+        Promise.all([initialization, cleanup]),
+        this.#ocrInitializationTimeoutMs,
+        "OCR worker shutdown",
+      ).catch(() => undefined)
     }
+    await this.#operations.close?.()
   }
 }

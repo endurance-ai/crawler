@@ -14,6 +14,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.100.1
         version: 2.105.3
+      '@tesseract.js-data/eng':
+        specifier: 1.0.0
+        version: 1.0.0
       ai:
         specifier: ^6.0.222
         version: 6.0.222(zod@4.4.3)
@@ -449,6 +452,9 @@ packages:
   '@supabase/supabase-js@2.105.3':
     resolution: {integrity: sha512-5Dm9+I61LAWwjw+0zcqXhSmTxUJaYHBPyHwMCIBH4TBUNwDn2pYUIsi6oUu0I5r9HtLtaFl7w4wa+DV9gRsbDg==}
     engines: {node: '>=20.0.0'}
+
+  '@tesseract.js-data/eng@1.0.0':
+    resolution: {integrity: sha512-mbTumm6KQPUHyzTPQaF3ObXYnx0SqqfV2nabqFVQBwD6Kl7PhGSLSzOlfFTWy0P3BjghaSKA2W9GB19Jk+ZcTg==}
 
   '@types/node@20.19.39':
     resolution: {integrity: sha512-orrrD74MBUyK8jOAD/r0+lfa1I2MO6I+vAkmAWzMYbCcgrN4lCrmK52gRFQq/JRxfYPfonkr4b0jcY7Olqdqbw==}
@@ -1110,6 +1116,8 @@ snapshots:
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
+
+  '@tesseract.js-data/eng@1.0.0': {}
 
   '@types/node@20.19.39':
     dependencies:
