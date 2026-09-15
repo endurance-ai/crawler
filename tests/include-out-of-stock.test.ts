@@ -77,6 +77,23 @@ test("cafe24: 상세 옵션이 모두 품절이면 구매 버튼보다 옵션 �
   }), false)
 })
 
+test("cafe24: 옵션 재고 수치가 없으면 렌더링된 구매 UI로 폴백한다", () => {
+  assert.equal(inferCafe24DetailStock({
+    optionStockData: {
+      available: {is_display: "T", is_selling: "T", use_stock: "T"},
+    },
+    buyVisible: true,
+    soldOutVisible: false,
+  }), true)
+  assert.equal(inferCafe24DetailStock({
+    optionStockData: {
+      unavailable: {is_display: "T", is_selling: "F", use_stock: "T"},
+    },
+    buyVisible: false,
+    soldOutVisible: true,
+  }), false)
+})
+
 test("cafe24: 같은 상품이 공식 Man/Woman 부서에 모두 있으면 공용 근거로 병합한다", () => {
   const product = (gender: string[]): Product => ({
     brand: "Opening Project", name: "Shared Bag", category: "department", gender,

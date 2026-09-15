@@ -1,0 +1,17 @@
+[Unit]
+Description=kiko.ai edit-shop source rankings — lab batch host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kjk/kiko-crawler-runtime
+Environment=PATH=/home/kjk/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/home/kjk
+Environment=CI=true
+ExecStart=/usr/bin/env bash /home/kjk/kiko-crawler-runtime/scripts/run-edit-shop-listings.sh
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target
+

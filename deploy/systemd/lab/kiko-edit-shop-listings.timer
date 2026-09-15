@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily kiko.ai edit-shop source rankings — lab batch host
+
+[Timer]
+# Capture the latest What100 shortly before the KST date changes. The AI
+# server's first post-midnight refresh can then build that day's stable ranks.
+OnCalendar=*-*-* 23:45:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=kiko-edit-shop-listings.service
+
+[Install]
+WantedBy=timers.target
+

@@ -52,6 +52,7 @@ const METADATA_KEYS = [
   "reviewCount",
   "reviews",
   "reviewCollection",
+  "listingPlacements",
 ] as const satisfies readonly MetadataProductKey[]
 
 type MissingMetadataKey = Exclude<MetadataProductKey, typeof METADATA_KEYS[number]>

@@ -75,6 +75,8 @@ export interface Product {
   inStock: boolean
   platform: string
   crawledAt: string
+  /** Ordered source-list membership retained independently from canonical category. */
+  listingPlacements?: EditShopListingPlacement[]
   // ── 상세 페이지 데이터 (Phase 2) ──
   /**
    * 상세 페이지를 실제로 방문해 파싱한 시각 (ISO). 재시작 스킵 마커다.
@@ -141,6 +143,14 @@ export interface Product {
   }>
   /** Explicit review snapshot provenance; absence remains unverified legacy data. */
   reviewCollection?: ReviewCollection
+}
+
+export interface EditShopListingPlacement {
+  listType: "category"
+  listKey: string
+  displayName: string
+  sourceRank: number
+  capturedAt: string
 }
 
 export interface PricingObservation {

@@ -367,10 +367,19 @@ export function inferCafe24DetailStock(evidence: Cafe24DetailStockEvidence): boo
     if (options.length > 0) {
       const sellable = options.filter((option) => option.is_display !== "F" && option.is_selling !== "F")
       if (sellable.length === 0) return false
-      return sellable.some((option) => {
+      const stockEvidence = sellable.map((option) => {
         const managesStock = option.use_stock === true || option.use_stock === "T"
-        return !managesStock || Number(option.stock_number) > 0
+        const rawStockNumber = option.stock_number
+        const hasStockNumber = rawStockNumber !== undefined
+          && rawStockNumber !== null
+          && rawStockNumber !== ""
+          && Number.isFinite(Number(rawStockNumber))
+        return {managesStock, hasStockNumber, stockNumber: Number(rawStockNumber)}
       })
+      if (stockEvidence.some((item) => !item.managesStock || (item.hasStockNumber && item.stockNumber > 0))) {
+        return true
+      }
+      if (stockEvidence.every((item) => !item.managesStock || item.hasStockNumber)) return false
     }
   }
   if (evidence.buyVisible) return true
@@ -1114,6 +1123,7 @@ async function crawlCategory(
   deadlineAt?: number,
 ): Promise<CrawlCategoryResult> {
   const allProducts: Product[] = []
+  let sourceRank = 0
   const maxPages = config.maxPages || 10
   const delay = config.crawlDelay || 2000
   const seenUrls = new Set<string>()
@@ -1160,6 +1170,18 @@ async function crawlCategory(
         timing
       )
       const products = filterCafe24ProductsForCategory(collected, category.cateNo)
+
+      const capturedAt = new Date().toISOString()
+      for (const product of products) {
+        sourceRank += 1
+        product.listingPlacements = [{
+          listType: "category",
+          listKey: String(category.cateNo),
+          displayName: category.name,
+          sourceRank,
+          capturedAt,
+        }]
+      }
 
       if (products.length === 0) break // 빈 페이지면 중단
 
@@ -1371,6 +1393,12 @@ export async function crawlCafe24(
       config.cafe24CanonicalDetailGender ? "unresolved" : "unisex",
     )
     mergeCafe24DuplicateCategory(existing, product)
+    const placements = [...(existing.listingPlacements ?? []), ...(product.listingPlacements ?? [])]
+    const unique = new Map(placements.map((placement) => [
+      `${placement.listType}:${placement.listKey}:${placement.sourceRank}`,
+      placement,
+    ]))
+    existing.listingPlacements = [...unique.values()]
   })
   const dedupedProducts = (config.verifyStockFromDetail || shouldKeepOutOfStock(options))
     ? dedupedAll

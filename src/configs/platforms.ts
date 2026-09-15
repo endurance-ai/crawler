@@ -445,7 +445,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "슬로우스테디클럽",
     type: "cafe24",
     baseUrl: "https://slowsteadyclub.com",
-    disabled: true, // 재고 파서 미스(전량 품절 오판) — 패치 전까지 크롤 제외
+    multiBrand: true,
+    trustedCategory: true,
+    crawlDetails: true,
     paginate: true,
     maxPages: 300,
     category: {
@@ -455,12 +457,16 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
         {name: "Top", cateNo: 742, gender: ["unisex"]},
         {name: "Knitwear", cateNo: 1020, gender: ["unisex"]},
         {name: "Bottom", cateNo: 755, gender: ["unisex"]},
+        {name: "Overall", cateNo: 774, gender: ["unisex"]},
         {name: "Shoes", cateNo: 783, gender: ["unisex"]},
         {name: "Bag", cateNo: 1341, gender: ["unisex"]},
         {name: "Accessories", cateNo: 798, gender: ["unisex"]},
+        {name: "Lifestyle", cateNo: 819, gender: ["unisex"]},
+        {name: "New Arrival", cateNo: 674, gender: ["unisex"]},
+        {name: "Sale", cateNo: 723, gender: ["unisex"]},
       ],
     },
-    notes: "unisex 편집샵. 7개 카테고리",
+    notes: "unisex 편집샵. What100 + 자체 분류 11개 카테고리",
   },
   {
     key: "adekuver",
@@ -497,6 +503,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "이티씨서울",
     type: "cafe24",
     baseUrl: "https://etcseoul.com",
+    multiBrand: true,
+    trustedCategory: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -556,6 +564,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "8디비전",
     type: "cafe24",
     baseUrl: "https://www.8division.com",
+    multiBrand: true,
+    trustedCategory: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -616,6 +626,8 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "프레이트",
     type: "cafe24",
     baseUrl: "https://fr8ight.co.kr",
+    multiBrand: true,
+    trustedCategory: true,
     paginate: true,
     maxPages: 300,
     crawlDetails: true,
@@ -5871,6 +5883,7 @@ const SITE_DEFAULT_CATEGORIES: Record<string, string> = {
 
 // 목록 템플릿이 모든 상품에 품절 아이콘을 렌더링하지만 상세 옵션에는 실제 재고가 있는 사이트.
 const SITE_CAFE24_DETAIL_STOCK_SITES = new Set([
+  "slowsteadyclub",
   "opening-project",
   // Listing cards do not reliably expose sold-out state; product options do.
   "wouldbe",

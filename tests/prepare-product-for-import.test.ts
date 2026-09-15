@@ -87,6 +87,24 @@ test("Cafe24 unknown pricing is recovered before brand and payload preparation",
   assert.deepEqual(calls, ["price", "brand"])
 })
 
+test("Cafe24 prepared payload preserves product_no for source ranking joins", async () => {
+  const cafe = {...config, key: "slowsteadyclub", type: "cafe24" as const}
+  const result = await prepareProductForImport(
+    {
+      product: product({
+        platform: "slowsteadyclub",
+        productUrl: "https://slowsteadyclub.com/product/item/8421/category/683/display/1/",
+      }),
+      config: cafe,
+      observedAt: "2026-09-12T00:00:00Z",
+      expectedUpdatedAt: null,
+    },
+    {resolveBrand: existingBrand},
+  )
+  assert.equal(result.status, "prepared")
+  if (result.status === "prepared") assert.equal(result.prepared.product.product_no, 8421)
+})
+
 test("unknown pricing cannot produce a prepared envelope", async () => {
   const result = await prepareProductForImport(
     {product: product({pricingObservation: {state: "unknown", source: "listing", version: 2}}), config, observedAt: "2026-09-12T00:00:00Z", expectedUpdatedAt: null},

@@ -489,6 +489,7 @@ async function crawlCafe24WithChromium(
   config: SiteConfig,
   detailParser?: IDetailParser,
   reviewParser?: IReviewParser,
+  listingOnly = false,
   detailConcurrency = 3,
   onDetailProgress?: (products: Product[]) => Promise<void> | void,
   existingDetails?: Map<string, DetailData>,
@@ -503,13 +504,14 @@ async function crawlCafe24WithChromium(
     const page = await context.newPage()
     page.on("dialog", (d) => d.dismiss().catch(() => {}))
     return await crawlCafe24(page, config, detailParser, reviewParser, {
+      listingOnly,
       detailConcurrency,
       onDetailProgress,
       existingDetails,
       includeOutOfStock,
       // Cafe24 목록의 단일 가격은 정상가인지 세일가인지 증명할 수 없다.
       // 온보딩도 refresh와 같은 가격 계약을 지키도록 미확정 상품을 전수 상세 확인한다.
-      recoverMissingPriceFromDetail: true,
+      recoverMissingPriceFromDetail: !listingOnly,
     })
   } finally {
     await browser.close()
@@ -521,6 +523,7 @@ async function crawlCafe24WithSelectedEngine(
   detailParser: IDetailParser | undefined,
   reviewParser: IReviewParser | undefined,
   mode: Cafe24EngineMode,
+  listingOnly: boolean,
   detailConcurrency: number,
   onDetailProgress?: (products: Product[]) => Promise<void> | void,
   existingDetails?: Map<string, DetailData>,
@@ -531,6 +534,7 @@ async function crawlCafe24WithSelectedEngine(
       config,
       detailParser,
       reviewParser,
+      listingOnly,
       detailConcurrency,
       onDetailProgress,
       existingDetails,
@@ -540,11 +544,12 @@ async function crawlCafe24WithSelectedEngine(
 
   try {
     const result = await crawlCafe24WithLightpanda(config, detailParser, reviewParser, {
+      listingOnly,
       detailConcurrency,
       onDetailProgress,
       existingDetails,
       includeOutOfStock,
-      recoverMissingPriceFromDetail: true,
+      recoverMissingPriceFromDetail: !listingOnly,
     })
     if (result.stats.totalProducts === 0) {
       throw new Error("Lightpanda returned 0 products")
@@ -558,6 +563,7 @@ async function crawlCafe24WithSelectedEngine(
       config,
       detailParser,
       reviewParser,
+      listingOnly,
       detailConcurrency,
       onDetailProgress,
       existingDetails,
@@ -566,7 +572,12 @@ async function crawlCafe24WithSelectedEngine(
   }
 }
 
-async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStock = false) {
+async function runCrawl(
+  configs: SiteConfig[],
+  dryRun: boolean,
+  includeOutOfStock = false,
+  listingOnly = false,
+) {
   const results: CrawlResult[] = []
   const outDir = path.join(process.cwd(), "data")
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, {recursive: true})
@@ -782,6 +793,7 @@ async function runCrawl(configs: SiteConfig[], dryRun: boolean, includeOutOfStoc
               dp,
               rp,
               cafe24EngineMode,
+              listingOnly,
               detailConcurrency,
               onDetailProgress,
               existingDetails,
@@ -1200,7 +1212,7 @@ async function main() {
     console.log("📦 품절 상품 포함 (재수집 모드)")
   }
 
-  await runCrawl(targets, dryRun, includeOutOfStock)
+  await runCrawl(targets, dryRun, includeOutOfStock, noDetailFlag)
 }
 
 
