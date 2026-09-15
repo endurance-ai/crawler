@@ -16,6 +16,7 @@ const CAFE24_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 export interface LightpandaCafe24Options {
+  listingOnly?: CrawlCafe24Options["listingOnly"]
   detailConcurrency?: number
   onDetailProgress?: CrawlCafe24Options["onDetailProgress"]
   existingDetails?: CrawlCafe24Options["existingDetails"]
@@ -152,6 +153,7 @@ export async function crawlCafe24WithLightpanda(
   try {
     await detailPool?.start()
     return await crawlCafe24(mainPage.page, config, detailParser, reviewParser, {
+      listingOnly: options.listingOnly,
       detailConcurrency,
       onDetailProgress: options.onDetailProgress,
       existingDetails: options.existingDetails,

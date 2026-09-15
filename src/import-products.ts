@@ -40,6 +40,7 @@ import {addPipelineError, createPipelineReport, finalizePipelineReport, pipeline
 import {toDecimalId, type BrandResolution, type PreparedProductWriteResult} from "./lib/pipeline-integrity-types"
 import type {Product} from "./lib/types"
 import {validateProduct} from "./lib/core/product-validator"
+import {persistCategoryListingSnapshots} from "./lib/edit-shop-listings"
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`
@@ -580,6 +581,15 @@ async function main() {
       })
     },
   }).finally(async () => { if (browser) await browser.close() })
+  if (!dryRun) {
+    for (const file of files) {
+      const products = sourceByFile.get(file.file ?? "") ?? file.products
+      const listingSnapshotCount = await persistCategoryListingSnapshots(db, file.platform, products)
+      if (listingSnapshotCount > 0) {
+        console.log(`   🗂️  ${file.platform}: 편집샵 카테고리 스냅샷 ${listingSnapshotCount}개 저장`)
+      }
+    }
+  }
   if (reportPath) await writePipelineReport(reportPath, result.report)
   const c = result.report.counts
   console.log(`Import ${result.report.status}: input=${c.input ?? 0} inserted=${c.inserted ?? 0} updated=${c.updated ?? 0} unchanged=${c.unchanged ?? 0} excluded=${c.policy_excluded ?? 0} failed=${c.failed ?? 0} pending=${c.pending ?? 0}`)

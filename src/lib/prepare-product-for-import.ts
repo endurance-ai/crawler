@@ -8,6 +8,7 @@ import type {
   PreparedProductWrite,
 } from "./pipeline-integrity-types"
 import {sanitizeProductImageFields} from "./product-images"
+import {productNoFromUrl} from "./edit-shop-listings"
 import {
   buildQwenNormalizationPatch,
   needsQwenNormalization,
@@ -242,6 +243,7 @@ export async function prepareProductForImport(
     gender: product.gender, gender_source: product.genderSource ?? null, crawled_at: observedAt,
     tags: product.tags?.slice(0, 50) ?? null, size_info: product.sizeInfo?.slice(0, 2000) ?? null,
     product_code: product.productCode?.slice(0, 100) ?? null,
+    product_no: input.config.type === "cafe24" ? productNoFromUrl(product.productUrl) : null,
   }
   const prepared: PreparedProductWrite = {
     product: row,

@@ -11,6 +11,7 @@
   "packageManager": "pnpm@10.33.2",
   "scripts": {
     "crawl": "dotenv -e .env -e .env.local -- tsx src/crawl.ts",
+    "crawl:edit-shop-listings": "dotenv -e .env -e .env.local -- tsx src/crawl-edit-shop-listings.ts",
     "import:products": "dotenv -e .env -e .env.local -- tsx src/import-products.ts",
     "sync:catalog": "dotenv -e .env -e .env.local -- tsx src/sync-catalog.ts",
     "match:catalog-pair": "dotenv -e .env -e .env.local -- tsx src/sync-catalog.ts --cross-shop-auto-match",
