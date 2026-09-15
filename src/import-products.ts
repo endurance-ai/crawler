@@ -562,6 +562,11 @@ async function main() {
       return data as {outcome: "applied" | "unchanged" | "stale" | "missing"; product_id: string; review_count: number}
     },
     writeCheckpoint: ({file, productUrl, normalization}) => {
+      // `not_required` is deterministic from the canonical taxonomy and does
+      // not protect an expensive Qwen result. Persisting it rewrites the whole
+      // crawl JSON once per product (tens of MB for large retailers), turning
+      // otherwise routine imports into multi-hour disk-bound jobs.
+      if (normalization.status === "not_required") return
       if (!file) return
       const products = sourceByFile.get(file)
       const target = products?.find((product) => product.productUrl === productUrl)
