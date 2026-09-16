@@ -46,6 +46,45 @@ test("QC does not read 'Short Sleeve' as shorts (bottoms alias excludes it)", ()
   assert.ok(!result.reasons.includes("category_text_conflict"))
 })
 
+test("category keyword noise is not classified as a dress", () => {
+  for (const name of ["DRESS COVER", "SAUNA BATH ROBE", "dress #063 / black", "MXR Dress Blues"]) {
+    assert.equal(inferCategoryFromText(name), null, name)
+  }
+})
+
+test("existing dress classifications are repaired from keyword noise", () => {
+  for (const name of ["DRESS COVER (ECRU)", "SAUNA BATH ROBE (OFF WHITE)"]) {
+    const result = normalizeProductTextFields(product({name, category: "dresses", subcategory: null}), {trustedCategory: true})
+    assert.equal(result.product.category, "other", name)
+    assert.ok(result.reasons.includes("category_keyword_noise_override"), name)
+  }
+
+  const footwear = normalizeProductTextFields(product({
+    name: "Vasque Skywalk GTX - Olive / Dress Blues",
+    category: "dresses",
+    subcategory: null,
+    tags: ["boot", "boots", "footwear"],
+  }), {trustedCategory: true})
+  assert.equal(footwear.product.category, "shoes")
+  assert.equal(footwear.product.subcategory, "boots")
+})
+
+test("explicit dress names override broad trusted retailer placements", () => {
+  for (const name of [
+    "Lausanne Mesh Dress (Multi)",
+    "Iris Mini Dress (Black)",
+    "Linen Rayon Sleeveless Maxi Dress [Navy]",
+    "Ancient Temple Lightweight Vest Dress [Washed Black]",
+  ]) {
+    const result = normalizeProductTextFields(product({name, category: "tops"}), {
+      trustedCategory: true,
+      trustedTitleCategoryOverrides: ["dresses"],
+    })
+    assert.equal(result.product.category, "dresses", name)
+    assert.ok(result.reasons.includes("category_trusted_title_override"), name)
+  }
+})
+
 test("QC still reads a standalone 'Short' as bottoms", () => {
   // `shorts?` 의 `s?` 는 유지돼야 한다 — 홑단어 Short 를 명사로 쓰는 상품명이
   // 실측상 더 많다 (1,170 vs 304). 예외는 'short sleeve' 한 갈래뿐이다.

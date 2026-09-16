@@ -16,6 +16,7 @@
 
 import type {Category} from "./enums/product-enums"
 import {matchSubcategory} from "./subcategory-classifier"
+import {stripCategoryKeywordNoise} from "./text-match"
 
 export interface ClassifyResult {
   category: string
@@ -96,9 +97,9 @@ export function classifyShopifyCategory(
   // normal `\bcardigan\b` rule cannot see the category token unless separators
   // are normalized first.
   const normalizeSeparators = (value: string) => value.toLowerCase().replace(/_/g, " ")
-  const typeLower = normalizeSeparators(productType.trim())
-  const titleLower = normalizeSeparators(title)
-  const tagsText = tags.map((t) => normalizeSeparators(t)).join(" ")
+  const typeLower = stripCategoryKeywordNoise(normalizeSeparators(productType.trim()))
+  const titleLower = stripCategoryKeywordNoise(normalizeSeparators(title))
+  const tagsText = stripCategoryKeywordNoise(tags.map((t) => normalizeSeparators(t)).join(" "))
   // combined signal for subcategory and fallback category matching
   const combined = `${titleLower} ${tagsText}`
 

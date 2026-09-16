@@ -1,7 +1,7 @@
 import {CATEGORIES, isValidCategory, type Category} from "../enums/product-enums"
 import {emit} from "../core/observability"
 import {resolveSubcategory} from "../subcategory-classifier"
-import {matchesAny, normalizeForMatch} from "../text-match"
+import {matchesAny, normalizeForMatch, stripCategoryKeywordNoise} from "../text-match"
 import {normalizeGenderToken, resolveProductGenderWithSource, type GenderSource} from "../product-gender"
 import {isNonFashionProductName} from "../product-scope"
 
@@ -56,6 +56,8 @@ export interface ProductQcOptions {
   brandGenderScope?: unknown
   /** 입력 category 가 신뢰 가능한 출처(LLM 보강)에서 왔는가. 기본 false. */
   trustedCategory?: boolean
+  /** Trusted listing categories that an explicit product noun may override. */
+  trustedTitleCategoryOverrides?: Category[]
   /** kids 가드에서만 제거할 사이트별 캠페인명/색상명 노이즈. */
   kidsGenderNoisePatterns?: RegExp[]
   /** 공식 사이트에서 검증된 경우에만 config_default unisex를 허용한다. */
@@ -282,10 +284,20 @@ const CATEGORY_PRIORITY_ALIASES: Array<{category: Category; patterns: RegExp[]}>
 ]
 
 function inferPriorityCategoryFromText(text: string): Category | null {
-  const normalized = normalizeForMatch(text)
+  const categoryText = stripCategoryKeywordNoise(text)
+  const normalized = normalizeForMatch(categoryText)
   for (const entry of CATEGORY_PRIORITY_ALIASES) {
-    if (entry.patterns.some((pattern) => pattern.test(text) || pattern.test(normalized))) return entry.category
+    if (entry.patterns.some((pattern) => pattern.test(categoryText) || pattern.test(normalized))) return entry.category
   }
+  return null
+}
+
+function inferTrustedTitleCategoryOverride(text: string, allowed: Category[]): Category | null {
+  const normalized = normalizeForMatch(stripCategoryKeywordNoise(text))
+  if (
+    allowed.includes("dresses")
+    && /\bdress(?:es)?\b(?!\s+(?:shirts?|pants?|shoes?|boots?)\b)/i.test(normalized)
+  ) return "dresses"
   return null
 }
 
@@ -422,9 +434,10 @@ function currentCategoryCompat(raw: string): Category | null {
 
 export function inferCategoryFromText(text: string): Category | null {
   if (!text.trim()) return null
-  const priority = inferPriorityCategoryFromText(text)
+  const categoryText = stripCategoryKeywordNoise(text)
+  const priority = inferPriorityCategoryFromText(categoryText)
   if (priority) return priority
-  const matches = CATEGORY_ALIASES.filter((entry) => matchesAny(text, entry.patterns, entry.contains)).map((entry) => entry.category)
+  const matches = CATEGORY_ALIASES.filter((entry) => matchesAny(categoryText, entry.patterns, entry.contains)).map((entry) => entry.category)
   const unique = [...new Set(matches)]
   return unique.length === 1 ? unique[0] : null
 }
@@ -432,6 +445,7 @@ export function inferCategoryFromText(text: string): Category | null {
 function normalizeCategoryField(
   product: ProductQcInput,
   trustedCategory: boolean,
+  trustedTitleCategoryOverrides: Category[] = [],
 ): {
   value: string | null
   reason: string | null
@@ -444,6 +458,7 @@ function normalizeCategoryField(
   }
   const inferred = inferCategoryFromText(product.name)
   const priorityInferred = inferPriorityCategoryFromText(product.name)
+  const trustedTitleOverride = inferTrustedTitleCategoryOverride(product.name, trustedTitleCategoryOverrides)
 
   if (!raw) {
     if (inferred) return {value: inferred, reason: "category_missing_text_fallback", confidence: 0.84, needsReview: false}
@@ -456,6 +471,17 @@ function normalizeCategoryField(
   // null(NOT NULL 에 걸려 적재 제외)로 떨어뜨린다.
   const current = currentCategoryCompat(raw)
   if (current) {
+    const strippedName = stripCategoryKeywordNoise(product.name)
+    const hasCategoryKeywordNoise = normalizeForMatch(strippedName) !== normalizeForMatch(product.name)
+    if (current === "dresses" && hasCategoryKeywordNoise) {
+      const alternative = inferCategoryFromText(`${strippedName} ${(product.tags ?? []).join(" ")}`)
+      return {
+        value: alternative && alternative !== "dresses" ? alternative : "other",
+        reason: "category_keyword_noise_override",
+        confidence: 0.95,
+        needsReview: false,
+      }
+    }
     // `other` is a fallback rather than a trusted taxonomy decision. When a
     // later pass finds explicit product-name evidence, promote it directly.
     if (current === "other" && inferred) {
@@ -468,6 +494,13 @@ function normalizeCategoryField(
     }
     if (priorityInferred && current !== priorityInferred && !trustedCategory) {
       return {value: priorityInferred, reason: "category_priority_text_override", confidence: 0.9, needsReview: false}
+    }
+    // Some editorial shops use broad landing placements (for example TOP)
+    // rather than the product's actual family. Opted-in families may use the
+    // sanitized product noun as stronger evidence; global trusted-category
+    // behavior stays unchanged for every other site/family.
+    if (trustedTitleOverride && current !== trustedTitleOverride) {
+      return {value: trustedTitleOverride, reason: "category_trusted_title_override", confidence: 0.9, needsReview: false}
     }
     // ② 이름 기반 번복. 신뢰 출처에서는 건너뛴다 — 구제할 원본이 아니다.
     // 아래 두 text_fallback 은 남긴다: 값이 **없을 때** 채우는 것이라 번복이 아니다.
@@ -498,7 +531,7 @@ function normalizeSubcategoryField(
   const resolved = resolveSubcategory(
     product.subcategory,
     canonicalCategory,
-    `${product.name} ${product.category ?? ""}`,
+    `${product.name} ${product.category ?? ""} ${(product.tags ?? []).join(" ")}`,
   )
 
   switch (resolved.reason) {
@@ -614,7 +647,11 @@ export function normalizeProductTextFields<T extends ProductQcInput>(
   // product regardless of site (real incident: 2026-08-20/21 overnight recollect
   // batch produced zero output across 59 sites this way).
   if (isQcEnabled()) {
-    const category = normalizeCategoryField(product, options.trustedCategory === true)
+    const category = normalizeCategoryField(
+      product,
+      options.trustedCategory === true,
+      options.trustedTitleCategoryOverrides,
+    )
     confidences.push(category.confidence)
     if (category.needsReview) needsReview = true
     if (category.reason) reasons.push(category.reason)

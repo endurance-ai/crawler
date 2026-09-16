@@ -414,6 +414,17 @@ test("isKidsText", () => {
   assert.equal(isKidsText("Wool Coat"), false)
 })
 
+test("kids는 기존 engine 성별이 있어도 성인 카탈로그에서 제외한다", () => {
+  for (const gender of [["men"], ["women"], ["unisex"]]) {
+    const result = resolveProductGenderWithSource(
+      gender,
+      {name: "Kith Kids Camryn Dress", tags: ["kids", "apparel", "dress"]},
+      "engine",
+    )
+    assert.deepEqual(result, {gender: [], source: null})
+  }
+})
+
 // ─── cleanGenderScope ────────────────────────────────────────────────────
 
 test("cleanGenderScope 는 kids 등 미지원 값을 버린다", () => {
