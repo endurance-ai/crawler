@@ -141,7 +141,6 @@ export async function prepareProductForImport(
   if (!isIsoTimestamp(observedAt)) return failure(product, "validation", "observed_at_invalid", "detail observation must be an ISO timestamp", false)
   const baseQcOptions = {
     trustedCategory: input.config.type === "shopify" || input.config.trustedCategory === true,
-    trustedTitleCategoryOverrides: input.config.trustedTitleCategoryOverrides as import("./enums/product-enums").Category[] | undefined,
     verifiedUnisexDefault: input.config.verifiedUnisexDefault,
     genderTextPatterns: input.config.genderTextPatterns,
     kidsGenderNoisePatterns: input.config.kidsGenderNoisePatterns,

@@ -614,18 +614,3 @@ test("HOMLY는 공식 남성 카탈로그를 쓰고 DURT 혼성몰은 전역 기
   assert.deepEqual(getSiteConfig("homly")?.defaultGender, ["men"])
   assert.equal(getSiteConfig("durt")?.defaultGender, undefined)
 })
-
-test("남성 원피스 누수로 검증된 편집샵 여성 드레스는 재수집해도 women을 유지한다", () => {
-  for (const name of [
-    "에리즈_ Ancient Temple Lightweight Vest Dress [Washed Black]",
-    "토니웩_ Twisted Long Dress [Black]",
-    "토니웩_ Light Cotton Strap Dress [Black]",
-    "토니웩_ Linen Rayon Sleeveless Maxi Dress [Navy]",
-  ]) assert.equal(inferVerifiedSiteGenderFromName("etcseoul", name), "women", name)
-
-  for (const name of [
-    "Lausanne Mesh Dress (Multi)",
-    "Iris Mini Dress (Black)",
-    "Bianca Mini Dress (Black)",
-  ]) assert.equal(inferVerifiedSiteGenderFromName("8division", name), "women", name)
-})

@@ -17,20 +17,6 @@ export function normalizeForMatch(value: string): string {
 }
 
 /**
- * Remove phrases where fashion category words describe a colour, an object,
- * or a model number rather than the product type. Keep this shared between
- * Shopify classification and the all-platform QC fallback so the same title
- * cannot be classified differently at crawl and import time.
- */
-export function stripCategoryKeywordNoise(value: string): string {
-  return value
-    .replace(/\bdress[\s_-]+blues?\b/gi, " ")
-    .replace(/\bdress[\s_-]+covers?\b/gi, " ")
-    .replace(/\bbath[\s_-]+robes?\b/gi, " ")
-    .replace(/\bdress\s*#\s*\d+\b/gi, " ")
-}
-
-/**
  * `patterns` 는 raw / NFKD-정규화 두 형태 모두에 시도하고, `contains` 는 raw
  * 에만 시도한다 — normalizeForMatch 의 NFKD 가 한글을 자모로 분해하므로 조합형
  * 한글 토큰("여성", "남녀공용")은 raw 에서만 매치되기 때문이다.

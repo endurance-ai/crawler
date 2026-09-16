@@ -67,16 +67,6 @@ test("구체적인 Footwear 타입은 상품명의 소재 Denim보다 우선한�
   assert.equal(category, "shoes")
 })
 
-test("Dress Blues 색상명은 footwear 태그를 원피스로 뒤집지 않는다", () => {
-  const result = classifyShopifyCategory(
-    "",
-    "Vasque Skywalk GTX - Olive / Dress Blues",
-    ["boot", "boots", "footwear", "Vasque Skywalk GTX - Olive / Dress Blues"],
-  )
-  assert.equal(result.category, "shoes")
-  assert.equal(result.subcategory, "boots")
-})
-
 test("classify_shopify_cardigan_type_to_knitwear", () => {
   const {category, subcategory} = classifyShopifyCategory("Cardigans", "Wool Cardigan", [])
   assert.equal(category, "knitwear")

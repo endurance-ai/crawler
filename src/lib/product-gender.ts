@@ -386,31 +386,6 @@ export function resolveProductGenderWithSource(
   // dedup merge 에서 동순위 충돌이 나 ['men','women'] union 이 만들어진다.
   const isConfigDefault = productGenderSource === "config_default"
 
-  const text = evidenceText(evidence)
-  const url = typeof evidence.productUrl === "string" ? evidence.productUrl : ""
-  const stripKidsNoise = (value: string) => options.kidsGenderNoisePatterns?.reduce(
-    (cleaned, pattern) => cleaned.replace(pattern, " "),
-    value,
-  ) ?? value
-  const rawFromText = text
-    ? inferGenderFromSiteTextPatterns(text, options.genderTextPatterns) ?? inferGenderFromText(text)
-    : null
-  const fromUrl = inferGenderFromUrl(url)
-
-  // Age scope is independent of gender provenance. An adult gender or
-  // verified-unisex label cannot make a Kids/Baby product eligible for the
-  // adult catalogue. Site-specific noise patterns still remove known campaign
-  // names before this guard to avoid false positives. Explicit adult evidence
-  // in product text/URL still wins (for example an adult women's line whose
-  // tags happen to contain a campaign label such as "Girls").
-  if (
-    rawFromText === null
-    && fromUrl === null
-    && (isKidsText(stripKidsNoise(text)) || isKidsText(stripKidsNoise(url)))
-  ) {
-    return {gender: [], source: null}
-  }
-
   // 엔진이 뽑은 men/women 은 상품 단위 단언이므로 그대로 확정한다.
   //
   // unisex 만 예외다 (2026-08-25). 엔진 unisex 의 실제 출처는 대부분
@@ -427,6 +402,34 @@ export function resolveProductGenderWithSource(
   const engineGender = !isConfigDefault && fromProduct.length === 1 ? fromProduct[0]! : null
   if (engineGender !== null && engineGender !== "unisex") {
     return {gender: fromProduct, source: productGenderSource}
+  }
+
+  const text = evidenceText(evidence)
+  const url = typeof evidence.productUrl === "string" ? evidence.productUrl : ""
+
+  const rawFromText = text
+    ? inferGenderFromSiteTextPatterns(text, options.genderTextPatterns) ?? inferGenderFromText(text)
+    : null
+  const fromUrl = inferGenderFromUrl(url)
+
+  // kids 가드는 태그 부서 분류보다 **먼저** 본다. 순서를 뒤집으면
+  // `["Kids","Men","Women"]` 같은 태그가 아동복에 성인 성별(unisex)을 주고,
+  // unisex 는 검색에서 남녀 양쪽에 노출되므로 정확히 이 모듈이 막으려는 세탁이 된다.
+  const stripKidsNoise = (value: string) => options.kidsGenderNoisePatterns?.reduce(
+    (cleaned, pattern) => cleaned.replace(pattern, " "),
+    value,
+  ) ?? value
+  //
+  // 엔진이 unisex 를 준 행은 이 가드를 타지 않는다 — 아래에서 엔진 값으로
+  // 확정되므로 기존 동작이 그대로 보존된다. 엔진 unisex 에 대한 이번 변경은
+  // "구체 신호가 있을 때만 양보" 하나로 좁혀 둔다.
+  if (
+    engineGender === null
+    && rawFromText === null
+    && fromUrl === null
+    && (isKidsText(stripKidsNoise(text)) || isKidsText(stripKidsNoise(url)))
+  ) {
+    return {gender: [], source: null}
   }
 
   // 일반 텍스트가 men·women 동시 검출로 모호해졌을 때만 태그 부서 분류를 본다.
