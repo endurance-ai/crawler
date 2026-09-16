@@ -265,6 +265,8 @@ export interface SiteConfig {
   trustedCategory?: boolean
   /** Canonical categories outside the service scope for this site. */
   outOfScopeCategories?: string[]
+  /** Product-title families allowed to override broad trusted listing placements. */
+  trustedTitleCategoryOverrides?: string[]
   /** Shopify의 사이트별 구조화 성별 부서 태그 prefix. */
   genderDepartmentTagPrefixes?: {men: string[]; women: string[]; unisex?: string[]}
   /**

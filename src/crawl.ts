@@ -829,6 +829,7 @@ async function writeProductsFile(outDir: string, platform: string, rawProducts: 
   const config = getSiteConfig(platform)
   const qcProducts = applyProductQcGate(rawProducts, platform, {
     trustedCategory: config?.type === "shopify" || config?.trustedCategory === true,
+    trustedTitleCategoryOverrides: config?.trustedTitleCategoryOverrides as import("./lib/enums/product-enums").Category[] | undefined,
     kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
     verifiedUnisexDefault: config?.verifiedUnisexDefault,
     genderTextPatterns: config?.genderTextPatterns,
