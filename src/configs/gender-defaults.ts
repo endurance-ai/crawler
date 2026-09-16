@@ -618,5 +618,16 @@ export function inferVerifiedSiteGenderFromName(
   if (site === "blackpurple" && /Deux[- ]Eyelet Long Handle Bag/i.test(name)) return "women"
   if (site === "mmmcorp" && /Cotton Check Pattern/i.test(name)) return "women"
   if (site === "swallowlounge" && /Inside Out Tote S/i.test(name)) return "women"
+  // Verified women products carried by mixed-gender editorial shops. These
+  // exact product-family names are stronger evidence than the shops' broad
+  // unisex fallback and prevent a later re-import from undoing the repair.
+  if (
+    site === "etcseoul"
+    && /(Ancient Temple Lightweight Vest Dress|Twisted Long Dress|Light Cotton Strap Dress|Linen Rayon Sleeveless Maxi Dress)/i.test(name)
+  ) return "women"
+  if (
+    site === "8division"
+    && /(Lausanne Mesh Dress|Iris Mini Dress|Bianca Mini Dress)/i.test(name)
+  ) return "women"
   return null
 }
