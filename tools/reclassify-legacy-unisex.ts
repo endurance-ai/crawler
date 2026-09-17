@@ -22,6 +22,7 @@ import {
   type ProductGender,
 } from "../src/lib/product-gender"
 import {toDecimalId} from "../src/lib/pipeline-integrity-types"
+import {reclassificationSnapshotPath} from "../src/lib/reclassification-snapshot"
 import {
   EDIT_SHOP_GENDER_RECLASSIFIED_SITES,
   HISTORICAL_BLANKET_UNISEX_SITES,
@@ -337,9 +338,9 @@ async function main(): Promise<void> {
   if (!apply) return
 
   const updatedAt = new Date().toISOString()
-  const snapshotPath = path.join(
-    "/private/tmp",
-    `legacy-unisex-reclassification-${updatedAt.replace(/[:.]/g, "-")}.json`,
+  const snapshotPath = reclassificationSnapshotPath(
+    "legacy-unisex-reclassification",
+    updatedAt,
   )
   fs.writeFileSync(snapshotPath, JSON.stringify({
     generated_at: updatedAt,
