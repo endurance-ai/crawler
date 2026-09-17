@@ -5,7 +5,7 @@
  * Dry-run by default. `--apply` writes only evidence-backed changes and marks
  * KITH kids products and unresolved blanket-unisex rows out of stock because
  * the adult gender schema cannot safely represent them. A rollback snapshot is
- * written to /private/tmp before writes.
+ * written to the operating system's temporary directory before writes.
  */
 import * as fs from "node:fs"
 import * as path from "node:path"
@@ -15,6 +15,7 @@ import {createClient, type SupabaseClient} from "@supabase/supabase-js"
 
 import {inferGenderFromText, type ProductGender} from "../src/lib/product-gender"
 import {toDecimalId} from "../src/lib/pipeline-integrity-types"
+import {reclassificationSnapshotPath} from "../src/lib/reclassification-snapshot"
 import {
   cafe24ListingLastPage,
   cafe24ListingProductNos,
@@ -387,9 +388,9 @@ async function main(): Promise<void> {
   if (!apply) return
 
   const updatedAt = new Date().toISOString()
-  const snapshotPath = path.join(
-    "/private/tmp",
-    `edit-shop-gender-reclassification-${updatedAt.replace(/[:.]/g, "-")}.json`,
+  const snapshotPath = reclassificationSnapshotPath(
+    "edit-shop-gender-reclassification",
+    updatedAt,
   )
   fs.writeFileSync(snapshotPath, JSON.stringify({
     generated_at: updatedAt,
