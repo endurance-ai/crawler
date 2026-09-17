@@ -53,6 +53,7 @@ import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlStructuredExisting} from "./lib/structured-refresh-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
 import {toDecimalId} from "./lib/pipeline-integrity-types"
+import {isUnverifiedUnisexRow} from "./lib/unisex-quarantine"
 import {crawlUniqlo} from "./lib/uniqlo-engine"
 import {crawlZara} from "./lib/zara-engine"
 
@@ -181,7 +182,7 @@ async function fetchExistingRows(
     const {data, error} = await db
       .from("products")
       .select(
-        "id,product_url,updated_at,crawled_at,price,original_price,sale_price,source_price,source_currency,in_stock,last_seen_at",
+        "id,product_url,updated_at,crawled_at,price,original_price,sale_price,source_price,source_currency,in_stock,last_seen_at,gender,gender_source",
       )
       .eq("platform", platformKey)
       // ORDER BY 없는 LIMIT/OFFSET 은 페이지 간 행 순서가 보장되지 않아 누락이 생긴다.
@@ -195,9 +196,20 @@ async function fetchExistingRows(
       .range(offset, offset + pageSize - 1)
       .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
     if (error) throw new Error(`products 조회 실패: ${error.message}`)
-    const page = (data ?? []).map((row) => ({...row,
-      id: toDecimalId((row as {id: string | number | bigint}).id),
-    })) as RefreshableRow[]
+    const config = getSiteConfig(platformKey)
+    const page = (data ?? []).map((row) => {
+      const product = row as typeof row & {gender: string[] | null; gender_source: string | null}
+      return {
+        ...product,
+        id: toDecimalId((product as {id: string | number | bigint}).id),
+        unverified_unisex_quarantined: isUnverifiedUnisexRow({
+          platform: platformKey,
+          gender: product.gender,
+          genderSource: product.gender_source,
+          verifiedUnisexDefault: config?.verifiedUnisexDefault === true,
+        }),
+      }
+    }) as RefreshableRow[]
     rows.push(...page)
     if (page.length < pageSize) break
   }
@@ -272,7 +284,13 @@ async function applyUpdates(
   let failed = 0
   for (const update of updates) {
     const payload = options.priceOnly
-      ? Object.fromEntries(Object.entries(update.patch).filter(([key]) => key !== "in_stock"))
+      ? Object.fromEntries(Object.entries(update.patch).filter(([key]) => [
+          "price",
+          "original_price",
+          "sale_price",
+          "source_price",
+          "source_currency",
+        ].includes(key)))
       : update.patch
     if (Object.keys(payload).length === 0) continue
     if (options.audit) {

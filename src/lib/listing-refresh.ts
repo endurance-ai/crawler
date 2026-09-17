@@ -24,13 +24,21 @@ export interface RefreshableRow {
   source_currency?: string | null
   in_stock: boolean | null
   last_seen_at?: string | null
+  gender?: string[] | null
+  gender_source?: string | null
+  /** This legacy row stays hidden until a current crawl verifies its gender. */
+  unverified_unisex_quarantined?: boolean
 }
 
 export type PriceFields = Pick<RefreshableRow, "price" | "original_price" | "sale_price">
 export type RefreshPriceFields = PriceFields & {source_price: number; source_currency: string}
 
 /** 갱신이 DB 에 쓰는 값. in_stock 은 항상, 가격은 산출된 경우에만 포함된다. */
-export type RefreshPatch = Partial<RefreshPriceFields> & {in_stock: boolean}
+export type RefreshPatch = Partial<RefreshPriceFields> & {
+  in_stock: boolean
+  gender?: string[]
+  gender_source?: string
+}
 
 export interface RefreshUpdate {
   id: string
@@ -236,10 +244,32 @@ export function diffListing(args: {
       )
       // Never let a delayed listing snapshot overwrite a more recent detail/listing write.
       if (!Number.isFinite(observedMs) || observedMs < storedMs) continue
-      const patch: RefreshPatch = {in_stock: product.inStock}
+      const currentGender = Array.isArray(product.gender) && product.gender.length === 1
+        && typeof product.genderSource === "string"
+        && ["engine", "url", "text", "config_default"].includes(product.genderSource)
+        ? {gender: product.gender, source: product.genderSource}
+        : null
+      const quarantineBlocksRestock = row.unverified_unisex_quarantined === true
+        && product.inStock
+        && currentGender === null
+      const nextInStock = quarantineBlocksRestock ? false : product.inStock
+      const patch: RefreshPatch = {in_stock: nextInStock}
+      const genderNeedsUpdate = currentGender !== null
+        && (
+          row.gender?.length !== 1
+          || row.gender[0] !== currentGender.gender[0]
+          || row.gender_source !== currentGender.source
+        )
+      if (row.unverified_unisex_quarantined && product.inStock && currentGender && genderNeedsUpdate) {
+        patch.gender = currentGender.gender
+        patch.gender_source = currentGender.source
+        reasons.push(`성별 재검증 → ${currentGender.gender[0]}`)
+      } else if (quarantineBlocksRestock && row.in_stock !== false) {
+        reasons.push("근거 없는 unisex 재활성화 차단")
+      }
       const prices = toRefreshPriceFields(product, row, args.sourceCurrency)
-      if (row.in_stock !== product.inStock) {
-        reasons.push(product.inStock ? "재입고" : "품절")
+      if (row.in_stock !== nextInStock) {
+        reasons.push(nextInStock ? "재입고" : "품절")
       }
 
       if (prices) {

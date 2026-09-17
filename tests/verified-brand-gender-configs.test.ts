@@ -10,9 +10,32 @@ import {getSiteConfig} from "../src/configs/platforms"
 test("8DIVISION의 성별 미구분 상품군을 unisex로 세탁하지 않는다", () => {
   const eightDivision = getSiteConfig("8division")
   assert.ok(eightDivision?.category?.categories?.length)
-  assert.ok(eightDivision.category.categories.every((category) => category.gender === undefined))
+  assert.deepEqual(eightDivision.category.categories.find(({cateNo}) => cateNo === 2682)?.gender, ["men"])
+  assert.deepEqual(eightDivision.category.categories.find(({cateNo}) => cateNo === 2740)?.gender, ["women"])
+  assert.ok(eightDivision.category.categories
+    .filter(({cateNo}) => ![2682, 2740].includes(cateNo))
+    .every((category) => category.gender === undefined))
   assert.equal(eightDivision.defaultGender, undefined)
   assert.notEqual(eightDivision.verifiedUnisexDefault, true)
+})
+
+test("편집샵 상품군을 blanket unisex로 쓰지 않고 공식 부서만 성별 근거로 쓴다", () => {
+  const etcSeoul = getSiteConfig("etcseoul")
+  assert.ok(etcSeoul?.category?.categories?.every(({gender}) => gender === undefined || gender.length === 0))
+
+  const fr8ight = getSiteConfig("fr8ight")
+  const categories = fr8ight?.category?.categories ?? []
+  assert.ok([1193, 1194, 1259, 1532].every(
+    (cateNo) => categories.some((category) => category.cateNo === cateNo && category.gender?.[0] === "men"),
+  ))
+  assert.deepEqual(categories.find(({cateNo}) => cateNo === 1539)?.gender, ["women"])
+  assert.ok(categories
+    .filter(({cateNo}) => ![1193, 1194, 1259, 1532, 1539].includes(cateNo))
+    .every(({gender}) => gender?.length === 0))
+
+  const kith = getSiteConfig("kith")
+  assert.deepEqual(kith?.shopifyExcludedTags, ["KIDS"])
+  assert.deepEqual(kith?.genderDepartmentTagPrefixes, {men: ["mens"], women: ["wmns"]})
 })
 
 test("Jijivisha 자사몰은 검증된 여성 카탈로그 기본값을 사용한다", () => {
