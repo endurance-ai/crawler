@@ -95,6 +95,53 @@ test("diffListing: 품절 전이를 잡는다", () => {
   assert.equal(diff.updates[0].expectedUpdatedAt, "2026-07-18T00:00:00Z")
 })
 
+test("diffListing: 격리된 unisex는 성별 근거 없이 재활성화하지 않는다", () => {
+  const diff = diffListing({
+    crawled: [product({inStock: true, gender: [], genderSource: undefined})],
+    existing: [row({in_stock: false, unverified_unisex_quarantined: true})],
+    markMissingOutOfStock: true,
+  })
+  assert.equal(diff.updates.length, 0)
+})
+
+test("diffListing: 이미 재활성화된 근거 없는 unisex는 다시 격리한다", () => {
+  const diff = diffListing({
+    crawled: [product({inStock: true, gender: [], genderSource: undefined})],
+    existing: [row({in_stock: true, unverified_unisex_quarantined: true})],
+    markMissingOutOfStock: true,
+  })
+  assert.equal(diff.updates[0].patch.in_stock, false)
+  assert.ok(diff.updates[0].reasons.includes("근거 없는 unisex 재활성화 차단"))
+})
+
+test("diffListing: 현재 크롤이 성별을 재검증하면 격리를 해제하고 재입고한다", () => {
+  const diff = diffListing({
+    crawled: [product({inStock: true, gender: ["women"], genderSource: "engine"})],
+    existing: [row({in_stock: false, unverified_unisex_quarantined: true})],
+    markMissingOutOfStock: true,
+  })
+  assert.deepEqual(diff.updates[0].patch, {
+    in_stock: true,
+    gender: ["women"],
+    gender_source: "engine",
+  })
+  assert.ok(diff.updates[0].reasons.includes("성별 재검증 → women"))
+})
+
+test("diffListing: 이미 검증된 활성 unisex는 반복해서 쓰지 않는다", () => {
+  const diff = diffListing({
+    crawled: [product({inStock: true, gender: ["unisex"], genderSource: "engine"})],
+    existing: [row({
+      in_stock: true,
+      gender: ["unisex"],
+      gender_source: "engine",
+      unverified_unisex_quarantined: true,
+    })],
+    markMissingOutOfStock: true,
+  })
+  assert.equal(diff.updates.length, 0)
+})
+
 test("diffListing: an older observation cannot overwrite a newer stored snapshot", () => {
   const diff = diffListing({crawled: [product({inStock: false,
     crawledAt: "2026-07-19T00:00:00Z"})], existing: [row({in_stock: true,

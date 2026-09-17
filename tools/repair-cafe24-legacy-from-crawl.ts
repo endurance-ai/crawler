@@ -85,8 +85,8 @@ export function cafe24CategoryNo(productUrl: string): number | null {
 }
 
 export function cafe24ListingProductNos(html: string): string[] {
-  return [...html.matchAll(/(?:[?&]|&amp;)product_no=(\d+)/gi)]
-    .map((match) => match[1])
+  return [...html.matchAll(/(?:[?&]|&amp;)product_no=(\d+)|\/product\/[^"'<>\s?]+?\/(\d+)\/category\/\d+(?:\/|$)/gi)]
+    .map((match) => match[1] ?? match[2])
     .filter((value, index, values) => values.indexOf(value) === index)
 }
 

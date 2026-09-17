@@ -453,20 +453,25 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 683, gender: ["unisex"]},
-        {name: "Top", cateNo: 742, gender: ["unisex"]},
-        {name: "Knitwear", cateNo: 1020, gender: ["unisex"]},
-        {name: "Bottom", cateNo: 755, gender: ["unisex"]},
-        {name: "Overall", cateNo: 774, gender: ["unisex"]},
-        {name: "Shoes", cateNo: 783, gender: ["unisex"]},
-        {name: "Bag", cateNo: 1341, gender: ["unisex"]},
-        {name: "Accessories", cateNo: 798, gender: ["unisex"]},
-        {name: "Lifestyle", cateNo: 819, gender: ["unisex"]},
-        {name: "New Arrival", cateNo: 674, gender: ["unisex"]},
-        {name: "Sale", cateNo: 723, gender: ["unisex"]},
+        // The storefront explicitly defines these as its gender tabs. Products
+        // listed in both departments become evidence-backed unisex on dedupe.
+        {name: "All", cateNo: 1330, gender: ["men"]},
+        {name: "All", cateNo: 1331, gender: ["women"]},
+        // Product-type departments provide category evidence only.
+        {name: "Outer", cateNo: 683, gender: []},
+        {name: "Top", cateNo: 742, gender: []},
+        {name: "Knitwear", cateNo: 1020, gender: []},
+        {name: "Bottom", cateNo: 755, gender: []},
+        {name: "Overall", cateNo: 774, gender: []},
+        {name: "Shoes", cateNo: 783, gender: []},
+        {name: "Bag", cateNo: 1341, gender: []},
+        {name: "Accessories", cateNo: 798, gender: []},
+        {name: "Lifestyle", cateNo: 819, gender: []},
+        {name: "New Arrival", cateNo: 674, gender: []},
+        {name: "Sale", cateNo: 723, gender: []},
       ],
     },
-    notes: "unisex 편집샵. What100 + 자체 분류 11개 카테고리",
+    notes: "멀티브랜드 편집샵. 공식 남성(1330)/여성(1331) 카테고리를 상품 성별 근거로 사용하며 양쪽 등록 상품만 unisex로 병합한다.",
   },
   {
     key: "adekuver",
@@ -574,6 +579,9 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
+        // 현재 공식 남성복/여성복 전체보기. 양쪽 등록 상품만 unisex로 합친다.
+        {name: "Men All", cateNo: 2682, gender: ["men"]},
+        {name: "Women All", cateNo: 2740, gender: ["women"]},
         // 성별 미구분 상품군이다. 편집샵 자체가 unisex라는 뜻은 아니므로 성별을
         // 채우지 않는다. 상품 단위 근거가 없으면 안전하게 적재에서 제외한다.
         {name: "Top", cateNo: 218}, // 상의
@@ -636,24 +644,30 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        // 일반 카테고리 (unisex)
-        {name: "Top", cateNo: 47, gender: ["unisex"]}, // t-shirts
-        {name: "Top", cateNo: 522, gender: ["unisex"]}, // sweats
-        {name: "Shirts", cateNo: 48, gender: ["unisex"]}, // shirts
-        {name: "Top", cateNo: 49, gender: ["unisex"]}, // vests
-        {name: "Knitwear", cateNo: 50, gender: ["unisex"]}, // knitwear
-        {name: "Outer", cateNo: 393, gender: ["unisex"]}, // jackets
-        {name: "Outer", cateNo: 525, gender: ["unisex"]}, // leather
-        {name: "Outer", cateNo: 394, gender: ["unisex"]}, // coats
-        {name: "Bottom", cateNo: 52, gender: ["unisex"]}, // pants
-        {name: "Bottom", cateNo: 1574, gender: ["unisex"]}, // skirt
-        {name: "Bottom", cateNo: 53, gender: ["unisex"]}, // shorts
-        {name: "Shoes", cateNo: 55, gender: ["unisex"]}, // shoes
-        {name: "Accessories", cateNo: 523, gender: ["unisex"]}, // headwear
-        {name: "Accessories", cateNo: 54, gender: ["unisex"]}, // accessories
+        // 공식 브랜드별 전체보기는 남성 라인과 EASTLOGUE WOMAN을 분리한다.
+        {name: "Eastlogue All", cateNo: 1193, gender: ["men"]},
+        {name: "Unaffected All", cateNo: 1194, gender: ["men"]},
+        {name: "Selected Brands All", cateNo: 1259, gender: ["men"]},
+        {name: "Eastlogue Permanent All", cateNo: 1532, gender: ["men"]},
+        {name: "Eastlogue Woman All", cateNo: 1539, gender: ["women"]},
+        // 일반 상품군은 WOMAN 상품도 함께 포함하므로 성별 근거로 쓰지 않는다.
+        {name: "Top", cateNo: 47, gender: []},
+        {name: "Top", cateNo: 522, gender: []},
+        {name: "Shirts", cateNo: 48, gender: []},
+        {name: "Top", cateNo: 49, gender: []},
+        {name: "Knitwear", cateNo: 50, gender: []},
+        {name: "Outer", cateNo: 393, gender: []},
+        {name: "Outer", cateNo: 525, gender: []},
+        {name: "Outer", cateNo: 394, gender: []},
+        {name: "Bottom", cateNo: 52, gender: []},
+        {name: "Bottom", cateNo: 1574, gender: []},
+        {name: "Bottom", cateNo: 53, gender: []},
+        {name: "Shoes", cateNo: 55, gender: []},
+        {name: "Accessories", cateNo: 523, gender: []},
+        {name: "Accessories", cateNo: 54, gender: []},
       ],
     },
-    notes: "Eastlogue/Unaffected 자사 브랜드 + 편집샵. 브랜드 페이지(list_b) 제외, 카테고리 14개",
+    notes: "Eastlogue/Unaffected 자사 브랜드 + 편집샵. 공식 남성 브랜드 All과 Eastlogue Woman All로 성별을 판정하고 일반 상품군은 성별 근거로 쓰지 않음.",
   },
   {
     key: "heights-store",
@@ -1121,15 +1135,24 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     category: {
       discovery: "manual",
       categories: [
-        {name: "Outer", cateNo: 87, gender: ["unisex"]},
-        {name: "Knitwear", cateNo: 51, gender: ["unisex"]},
-        {name: "Shirts", cateNo: 80, gender: ["unisex"]},
-        {name: "Top", cateNo: 30, gender: ["unisex"]},
-        {name: "Bottom", cateNo: 31, gender: ["unisex"]},
-        {name: "Bottom", cateNo: 188, gender: ["unisex"]}, // Denim
+        {name: "Men Outer", cateNo: 87, gender: ["men"]},
+        {name: "Men Knitwear", cateNo: 51, gender: ["men"]},
+        {name: "Men Shirts", cateNo: 80, gender: ["men"]},
+        {name: "Men Top", cateNo: 30, gender: ["men"]},
+        {name: "Men Bottom", cateNo: 31, gender: ["men"]},
+        {name: "Men Denim", cateNo: 188, gender: ["men"]},
+        {name: "Women Outer", cateNo: 103, gender: ["women"]},
+        {name: "Women Knitwear", cateNo: 104, gender: ["women"]},
+        {name: "Women Shirts", cateNo: 105, gender: ["women"]},
+        {name: "Women Top", cateNo: 107, gender: ["women"]},
+        {name: "Women Skirt", cateNo: 240, gender: ["women"]},
+        {name: "Women Bottom", cateNo: 106, gender: ["women"]},
+        {name: "Women Denim", cateNo: 187, gender: ["women"]},
+        {name: "Women Accessories", cateNo: 110, gender: ["women"]},
+        {name: "Women Sleeveless", cateNo: 333, gender: ["women"]},
       ],
     },
-    notes: "미니멀 라이프스타일. 6개 카테고리 (Home 제외)",
+    notes: "공식 MAN/blankroom.her WOMAN 부서를 분리해 수집. Home/편집 카테고리는 제외.",
   },
   {
     key: "steadyeverywear",
@@ -1225,6 +1248,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     sourceCurrency: "USD",
     maxPages: 300,
     crawlDelay: 1500,
+    shopifyExcludedTags: ["KIDS"],
     notes: "Multi-brand editorial, ~15~25k SKU 예상",
   },
   {
@@ -5720,6 +5744,22 @@ const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
   "sagega", // 공식 카탈로그가 남녀공용 라인으로 전개됨
 ])
 
+// These configs historically stamped product-type categories as unisex.
+// Product type is not gender evidence, so strip only those blanket values at
+// runtime while retaining the raw entries for repair/audit traceability.
+const SITE_BLANKET_UNISEX_CATEGORY_KEYS = new Set([
+  "sculpstore",
+  "takeastreet",
+  "chanceclothing",
+  "havati",
+  "blankroom",
+  "taats",
+  "franksupply",
+  "nnpcs",
+  "seygun",
+  "demoshop",
+])
+
 const SITE_GENDER_DEPARTMENT_TAG_PREFIXES: Record<string, {men: string[]; women: string[]; unisex?: string[]}> = {
   // Kith 공식 Shopify 부서 태그. `wmns`는 범용 성별 사전에 없는 축약형이라
   // 사이트가 실제로 부서 태그로 쓰는 이 범위에서만 판정한다.
@@ -5895,15 +5935,20 @@ const SITE_CAFE24_DETAIL_STOCK_SITES = new Set([
 export function getSiteConfig(key: string): SiteConfig | undefined {
   const config = PLATFORMS.find((p) => p.key === key)
   if (!config) return undefined
+  const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
   // 사이트가 자체 defaultGender 를 갖고 있으면 그대로 둔다. 없을 때만
   // 사람이 검증한 보강 맵에서 채운다 — platforms.generated.ts 는
   // AUTO-GENERATED 라 여기에 값을 넣을 수 없기 때문이다.
   // 근거 규칙은 src/configs/gender-defaults.ts 헤더 참조.
-  const fallback = config.defaultGender && config.defaultGender.length > 0
+  const configuredFallback = config.defaultGender && config.defaultGender.length > 0
     ? config.defaultGender
     : SITE_GENDER_DEFAULTS[key]
+  const fallback = configuredFallback?.length === 1
+    && configuredFallback[0] === "unisex"
+    && !verifiedUnisexDefault
+    ? undefined
+    : configuredFallback
   const kidsGenderNoisePatterns = SITE_KIDS_GENDER_NOISE_PATTERNS[key] ?? config.kidsGenderNoisePatterns
-  const verifiedUnisexDefault = SITE_VERIFIED_UNISEX_DEFAULTS.has(key) || config.verifiedUnisexDefault
   const genderDepartmentTagPrefixes = SITE_GENDER_DEPARTMENT_TAG_PREFIXES[key] ?? config.genderDepartmentTagPrefixes
   const shopifyGenderCollections = SITE_SHOPIFY_GENDER_COLLECTIONS[key] ?? config.shopifyGenderCollections
   const genderTextPatterns = SITE_GENDER_TEXT_PATTERNS[key] ?? config.genderTextPatterns
@@ -5911,7 +5956,7 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   const defaultCategory = SITE_DEFAULT_CATEGORIES[key] ?? config.defaultCategory
   const verifyStockFromDetail = SITE_CAFE24_DETAIL_STOCK_SITES.has(key) || config.verifyStockFromDetail
   const categoryGenders = SITE_CAFE24_CATEGORY_GENDERS[key]
-  const category = categoryGenders
+  const categoryWithOverrides = categoryGenders
     ? (() => {
         const existing = config.category && "categories" in config.category
           ? config.category.categories ?? []
@@ -5932,6 +5977,18 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
         }
       })()
     : config.category
+  const category = SITE_BLANKET_UNISEX_CATEGORY_KEYS.has(key)
+    && categoryWithOverrides
+    && "categories" in categoryWithOverrides
+    ? {
+        ...categoryWithOverrides,
+        categories: (categoryWithOverrides.categories ?? []).map((entry) => {
+          if (entry.gender?.length !== 1 || entry.gender[0] !== "unisex") return entry
+          const {gender: _gender, ...withoutGender} = entry
+          return withoutGender
+        }),
+      }
+    : categoryWithOverrides
   if (
     fallback === config.defaultGender
     && kidsGenderNoisePatterns === config.kidsGenderNoisePatterns
@@ -5946,7 +6003,9 @@ export function getSiteConfig(key: string): SiteConfig | undefined {
   ) return config
   return {
     ...config,
-    ...(fallback ? {defaultGender: fallback} : {}),
+    // Overwrite unsafe raw defaults instead of leaving config.defaultGender in
+    // place through the spread above.
+    defaultGender: fallback,
     ...(kidsGenderNoisePatterns ? {kidsGenderNoisePatterns} : {}),
     ...(verifiedUnisexDefault ? {verifiedUnisexDefault: true} : {}),
     ...(genderDepartmentTagPrefixes ? {genderDepartmentTagPrefixes} : {}),

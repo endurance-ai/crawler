@@ -47,10 +47,12 @@ test("공식 Cafe24 목록에서 중복 없는 상품 번호와 마지막 페이
     <a href="?cate_no=467&amp;product_no=11933">one</a>
     <a href="/product/detail.html?product_no=11933">duplicate</a>
     <a href="?cate_no=467&product_no=12168">two</a>
+    <a href="/product/product-name/12168/category/467/display/1/">duplicate pretty</a>
+    <a href="/product/another-product/13001/category/467/display/1/">pretty</a>
     <a href="?cate_no=467&amp;page=2">2</a>
     <a href="?cate_no=467&page=3">last</a>
   `
-  assert.deepEqual(cafe24ListingProductNos(html), ["11933", "12168"])
+  assert.deepEqual(cafe24ListingProductNos(html), ["11933", "12168", "13001"])
   assert.equal(cafe24ListingLastPage(html, 467), 3)
 })
 

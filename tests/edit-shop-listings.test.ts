@@ -9,7 +9,7 @@ import {
   validateWhat100ProductNos,
 } from "../src/lib/edit-shop-listings"
 
-test("Slow Steady Club is enabled with detail stock and all eleven source categories", () => {
+test("Slow Steady Club is enabled with official gender departments and source categories", () => {
   const config = getSiteConfig("slowsteadyclub")
   assert.ok(config)
   assert.notEqual(config.disabled, true)
@@ -17,8 +17,13 @@ test("Slow Steady Club is enabled with detail stock and all eleven source catego
   assert.equal(config.verifyStockFromDetail, true)
   assert.deepEqual(
     config.category?.categories?.map((item) => item.cateNo),
-    [683, 742, 1020, 755, 774, 783, 1341, 798, 819, 674, 723],
+    [1330, 1331, 683, 742, 1020, 755, 774, 783, 1341, 798, 819, 674, 723],
   )
+  assert.deepEqual(config.category?.categories?.find(({cateNo}) => cateNo === 1330)?.gender, ["men"])
+  assert.deepEqual(config.category?.categories?.find(({cateNo}) => cateNo === 1331)?.gender, ["women"])
+  assert.ok(config.category?.categories
+    ?.filter(({cateNo}) => ![1330, 1331].includes(cateNo))
+    .every(({gender}) => gender?.length === 0))
 })
 
 test("Cafe24 edit shops are multi-brand catalogs with trusted source taxonomy", () => {
