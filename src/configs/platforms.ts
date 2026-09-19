@@ -571,6 +571,10 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://www.8division.com",
     multiBrand: true,
+    // 8DIVISION is a mixed retailer. COYSEIO is a verified women-only brand
+    // inside the retailer, so keep its fallback narrower than the source.
+    // https://www.coyseio.com/ · https://8division.com/en/product/women.html?cate_no=3338
+    brandGenderDefaults: {coyseio: ["women"]},
     trustedCategory: true,
     trustedTitleCategoryOverrides: ["dresses"],
     paginate: true,
@@ -2632,6 +2636,10 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     type: "cafe24",
     baseUrl: "https://dared.kr",
     brand: "DARED",
+    // The current official catalogue is women-focused; do not let the legacy
+    // blanket-unisex import leak these products into men's results.
+    // https://dared.kr/
+    defaultGender: ["women"],
     paginate: true,
     category: {discovery: "auto"},
     notes: "3차 배치 draft — dry-run 필요",

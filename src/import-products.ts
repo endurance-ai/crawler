@@ -18,7 +18,11 @@ import {chromium, type Browser} from "playwright"
 // only the DB upsert payload sees post-conversion KRW.
 // SPEC: SPEC-PLATFORM-EXPANSION-002 REQ-004
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
-import {inferVerifiedSiteGenderFromName, SITE_GENDER_DEFAULTS} from "./configs/gender-defaults"
+import {
+  getConfiguredProductGenderDefault,
+  inferVerifiedSiteGenderFromName,
+  SITE_GENDER_DEFAULTS,
+} from "./configs/gender-defaults"
 import {queuePlatformType} from "./lib/platform-config-lifecycle"
 import {canonicalizeCafe24ProductUrl} from "./lib/cafe24-chain"
 import {
@@ -413,7 +417,12 @@ export function prepareImportInputProducts(input: unknown[], platform: string,
       tags: Array.isArray(raw.tags) ? raw.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
       productUrl,
     }
-    let resolved = resolveProductGenderWithSource(raw.gender, evidence, (raw.genderSource as GenderSource | undefined) ?? "engine", {
+    const configuredDefault = getConfiguredProductGenderDefault(config, typeof raw.brand === "string" ? raw.brand : null)
+    const rawGender = Array.isArray(raw.gender) && raw.gender.length === 1 && raw.gender[0] === "unisex"
+      && configuredDefault.length === 1 && configuredDefault[0] !== "unisex"
+      ? []
+      : raw.gender
+    let resolved = resolveProductGenderWithSource(rawGender, evidence, (raw.genderSource as GenderSource | undefined) ?? "engine", {
       kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,
       verifiedUnisexDefault: config.verifiedUnisexDefault || SITE_GENDER_DEFAULTS[platform]?.includes("unisex"),
       genderTextPatterns: config.genderTextPatterns,
@@ -428,7 +437,7 @@ export function prepareImportInputProducts(input: unknown[], platform: string,
         brandGenderScope: brandGenderScope(typeof raw.brand === "string" ? raw.brand : config.brand ?? ""),
       })
     }
-    const siteDefault = config.defaultGender ?? SITE_GENDER_DEFAULTS[platform] ?? []
+    const siteDefault = configuredDefault.length > 0 ? configuredDefault : SITE_GENDER_DEFAULTS[platform] ?? []
     if (!resolved.conflict && resolved.gender.length === 0 && siteDefault.length > 0) {
       resolved = resolveProductGenderWithSource(siteDefault, evidence, "config_default", {
         kidsGenderNoisePatterns: config.kidsGenderNoisePatterns,

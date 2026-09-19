@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import {getSiteConfig} from "../src/configs/platforms"
 import {prepareImportInputProducts} from "../src/import-products"
 import type {Product, SiteConfig} from "../src/lib/types"
 
@@ -34,4 +35,23 @@ test("input boundary preserves the verified single-gender brand scope fallback",
   assert.equal(resolved.genderSource, "brand_scope")
   assert.throws(() => prepareImportInputProducts([product({gender: []})], "shop", config,
     () => ["unisex"]), /validation failed/)
+})
+
+test("curated Coyseio and DARED defaults override blanket unisex input", () => {
+  for (const [platform, brand] of [["8division", "Coyseio"], ["dared", "DARED"]] as const) {
+    const siteConfig = getSiteConfig(platform)
+    assert.ok(siteConfig)
+    const [resolved] = prepareImportInputProducts([
+      product({
+        brand,
+        platform,
+        productUrl: "https://example.com/" + platform + "/product/1",
+        gender: ["unisex"],
+        genderSource: "engine",
+      }),
+    ], platform, siteConfig)
+
+    assert.deepEqual(resolved.gender, ["women"], platform)
+    assert.equal(resolved.genderSource, "config_default", platform)
+  }
 })

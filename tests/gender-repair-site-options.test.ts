@@ -83,3 +83,23 @@ test("태그에만 kids가 있는 레거시 상품도 kids 버킷으로 센다",
 
   assert.equal(decision.bucket, "kids")
 })
+
+test("브랜드별 기본값은 혼합 편집샵의 legacy unisex를 여성으로 복구한다", () => {
+  const config = getSiteConfig("8division")
+  const decision = classifyGenderRepair({
+    ...loadingroomBabyTee,
+    id: 5,
+    gender: ["unisex"],
+    gender_source: "engine",
+    name: "Basic Tank (White)",
+    product_url: "https://www.8division.com/product/detail.html?product_no=53473",
+    platform: "8division",
+    brand: "Coyseio",
+  }, {
+    siteDefaultGender: config?.brandGenderDefaults?.coyseio,
+  })
+
+  assert.equal(decision.bucket, "confirmed_women")
+  assert.deepEqual(decision.after, ["women"])
+  assert.equal(decision.gender_source, "config_default")
+})

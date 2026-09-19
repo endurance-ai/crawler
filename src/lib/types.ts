@@ -2,7 +2,7 @@
  * 크롤러 공통 타입
  */
 
-import type {GenderSource} from "./product-gender"
+import type {GenderSource, ProductGender} from "./product-gender"
 import type {NormalizationResult, ReviewCollection} from "./pipeline-integrity-types"
 
 // ─── 통화 ─────────────────────────────────────────────
@@ -252,6 +252,12 @@ export interface SiteConfig {
    * 상품이 전량 드랍되는 것을 막는 장치다.
    */
   defaultGender?: string[]
+  /**
+   * Curated single-gender defaults for a named brand inside a multi-brand
+   * source. These are narrower than defaultGender and only apply when the
+   * product has no stronger URL/text evidence. Keys are normalized brand names.
+   */
+  brandGenderDefaults?: Record<string, ProductGender[]>
   /**
    * 공식 사이트에서 전 상품군의 남녀공용 범위를 확인한 경우에만 켠다.
    * 일반적인 `defaultGender: ["unisex"]`는 미확인을 공용으로 세탁할 수 있어

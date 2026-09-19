@@ -51,6 +51,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 
+import {getConfiguredProductGenderDefault} from "./configs/gender-defaults"
 import {getSiteConfig} from "./configs/platforms"
 import {createProductCollectionClient, type ProductCollectionClient} from "./lib/product-collection"
 import {cleanGenderScope, type ProductGender} from "./lib/product-gender"
@@ -132,7 +133,7 @@ const MULTI_GENDER_FILTER = "gender.cs.{men,women},gender.cs.{men,unisex},gender
 const SCOPES = ["null-gender", "multi-gender", "unisex", "unverified-legacy", "source-null", "all"]
 
 /** 플랫폼 키 → 사람이 검증한 사이트 전역 기본 성별 (getSiteConfig 가 gender-defaults.ts 를 병합해 준다). */
-function siteDefaultFor(platform: string | null): {
+function siteDefaultFor(platform: string | null, brand: string | null): {
   siteDefaultGender: string[]
   verifiedUnisexDefault: boolean
   kidsGenderNoisePatterns?: RegExp[]
@@ -142,7 +143,7 @@ function siteDefaultFor(platform: string | null): {
   if (!platform) return {siteDefaultGender: [], verifiedUnisexDefault: false}
   const config = getSiteConfig(platform)
   return {
-    siteDefaultGender: config?.defaultGender ?? [],
+    siteDefaultGender: config ? getConfiguredProductGenderDefault(config, brand) : [],
     verifiedUnisexDefault: config?.verifiedUnisexDefault === true,
     kidsGenderNoisePatterns: config?.kidsGenderNoisePatterns,
     genderTextPatterns: config?.genderTextPatterns,
@@ -269,7 +270,7 @@ async function writePlan(outputPath: string): Promise<void> {
 
   const decisions: GenderRepairDecision[] = []
   for await (const page of streamProducts(db, {scope, platform, brandNodeId, limit})) {
-    for (const row of page) decisions.push(classifyGenderRepair(row, {useDescription, ...siteDefaultFor(row.platform)}))
+    for (const row of page) decisions.push(classifyGenderRepair(row, {useDescription, ...siteDefaultFor(row.platform, row.brand)}))
     process.stdout.write(`\r   🔍 ${decisions.length}행 분류`)
   }
   console.log("")
@@ -390,7 +391,7 @@ async function applyPlan(planPath: string): Promise<void> {
     // 이미 다른 경로(재임포트 등)로 갱신되어 스코프에서 빠진 행 — 아래 .contains
     // 가드가 어차피 걸러내므로 drift 로 세지 않는다.
     if (!row) continue
-    const now = classifyGenderRepair(row, {useDescription: plan.use_description, ...siteDefaultFor(row.platform)})
+    const now = classifyGenderRepair(row, {useDescription: plan.use_description, ...siteDefaultFor(row.platform, row.brand)})
     if (JSON.stringify({after: now.after, gender_source: now.gender_source}) !== expected.get(id)) drifted += 1
   }
   if (drifted > 0) {

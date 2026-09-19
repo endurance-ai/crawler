@@ -35,6 +35,7 @@
  * — engine/url/text 근거가 하나라도 있으면 그쪽이 이긴다.
  */
 import type {ProductGender} from "../lib/product-gender"
+import type {SiteConfig} from "../lib/types"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   // 2026-09-01 user-confirmed from the current brand-node QC batch.
@@ -601,6 +602,23 @@ export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
   //     temporahaus     실크롤로 실제 카탈로그 크기는 확인했으나(각 3~257건)
   //                     단일 성별 근거가 여전히 불충분하거나(unisex 어휘/혼성)
   //                     비의류(ruby-merlot 가방)라 defaultGender 미부여 유지.
+}
+
+/**
+ * Resolve the curated fallback for one product. A brand-specific fallback is
+ * intentionally preferred over a source-wide fallback so a mixed retailer
+ * can carry a verified single-gender brand without turning the whole retailer
+ * into that gender.
+ */
+export function getConfiguredProductGenderDefault(
+  config: Pick<SiteConfig, "defaultGender" | "brandGenderDefaults">,
+  brand?: string | null,
+): ProductGender[] {
+  const brandKey = typeof brand === "string" ? brand.trim().toLowerCase().replace(/\s+/g, " ") : ""
+  const brandDefault = brandKey ? config.brandGenderDefaults?.[brandKey] : undefined
+  return brandDefault && brandDefault.length > 0
+    ? [...brandDefault]
+    : [...(config.defaultGender ?? [])] as ProductGender[]
 }
 
 /** 혼성 사이트에서 공식 상품명 표기가 제공하는 상품 단위 성별 근거. */
