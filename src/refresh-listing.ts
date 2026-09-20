@@ -48,7 +48,7 @@ import {
   type RefreshWorklistEntry,
 } from "./lib/refresh-source"
 import {crawlShopify} from "./lib/shopify-engine"
-import {isRefreshBatchSourceRunnable} from "./lib/refresh-batch"
+import {classifyRefreshException, isRefreshBatchSourceRunnable, retryAtFromErrors} from "./lib/refresh-batch"
 import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlStructuredExisting} from "./lib/structured-refresh-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
@@ -58,6 +58,7 @@ import {crawlUniqlo} from "./lib/uniqlo-engine"
 import {crawlZara} from "./lib/zara-engine"
 
 const DB_READ_TIMEOUT_MS = 20_000
+const PRODUCT_PAGE_READ_TIMEOUT_MS = 60_000
 const DB_PRIMARY_WRITE_TIMEOUT_MS = 10_000
 
 const ALL_TYPES: PlatformType[] = [
@@ -82,6 +83,7 @@ interface Flags {
   dryRun: boolean
   auditPrices: boolean
   priceOnly: boolean
+  existingOnly: boolean
   ignoreBackoff: boolean
   batchId: number | null
   onlyPending: boolean
@@ -101,6 +103,7 @@ function parseFlags(): Flags {
     dryRun: false,
     auditPrices: false,
     priceOnly: false,
+    existingOnly: false,
     ignoreBackoff: false,
     batchId: null,
     onlyPending: false,
@@ -111,6 +114,7 @@ function parseFlags(): Flags {
     if (arg === "--dry-run") flags.dryRun = true
     else if (arg === "--audit-prices") flags.auditPrices = true
     else if (arg === "--price-only") flags.priceOnly = true
+    else if (arg === "--existing-only") flags.existingOnly = true
     else if (arg === "--ignore-backoff") flags.ignoreBackoff = true
     else if (arg === "--only-pending") flags.onlyPending = true
     else if (arg.startsWith("--budget-minutes=")) flags.budgetMinutes = Number(arg.split("=")[1])
@@ -155,10 +159,14 @@ async function fetchWorklist(
   types: string[],
   ignoreBackoff: boolean,
 ): Promise<{entries: RefreshWorklistEntry[]; skipped: string[]}> {
+  // Batch recovery always uses --ignore-backoff. Loading 30 days of run
+  // metrics in that mode cannot affect selection, but can time out before any
+  // source starts when the history table is busy.
+  const runOutcomesPromise = ignoreBackoff ? Promise.resolve([]) : loadRefreshRunOutcomes(db)
   const [sourceStates, productCounts, runOutcomes] = await Promise.all([
     loadRefreshSourceStates(db),
     loadRefreshProductCounts(db),
-    loadRefreshRunOutcomes(db),
+    runOutcomesPromise,
   ])
   return buildRefreshWorklist({
     configs: PLATFORMS,
@@ -178,8 +186,9 @@ async function fetchExistingRows(
 ): Promise<RefreshableRow[]> {
   const pageSize = 1000
   const rows: RefreshableRow[] = []
-  for (let offset = 0; ; offset += pageSize) {
-    const {data, error} = await db
+  let cursor = "0"
+  for (;;) {
+    const loadPage = () => db
       .from("products")
       .select(
         "id,product_url,updated_at,crawled_at,price,original_price,sale_price,source_price,source_currency,in_stock,last_seen_at,gender,gender_source",
@@ -192,9 +201,15 @@ async function fetchExistingRows(
       // 그중 3,892건이 상품 1,000행을 넘는 platform(=페이지네이션이 도는 경우)에서
       // 나왔다 — sculpstore 3,622행→2,527건, drakes 1,608행→666건.
       // loadExistingBrands 는 같은 이유로 이미 .order("id") 를 붙여 뒀다.
-      .order("product_url", {ascending: true})
-      .range(offset, offset + pageSize - 1)
-      .abortSignal(AbortSignal.timeout(DB_READ_TIMEOUT_MS))
+      .gt("id", cursor)
+      .order("id", {ascending: true})
+      .limit(pageSize)
+      .abortSignal(AbortSignal.timeout(PRODUCT_PAGE_READ_TIMEOUT_MS))
+    let {data, error} = await loadPage()
+    if (error) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      ;({data, error} = await loadPage())
+    }
     if (error) throw new Error(`products 조회 실패: ${error.message}`)
     const config = getSiteConfig(platformKey)
     const page = (data ?? []).map((row) => {
@@ -212,6 +227,7 @@ async function fetchExistingRows(
     }) as RefreshableRow[]
     rows.push(...page)
     if (page.length < pageSize) break
+    cursor = page.at(-1)!.id
   }
   return rows
 }
@@ -282,7 +298,13 @@ async function applyUpdates(
 ): Promise<{ok: number; failed: number}> {
   let ok = 0
   let failed = 0
-  for (const update of updates) {
+  let nextIndex = 0
+  const workers = Array.from({length: Math.min(8, updates.length)}, async () => {
+    while (true) {
+      const index = nextIndex
+      nextIndex += 1
+      if (index >= updates.length) return
+      const update = updates[index]
     const payload = options.priceOnly
       ? Object.fromEntries(Object.entries(update.patch).filter(([key]) => [
           "price",
@@ -297,41 +319,61 @@ async function applyUpdates(
       ok += 1
       continue
     }
-    const {data, error} = await db
-      .from("products")
-      .update({...payload, crawled_at: update.observedAt, updated_at: new Date().toISOString()})
-      .eq("id", update.id)
-      .eq("product_url", update.productUrl)
-      .eq("updated_at", update.expectedUpdatedAt)
-      .select("id")
-      .abortSignal(AbortSignal.timeout(DB_PRIMARY_WRITE_TIMEOUT_MS))
-    if (error || data?.length !== 1) {
-      failed += 1
-      if (failed <= 3) console.error(`   ❌ update 실패 ${update.productUrl}: ${error?.message ?? "CAS conflict"}`)
-    } else {
-      ok += 1
+    let expectedUpdatedAt = update.expectedUpdatedAt
+    let written = false
+    let lastError = "CAS conflict"
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const {data, error} = await db
+        .from("products")
+        .update({...payload, crawled_at: update.observedAt, updated_at: new Date().toISOString()})
+        .eq("id", update.id)
+        .eq("product_url", update.productUrl)
+        .eq("updated_at", expectedUpdatedAt)
+        .select("id")
+        .abortSignal(AbortSignal.timeout(DB_PRIMARY_WRITE_TIMEOUT_MS))
+      if (!error && data?.length === 1) {
+        written = true
+        break
+      }
+      lastError = error?.message ?? "CAS conflict"
+      const {data: current, error: reloadError} = await db
+        .from("products")
+        .select("updated_at,crawled_at,price,original_price,sale_price,source_price,source_currency,in_stock")
+        .eq("id", update.id)
+        .eq("product_url", update.productUrl)
+        .abortSignal(AbortSignal.timeout(DB_PRIMARY_WRITE_TIMEOUT_MS))
+        .maybeSingle()
+      if (reloadError || !current) {
+        lastError = reloadError?.message ?? lastError
+        if (attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 500))
+          continue
+        }
+        break
+      }
+      const currentRecord = current as Record<string, unknown>
+      if (Object.entries(payload).every(([key, value]) => currentRecord[key] === value)) {
+        written = true
+        break
+      }
+      const currentObserved = Date.parse(String(currentRecord.crawled_at ?? ""))
+      if (Number.isFinite(currentObserved) && currentObserved > Date.parse(update.observedAt)) break
+      expectedUpdatedAt = String(currentRecord.updated_at)
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 250))
     }
-  }
+    if (written) ok += 1
+    else {
+      failed += 1
+      if (failed <= 3) console.error(`   ❌ update 실패 ${update.productUrl}: ${lastError}`)
+    }
+    }
+  })
+  await Promise.all(workers)
   return {ok, failed}
 }
 
 function minutes(ms: number): string {
   return `${Math.round(ms / 60_000)}분`
-}
-
-function refreshExceptionCode(
-  result: CrawlResult,
-  unreachable: string[],
-  status: string,
-): string | null {
-  if (status === "success" || status === "partial") return null
-  if (result.errors.some((error) => /robots|disallow/i.test(error))) return "external_block"
-  if (result.errors.some((error) => /HTTP (404|410)/i.test(error))) return "endpoint_removed"
-  if (result.errors.some((error) => /category|catalog/i.test(error))) return "config_drift"
-  if (unreachable.length > 0 || result.errors.some((error) => /timeout|fetch failed|HTTP (429|5\d\d)/i.test(error))) {
-    return "transient_exhausted"
-  }
-  return "db_write_exhausted"
 }
 
 async function main() {
@@ -346,6 +388,17 @@ async function main() {
     ? Math.min(configuredBudgetMs, Math.max(0, flags.deadlineAt - startedAt))
     : configuredBudgetMs
   const batchSourceAttempts = new Map<string, number>()
+  const existingRowsCache = new Map<string, Promise<RefreshableRow[]>>()
+  const touchedUrlsBySource = new Map<string, Set<string>>()
+
+  const existingRowsFor = (platformKey: string): Promise<RefreshableRow[]> => {
+    const cached = existingRowsCache.get(platformKey)
+    if (cached) return cached
+    const pending = fetchExistingRows(db, platformKey)
+    existingRowsCache.set(platformKey, pending)
+    pending.catch(() => existingRowsCache.delete(platformKey))
+    return pending
+  }
 
   if (!flags.dryRun && !flags.auditPrices) {
     await syncRefreshSources(db, PLATFORMS)
@@ -373,7 +426,13 @@ async function main() {
       const source = allowed.get(entry.platform_key)
       return Boolean(
         source &&
-        isRefreshBatchSourceRunnable(source.status, source.attempts, flags.maxAttempts),
+        isRefreshBatchSourceRunnable(
+          source.status,
+          source.attempts,
+          flags.maxAttempts,
+          source.exception_code,
+          source.exception_message,
+        ),
       )
     })
     const selectedKeys = new Set(selected.map((entry) => entry.platform_key))
@@ -510,13 +569,12 @@ async function main() {
             )
           }
           if (flags.batchId) {
-            const attempts = (batchSourceAttempts.get(entry.platform_key) ?? 0) + 1
+            const attempts = batchSourceAttempts.get(entry.platform_key) ?? 0
             await markRefreshBatchSourceStarted(db, {
               batchId: flags.batchId,
               platformKey: entry.platform_key,
               attempts,
             })
-            batchSourceAttempts.set(entry.platform_key, attempts)
           }
         } catch (error) {
           telemetryFailures += 1
@@ -535,7 +593,7 @@ async function main() {
           sourceStartedAt + flags.sourceSliceMinutes * 60_000,
           flags.deadlineAt ?? Number.POSITIVE_INFINITY,
         )
-        const existingPromise = fetchExistingRows(db, entry.platform_key)
+        const existingPromise = existingRowsFor(entry.platform_key)
         const listingOptions = {
           cursor: entry.refresh_cursor,
           deadlineAt: entry.config.type === "cafe24" ? sliceDeadlineAt : undefined,
@@ -603,16 +661,34 @@ async function main() {
         })
         // 살아있음이 확인된 상품의 생존 타임스탬프. 완전성 가드와 무관하게 올린다 —
         // 확인된 상품은 실제로 살아있고, 사라진 상품을 죽이는 판단은 가드가 따로 한다.
+        const touchedUrls = touchedUrlsBySource.get(entry.platform_key) ?? new Set<string>()
+        touchedUrlsBySource.set(entry.platform_key, touchedUrls)
+        const urlsToTouch = diff.confirmedUrls.filter((url) => !touchedUrls.has(url))
+        const seenAt = new Date().toISOString()
         const seen = flags.auditPrices || flags.priceOnly
           ? {ok: 0, failed: 0}
           : await touchProductsLastSeen(
               db,
-              diff.confirmedUrls,
-              new Date().toISOString(),
+              urlsToTouch,
+              seenAt,
             )
+        if (seen.failed === 0) {
+          for (const url of urlsToTouch) touchedUrls.add(url)
+          const urls = new Set(urlsToTouch)
+          for (const row of existing) {
+            if (urls.has(row.product_url)) row.last_seen_at = seenAt
+          }
+        }
+        if (applied.failed === 0) {
+          const rowsByUrl = new Map(existing.map((row) => [row.product_url, row]))
+          for (const update of diff.updates) {
+            const row = rowsByUrl.get(update.productUrl)
+            if (row) Object.assign(row, update.patch)
+          }
+        }
         let queued = {inserted: 0, updated: 0, unchanged: 0, stale: 0, conflicted: 0, rematched: 0, brandUnmatched: 0}
         let candidateError: string | null = null
-        if (!flags.auditPrices && !flags.priceOnly) {
+        if (!flags.auditPrices && !flags.priceOnly && !flags.existingOnly) {
           try {
             queued = await enqueueRefreshCandidates(db, {
               products: crawled,
@@ -628,11 +704,13 @@ async function main() {
           }
         }
 
+        const catalogTruncated = qualityWarnings.some((warning) => warning.startsWith("catalog_truncated="))
         const cycleDegraded =
           entry.refresh_cycle_degraded ||
           crawlResult.errors.length > 0 ||
           unreachable.length > 0 ||
-          seen.failed > 0
+          seen.failed > 0 ||
+          catalogTruncated
         const cycleCoverage = flags.auditPrices && !entry.refresh_cycle_started_at
           ? provisional.coverage
           : refreshCycleCoverage(existing, diff.confirmedUrls, cycleStartedAt)
@@ -688,11 +766,11 @@ async function main() {
         // unreachable 은 failed 로 친다(성공이 아니므로 last_succeeded_at 을 올리면
         // 안 된다). 다만 백오프 사다리는 metrics.unreachable_only 를 보고 건너뛴다.
         const failed =
-          applied.failed > 0 || seen.failed > 0 || candidateError !== null || queued.conflicted > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
+          applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
         const unreachableOnly =
           unreachable.length > 0 && applied.failed === 0 && seen.failed === 0 && crawlResult.errors.length === 0
         const dbPartialOnly =
-          (applied.failed > 0 || seen.failed > 0 || candidateError !== null || queued.conflicted > 0) && crawlResult.errors.length === 0 && unreachable.length === 0
+          (applied.failed > 0 || seen.failed > 0) && crawlResult.errors.length === 0 && unreachable.length === 0
         const status = failed
           ? "failed"
           : crawlResult.continuation
@@ -741,6 +819,9 @@ async function main() {
             brand_unmatched: queued.brandUnmatched,
             coverage: Number(cycleCoverage.toFixed(3)),
             slice_coverage: Number(diff.coverage.toFixed(3)),
+            exact_match_rows: diff.exactMatchRows,
+            identity_match_rows: diff.identityMatchRows,
+            unmatched_observations: diff.unknownUrls.length,
             partial: Boolean(crawlResult.continuation),
             continuation: crawlResult.continuation ?? null,
             cycle_started_at: cycleStartedAt,
@@ -756,6 +837,7 @@ async function main() {
             db_partial_only: dbPartialOnly,
             last_seen_failures: seen.failed,
             candidate_enqueue_error: candidateError,
+            retry_at: retryAtFromErrors(crawlResult.errors),
             ...pricingMetrics,
             price_updates_skipped: priceUpdatesSkipped,
             pricing_complete:
@@ -763,13 +845,28 @@ async function main() {
           },
         })
         if (flags.batchId) {
+          const coverageGuard = complete && !flags.priceOnly && (cycleDegraded || !coverageOk)
+          const exceptionCode = classifyRefreshException({
+            status,
+            errors: crawlResult.errors,
+            unreachable,
+            dbWriteFailed: applied.failed > 0 || seen.failed > 0,
+            coverageGuard,
+          })
+          const failureAttempts = status === "success" || crawlResult.continuation
+            ? batchSourceAttempts.get(entry.platform_key) ?? 0
+            : (batchSourceAttempts.get(entry.platform_key) ?? 0) + 1
+          batchSourceAttempts.set(entry.platform_key, failureAttempts)
           await finishRefreshBatchSource(db, {
             batchId: flags.batchId,
             platformKey: entry.platform_key,
             runId: run?.id,
             status: crawlResult.continuation ? "partial" : status === "success" ? "success" : "exception",
-            exceptionCode: refreshExceptionCode(crawlResult, unreachable, status),
-            exceptionMessage: failed ? [...crawlResult.errors, ...unreachable].join(" | ") : null,
+            exceptionCode,
+            exceptionMessage: failed
+              ? [...crawlResult.errors, ...unreachable].join(" | ")
+              : coverageGuard ? `coverage=${cycleCoverage.toFixed(3)} degraded=${cycleDegraded}` : null,
+            attempts: failureAttempts,
           })
         }
         // Requeue only after the current run record is closed. Appending to the
@@ -792,13 +889,22 @@ async function main() {
           },
         })
         if (flags.batchId) {
+          const failureAttempts = (batchSourceAttempts.get(entry.platform_key) ?? 0) + 1
+          batchSourceAttempts.set(entry.platform_key, failureAttempts)
           await finishRefreshBatchSource(db, {
             batchId: flags.batchId,
             platformKey: entry.platform_key,
             runId: run?.id,
             status: "exception",
-            exceptionCode: "db_write_exhausted",
+            exceptionCode: classifyRefreshException({
+              status: "failed",
+              errors: [detail],
+              unreachable: [],
+              dbReadFailed: /조회 실패|load failed|read failed/i.test(detail),
+              dbWriteFailed: !/조회 실패|load failed|read failed/i.test(detail),
+            }),
             exceptionMessage: detail,
+            attempts: failureAttempts,
           })
         }
       }

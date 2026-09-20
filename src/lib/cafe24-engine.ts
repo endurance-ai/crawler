@@ -235,6 +235,13 @@ export const PRICE_LIKE_TEXT_PATTERN = new RegExp(PRICE_LIKE_TEXT_SOURCE, "i")
 /** 가격 요소는 짧고 숫자 위주다. 상품명이 섞인 컨테이너는 여기서 걸러진다. */
 export const MAX_PRICE_TEXT_LENGTH = 80
 
+/** Failures that cannot improve by trying another category on the same host. */
+export function isSourceWideCafe24NavigationFailure(error: unknown): boolean {
+  return /ERR_(?:NAME_NOT_RESOLVED|CONNECTION_REFUSED|ADDRESS_UNREACHABLE|INTERNET_DISCONNECTED|PROXY_CONNECTION_FAILED|TUNNEL_CONNECTION_FAILED)|\b(?:ENOTFOUND|EAI_AGAIN)\b/i.test(
+    String(error),
+  )
+}
+
 /**
  * 이 텍스트를 통째로 "가격"으로 읽어도 되는지.
  *
@@ -351,6 +358,24 @@ interface Cafe24DetailStockEvidence {
   buyVisible: boolean
   soldOutVisible: boolean
 }
+
+export const CAFE24_DETAIL_BUY_SELECTOR = [
+  "#actionBuy",
+  ".btnSubmit",
+  "[class*=btn_buy]",
+  ".prd-btn__buy",
+  ".prd-btn__basket",
+  '[onclick*="product_submit(1"]',
+  '[onclick*="product_submit(2"]',
+].join(", ")
+
+export const CAFE24_DETAIL_SOLD_OUT_SELECTOR = [
+  "#actionSoldout",
+  ".soldout",
+  ".sold-out",
+  "[class*=btn_soldout]",
+  ".prd-btn__soldout",
+].join(", ")
 
 /** Cafe24 상세의 옵션 재고와 구매 UI를 목록 품절 아이콘보다 우선해 해석한다. */
 export function inferCafe24DetailStock(evidence: Cafe24DetailStockEvidence): boolean | null {
@@ -496,11 +521,11 @@ export function cafe24ProductIdentityKey(productUrl: string): string {
   return productUrl
 }
 
-async function extractCafe24DetailStock(page: Cafe24Page): Promise<boolean | null> {
-  const evidence = await page.evaluate(() => {
+export async function extractCafe24DetailStock(page: Cafe24Page): Promise<boolean | null> {
+  const evidence = await page.evaluate((selectors: {buy: string; soldOut: string}) => {
     // page.evaluate 내부의 로컬 함수는 tsx가 __name을 주입할 수 있으므로 단순 식으로 유지한다.
-    var buyElement = document.querySelector("#actionBuy, .btnSubmit, [class*=btn_buy]") as HTMLElement | null
-    var soldOutElement = document.querySelector("#actionSoldout, .soldout, .sold-out, [class*=btn_soldout]") as HTMLElement | null
+    var buyElement = document.querySelector(selectors.buy) as HTMLElement | null
+    var soldOutElement = document.querySelector(selectors.soldOut) as HTMLElement | null
     var buyStyle = buyElement ? window.getComputedStyle(buyElement) : null
     var soldOutStyle = soldOutElement ? window.getComputedStyle(soldOutElement) : null
     var stockWindow = window as typeof window & {option_stock_data?: unknown}
@@ -515,7 +540,7 @@ async function extractCafe24DetailStock(page: Cafe24Page): Promise<boolean | nul
         && !soldOutElement.classList.contains("displaynone"),
       ),
     }
-  })
+  }, {buy: CAFE24_DETAIL_BUY_SELECTOR, soldOut: CAFE24_DETAIL_SOLD_OUT_SELECTOR})
   return inferCafe24DetailStock(evidence)
 }
 
@@ -1327,11 +1352,13 @@ export async function crawlCafe24(
         `${tag} [${i + 1}/${categories.length}] ${cat.gender.length > 0 ? cat.gender.join("/") : "all"} > ${cat.name} — ${products.length}개 (재고 ${inStockCount})`
       )
 
-      for (const p of products) {
-        const stock = p.inStock ? "" : " [품절]"
-        console.log(
-          `${tag}    ${p.priceFormatted || "가격없음"} — ${p.brand || "?"} | ${p.name.slice(0, 50)}${stock}`
-        )
+      if (process.env.CRAWLER_LOG_PRODUCTS === "true") {
+        for (const p of products) {
+          const stock = p.inStock ? "" : " [품절]"
+          console.log(
+            `${tag}    ${p.priceFormatted || "가격없음"} — ${p.brand || "?"} | ${p.name.slice(0, 50)}${stock}`
+          )
+        }
       }
 
       if (options.sampleLimit && countUniqueInStockProducts(allProducts) >= options.sampleLimit) {
@@ -1374,6 +1401,14 @@ export async function crawlCafe24(
         if (navAttempts > 1) {
           navAttempts = 1
           console.warn(`${tag} ⛔ 내비 실패 — 남은 카테고리는 재시도 없이 1회만 시도한다`)
+        }
+        // A failed browser navigation can leave an error-page navigation alive.
+        // Reset it before reuse, otherwise later categories only report
+        // "interrupted by another navigation" and hide the original failure.
+        await page.goto("about:blank", {timeout: 5000}).catch(() => {})
+        if (isSourceWideCafe24NavigationFailure(err)) {
+          console.warn(`${tag} ⛔ 호스트 연결 실패 — 같은 호스트의 남은 카테고리를 건너뛴다`)
+          break
         }
       } else {
         errors.push(msg)

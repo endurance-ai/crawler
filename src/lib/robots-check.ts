@@ -23,7 +23,14 @@ export interface RobotsCheckResult {
   blockingLine?: string
 }
 
-const FETCH_TIMEOUT_MS = 5000
+const FETCH_TIMEOUT_MS = 15_000
+const MAX_FETCH_ATTEMPTS = 2
+
+export interface RobotsCheckOptions {
+  attempts?: number
+  retryDelayMs?: number
+  timeoutMs?: number
+}
 
 /**
  * Fetch `<baseUrl>/robots.txt` (host root, ignoring any path on baseUrl) and
@@ -37,7 +44,10 @@ const FETCH_TIMEOUT_MS = 5000
  * Returns `{allowed:true}` only when robots.txt is reachable AND the wildcard
  * group does NOT contain a blanket disallow.
  */
-export async function checkRobots(baseUrl: string): Promise<RobotsCheckResult> {
+export async function checkRobots(
+  baseUrl: string,
+  options: RobotsCheckOptions = {},
+): Promise<RobotsCheckResult> {
   let robotsUrl: string
   try {
     robotsUrl = new URL("/robots.txt", baseUrl).toString()
@@ -45,36 +55,43 @@ export async function checkRobots(baseUrl: string): Promise<RobotsCheckResult> {
     return {allowed: false, blockingLine: `robots.txt URL construction failed: ${String(err)}`}
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  const attempts = Math.max(1, options.attempts ?? MAX_FETCH_ATTEMPTS)
+  const retryDelayMs = Math.max(0, options.retryDelayMs ?? 750)
+  const timeoutMs = Math.max(1, options.timeoutMs ?? FETCH_TIMEOUT_MS)
+  let lastFailure = "robots.txt fetch failed"
 
-  let res: Response
-  try {
-    res = await fetch(robotsUrl, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      },
-    })
-  } catch (err) {
-    clearTimeout(timer)
-    return {allowed: false, blockingLine: `robots.txt fetch failed: ${String(err)}`}
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const res = await fetch(robotsUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        },
+      })
+      if (!res.ok) {
+        lastFailure = `robots.txt fetch failed: HTTP ${res.status}`
+        if (res.status < 500 || attempt === attempts) return {allowed: false, blockingLine: lastFailure}
+      } else {
+        try {
+          return parseRobotsBody(await res.text())
+        } catch (err) {
+          lastFailure = `robots.txt body read failed: ${String(err)}`
+        }
+      }
+    } catch (err) {
+      lastFailure = `robots.txt fetch failed: ${String(err)}`
+    } finally {
+      clearTimeout(timer)
+    }
+    if (attempt < attempts && retryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    }
   }
-  clearTimeout(timer)
 
-  if (!res.ok) {
-    return {allowed: false, blockingLine: `robots.txt fetch failed: HTTP ${res.status}`}
-  }
-
-  let body: string
-  try {
-    body = await res.text()
-  } catch (err) {
-    return {allowed: false, blockingLine: `robots.txt body read failed: ${String(err)}`}
-  }
-
-  return parseRobotsBody(body)
+  return {allowed: false, blockingLine: lastFailure}
 }
 
 /**

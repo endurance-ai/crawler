@@ -33,7 +33,12 @@ import {crawlImweb} from "./lib/imweb-engine"
 import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlShopify} from "./lib/shopify-engine"
 import {crawlUniqlo, parseRateFlag, pickUserAgent} from "./lib/uniqlo-engine"
-import {crawlZara, detectBmVerifyIntercept, pickZaraUserAgent} from "./lib/zara-engine"
+import {
+  buildZaraContextOptions,
+  buildZaraLaunchOptions,
+  crawlZara,
+  detectBmVerifyIntercept,
+} from "./lib/zara-engine"
 import {
   crawlFarfetch,
   detectChallengeIntercept as detectFarfetchChallenge,
@@ -223,19 +228,14 @@ async function probeSite(config: SiteConfig) {
     }
     let browser
     try {
-      browser = await chromium.launch({headless: true, channel: "chrome"})
+      browser = await chromium.launch(buildZaraLaunchOptions())
     } catch (err) {
       console.log(`   ❌ Chromium (channel:'chrome') launch failed: ${err}`)
       console.log(`      Install with: npx playwright install chrome`)
       return
     }
     try {
-      const ctx = await browser.newContext({
-        userAgent: pickZaraUserAgent(0),
-        locale: "ko-KR",
-        timezoneId: "Asia/Seoul",
-        viewport: {width: 1440, height: 900},
-      })
+      const ctx = await browser.newContext(buildZaraContextOptions(config.region === "US" ? "US" : "KR"))
       const page = await ctx.newPage()
       let xhrPayload: unknown = null
       page.on("response", async (res) => {
@@ -249,6 +249,7 @@ async function probeSite(config: SiteConfig) {
       })
       const response = await page.goto(firstUrl, {waitUntil: "domcontentloaded", timeout: 30000})
       console.log(`   HTTP: ${response?.status()}`)
+      if (process.env.CRAWLER_ZARA_HEADED === "1") await page.waitForTimeout(15_000)
       const body = await page.content()
       const intercept = detectBmVerifyIntercept(body)
       if (intercept.isIntercept) {

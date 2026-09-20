@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import {chunkByEncodedLength, chunkRowsByJsonSize} from "../src/lib/product-refresh"
+import {
+  chunkByEncodedLength,
+  chunkRowsByJsonSize,
+  touchProductsLastSeen,
+  type ProductRefreshClient,
+} from "../src/lib/product-refresh"
 import {
   backoffReason,
   backoffWaitMs,
@@ -131,7 +136,7 @@ test("신규상품 identity는 플랫폼 상품번호를 우선하고 URL로 폴
   )
   assert.equal(
     candidateIdentity("kith", "https://kith.com/products/new-shirt?variant=1"),
-    "kith:https://kith.com/products/new-shirt?variant=1",
+    "kith:kith.com#shopify_handle=new-shirt&variant=1",
   )
 })
 
@@ -441,6 +446,55 @@ test("chunkRowsByJsonSize: 빈 입력은 빈 배열", () => {
 
 test("chunkByEncodedLength: 빈 입력은 빈 배열", () => {
   assert.deepEqual(chunkByEncodedLength([], 100), [])
+})
+
+test("touchProductsLastSeen: transient chunk write is retried without losing confirmed URLs", async () => {
+  let calls = 0
+  const db = {
+    from: () => ({
+      update: () => ({
+        in: () => ({
+          abortSignal: async () => {
+            calls++
+            return calls === 1 ? {error: {message: "temporary timeout"}} : {error: null}
+          },
+        }),
+      }),
+    }),
+  } as unknown as ProductRefreshClient
+
+  assert.deepEqual(
+    await touchProductsLastSeen(db, ["https://shop.test/a", "https://shop.test/b"], "2026-09-19T00:00:00Z", {
+      retryDelayMs: 0,
+    }),
+    {ok: 2, failed: 0},
+  )
+  assert.equal(calls, 2)
+})
+
+test("touchProductsLastSeen: persistent failure is reported after the bounded retry", async () => {
+  let calls = 0
+  const db = {
+    from: () => ({
+      update: () => ({
+        in: () => ({
+          abortSignal: async () => {
+            calls++
+            return {error: {message: "still unavailable"}}
+          },
+        }),
+      }),
+    }),
+  } as unknown as ProductRefreshClient
+
+  assert.deepEqual(
+    await touchProductsLastSeen(db, ["https://shop.test/a"], "2026-09-19T00:00:00Z", {
+      maxAttempts: 2,
+      retryDelayMs: 0,
+    }),
+    {ok: 0, failed: 1},
+  )
+  assert.equal(calls, 2)
 })
 
 test("brandFromNamePrefix: '[BRAND] 제품명' 프리픽스만 브랜드로 인정한다", () => {

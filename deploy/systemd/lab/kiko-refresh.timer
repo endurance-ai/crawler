@@ -1,10 +1,10 @@
-# Nightly refresh window. The service hard timeout ends by 04:30 KST, leaving
+# Daily refresh window. The service deadline remains 04:15 KST, leaving
 # room for the candidate worker before the 07:00 KST database backup.
 [Unit]
 Description=Nightly kiko.ai listing refresh — lab batch host
 
 [Timer]
-OnCalendar=*-*-* 18:00:00 Asia/Seoul
+OnCalendar=*-*-* 12:00:00 Asia/Seoul
 Persistent=true
 AccuracySec=1min
 Unit=kiko-refresh.service

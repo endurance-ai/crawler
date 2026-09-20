@@ -249,6 +249,40 @@ test("productIdentityKey: 호스트가 다르면 키도 다르다 (교차 브랜
   assert.notEqual(productIdentityKey("https://a.kr/1/?idx=5"), productIdentityKey("https://b.kr/1/?idx=5"))
 })
 
+test("productIdentityKey: Shopify handle과 www 변형을 같은 상품으로 본다", () => {
+  assert.equal(
+    productIdentityKey("https://www.shop.test/en-kr/products/Canvas-Jacket"),
+    productIdentityKey("https://shop.test/products/canvas-jacket.js"),
+  )
+})
+
+test("productIdentityKey: Shopify variant와 지역·통화 의미를 보존한다", () => {
+  assert.equal(
+    productIdentityKey("https://shop.test/products/jacket?currency=USD&variant=10&utm_source=x"),
+    "shop.test#shopify_handle=jacket&variant=10&currency=USD",
+  )
+  assert.notEqual(
+    productIdentityKey("https://shop.test/products/jacket?variant=10"),
+    productIdentityKey("https://shop.test/products/jacket?variant=11"),
+  )
+  assert.notEqual(
+    productIdentityKey("https://shop.test/products/jacket?country=US"),
+    productIdentityKey("https://shop.test/products/jacket?country=KR"),
+  )
+})
+
+test("productIdentityKey: Zara 상품번호로 슬러그 변경을 매칭하고 지역을 보존한다", () => {
+  assert.equal(
+    productIdentityKey("https://www.zara.com/kr/ko/old-name-p03641406.html"),
+    productIdentityKey("https://www.zara.com/kr/ko/new-name-p03641406.html"),
+  )
+  assert.notEqual(
+    productIdentityKey("https://www.zara.com/kr/ko/name-p03641406.html"),
+    productIdentityKey("https://www.zara.com/us/en/name-p03641406.html"),
+  )
+  assert.equal(productIdentityKey("https://example.com/kr/ko/name-p03641406.html"), null)
+})
+
 test("diffListing: imweb 카테고리 경로가 바뀌어도 idx 로 같은 상품을 찾는다", () => {
   // 실측 2026-07-19 differentis: DB /66/?idx=402 vs 재크롤 /wwwdifferentiskr/?idx=402
   const diff = diffListing({
@@ -262,6 +296,8 @@ test("diffListing: imweb 카테고리 경로가 바뀌어도 idx 로 같은 상�
   assert.equal(diff.updates[0].patch.in_stock, false)
   assert.deepEqual(diff.unknownUrls, [])
   assert.equal(diff.coverage, 1) // 사라진 것으로 세지 않는다
+  assert.equal(diff.exactMatchRows, 0)
+  assert.equal(diff.identityMatchRows, 1)
 })
 
 test("diffListing: 같은 상품이 여러 행으로 중복 적재돼 있으면 전부 함께 갱신한다", () => {

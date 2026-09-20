@@ -34,11 +34,12 @@ export type PriceFields = Pick<RefreshableRow, "price" | "original_price" | "sal
 export type RefreshPriceFields = PriceFields & {source_price: number; source_currency: string}
 
 /** 갱신이 DB 에 쓰는 값. in_stock 은 항상, 가격은 산출된 경우에만 포함된다. */
-export type RefreshPatch = Partial<RefreshPriceFields> & {
+export type RefreshPatch = Partial<RefreshPriceFields & {
+  product_url: string
   in_stock: boolean
-  gender?: string[]
-  gender_source?: string
-}
+  gender: string[]
+  gender_source: string
+}>
 
 export interface RefreshUpdate {
   id: string
@@ -65,6 +66,8 @@ export interface RefreshDiff {
   missingUrls: string[]
   /** DB 보유분 중 리스트에서 다시 확인된 비율 (0~1). DB 가 비면 1. */
   coverage: number
+  exactMatchRows: number
+  identityMatchRows: number
 }
 
 /** Coverage accumulated across resumable slices in one source cycle. */
@@ -109,7 +112,7 @@ export function productIdentityKey(url: string): string | null {
   let query: URLSearchParams
   try {
     const parsed = new URL(url)
-    host = parsed.host
+    host = parsed.host.toLowerCase().replace(/^www\./, "")
     pathname = parsed.pathname
     query = parsed.searchParams
   } catch {
@@ -119,6 +122,25 @@ export function productIdentityKey(url: string): string | null {
   if (idx) return `${host}#idx=${idx}`
   const productNo = query.get("product_no")
   if (productNo) return `${host}#product_no=${productNo}`
+  const zara = pathname.match(/-p(\d+)\.html$/i)
+  if (host === "zara.com" && zara) {
+    const locale = pathname.match(/^\/([a-z]{2})\/([a-z]{2})\//i)
+    const localeKey = locale ? `${locale[1]!.toLowerCase()}/${locale[2]!.toLowerCase()}` : "unknown"
+    return `${host}#zara_product=${zara[1]}&locale=${localeKey}`
+  }
+  // Shopify Markets may persist locale-prefixed product URLs even though the
+  // catalog API emits root `/products/...` URLs. The handle remains the stable
+  // identity across `/en-kr/products/x` and `/products/x`.
+  const shopify = pathname.match(/^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?products\/([a-z0-9][a-z0-9-]*)(?:\.(?:js|json))?\/?$/i)
+  if (shopify) {
+    // The handle is Shopify's stable product identifier, but these parameters
+    // can select a materially different storefront observation. Keep them in
+    // the identity so matching never collapses variants, countries or prices.
+    const semanticQuery = ["variant", "country", "currency", "locale"]
+      .flatMap((name) => query.getAll(name).map((value) => `${name}=${encodeURIComponent(value)}`))
+      .join("&")
+    return `${host}#shopify_handle=${shopify[1].toLowerCase()}${semanticQuery ? `&${semanticQuery}` : ""}`
+  }
   // cafe24 rewrite: /product/{슬러그}/{product_no}/... — 쿼리형과 같은 네임스페이스에
   // 넣어 한 사이트가 두 형식을 섞어 써도 통합된다.
   const rewritten = pathname.match(/^\/product\/[^/]+\/(\d+)(?:\/|$)/)
@@ -216,6 +238,8 @@ export function diffListing(args: {
   const seen = new Set<string>()
   const updates: RefreshUpdate[] = []
   const unknownUrls: string[] = []
+  let exactMatchRows = 0
+  let identityMatchRows = 0
 
   for (const product of args.crawled) {
     const url = product.productUrl
@@ -225,11 +249,14 @@ export function diffListing(args: {
     // 상품 식별자가 같은 DB 행 전부가 대상이다 (같은 상품의 카테고리별 중복 적재).
     // 식별자를 못 뽑는 URL 은 정확 매칭만 시도한다.
     const key = productIdentityKey(url)
-    const targets = (key && byIdentity.get(key)) || (byUrl.has(url) ? [byUrl.get(url)!] : [])
+    const exact = byUrl.get(url)
+    const targets = (key && byIdentity.get(key)) || (exact ? [exact] : [])
     if (targets.length === 0) {
       unknownUrls.push(url)
       continue
     }
+    if (exact) exactMatchRows += targets.length
+    else identityMatchRows += targets.length
 
     for (const row of targets) {
       // 사라진 것으로 오인되지 않도록 대상 행의 URL 을 전부 본 것으로 표시한다.
@@ -317,5 +344,5 @@ export function diffListing(args: {
     }
   }
 
-  return {updates, unknownUrls, confirmedUrls, missingUrls, coverage}
+  return {updates, unknownUrls, confirmedUrls, missingUrls, coverage, exactMatchRows, identityMatchRows}
 }

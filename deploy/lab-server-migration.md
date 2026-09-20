@@ -344,8 +344,10 @@ ln -sfn "$NEW" ~/kiko-crawler-runtime
 UPDATE 는 계속 성공하므로 대시보드는 초록색인 채 유입만 멈춘다 — migration 099 가
 기록한 color 사고와 같은 모양이다.
 
-현재 운영은 `18:00 KST` 야간 1회다. refresh는 600분 예산·소스당 10분 재개 조각·
-동시성 6·hard timeout 10시간 30분이며 성공 후 신규상품 워커가 `OnSuccess`로 이어진다. 가격·재고 행, 보조
+현재 운영은 `12:00 KST` 일일 1회다. refresh는 04:15까지 16시간 15분의 명시적
+deadline을 사용하며, 01:15부터 마지막 3시간은 품절 상품까지 포함한 상세 fallback에
+예약한다. systemd timeout은 17시간 30분으로 배치 deadline보다 뒤에 있으며 성공 후
+신규상품 워커가 `OnSuccess`로 이어진다. 가격·재고 행, 보조
 `last_seen`, candidate, 실행 이력의 개별 DB 실패는 기록하고 다음 항목으로 넘어간다.
 초기 worklist를 만들 수 없을 때만 전체 런이 실패한다.
 

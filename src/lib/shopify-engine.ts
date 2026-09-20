@@ -37,8 +37,21 @@ const SAFE_HANDLE = /^[a-z0-9][a-z0-9-]*$/
  * SPEC-PLATFORM-EXPANSION-007 v0.2.2 (2026-05-07): added after empirical
  * observation that parallel Shopify dispatch triggered 429 across 8 sites.
  */
-async function fetchWithBackoff(url: string, init: RequestInit): Promise<Response> {
-  const MAX_RETRIES = 3
+export function retryAfterDelayMs(value: string | null, now = Date.now()): number | null {
+  if (!value) return null
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000
+  const date = Date.parse(value)
+  return Number.isFinite(date) ? Math.max(0, date - now) : null
+}
+
+export function retryAtForRateLimit(value: string | null, now = Date.now()): string {
+  const delay = retryAfterDelayMs(value, now) ?? 30 * 60_000
+  return new Date(now + delay).toISOString()
+}
+
+async function fetchWithBackoff(url: string, init: RequestInit, maxRetries = 3): Promise<Response> {
+  const MAX_RETRIES = Math.max(1, maxRetries)
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     // 일부 Shopify/Cloudflare endpoint는 연결만 잡고 응답 body를 끝내지 않아
     // 사이트 하나가 전체 다중 브랜드 배치를 영구 정지시킨다. 개별 요청을
@@ -52,10 +65,8 @@ async function fetchWithBackoff(url: string, init: RequestInit): Promise<Respons
     if (attempt === MAX_RETRIES - 1) return res
     const retryAfter = res.headers.get("Retry-After")
     let waitMs = (attempt + 1) * 5000  // 5s → 10s → 15s default
-    if (retryAfter) {
-      const asInt = parseInt(retryAfter, 10)
-      if (!isNaN(asInt)) waitMs = Math.max(waitMs, asInt * 1000)
-    }
+    const requestedWait = retryAfterDelayMs(retryAfter)
+    if (requestedWait !== null) waitMs = Math.max(waitMs, Math.min(requestedWait, 30_000))
     await new Promise((r) => setTimeout(r, waitMs))
   }
   return await fetch(url, init)
@@ -112,6 +123,60 @@ interface ShopifyProduct {
 
 interface ShopifyResponse {
   products: ShopifyProduct[]
+}
+
+export function shouldUseShopifyBrowserFallback(status: number): boolean {
+  return status === 429
+}
+
+export function isShopifyTransientNetworkError(error: unknown): boolean {
+  let current: unknown = error
+  for (let depth = 0; depth < 4 && current; depth++) {
+    const record = typeof current === "object" ? current as Record<string, unknown> : null
+    const name = record && typeof record.name === "string" ? record.name : ""
+    const code = record && typeof record.code === "string" ? record.code : ""
+    const message = record && typeof record.message === "string" ? record.message : String(current)
+    if (
+      name === "AbortError"
+      || /^(ECONNRESET|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|EAI_AGAIN|UND_ERR_)/.test(code)
+      || /fetch failed|network error|socket hang up|timed? ?out/i.test(message)
+    ) {
+      return true
+    }
+    current = record?.cause
+  }
+  return false
+}
+
+export function isShopifyCatalogPageLimit(status: number, page: number): boolean {
+  return status === 400 && page > 100
+}
+
+export function isShopifyCatalogTruncated(page: number, maxPages: number, pageSize: number): boolean {
+  return page === maxPages && pageSize >= 250
+}
+
+interface ShopifyBrowserSession {
+  fetchJson(url: string): Promise<{status: number; data: ShopifyResponse | null}>
+  close(): Promise<void>
+}
+
+async function createShopifyBrowserSession(): Promise<ShopifyBrowserSession> {
+  const {chromium} = await import("playwright")
+  const browser = await chromium.launch({headless: true})
+  const page = await browser.newPage()
+  return {
+    async fetchJson(url) {
+      const response = await page.goto(url, {waitUntil: "domcontentloaded", timeout: 30_000})
+      const status = response?.status() ?? 0
+      if (status < 200 || status >= 300) return {status, data: null}
+      const body = await page.locator("body").innerText()
+      return {status, data: JSON.parse(body) as ShopifyResponse}
+    },
+    async close() {
+      await browser.close()
+    },
+  }
 }
 
 /**
@@ -552,6 +617,8 @@ export async function crawlShopify(
   console.log(`   💱 market=${country} currency=${currency}${detected ? "" : " (스토어 통화 미확인 — config 값 사용)"}`)
   console.log(`${"─".repeat(50)}`)
 
+  let browserSession: ShopifyBrowserSession | null = null
+  let catalogTruncated = false
   for (let page = 1; page <= maxPages; page++) {
     try {
       const url = buildShopifyProductsUrl(config.baseUrl, page, country)
@@ -561,29 +628,70 @@ export async function crawlShopify(
       // sec-ch-ua client hint family + standard browser Accept-Encoding
       // mimics a real Chrome request and avoids the 429 fingerprint trap.
       // SPEC-PLATFORM-EXPANSION-007 v0.2.2 (2026-05-07).
-      const res = await fetchWithBackoff(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          Accept: "application/json, text/plain, */*",
-          "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
-          "Accept-Encoding": "gzip, deflate, br",
-          "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-          "sec-ch-ua-mobile": "?0",
-          "sec-ch-ua-platform": '"macOS"',
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "same-origin",
-          Referer: config.baseUrl + "/",
-          Cookie: localizationCookie,
-        },
-      })
+      let data: ShopifyResponse | null = null
+      if (browserSession) {
+        const browserResult = await browserSession.fetchJson(url)
+        if (!browserResult.data) {
+          if (isShopifyCatalogPageLimit(browserResult.status, page)) break
+          const retryAt = browserResult.status === 429 ? ` retry_at=${retryAtForRateLimit(null)}` : ""
+          errors.push(`HTTP ${browserResult.status} on page ${page} (browser fallback)${retryAt}`)
+          break
+        }
+        data = browserResult.data
+      } else {
+        let res: Response | null = null
+        try {
+          res = await fetchWithBackoff(url, {
+            headers: {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            Accept: "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            Referer: config.baseUrl + "/",
+            Cookie: localizationCookie,
+            },
+          }, 1)
+        } catch (error) {
+          if (!isShopifyTransientNetworkError(error)) throw error
+          browserSession = await createShopifyBrowserSession()
+          const browserResult = await browserSession.fetchJson(url)
+          if (!browserResult.data) {
+            errors.push(`HTTP ${browserResult.status} on page ${page} (network browser fallback)`)
+            break
+          }
+          data = browserResult.data
+        }
 
-      if (!res.ok) {
-        errors.push(`HTTP ${res.status} on page ${page}`)
-        break
+        if (res && shouldUseShopifyBrowserFallback(res.status)) {
+          browserSession = await createShopifyBrowserSession()
+          const browserResult = await browserSession.fetchJson(url)
+          if (!browserResult.data) {
+            if (isShopifyCatalogPageLimit(browserResult.status, page)) break
+            const retryAt = browserResult.status === 429 ? ` retry_at=${retryAtForRateLimit(null)}` : ""
+            errors.push(`HTTP ${browserResult.status} on page ${page} (browser fallback)${retryAt}`)
+            break
+          }
+          data = browserResult.data
+        } else if (res) {
+          if (!res.ok) {
+            if (isShopifyCatalogPageLimit(res.status, page)) break
+            errors.push(`HTTP ${res.status} on page ${page}`)
+            break
+          }
+          data = await res.json() as ShopifyResponse
+        }
       }
 
-      const data: ShopifyResponse = await res.json()
+      if (!data) {
+        errors.push(`page ${page} produced no Shopify payload`)
+        break
+      }
 
       if (!data.products || data.products.length === 0) break
 
@@ -614,6 +722,7 @@ export async function crawlShopify(
 
       console.log(`   페이지 ${page}: ${data.products.length}개 상품`)
 
+      if (isShopifyCatalogTruncated(page, maxPages, data.products.length)) catalogTruncated = true
       if (data.products.length < 250) break // 마지막 페이지
 
       await new Promise((r) => setTimeout(r, delay))
@@ -622,6 +731,10 @@ export async function crawlShopify(
       break
     }
   }
+
+  await browserSession?.close().catch((error) => {
+    errors.push(`browser fallback close failed: ${String(error)}`)
+  })
 
   // 통계
   const uniqueBrands = new Set(allProducts.map((p) => p.brand))
@@ -643,6 +756,7 @@ export async function crawlShopify(
       duration: Date.now() - startTime,
     },
     errors,
+    qualityWarnings: catalogTruncated ? [`catalog_truncated=max_pages_${maxPages}`] : [],
   }
 
   console.log(`\n   ✅ ${config.name} 완료: ${result.stats.totalProducts}개 상품, ${result.stats.uniqueBrands}개 브랜드 (${(result.stats.duration / 1000).toFixed(1)}s)`)
