@@ -456,6 +456,8 @@ const SELECTOR_TIMEOUT_MS = 15_000
 const SCROLL_PIXEL_STEP = 600
 const SCROLL_PAUSE_MS = 350
 const SCROLL_MAX_STEPS = 12
+const CHALLENGE_TIMEOUT_MS = 20_000
+const CHALLENGE_POLL_MS = 500
 const PRODUCT_CARD_SELECTOR = ".product-grid-product, [data-productid]"
 const COOKIE_ACCEPT_SELECTOR = "#onetrust-accept-btn-handler"
 const XHR_URL_RE = /\/category\/\d+\/products\?ajax=true/
@@ -464,6 +466,44 @@ interface CategoryScrapeResult {
   url: string
   products: Product[]
   error?: {type: string; detail: string}
+}
+
+export function buildZaraLaunchOptions(
+  env: Record<string, string | undefined> = process.env,
+) {
+  return {
+    headless: env.CRAWLER_ZARA_HEADED !== "1",
+    ...(env.CRAWLER_BROWSER_CHANNEL === "chromium" ? {} : {channel: "chrome" as const}),
+  }
+}
+
+export function buildZaraContextOptions(region: ZaraRegion) {
+  return {
+    ...(region === "US"
+      ? {locale: "en-US", timezoneId: "America/New_York"}
+      : {locale: "ko-KR", timezoneId: "Asia/Seoul"}),
+    viewport: {width: 1440, height: 900},
+  }
+}
+
+async function waitForZaraChallenge(page: Page): Promise<{type: string; detail: string} | null> {
+  const deadline = Date.now() + CHALLENGE_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    let html: string
+    try {
+      html = await page.content()
+    } catch {
+      await page.waitForTimeout(CHALLENGE_POLL_MS)
+      continue
+    }
+    const intercept = detectBmVerifyIntercept(html)
+    if (!intercept.isIntercept) return null
+    if (intercept.reason === "access-denied-403") {
+      return {type: intercept.reason, detail: "Akamai access denied"}
+    }
+    await page.waitForTimeout(CHALLENGE_POLL_MS)
+  }
+  return {type: "bm-verify-timeout", detail: `Akamai challenge did not resolve within ${CHALLENGE_TIMEOUT_MS}ms`}
 }
 
 // @MX:WARN: [AUTO] Browser lifecycle is owned by this function — every
@@ -496,24 +536,41 @@ async function crawlOneCategory(
       // ignore parse failure; will be reported as no-data below
     }
   }
-  page.on("response", onResponse)
-
   try {
+    // Preserve the context cookies but detach the page from the previous SPA.
+    // Otherwise a late products response from category N can be captured as
+    // category N+1 immediately after its listener is installed.
+    await page.goto("about:blank", {waitUntil: "commit", timeout: 5_000})
+    page.on("response", onResponse)
     const navResp = await page.goto(categoryUrl, {
       waitUntil: "domcontentloaded",
       timeout: PER_CATEGORY_TIMEOUT_MS,
     })
     const status = navResp?.status() ?? 0
     if (status >= 400) {
-      result.error = {type: `http-${status}`, detail: `nav status ${status}`}
+      const html = await page.content().catch(() => "")
+      const intercept = detectBmVerifyIntercept(html)
+      result.error = {
+        type: intercept.isIntercept ? (intercept.reason ?? `http-${status}`) : `http-${status}`,
+        detail: `nav status ${status}`,
+      }
       return result
     }
-    // Quick body check for hard-403 / bm-verify intercept.
+    // Akamai may return an HTTP 200 interstitial which navigates through its
+    // verification endpoint before loading the category. Keep the shared
+    // browser session alive long enough to receive the trusted cookies.
     const probeBody = await page.content()
     const intercept = detectBmVerifyIntercept(probeBody)
     if (intercept.isIntercept) {
-      result.error = {type: intercept.reason ?? "intercept", detail: "bm-verify or hard-block"}
-      return result
+      if (intercept.reason === "access-denied-403") {
+        result.error = {type: intercept.reason, detail: "Akamai access denied"}
+        return result
+      }
+      const challengeError = await waitForZaraChallenge(page)
+      if (challengeError) {
+        result.error = challengeError
+        return result
+      }
     }
     // Dismiss cookie banner if it intercepts events; ignore failures.
     try {
@@ -608,11 +665,7 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
 
   let browser: Browser | null = null
   try {
-    browser = await chromium.launch(
-      process.env.CRAWLER_BROWSER_CHANNEL === "chromium"
-        ? {headless: true}
-        : {headless: true, channel: "chrome"},
-    )
+    browser = await chromium.launch(buildZaraLaunchOptions())
   } catch (err) {
     const runtime =
       process.env.CRAWLER_BROWSER_CHANNEL === "chromium"
@@ -632,9 +685,13 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
 
   let consecutiveErrors = 0
   try {
+    // One context per regional crawl preserves Akamai verification cookies
+    // across categories and avoids repeating the interstitial 17-18 times.
+    const ctx = await browser.newContext(buildZaraContextOptions(region))
+    const page = await ctx.newPage()
+    try {
     for (let i = 0; i < categoryUrls.length; i++) {
       const categoryUrl = categoryUrls[i]!
-      const ua = pickZaraUserAgent(i)
 
       // 2 sec/page pacing between consecutive page navigations
       // (REQ-003). First request runs immediately.
@@ -642,28 +699,15 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
         await new Promise((r) => setTimeout(r, crawlDelay))
       }
 
-      const ctx = await browser.newContext({
-        userAgent: ua,
-        ...(region === "US"
-          ? {locale: "en-US", timezoneId: "America/New_York"}
-          : {locale: "ko-KR", timezoneId: "Asia/Seoul"}),
-        viewport: {width: 1440, height: 900},
-      })
-      const page = await ctx.newPage()
-      let result: CategoryScrapeResult
-      try {
-        result = await crawlOneCategory(
-          page,
-          categoryUrl,
-          config.baseUrl,
-          config.key,
-          deriveGenderFromUrl(categoryUrl),
-          region,
-          sourceCurrency,
-        )
-      } finally {
-        await ctx.close().catch(() => {})
-      }
+      const result = await crawlOneCategory(
+        page,
+        categoryUrl,
+        config.baseUrl,
+        config.key,
+        deriveGenderFromUrl(categoryUrl),
+        region,
+        sourceCurrency,
+      )
 
       if (result.error) {
         consecutiveErrors += 1
@@ -697,6 +741,9 @@ export async function crawlZara(config: SiteConfig): Promise<CrawlResult> {
       allProducts.push(...result.products)
       console.log(`   ${categoryUrl}: ${result.products.length} products`)
       consecutiveErrors = 0
+    }
+    } finally {
+      await ctx.close().catch(() => {})
     }
   } finally {
     await browser.close().catch(() => {})

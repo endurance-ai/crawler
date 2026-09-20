@@ -8,6 +8,7 @@ import {
   syncRefreshSources,
 } from "../src/lib/product-refresh"
 import {createProductCollectionClient} from "../src/lib/product-collection"
+import {uniqueRefreshConfigs} from "../src/lib/refresh-source"
 
 function flag(name: string): string | null {
   const prefix = `--${name}=`
@@ -37,7 +38,7 @@ async function start(): Promise<void> {
       .map((value) => value.trim())
       .filter(Boolean),
   )
-  const sources = PLATFORMS
+  const sources = uniqueRefreshConfigs(PLATFORMS)
     .filter((config) => !config.disabled && !excluded.has(config.key))
     .map((config) => ({
       platformKey: config.key,
@@ -47,8 +48,30 @@ async function start(): Promise<void> {
     .filter((source) => source.productCount > 0)
   const deadline = flag("deadline-at")
   if (!deadline) throw new Error("--deadline-at=<ISO timestamp> is required")
+  const scheduledFor = flag("scheduled-for") ?? todayKst()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledFor)) {
+    throw new Error("--scheduled-for=<YYYY-MM-DD> is invalid")
+  }
+  const {data: current, error: currentError} = await db
+    .from("product_refresh_batches")
+    .select("id,status")
+    .eq("scheduled_for", scheduledFor)
+    .order("id", {ascending: false})
+    .limit(1)
+    .maybeSingle()
+  if (currentError) throw new Error(`refresh batch resume lookup failed: ${currentError.message}`)
+  if (current) {
+    const batchId = Number((current as {id: number}).id)
+    const {error: resumeError} = await db
+      .from("product_refresh_batches")
+      .update({status: "running", ended_at: null, deadline_at: deadline})
+      .eq("id", batchId)
+    if (resumeError) throw new Error(`refresh batch resume failed: ${resumeError.message}`)
+    console.log(String(batchId))
+    return
+  }
   const id = await createRefreshBatch(db, {
-    scheduledFor: todayKst(),
+    scheduledFor,
     deadlineAt: deadline,
     sources,
     metrics: {excluded: [...excluded]},

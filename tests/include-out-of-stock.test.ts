@@ -19,6 +19,8 @@ import * as assert from "node:assert/strict"
 import {parseShopifyProducts} from "../src/lib/shopify-engine"
 import {
   applyCafe24CanonicalDetailGender,
+  CAFE24_DETAIL_BUY_SELECTOR,
+  CAFE24_DETAIL_SOLD_OUT_SELECTOR,
   cafe24BrandOverride,
   canonicalCafe24ProductDetailUrl,
   cafe24ManualCategoryUrl,
@@ -65,6 +67,12 @@ test("cafe24: 상세 옵션 중 판매 가능 재고가 하나라도 있으면 �
     buyVisible: false,
     soldOutVisible: true,
   }), true)
+})
+
+test("cafe24: ShopLCDC 테마의 구매/품절 버튼을 상세 재고 근거로 찾는다", () => {
+  assert.match(CAFE24_DETAIL_BUY_SELECTOR, /\.prd-btn__buy/)
+  assert.match(CAFE24_DETAIL_BUY_SELECTOR, /product_submit/)
+  assert.match(CAFE24_DETAIL_SOLD_OUT_SELECTOR, /\.prd-btn__soldout/)
 })
 
 test("cafe24: 상세 옵션이 모두 품절이면 구매 버튼보다 옵션 재고를 우선한다", () => {

@@ -161,6 +161,7 @@ export async function finishRefreshBatchSource(
     status: "partial" | "success" | "exception"
     exceptionCode?: string | null
     exceptionMessage?: string | null
+    attempts?: number
   },
 ): Promise<void> {
   const {error} = await db
@@ -170,6 +171,7 @@ export async function finishRefreshBatchSource(
       last_run_id: input.runId ?? null,
       exception_code: input.exceptionCode ?? null,
       exception_message: input.exceptionMessage ?? null,
+      ...(input.attempts === undefined ? {} : {attempts: input.attempts}),
     })
     .eq("batch_id", input.batchId)
     .eq("platform_key", input.platformKey)
@@ -288,18 +290,32 @@ export async function touchProductsLastSeen(
   db: ProductRefreshClient,
   productUrls: string[],
   seenAt: string,
+  options: {maxAttempts?: number; retryDelayMs?: number} = {},
 ): Promise<{ok: number; failed: number}> {
   let ok = 0
   let failed = 0
+  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 3))
+  const retryDelayMs = Math.max(0, options.retryDelayMs ?? 250)
   for (const chunk of chunkByEncodedLength(productUrls)) {
-    const {error} = await db
-      .from("products")
-      .update({last_seen_at: seenAt})
-      .in("product_url", chunk)
-      .abortSignal(AbortSignal.timeout(DB_AUX_WRITE_TIMEOUT_MS))
-    if (error) {
+    let lastError: {message: string} | null = null
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const {error} = await db
+        .from("products")
+        .update({last_seen_at: seenAt})
+        .in("product_url", chunk)
+        .abortSignal(AbortSignal.timeout(DB_AUX_WRITE_TIMEOUT_MS))
+      if (!error) {
+        lastError = null
+        break
+      }
+      lastError = error
+      if (attempt + 1 < maxAttempts && retryDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (attempt + 1)))
+      }
+    }
+    if (lastError) {
       failed += chunk.length
-      if (failed <= chunk.length) console.error(`   ❌ last_seen_at 갱신 실패: ${error.message}`)
+      if (failed <= chunk.length) console.error(`   ❌ last_seen_at 갱신 실패: ${lastError.message}`)
     } else {
       ok += chunk.length
     }

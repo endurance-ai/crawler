@@ -14,9 +14,9 @@ Environment=CI=true
 # explicitly during deployment, never from inside a running batch.
 Environment=BATCH_SKIP_UPDATE=true
 ExecStart=/home/kjk/kiko-crawler-runtime/scripts/run-refresh-daily.sh
-# Normal claiming stops at 04:00. Page-boundary draining has 30 minutes, so the
-# 90-minute candidate worker can finish by 06:00 ahead of the 07:00 DB backup.
-TimeoutStartSec=37800
+# The script owns its 04:15 KST deadline. Keep systemd outside that window so
+# an early manual start or final DB reconciliation cannot be killed mid-finalize.
+TimeoutStartSec=63000
 
 [Install]
 WantedBy=default.target

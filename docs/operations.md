@@ -14,11 +14,19 @@
 
 ## Daily refresh batch (300k growth plan)
 
-The lab timer runs `scripts/run-refresh-daily.sh`. It creates one immutable
-source manifest, runs fast API/structured sources first, gives Cafe24 a shared
-browser and a longer window, then drains partial/transient sources until the
-04:15 KST deadline. A source is marked `success`, `partial`, or an explicit
-exception; the batch is finalized in `product_refresh_batches`.
+The lab timer starts `scripts/run-refresh-daily.sh` at 12:00 KST. It creates one
+immutable source manifest, runs fast API/structured sources first, gives Cafe24
+a shared browser and a longer window, then reserves 01:15-04:15 KST for detail
+fallback. The fallback includes already out-of-stock rows, updates `crawled_at`
+for confirmed removals, and clears a `coverage_guard` only after 100% of that
+source's manifest products were observed. A source is marked `success`,
+`partial`, or an explicit exception; the batch is finalized in
+`product_refresh_batches`.
+
+Fallback product reads use bounded platform-key chunks rather than scanning the
+whole products table. Transient PostgREST reads are retried, and a failed early
+phase does not fail the systemd unit after the final fallback and batch
+finalization succeed.
 
 The required migration is `kiko.ai-app/database/migrations/110_product_refresh_batches.sql`.
 Apply it before enabling the new unit. Until then, keep the existing unit and

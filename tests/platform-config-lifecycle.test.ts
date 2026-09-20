@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import {getSiteConfig} from "../src/configs/platforms"
 import {
   generatedPlatformType,
   queuePlatformType,
@@ -72,4 +73,16 @@ test("custom detection은 지원되는 구체 엔진 설정으로 복원한다",
   assert.equal(queuePlatformType("imweb"), "custom")
   assert.equal(queuePlatformType("sixshop"), "custom")
   assert.equal(queuePlatformType("structured"), "custom")
+})
+
+test("TOWTOW ARCHIVE의 검증된 Cafe24 이관은 generated Imweb 탐지를 덮어쓴다", () => {
+  const config = getSiteConfig("towtowarchive")
+  assert.equal(config?.type, "cafe24")
+  assert.deepEqual(
+    config?.category?.categories?.map(({name, cateNo}) => ({name, cateNo})),
+    [
+      {name: "Jewelry", cateNo: 24},
+      {name: "Apparel", cateNo: 25},
+    ],
+  )
 })

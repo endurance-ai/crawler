@@ -293,10 +293,23 @@ test("AC-4 robots: fail-closed on network error", async () => {
   const mock = installFetch(async () => {
     throw new Error("ECONNRESET")
   })
-  const r = await checkRobots(TEST_BASE_URL)
+  const r = await checkRobots(TEST_BASE_URL, {retryDelayMs: 0})
   mock.restore()
   assert.equal(r.allowed, false)
   assert.ok((r.blockingLine ?? "").length > 0)
+})
+
+test("AC-4 robots: a transient network error is retried before failing closed", async () => {
+  let attempts = 0
+  const mock = installFetch(async () => {
+    attempts++
+    if (attempts === 1) throw new Error("EAI_AGAIN")
+    return textResponse(PERMISSIVE_ROBOTS)
+  })
+  const r = await checkRobots(TEST_BASE_URL, {retryDelayMs: 0})
+  mock.restore()
+  assert.equal(r.allowed, true)
+  assert.equal(attempts, 2)
 })
 
 test("AC-4 crawlUniqlo: blanket-disallow robots.txt blocks ALL product fetches", async () => {

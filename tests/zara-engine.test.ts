@@ -30,6 +30,8 @@ import * as path from "node:path"
 import {fileURLToPath} from "node:url"
 
 import {
+  buildZaraContextOptions,
+  buildZaraLaunchOptions,
   buildZaraProductUrlPattern,
   detectBmVerifyIntercept,
   formatZaraPrice,
@@ -40,6 +42,60 @@ import {
   pickZaraUserAgent,
   type RawZaraProduct,
 } from "../src/lib/zara-engine"
+
+test("Zara browser uses headed native Chrome when explicitly enabled", () => {
+  assert.deepEqual(buildZaraLaunchOptions({CRAWLER_ZARA_HEADED: "1"}), {
+    headless: false,
+    channel: "chrome",
+  })
+  assert.deepEqual(buildZaraLaunchOptions({}), {headless: true, channel: "chrome"})
+})
+
+test("Zara context uses native UA and region-specific locale", () => {
+  const kr = buildZaraContextOptions("KR")
+  const us = buildZaraContextOptions("US")
+  assert.equal("userAgent" in kr, false)
+  assert.equal(kr.locale, "ko-KR")
+  assert.equal(kr.timezoneId, "Asia/Seoul")
+  assert.equal(us.locale, "en-US")
+  assert.equal(us.timezoneId, "America/New_York")
+})
+
+test("Zara KR category URLs use the current menu route IDs", async () => {
+  const {getSiteConfig} = await import("../src/configs/platforms")
+  const urls = getSiteConfig("zara-kr")?.categoryUrls ?? []
+  for (const expected of [
+    "woman-jackets-l1114.html",
+    "woman-knitwear-l1152.html",
+    "woman-tshirts-l1362.html",
+    "man-jackets-l640.html",
+    "man-jeans-l659.html",
+  ]) {
+    assert.ok(urls.some((url) => url.endsWith(expected)), `missing current Zara KR route: ${expected}`)
+  }
+  for (const stale of [
+    "woman-jackets-l1185.html",
+    "woman-knitwear-l1182.html",
+    "woman-tshirts-l1180.html",
+    "man-jackets-l717.html",
+    "man-jeans-l710.html",
+    "man-outerwear-l715.html",
+  ]) {
+    assert.equal(urls.some((url) => url.endsWith(stale)), false, `stale Zara KR route: ${stale}`)
+  }
+})
+
+test("Zara refresh excludes the non-XHR woman new-in landing in both regions", async () => {
+  const {getSiteConfig} = await import("../src/configs/platforms")
+  for (const key of ["zara-kr", "zara-us"]) {
+    const urls = getSiteConfig(key)?.categoryUrls ?? []
+    assert.equal(
+      urls.some((url) => url.endsWith("/woman-new-in-l1180.html")),
+      false,
+      `${key} woman new-in does not emit the category products XHR`,
+    )
+  }
+})
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -309,11 +365,12 @@ test("AC-1 platform registry: zara-us is registered and active (REQ-007/008/009 
   // SPEC-005 REQ-007/008/009 cleared 2026-05-06: zara-us is active (no disabled flag).
   assert.notEqual(z!.disabled, true, "zara-us must NOT be disabled after Run-phase gates cleared")
   assert.ok(Array.isArray(z!.categoryUrls), "categoryUrls must be present")
-  // REQ-009 result: 17/18 PASS. man-outerwear-l715 removed (no AJAX endpoint).
+  // man-outerwear-l715 and woman-new-in-l1180 are excluded because neither
+  // route exposes the listing XHR consumed by the refresh engine.
   assert.equal(
     z!.categoryUrls!.length,
-    17,
-    `expected exactly 17 category URLs (10 women + 7 men, post REQ-009 remediation), got ${z!.categoryUrls!.length}`,
+    16,
+    `expected exactly 16 category URLs (9 women + 7 men), got ${z!.categoryUrls!.length}`,
   )
   for (const u of z!.categoryUrls!) {
     assert.ok(u.startsWith("https://www.zara.com/us/en/"), `bad URL: ${u}`)

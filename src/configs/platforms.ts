@@ -1577,27 +1577,25 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     crawlDelay: 2000,
     categoryUrls: [
       // WOMAN
-      "https://www.zara.com/kr/ko/woman-new-in-l1180.html",
-      "https://www.zara.com/kr/ko/woman-coats-l1184.html",
-      "https://www.zara.com/kr/ko/woman-jackets-l1185.html",
-      "https://www.zara.com/kr/ko/woman-knitwear-l1182.html",
+      "https://www.zara.com/kr/ko/woman-outerwear-l1184.html",
+      "https://www.zara.com/kr/ko/woman-jackets-l1114.html",
+      "https://www.zara.com/kr/ko/woman-knitwear-l1152.html",
       "https://www.zara.com/kr/ko/woman-shirts-l1217.html",
-      "https://www.zara.com/kr/ko/woman-tshirts-l1180.html",
+      "https://www.zara.com/kr/ko/woman-tshirts-l1362.html",
       "https://www.zara.com/kr/ko/woman-trousers-l1335.html",
       "https://www.zara.com/kr/ko/woman-jeans-l1119.html",
       "https://www.zara.com/kr/ko/woman-dresses-l1066.html",
       "https://www.zara.com/kr/ko/woman-skirts-l1299.html",
       // MAN
       "https://www.zara.com/kr/ko/man-new-in-l711.html",
-      "https://www.zara.com/kr/ko/man-coats-l715.html",
-      "https://www.zara.com/kr/ko/man-jackets-l717.html",
+      "https://www.zara.com/kr/ko/man-jackets-l640.html",
       "https://www.zara.com/kr/ko/man-knitwear-l681.html",
       "https://www.zara.com/kr/ko/man-shirts-l737.html",
       "https://www.zara.com/kr/ko/man-tshirts-l855.html",
       "https://www.zara.com/kr/ko/man-trousers-l838.html",
-      "https://www.zara.com/kr/ko/man-jeans-l710.html",
+      "https://www.zara.com/kr/ko/man-jeans-l659.html",
     ],
-    notes: "ZARA KR Playwright engine. Akamai bypass via channel:'chrome' (real Chrome required, bundled Chromium hard-403'd). XHR-interception strategy: /kr/ko/category/{id}/products?ajax=true carries full product JSON. KRW-native, 2 sec/page, 5-UA rotation (one UA per browser context), robots-check enforced. ToS pre-verified 2026-05-05 (research.md §1.2 verified, AMBIGUOUS-ACCEPTED-BY-OWNER). portal.ai-internal-use only; halt on cease-and-desist.",
+    notes: "ZARA KR Playwright engine. Akamai path uses headed system Chrome under Xvfb, native UA, and one persistent context per regional crawl. XHR-interception strategy: /kr/ko/category/{id}/products?ajax=true carries full product JSON. KRW-native, 2 sec/page, robots-check enforced. ToS pre-verified 2026-05-05 (research.md §1.2 verified, AMBIGUOUS-ACCEPTED-BY-OWNER). portal.ai-internal-use only; halt on cease-and-desist.",
   },
 
   // ─── ZARA (US) — region=US shared engine, USD-native cache ──────────
@@ -1635,7 +1633,6 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     crawlDelay: 2000,
     categoryUrls: [
       // WOMAN (10)
-      "https://www.zara.com/us/en/woman-new-in-l1180.html",
       "https://www.zara.com/us/en/woman-outerwear-l1184.html",
       "https://www.zara.com/us/en/woman-jackets-l1114.html",
       "https://www.zara.com/us/en/woman-knitwear-l1152.html",
@@ -1660,7 +1657,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
       "https://www.zara.com/us/en/man-trousers-l838.html",
       "https://www.zara.com/us/en/man-jeans-l659.html",
     ],
-    notes: "ZARA US Playwright engine. Shares src/lib/zara-engine.ts with KR via region:'US' (SPEC-005 §9 DDD). Run-phase gates verified 2026-05-06: REQ-007 Akamai bypass 5/5 (100%) with channel:'chrome' against woman-new-in-l1180. REQ-008 ToS captured from canonical PDF terms-and-conditions-en_US-20250829.pdf via SPA homepage footer; verdict AMBIGUOUS-ACCEPTED-BY-OWNER (no automation keyword present; §17 IP rights structurally parallel to KR §15) — verbatim English clauses embedded at top of zara-engine.ts. REQ-009 live URL verification 17/18 (man-outerwear-l715 removed: page does not fire AJAX endpoint). XHR-interception: /us/en/category/{id}/products?ajax=true (region-agnostic regex). USD-native cache, USD→KRW import-time conversion via SPEC-002 fx.ts hook (FX_TO_KRW.USD = 1430). 2 sec/page pacing, 5-UA rotation, robots-check enforced. portal.ai-internal-use only; halt-on-cease-and-desist; re-verify > 90 days OR Inditex USA, Inc. communication OR ToS PDF version change.",
+    notes: "ZARA US Playwright engine. Shares src/lib/zara-engine.ts with KR via region:'US'. Akamai path uses headed system Chrome under Xvfb, native UA, and one persistent context per regional crawl. REQ-008 ToS verdict AMBIGUOUS-ACCEPTED-BY-OWNER; clauses are embedded at the top of zara-engine.ts. REQ-009 live URL verification 17/18 (man-outerwear-l715 removed: no AJAX endpoint). XHR-interception: /us/en/category/{id}/products?ajax=true. USD-native cache with import-time KRW conversion. 2 sec/page pacing, robots-check enforced. portal.ai-internal-use only; halt-on-cease-and-desist; re-verify > 90 days OR Inditex USA, Inc. communication OR ToS PDF version change.",
   },
 
   // ─── Farfetch (KR) — luxury multi-brand DOM-scrape engine ───────────
@@ -3169,6 +3166,7 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
     name: "HERETIC",
     type: "imweb",
     baseUrl: "https://heretic.kr",
+    categoryUrls: ["https://heretic.kr/198/"],
     defaultGender: ["women"],
     brand: "HERETIC",
     notes: "imweb 파일럿 — brand_node_id=5608. 공식 스토어의 Dresses/Skirts/Blouses 카테고리로 여성복 확인(2026-08-03).",
@@ -5654,7 +5652,36 @@ export const MANUAL_PLATFORMS: SiteConfig[] = [
   },
 ]
 
-export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS]
+// Upstream homepage metadata can drift away from the storefront that owns the
+// already-imported product URLs. Keep confirmed corrections outside the
+// generated file so the nightly codegen cannot overwrite them.
+const SITE_CONFIG_OVERRIDES: Readonly<Record<string, Partial<SiteConfig>>> = {
+  "libere-official": {baseUrl: "https://libere-official.com"},
+  // The apex storefront serves HTML but returns 404 for `/products.json`;
+  // Shopify's canonical www host exposes the same catalog API.
+  skims: {baseUrl: "https://www.skims.com"},
+  // The storefront migrated from Imweb to Cafe24. Its current Jewelry and
+  // Apparel roots expose 239/332 existing products (72%) and the detail
+  // fallback checks the historical URLs omitted from those live listings.
+  towtowarchive: {
+    type: "cafe24",
+    paginate: true,
+    maxPages: 300,
+    category: {
+      discovery: "manual",
+      categories: [
+        {name: "Jewelry", cateNo: 24},
+        {name: "Apparel", cateNo: 25},
+      ],
+    },
+    notes: "2026-09-19 verified migration from Imweb to Cafe24; official Jewelry/Apparel roots",
+  },
+}
+
+export const PLATFORMS: SiteConfig[] = [...MANUAL_PLATFORMS, ...GENERATED_PLATFORMS].map((config) => {
+  const override = SITE_CONFIG_OVERRIDES[config.key]
+  return override ? {...config, ...override} : config
+})
 
 // AUTO-GENERATED 플랫폼에도 사람 검증이 필요한 kids 오탐 예외가 있다.
 // generated 파일을 직접 수정하면 재생성 때 사라지므로 이 보강 맵에서 합성한다.
