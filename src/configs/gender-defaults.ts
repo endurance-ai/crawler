@@ -633,7 +633,7 @@ export function inferVerifiedSiteGenderFromName(
     (/(?:^|\W)(?:WOMAN|WOMEN|W'S)(?:\W|$)/i.test(name) || /^W(?:\s|[-_])/i.test(name.trim()))
   ) return "women"
   if (site === "yiyae" && /(?:^|\W)W'S(?:\W|$)/i.test(name)) return "women"
-  if (site === "blackpurple" && /Deux[- ]Eyelet Long Handle Bag/i.test(name)) return "women"
+  if (site === "blackpurple" && /(?:Breeze Beanie|Deux[- ]Eyelet Long Handle Bag)/i.test(name)) return "women"
   if (site === "mmmcorp" && /Cotton Check Pattern/i.test(name)) return "women"
   if (site === "swallowlounge" && /Inside Out Tote S/i.test(name)) return "women"
   // Verified women products carried by mixed-gender editorial shops. These

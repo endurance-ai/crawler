@@ -200,6 +200,10 @@ test("여성 자사몰과 혼성 브랜드의 검증된 여성 상품 예외를 
     "women",
   )
   assert.equal(
+    inferVerifiedSiteGenderFromName("blackpurple", "[REFURB]Breeze Beanie- NAVY"),
+    "women",
+  )
+  assert.equal(
     inferVerifiedSiteGenderFromName("mmmcorp", "Cotton Check Pattern T-Shirts_Check"),
     "women",
   )
