@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily kiko.ai refresh candidate enrichment
+
+[Timer]
+OnCalendar=*-*-* 04:35:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=kiko-refresh-candidates.service
+
+[Install]
+WantedBy=timers.target

@@ -2,7 +2,6 @@
 Description=kiko.ai listing refresh (stock/price only) — lab batch host
 After=network-online.target
 Wants=network-online.target
-OnSuccess=kiko-refresh-candidates.service
 
 [Service]
 Type=oneshot

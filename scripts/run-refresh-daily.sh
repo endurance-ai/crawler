@@ -156,7 +156,7 @@ zara_deadline_epoch=$((now_epoch + 45 * 60))
 if [ "$zara_deadline_epoch" -gt "$deadline_epoch" ]; then zara_deadline_epoch=$deadline_epoch; fi
 zara_deadline=$(TZ=Asia/Seoul date -d "@$zara_deadline_epoch" --iso-8601=seconds)
 run_refresh_phase \
-  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --type=zara \
+  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --discover-candidates --type=zara \
   --budget-minutes=45 --source-slice-minutes=25 --concurrency=1 \
   --deadline-at="$zara_deadline"
 
@@ -165,7 +165,7 @@ fast_deadline_epoch=$((now_epoch + 75 * 60))
 if [ "$fast_deadline_epoch" -gt "$deadline_epoch" ]; then fast_deadline_epoch=$deadline_epoch; fi
 fast_deadline=$(TZ=Asia/Seoul date -d "@$fast_deadline_epoch" --iso-8601=seconds)
 run_refresh_phase \
-  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only \
+  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --discover-candidates \
   --type=shopify,imweb,uniqlo,farfetch,sixshop,structured \
   --budget-minutes=75 --source-slice-minutes=10 --concurrency=8 \
   --deadline-at="$fast_deadline"
@@ -177,7 +177,7 @@ fast_retry_deadline_epoch=$((start_epoch + 2 * 60 * 60))
 if [ "$fast_retry_deadline_epoch" -gt "$deadline_epoch" ]; then fast_retry_deadline_epoch=$deadline_epoch; fi
 fast_retry_deadline=$(TZ=Asia/Seoul date -d "@$fast_retry_deadline_epoch" --iso-8601=seconds)
 run_refresh_phase \
-  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --max-attempts=2 \
+  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --discover-candidates --max-attempts=2 \
   --type=shopify,imweb,uniqlo,farfetch,sixshop,structured \
   --budget-minutes=45 --source-slice-minutes=10 --concurrency=8 \
   --deadline-at="$fast_retry_deadline"
@@ -188,7 +188,7 @@ zara_retry_deadline_epoch=$((start_epoch + 2 * 60 * 60 + 45 * 60))
 if [ "$zara_retry_deadline_epoch" -gt "$deadline_epoch" ]; then zara_retry_deadline_epoch=$deadline_epoch; fi
 zara_retry_deadline=$(TZ=Asia/Seoul date -d "@$zara_retry_deadline_epoch" --iso-8601=seconds)
 run_refresh_phase \
-  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --max-attempts=2 \
+  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --discover-candidates --max-attempts=2 \
   --type=zara --budget-minutes=45 --source-slice-minutes=25 --concurrency=1 \
   --deadline-at="$zara_retry_deadline"
 
@@ -221,13 +221,13 @@ start_shoplcdc_fallback_phase \
 
 # Cafe24 is the dominant workload; give it the longest contiguous window.
 run_refresh_phase \
-  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --type=cafe24 \
+    --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --discover-candidates --type=cafe24 \
   --budget-minutes=600 --source-slice-minutes=20 --concurrency=8 \
   --deadline-at="$cafe24_deadline"
 
 # Drain partial/transient sources before the detail fallback window.
 run_refresh_phase \
-  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --max-attempts=2 \
+  --batch-id="$batch_id" --only-pending --ignore-backoff --existing-only --discover-candidates --max-attempts=2 \
   --type=cafe24,shopify,imweb,uniqlo,farfetch,sixshop,structured \
   --budget-minutes=600 --source-slice-minutes=10 --concurrency=8 \
   --deadline-at="$fallback_start"

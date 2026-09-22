@@ -404,14 +404,22 @@ async function main(): Promise<void> {
   let synced = 0
   let eligible = 0
   let matched = 0
+  let failed = 0
   for (const row of rows) {
-    const outcome = await syncRow(row)
-    if (outcome.autoMatchEligible) eligible++
-    if (outcome.attachedToExistingTarget) matched++
-    synced++
+    try {
+      const outcome = await syncRow(row)
+      if (outcome.autoMatchEligible) eligible++
+      if (outcome.attachedToExistingTarget) matched++
+      synced++
+    } catch (error) {
+      if (crossShopAutoMatch) throw error
+      failed++
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`catalog sync failed product_id=${row.id}: ${message}`)
+    }
     if (synced % 100 === 0 || synced === rows.length) console.log(`  ${synced}/${rows.length}`)
   }
-  console.log(`catalog identity: eligible=${eligible} attached_to_existing=${matched} auto_match=${autoMatch || crossShopAutoMatch}`)
+  console.log(`catalog identity: synced=${synced} failed=${failed} eligible=${eligible} attached_to_existing=${matched} auto_match=${autoMatch || crossShopAutoMatch}`)
 }
 
 main().catch((error) => {
