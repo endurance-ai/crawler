@@ -49,6 +49,7 @@ import {
 } from "./lib/refresh-source"
 import {crawlShopify} from "./lib/shopify-engine"
 import {classifyRefreshException, isRefreshBatchSourceRunnable, retryAtFromErrors} from "./lib/refresh-batch"
+import {shouldObserveRefreshCandidates} from "./lib/refresh-candidate-policy"
 import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlStructuredExisting} from "./lib/structured-refresh-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
@@ -84,6 +85,7 @@ interface Flags {
   auditPrices: boolean
   priceOnly: boolean
   existingOnly: boolean
+  discoverCandidates: boolean
   ignoreBackoff: boolean
   batchId: number | null
   onlyPending: boolean
@@ -104,6 +106,7 @@ function parseFlags(): Flags {
     auditPrices: false,
     priceOnly: false,
     existingOnly: false,
+    discoverCandidates: false,
     ignoreBackoff: false,
     batchId: null,
     onlyPending: false,
@@ -115,6 +118,7 @@ function parseFlags(): Flags {
     else if (arg === "--audit-prices") flags.auditPrices = true
     else if (arg === "--price-only") flags.priceOnly = true
     else if (arg === "--existing-only") flags.existingOnly = true
+    else if (arg === "--discover-candidates") flags.discoverCandidates = true
     else if (arg === "--ignore-backoff") flags.ignoreBackoff = true
     else if (arg === "--only-pending") flags.onlyPending = true
     else if (arg.startsWith("--budget-minutes=")) flags.budgetMinutes = Number(arg.split("=")[1])
@@ -688,7 +692,7 @@ async function main() {
         }
         let queued = {inserted: 0, updated: 0, unchanged: 0, stale: 0, conflicted: 0, rematched: 0, brandUnmatched: 0}
         let candidateError: string | null = null
-        if (!flags.auditPrices && !flags.priceOnly && !flags.existingOnly) {
+        if (shouldObserveRefreshCandidates(flags)) {
           try {
             queued = await enqueueRefreshCandidates(db, {
               products: crawled,

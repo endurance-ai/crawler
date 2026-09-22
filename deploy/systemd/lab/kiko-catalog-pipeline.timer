@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily kiko.ai product catalog derivation
+
+[Timer]
+OnCalendar=*-*-* 06:10:00 Asia/Seoul
+Persistent=true
+AccuracySec=1min
+Unit=kiko-catalog-pipeline.service
+
+[Install]
+WantedBy=timers.target

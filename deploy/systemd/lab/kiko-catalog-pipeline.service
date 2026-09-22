@@ -1,6 +1,6 @@
 [Unit]
 Description=kiko.ai product catalog derivation and cross-shop matching
-After=network-online.target kiko-refresh-candidates.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]

@@ -41,8 +41,25 @@ pnpm refresh -- --dry-run --type=cafe24
 ```
 
 `--batch-id`, `--only-pending`, `--max-attempts`, and `--deadline-at` are safe
-resume controls. Candidate enrichment remains a separate OnSuccess unit and
-uses only the local Qwen endpoint on port 8001.
+resume controls. The nightly listing pass keeps existing-product writes scoped
+with `--existing-only` while `--discover-candidates` reuses the same observations
+to enqueue unknown URLs. It does not perform a second discovery crawl.
+
+Candidate enrichment and catalog derivation use independent timers rather than
+`OnSuccess` chaining. Candidate work starts at 04:35 KST with a 90-minute budget
+and a 1,000-item safety ceiling; catalog work starts at 06:10 KST. A failure in
+one worker therefore does not suppress the next durable queue consumer. Install
+and enable all three timers after deploying their service units:
+
+```bash
+systemctl --user enable --now \
+  kiko-refresh.timer kiko-refresh-candidates.timer kiko-catalog-pipeline.timer
+```
+
+Each catalog run logs `pipeline-health` before and after processing. The JSON
+contains candidate/catalog status counts, oldest actionable wait, newly added
+products, and image/catalog-identity/VLM/embedding readiness counts from
+`product_pipeline_health()` (migration 125).
 
 ### Batch result semantics
 

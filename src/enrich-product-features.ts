@@ -10,6 +10,7 @@ import {
   productFeaturePrompt,
   productFeatureSchema,
 } from "./lib/catalog/product-features"
+import {runIsolatedPool} from "./lib/catalog/isolated-pool"
 
 type ProductRow = {
   id: number | string
@@ -56,20 +57,13 @@ async function loadRows(): Promise<ProductRow[]> {
   return (data ?? []) as unknown as ProductRow[]
 }
 
-async function runPool<T>(items: T[], worker: (item: T) => Promise<void>): Promise<void> {
-  let cursor = 0
-  await Promise.all(Array.from({length: Math.min(concurrency, items.length)}, async () => {
-    while (cursor < items.length) await worker(items[cursor++]!)
-  }))
-}
-
 async function main(): Promise<void> {
   const rows = await loadRows()
   console.log(`product feature candidates=${rows.length} mode=${apply ? "apply" : "dry-run"}`)
   if (rows.length === 0 || !apply) return
   await assertQwenReady(loadQwenConfig())
   let written = 0
-  await runPool(rows, async (row) => {
+  const failures = await runIsolatedPool(rows, concurrency, async (row) => {
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "kiko-product-feature-"))
     let generated
     try {
@@ -99,7 +93,11 @@ async function main(): Promise<void> {
     if (error) throw error
     written++
   })
-  console.log(`product features written=${written}`)
+  for (const failure of failures) {
+    const message = failure.error instanceof Error ? failure.error.message : String(failure.error)
+    console.error(`product feature failed product_id=${failure.item.id}: ${message}`)
+  }
+  console.log(`product features written=${written} failed=${failures.length}`)
 }
 
 main().catch((error) => {
