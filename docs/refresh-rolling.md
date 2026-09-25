@@ -29,7 +29,10 @@ that the global success rate would otherwise hide.
 Rolling detail selection rotates sources within each platform type. It assigns
 attempts in proportion to eligible products, with a 5% minimum share for each
 type that has eligible work. Products within a source remain ordered by their
-oldest successful check. The Zara and general passes use separate queues;
+oldest successful check. A worker checks at most 20 products before rotating
+to another source, and Cafe24 closes its browser context when the source
+changes. This bounds Chromium processes during cross-origin navigation. The
+Zara and general passes use separate queues;
 non-rolling batch selection is unchanged. Review `by_type` attempted counts
 to confirm that Imweb and Sixshop receive work.
 

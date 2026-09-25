@@ -138,7 +138,7 @@ test("rolling detail gives sparse platforms a minimum share of attempts", () => 
     const group = queue.next()!
     group.rows.shift()
     attempted.set(group.type, (attempted.get(group.type) ?? 0) + 1)
-    if (group.rows.length > 0) queue.requeue(group)
+    queue.finish(group, 1)
   }
   assert.ok((attempted.get("cafe24") ?? 0) >= 48)
   assert.ok((attempted.get("shopify") ?? 0) >= 38)
@@ -156,12 +156,29 @@ test("rolling detail rotates sources while keeping each source's oldest row firs
   for (let i = 0; i < 4; i++) {
     const group = queue.next()!
     selected.push(`${group.platform}:${group.rows.shift()}`)
-    if (group.rows.length > 0) queue.requeue(group)
+    queue.finish(group, 1)
   }
   assert.deepEqual(selected, [
     "old-source:oldest", "other-source:other-oldest",
     "old-source:next", "other-source:other-next",
   ])
+})
+
+test("rolling detail leases a bounded source slice before rotating", () => {
+  const groups = [
+    {type: "cafe24" as const, platform: "first", rows: Array.from({length: 25}, (_, i) => i)},
+    {type: "cafe24" as const, platform: "second", rows: Array.from({length: 25}, (_, i) => i)},
+  ]
+  const queue = createRollingDetailGroupQueue(groups)
+  const first = queue.next(20)!
+  assert.equal(first.platform, "first")
+  first.rows.splice(0, 20)
+  queue.finish(first, 20)
+  const second = queue.next(20)!
+  assert.equal(second.platform, "second")
+  second.rows.splice(0, 20)
+  queue.finish(second, 20)
+  assert.equal(queue.next(20)?.platform, "first")
 })
 
 test("rolling detail cooldowns defer failures without delaying confirmed checks", () => {

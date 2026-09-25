@@ -281,10 +281,11 @@ export function assessRollingDetailHealth(counts: {
 export function createRollingDetailGroupQueue<T extends {type: DetailFallbackType; rows: unknown[]}>(
   groups: T[],
   minimumTypeShare = 0.05,
-): {next: () => T | undefined; requeue: (group: T) => void} {
+): {next: (maxItems?: number) => T | undefined; finish: (group: T, attempted: number) => void} {
   const queues = new Map<DetailFallbackType, T[]>()
   const products = new Map<DetailFallbackType, number>()
   const served = new Map<DetailFallbackType, number>()
+  const reservations = new Map<T, number>()
   const totalProducts = groups.reduce((total, group) => total + group.rows.length, 0)
   for (const group of groups) {
     const queue = queues.get(group.type) ?? []
@@ -293,7 +294,7 @@ export function createRollingDetailGroupQueue<T extends {type: DetailFallbackTyp
     products.set(group.type, (products.get(group.type) ?? 0) + group.rows.length)
   }
   return {
-    next: () => {
+    next: (maxItems = 1) => {
       let selected: DetailFallbackType | undefined
       let lowestScore = Number.POSITIVE_INFINITY
       for (const [type, queue] of queues) {
@@ -306,10 +307,19 @@ export function createRollingDetailGroupQueue<T extends {type: DetailFallbackTyp
         }
       }
       if (!selected) return undefined
-      served.set(selected, (served.get(selected) ?? 0) + 1)
-      return queues.get(selected)!.shift()
+      const group = queues.get(selected)!.shift()!
+      const reserved = Math.min(maxItems, group.rows.length)
+      reservations.set(group, reserved)
+      served.set(selected, (served.get(selected) ?? 0) + reserved)
+      return group
     },
-    requeue: (group) => { queues.get(group.type)!.push(group) },
+    finish: (group, attempted) => {
+      const reserved = reservations.get(group)
+      if (reserved === undefined) throw new Error("rolling detail group was not reserved")
+      reservations.delete(group)
+      served.set(group.type, (served.get(group.type) ?? 0) - reserved + attempted)
+      if (group.rows.length > 0) queues.get(group.type)!.push(group)
+    },
   }
 }
 
