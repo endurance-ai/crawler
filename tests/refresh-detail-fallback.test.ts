@@ -2,12 +2,15 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import {
+  assessRollingDetailHealth,
   buildDetailRefreshPatch,
   buildRemovedProductPatch,
   chunkDetailFallbackPlatforms,
   combinedRefreshCoverage,
+  compareOldestDetailRows,
   detailFallbackPacingMs,
   detailFallbackRecovered,
+  detailRetryAt,
   detailTransientRetryDelayMs,
   isCafe24RemovedRedirect,
   isImwebExpiredStorePage,
@@ -112,6 +115,70 @@ test("detail fallback prefers the current platform type over a stale batch snaps
   assert.equal(resolveDetailFallbackType("imweb", "cafe24"), "cafe24")
   assert.equal(resolveDetailFallbackType("shopify", "custom"), "shopify")
   assert.equal(resolveDetailFallbackType("custom", "structured"), null)
+})
+
+test("rolling detail checks the least recently verified product first", () => {
+  const neverChecked = row({id: "1", last_seen_at: null, crawled_at: null})
+  const checkedYesterday = row({id: "2", last_seen_at: "2026-09-18T00:00:00Z", crawled_at: "2026-09-19T00:00:00Z"})
+  const checkedToday = row({id: "3", last_seen_at: "2026-09-20T00:00:00Z", crawled_at: "2026-09-18T00:00:00Z"})
+  assert.deepEqual([checkedToday, neverChecked, checkedYesterday].sort(compareOldestDetailRows).map((item) => item.id), ["1", "2", "3"])
+})
+
+test("rolling detail cooldowns defer failures without delaying confirmed checks", () => {
+  const now = Date.parse("2026-09-25T00:00:00Z")
+  assert.equal(detailRetryAt("confirmed", now), null)
+  assert.equal(detailRetryAt("removed", now), null)
+  assert.equal(detailRetryAt("transient", now), "2026-09-25T00:30:00.000Z")
+  assert.equal(detailRetryAt("db_failed", now), "2026-09-25T01:00:00.000Z")
+  assert.equal(detailRetryAt("unreadable", now), "2026-09-26T00:00:00.000Z")
+  assert.equal(detailRetryAt("transient", now, "2026-09-25T02:00:00Z"), "2026-09-25T02:00:00.000Z")
+})
+
+test("rolling detail distinguishes isolated retries from a failed pass", () => {
+  const counts = {
+    eligible_products: 3_000,
+    attempted: 3_000,
+    confirmed: 2_935,
+    removed: 0,
+    removed_recorded: 0,
+    blocked: 0,
+    transient: 60,
+    unreadable: 0,
+    db_failed: 3,
+    cas_conflicts: 2,
+  }
+  assert.deepEqual(assessRollingDetailHealth(counts), {
+    status: "degraded",
+    reason: "retry_pending",
+    persisted: 2_935,
+    persistence_attempted: 2_940,
+  })
+  assert.equal(assessRollingDetailHealth({...counts, transient: 0, confirmed: 3_000, db_failed: 0, cas_conflicts: 0}).status, "success")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 100, confirmed: 75, transient: 0, db_failed: 24, cas_conflicts: 1}).reason, "db_write_rate")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 100, confirmed: 97, transient: 0, db_failed: 0, cas_conflicts: 3}).reason, "cas_conflict_rate")
+})
+
+test("rolling detail reports no progress only when eligible work was left undone", () => {
+  const counts = {
+    eligible_products: 20,
+    attempted: 0,
+    confirmed: 0,
+    removed: 0,
+    removed_recorded: 0,
+    blocked: 0,
+    transient: 0,
+    unreadable: 0,
+    db_failed: 0,
+    cas_conflicts: 0,
+  }
+  assert.equal(assessRollingDetailHealth(counts).reason, "no_progress")
+  assert.equal(assessRollingDetailHealth({...counts, eligible_products: 0}).status, "success")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 10, blocked: 10}).reason, "no_progress")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 10, confirmed: 4, blocked: 6}).reason, "low_evidence")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 10, confirmed: 5, blocked: 5}).status, "degraded")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 1, blocked: 1}).status, "degraded")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 10, removed: 10, removed_recorded: 10}).status, "success")
+  assert.equal(assessRollingDetailHealth({...counts, attempted: 10, removed: 10}, true).status, "success")
 })
 
 test("Imweb detail fallback uses conservative pacing and bounded transient backoff", () => {

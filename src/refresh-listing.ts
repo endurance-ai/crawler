@@ -50,6 +50,7 @@ import {
 import {crawlShopify} from "./lib/shopify-engine"
 import {classifyRefreshException, isRefreshBatchSourceRunnable, retryAtFromErrors} from "./lib/refresh-batch"
 import {shouldObserveRefreshCandidates} from "./lib/refresh-candidate-policy"
+import {assessRollingListingHealth} from "./lib/refresh-listing-health"
 import {crawlSixshop} from "./lib/sixshop-engine"
 import {crawlStructuredExisting} from "./lib/structured-refresh-engine"
 import type {CrawlResult, PlatformType, Product, SiteConfig} from "./lib/types"
@@ -524,8 +525,11 @@ async function main() {
   let partialSlices = 0
   let budgetStopped = false
   let skippedSources = 0
+  let failedSlices = 0
   let writeFailures = 0
   let lastSeenFailures = 0
+  let confirmedProducts = 0
+  let updatedProducts = 0
   let candidateFailures = 0
   let telemetryFailures = 0
   const failures: string[] = []
@@ -765,12 +769,15 @@ async function main() {
         brandUnmatchedTotal += queued.brandUnmatched
         writeFailures += applied.failed
         lastSeenFailures += seen.failed
+        confirmedProducts += seen.ok
+        updatedProducts += applied.ok
         // 런 성패도 품질 경고를 보지 않는다 — 가격을 못 읽어도 재고 갱신은 성공한 것이다.
         // 경고는 아래 메트릭에 남겨 추적 가능하게 둔다.
         // unreachable 은 failed 로 친다(성공이 아니므로 last_succeeded_at 을 올리면
         // 안 된다). 다만 백오프 사다리는 metrics.unreachable_only 를 보고 건너뛴다.
         const failed =
           applied.failed > 0 || seen.failed > 0 || crawlResult.errors.length > 0 || unreachable.length > 0
+        if (crawlResult.errors.length > 0 || unreachable.length > 0) failedSlices += 1
         const unreachableOnly =
           unreachable.length > 0 && applied.failed === 0 && seen.failed === 0 && crawlResult.errors.length === 0
         const dbPartialOnly =
@@ -939,7 +946,36 @@ async function main() {
   if (failures.length > 0) {
     console.log(`   ⚠️ 실패 ${failures.length}개: ${failures.slice(0, 5).join(" | ")}`)
   }
-  if (failures.length > 0 || writeFailures > 0 || lastSeenFailures > 0 || candidateFailures > 0 || telemetryFailures > 0) process.exitCode = 1
+  if (flags.existingOnly && flags.batchId === null) {
+    const health = assessRollingListingHealth({
+      attempted_slices: attempted,
+      completed_sources: done,
+      partial_slices: partialSlices,
+      skipped_sources: skippedSources,
+      failed_slices: failedSlices,
+      confirmed_products: confirmedProducts,
+      updated_products: updatedProducts,
+      update_failures: writeFailures,
+      last_seen_failures: lastSeenFailures,
+      telemetry_failures: telemetryFailures,
+      guard_tripped: guardTripped,
+    })
+    console.log(JSON.stringify({
+      rolling_listing_health: health,
+      attempted_slices: attempted,
+      completed_sources: done,
+      partial_slices: partialSlices,
+      confirmed_products: confirmedProducts,
+      skipped_sources: skippedSources,
+      failed_slices: failedSlices,
+      update_failures: writeFailures,
+      last_seen_failures: lastSeenFailures,
+      telemetry_failures: telemetryFailures,
+    }))
+    if (health.status === "failed") process.exitCode = 1
+  } else if (failures.length > 0 || writeFailures > 0 || lastSeenFailures > 0 || candidateFailures > 0 || telemetryFailures > 0) {
+    process.exitCode = 1
+  }
 }
 
 main().catch((error) => {
