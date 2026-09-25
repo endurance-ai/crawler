@@ -15,6 +15,7 @@ import {loadRefreshBatchSources} from "./lib/product-refresh"
 import {
   buildDetailRefreshPatch,
   buildRemovedProductPatch,
+  assessRollingDetailHealth,
   chunkDetailFallbackPlatforms,
   classifyDetailHttpStatus,
   combinedRefreshCoverage,
@@ -817,8 +818,10 @@ async function main(): Promise<void> {
     await browser?.close()
   }
   if (rolling) await saveRetryState(retryStateFile, retryState)
+  const health = rolling ? assessRollingDetailHealth(metrics, audit) : null
   const finalMetrics = {
     ...metrics,
+    ...(health ? {health} : {}),
     priority,
     rolling,
     cooled_products: cooledProducts,
@@ -868,7 +871,11 @@ async function main(): Promise<void> {
     if (metricsError) throw new Error(`batch metrics update failed: ${metricsError.message}`)
   }
   console.log(JSON.stringify(finalMetrics))
-  if (metrics.db_failed > 0 || metrics.cas_conflicts > 0) process.exitCode = 1
+  if (health) {
+    if (health.status === "failed") process.exitCode = 1
+  } else if (metrics.db_failed > 0 || metrics.cas_conflicts > 0) {
+    process.exitCode = 1
+  }
 }
 
 main().catch((error) => {

@@ -227,6 +227,51 @@ export function needsDetailFallback(row: DetailFallbackTimestampRow, since: stri
 
 export type DetailRetryReason = DetailFetchKind | "db_failed" | "cas_conflict"
 
+export type RollingDetailHealth = {
+  status: "success" | "degraded" | "failed"
+  reason: "none" | "no_progress" | "low_evidence" | "db_write_rate" | "cas_conflict_rate" | "retry_pending"
+  persisted: number
+  persistence_attempted: number
+}
+
+/** A few isolated retries do not mean that the whole bounded pass failed. */
+export function assessRollingDetailHealth(counts: {
+  eligible_products: number
+  attempted: number
+  confirmed: number
+  removed: number
+  removed_recorded: number
+  blocked: number
+  transient: number
+  unreadable: number
+  db_failed: number
+  cas_conflicts: number
+}, audit = false): RollingDetailHealth {
+  const persistenceAttempted = counts.attempted - counts.blocked - counts.transient - counts.unreadable
+  const persisted = counts.confirmed + (audit ? counts.removed : counts.removed_recorded)
+  const failureRateExceeded = (failures: number) =>
+    failures >= 3 && persistenceAttempted > 0 && failures / persistenceAttempted >= 0.02
+  if (counts.eligible_products > 0 && (counts.attempted === 0 || (counts.attempted >= 10 && persisted === 0))) {
+    return {status: "failed", reason: "no_progress", persisted, persistence_attempted: persistenceAttempted}
+  }
+  if (counts.attempted >= 10 && persisted / counts.attempted < 0.5) {
+    return {status: "failed", reason: "low_evidence", persisted, persistence_attempted: persistenceAttempted}
+  }
+  if (failureRateExceeded(counts.db_failed)) {
+    return {status: "failed", reason: "db_write_rate", persisted, persistence_attempted: persistenceAttempted}
+  }
+  if (failureRateExceeded(counts.cas_conflicts)) {
+    return {status: "failed", reason: "cas_conflict_rate", persisted, persistence_attempted: persistenceAttempted}
+  }
+  const retryPending = counts.db_failed + counts.cas_conflicts + counts.blocked + counts.transient + counts.unreadable > 0
+  return {
+    status: retryPending ? "degraded" : "success",
+    reason: retryPending ? "retry_pending" : "none",
+    persisted,
+    persistence_attempted: persistenceAttempted,
+  }
+}
+
 /** Sort by the most recent successful live/removal check, with never-checked rows first. */
 export function compareOldestDetailRows(
   a: DetailPriorityRow & DetailFallbackTimestampRow,
