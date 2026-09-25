@@ -22,6 +22,16 @@ are attempted but none are persisted or fewer than half are persisted; or if at
 least 3 DB failures or CAS conflicts affect at least 2% of persistence attempts.
 Other blocked, transient, unreadable, DB, and CAS results remain visible as
 `degraded` and in the retry state.
+An eligible detail type with zero attempts in a pass that attempted at least
+10 products is also `degraded` with reason `coverage_gap`. This catches a type
+that the global success rate would otherwise hide.
+
+Rolling detail selection rotates sources within each platform type. It assigns
+attempts in proportion to eligible products, with a 5% minimum share for each
+type that has eligible work. Products within a source remain ordered by their
+oldest successful check. The Zara and general passes use separate queues;
+non-rolling batch selection is unchanged. Review `by_type` attempted counts
+to confirm that Imweb and Sixshop receive work.
 
 For listing, partial source slices are normal progress. A pass fails if every
 attempted slice fails before completion or checkpoint; if at least 3 source

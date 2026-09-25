@@ -229,7 +229,7 @@ export type DetailRetryReason = DetailFetchKind | "db_failed" | "cas_conflict"
 
 export type RollingDetailHealth = {
   status: "success" | "degraded" | "failed"
-  reason: "none" | "no_progress" | "low_evidence" | "db_write_rate" | "cas_conflict_rate" | "retry_pending"
+  reason: "none" | "no_progress" | "low_evidence" | "db_write_rate" | "cas_conflict_rate" | "coverage_gap" | "retry_pending"
   persisted: number
   persistence_attempted: number
 }
@@ -246,6 +246,7 @@ export function assessRollingDetailHealth(counts: {
   unreadable: number
   db_failed: number
   cas_conflicts: number
+  by_type?: Partial<Record<DetailFallbackType, {eligible_products: number; attempted: number}>>
 }, audit = false): RollingDetailHealth {
   const persistenceAttempted = counts.attempted - counts.blocked - counts.transient - counts.unreadable
   const persisted = counts.confirmed + (audit ? counts.removed : counts.removed_recorded)
@@ -263,12 +264,52 @@ export function assessRollingDetailHealth(counts: {
   if (failureRateExceeded(counts.cas_conflicts)) {
     return {status: "failed", reason: "cas_conflict_rate", persisted, persistence_attempted: persistenceAttempted}
   }
+  if (counts.attempted >= 10 && Object.values(counts.by_type ?? {}).some((type) =>
+    type && type.eligible_products > 0 && type.attempted === 0)) {
+    return {status: "degraded", reason: "coverage_gap", persisted, persistence_attempted: persistenceAttempted}
+  }
   const retryPending = counts.db_failed + counts.cas_conflicts + counts.blocked + counts.transient + counts.unreadable > 0
   return {
     status: retryPending ? "degraded" : "success",
     reason: retryPending ? "retry_pending" : "none",
     persisted,
     persistence_attempted: persistenceAttempted,
+  }
+}
+
+/** Rotate sources within each type while reserving a small share for sparse types. */
+export function createRollingDetailGroupQueue<T extends {type: DetailFallbackType; rows: unknown[]}>(
+  groups: T[],
+  minimumTypeShare = 0.05,
+): {next: () => T | undefined; requeue: (group: T) => void} {
+  const queues = new Map<DetailFallbackType, T[]>()
+  const products = new Map<DetailFallbackType, number>()
+  const served = new Map<DetailFallbackType, number>()
+  const totalProducts = groups.reduce((total, group) => total + group.rows.length, 0)
+  for (const group of groups) {
+    const queue = queues.get(group.type) ?? []
+    queue.push(group)
+    queues.set(group.type, queue)
+    products.set(group.type, (products.get(group.type) ?? 0) + group.rows.length)
+  }
+  return {
+    next: () => {
+      let selected: DetailFallbackType | undefined
+      let lowestScore = Number.POSITIVE_INFINITY
+      for (const [type, queue] of queues) {
+        if (queue.length === 0) continue
+        const share = Math.max((products.get(type) ?? 0) / totalProducts, minimumTypeShare)
+        const score = (served.get(type) ?? 0) / share
+        if (score < lowestScore) {
+          selected = type
+          lowestScore = score
+        }
+      }
+      if (!selected) return undefined
+      served.set(selected, (served.get(selected) ?? 0) + 1)
+      return queues.get(selected)!.shift()
+    },
+    requeue: (group) => { queues.get(group.type)!.push(group) },
   }
 }
 

@@ -21,6 +21,7 @@ import {
   combinedRefreshCoverage,
   compareOldestDetailRows,
   compareLikelyLiveDetailRows,
+  createRollingDetailGroupQueue,
   detailFallbackPacingMs,
   detailFallbackRecovered,
   detailRetryAt,
@@ -609,6 +610,7 @@ async function main(): Promise<void> {
     else groups.splice(index, 0, group)
   }
   groups.sort(compareGroupHeads)
+  const fairQueue = rolling && priority === "oldest" ? createRollingDetailGroupQueue(groups) : null
   if (dryRun) {
     console.log(JSON.stringify({
       batch_id: batchId,
@@ -709,7 +711,7 @@ async function main(): Promise<void> {
       try {
         while (Date.now() < deadline) {
           if (limit > 0 && metrics.attempted >= limit) break
-          const group = groups.shift()
+          const group = fairQueue ? fairQueue.next() : groups.shift()
           if (!group) break
           const row = group.rows.shift()
           if (!row) continue
@@ -807,7 +809,10 @@ async function main(): Promise<void> {
               group.rows.length = 0
             }
           }
-          if (group.rows.length > 0 && Date.now() < deadline) enqueueGroup(group)
+          if (group.rows.length > 0 && Date.now() < deadline) {
+            if (fairQueue) fairQueue.requeue(group)
+            else enqueueGroup(group)
+          }
         }
       } finally {
         await context?.close()
@@ -818,12 +823,13 @@ async function main(): Promise<void> {
     await browser?.close()
   }
   if (rolling) await saveRetryState(retryStateFile, retryState)
-  const health = rolling ? assessRollingDetailHealth(metrics, audit) : null
+  const health = rolling ? assessRollingDetailHealth({...metrics, by_type: byType}, audit) : null
   const finalMetrics = {
     ...metrics,
     ...(health ? {health} : {}),
     priority,
     rolling,
+    ...(fairQueue ? {selection_policy: "weighted_type_source_rotation", minimum_type_share: 0.05} : {}),
     cooled_products: cooledProducts,
     cooldown_products: Object.keys(retryState.products).length,
     cooldown_sources: Object.keys(retryState.sources).length,

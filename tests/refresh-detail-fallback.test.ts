@@ -8,6 +8,7 @@ import {
   chunkDetailFallbackPlatforms,
   combinedRefreshCoverage,
   compareOldestDetailRows,
+  createRollingDetailGroupQueue,
   detailFallbackPacingMs,
   detailFallbackRecovered,
   detailRetryAt,
@@ -124,6 +125,45 @@ test("rolling detail checks the least recently verified product first", () => {
   assert.deepEqual([checkedToday, neverChecked, checkedYesterday].sort(compareOldestDetailRows).map((item) => item.id), ["1", "2", "3"])
 })
 
+test("rolling detail gives sparse platforms a minimum share of attempts", () => {
+  const groups = ([
+    ["cafe24", 500],
+    ["shopify", 400],
+    ["imweb", 25],
+    ["sixshop", 10],
+  ] as const).map(([type, count]) => ({type, rows: Array.from({length: count}, (_, i) => i)}))
+  const queue = createRollingDetailGroupQueue(groups)
+  const attempted = new Map<string, number>()
+  for (let i = 0; i < 100; i++) {
+    const group = queue.next()!
+    group.rows.shift()
+    attempted.set(group.type, (attempted.get(group.type) ?? 0) + 1)
+    if (group.rows.length > 0) queue.requeue(group)
+  }
+  assert.ok((attempted.get("cafe24") ?? 0) >= 48)
+  assert.ok((attempted.get("shopify") ?? 0) >= 38)
+  assert.ok((attempted.get("imweb") ?? 0) >= 4)
+  assert.ok((attempted.get("sixshop") ?? 0) >= 4)
+})
+
+test("rolling detail rotates sources while keeping each source's oldest row first", () => {
+  const groups = [
+    {type: "cafe24" as const, platform: "old-source", rows: ["oldest", "next"]},
+    {type: "cafe24" as const, platform: "other-source", rows: ["other-oldest", "other-next"]},
+  ]
+  const queue = createRollingDetailGroupQueue(groups)
+  const selected: string[] = []
+  for (let i = 0; i < 4; i++) {
+    const group = queue.next()!
+    selected.push(`${group.platform}:${group.rows.shift()}`)
+    if (group.rows.length > 0) queue.requeue(group)
+  }
+  assert.deepEqual(selected, [
+    "old-source:oldest", "other-source:other-oldest",
+    "old-source:next", "other-source:other-next",
+  ])
+})
+
 test("rolling detail cooldowns defer failures without delaying confirmed checks", () => {
   const now = Date.parse("2026-09-25T00:00:00Z")
   assert.equal(detailRetryAt("confirmed", now), null)
@@ -156,6 +196,31 @@ test("rolling detail distinguishes isolated retries from a failed pass", () => {
   assert.equal(assessRollingDetailHealth({...counts, transient: 0, confirmed: 3_000, db_failed: 0, cas_conflicts: 0}).status, "success")
   assert.equal(assessRollingDetailHealth({...counts, attempted: 100, confirmed: 75, transient: 0, db_failed: 24, cas_conflicts: 1}).reason, "db_write_rate")
   assert.equal(assessRollingDetailHealth({...counts, attempted: 100, confirmed: 97, transient: 0, db_failed: 0, cas_conflicts: 3}).reason, "cas_conflict_rate")
+})
+
+test("rolling detail reports eligible platforms with no attempts as a coverage gap", () => {
+  const counts = {
+    eligible_products: 200,
+    attempted: 100,
+    confirmed: 100,
+    removed: 0,
+    removed_recorded: 0,
+    blocked: 0,
+    transient: 0,
+    unreadable: 0,
+    db_failed: 0,
+    cas_conflicts: 0,
+    by_type: {
+      cafe24: {eligible_products: 150, attempted: 100},
+      imweb: {eligible_products: 50, attempted: 0},
+    },
+  }
+  assert.equal(assessRollingDetailHealth(counts).reason, "coverage_gap")
+  assert.equal(assessRollingDetailHealth({...counts, by_type: {
+    cafe24: {eligible_products: 150, attempted: 99},
+    imweb: {eligible_products: 50, attempted: 1},
+  }}).status, "success")
+  assert.equal(assessRollingDetailHealth({...counts, db_failed: 5}).reason, "db_write_rate")
 })
 
 test("rolling detail reports no progress only when eligible work was left undone", () => {
