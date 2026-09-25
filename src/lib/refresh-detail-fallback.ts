@@ -225,6 +225,36 @@ export function needsDetailFallback(row: DetailFallbackTimestampRow, since: stri
   return seenAt < threshold && checkedAt < threshold
 }
 
+export type DetailRetryReason = DetailFetchKind | "db_failed" | "cas_conflict"
+
+/** Sort by the most recent successful live/removal check, with never-checked rows first. */
+export function compareOldestDetailRows(
+  a: DetailPriorityRow & DetailFallbackTimestampRow,
+  b: DetailPriorityRow & DetailFallbackTimestampRow,
+): number {
+  const checkedAt = (row: DetailFallbackTimestampRow): number => Math.max(
+    row.last_seen_at ? Date.parse(row.last_seen_at) || 0 : 0,
+    row.crawled_at ? Date.parse(row.crawled_at) || 0 : 0,
+  )
+  return checkedAt(a) - checkedAt(b) || String(a.id).localeCompare(String(b.id))
+}
+
+/** Persistent cooldowns keep failed rows from consuming every hourly slot. */
+export function detailRetryAt(
+  reason: DetailRetryReason,
+  observedAtMs: number,
+  requestedRetryAt?: string | null,
+): string | null {
+  if (reason === "confirmed" || reason === "removed") return null
+  const requestedMs = requestedRetryAt ? Date.parse(requestedRetryAt) : Number.NaN
+  const delayMs = reason === "transient"
+    ? 30 * 60_000
+    : reason === "db_failed" || reason === "cas_conflict"
+      ? 60 * 60_000
+      : 24 * 60 * 60_000
+  return new Date(Math.max(observedAtMs + delayMs, Number.isFinite(requestedMs) ? requestedMs : 0)).toISOString()
+}
+
 /** Spend a bounded fallback window on URLs most likely to still be live. */
 export function compareLikelyLiveDetailRows(a: DetailPriorityRow, b: DetailPriorityRow): number {
   const stockRank = (value: boolean | null) => value === true ? 0 : value === false ? 1 : 2

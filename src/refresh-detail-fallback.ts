@@ -1,8 +1,11 @@
 #!/usr/bin/env npx tsx
 
+import {mkdir, readFile, rename, writeFile} from "node:fs/promises"
+import {dirname} from "node:path"
 import {chromium, type BrowserContext, type Page} from "playwright"
 
 import {getSiteConfig, PLATFORMS} from "./configs/platforms"
+import {applyDetailCasWrite, recoverDuplicateCanonicalUrl} from "./lib/detail-db-retry"
 import {extractCafe24DetailStock} from "./lib/cafe24-engine"
 import {extractCafe24DetailFallbacks} from "./lib/cafe24-chain"
 import {initFxRates} from "./lib/fx"
@@ -15,9 +18,11 @@ import {
   chunkDetailFallbackPlatforms,
   classifyDetailHttpStatus,
   combinedRefreshCoverage,
+  compareOldestDetailRows,
   compareLikelyLiveDetailRows,
   detailFallbackPacingMs,
   detailFallbackRecovered,
+  detailRetryAt,
   detailTransientRetryDelayMs,
   needsDetailFallback,
   isCafe24RemovedRedirect,
@@ -52,6 +57,13 @@ type DetailRow = RefreshableRow & {
 
 type SourceGroup = {platform: string; type: DetailFallbackType; lane: number; rows: DetailRow[]}
 
+type RetryEntry = {retry_at: string; reason: string}
+type RollingRetryState = {
+  version: 1
+  products: Record<string, RetryEntry>
+  sources: Record<string, RetryEntry>
+}
+
 function isDetailFallbackType(value: string): value is DetailFallbackType {
   return ["cafe24", "shopify", "zara", "imweb", "sixshop"].includes(value)
 }
@@ -83,6 +95,46 @@ function positiveInt(name: string, fallback: number): number {
   const value = Number(flag(name) ?? fallback)
   if (!Number.isInteger(value) || value <= 0) throw new Error(`--${name} must be a positive integer`)
   return value
+}
+
+function emptyRetryState(): RollingRetryState {
+  return {version: 1, products: {}, sources: {}}
+}
+
+async function loadRetryState(path: string | null): Promise<RollingRetryState> {
+  if (!path) return emptyRetryState()
+  try {
+    const value = JSON.parse(await readFile(path, "utf8")) as Partial<RollingRetryState>
+    return {
+      version: 1,
+      products: value.products && typeof value.products === "object" ? value.products : {},
+      sources: value.sources && typeof value.sources === "object" ? value.sources : {},
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return emptyRetryState()
+    throw new Error(`rolling retry state load failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+async function saveRetryState(path: string | null, state: RollingRetryState): Promise<void> {
+  if (!path) return
+  await mkdir(dirname(path), {recursive: true})
+  const temporary = `${path}.${process.pid}.tmp`
+  await writeFile(temporary, `${JSON.stringify(state)}\n`, "utf8")
+  await rename(temporary, path)
+}
+
+function retryPending(entry: RetryEntry | undefined, now: number): boolean {
+  return Boolean(entry && Date.parse(entry.retry_at) > now)
+}
+
+function parseExcluded(): Set<string> {
+  return new Set((process.env.REFRESH_EXCLUDE ?? "").split(",").map((key) => key.trim()).filter(Boolean))
+}
+
+function logDetailDbError(operation: string, platform: string, code: string | undefined): void {
+  const safeCode = code && /^[A-Za-z0-9]{1,16}$/.test(code) ? code : "unknown"
+  console.error(`detail DB ${operation} failed: platform=${platform} code=${safeCode}`)
 }
 
 async function loadUnconfirmedProducts(
@@ -365,25 +417,39 @@ async function writeConfirmed(
   for (let attempt = 0; attempt < 2; attempt++) {
     const observedAt = new Date().toISOString()
     const patch = buildDetailRefreshPatch(row, observation, observedAt)
+    const writePatch = () => applyDetailCasWrite(observedAt,
+      () => db.from("products")
+        .update({...patch, last_seen_at: observedAt, crawled_at: observedAt, updated_at: observedAt})
+        .eq("id", row.id)
+        .eq("updated_at", row.updated_at)
+        .select("id")
+        .abortSignal(AbortSignal.timeout(20_000)),
+      () => db.from("products")
+        .select("id,platform,product_url,updated_at,crawled_at,last_seen_at,price,original_price,sale_price,source_price,source_currency,in_stock,gender,gender_source")
+        .eq("id", row.id)
+        .abortSignal(AbortSignal.timeout(20_000))
+        .maybeSingle(),
+    )
+    const initialOutcome = await writePatch()
+    const recovered = await recoverDuplicateCanonicalUrl(
+      initialOutcome,
+      patch,
+      row.id,
+      () => db.from("products").select("id").eq("product_url", patch.product_url!).abortSignal(AbortSignal.timeout(20_000)).maybeSingle(),
+      writePatch,
+    )
+    const outcome = recovered.outcome
+    if (recovered.preservedUrl && outcome.kind === "written") {
+      console.warn(`[detail-db] canonical URL already belongs to another product; preserved existing URL platform=${row.platform}`)
+    }
     const changed = Object.keys(patch).some((key) => (row as unknown as Record<string, unknown>)[key] !== (patch as Record<string, unknown>)[key])
-    const {data, error} = await db
-      .from("products")
-      .update({...patch, last_seen_at: observedAt, crawled_at: observedAt, updated_at: observedAt})
-      .eq("id", row.id)
-      .eq("updated_at", row.updated_at)
-      .select("id")
-      .abortSignal(AbortSignal.timeout(20_000))
-    if (!error && data?.length === 1) return changed ? "updated" : "confirmed"
-    if (error) return "failed"
+    if (outcome.kind === "written") return changed ? "updated" : "confirmed"
+    if (outcome.kind === "failed") {
+      logDetailDbError("confirm", row.platform, outcome.code)
+      return "failed"
+    }
     if (attempt === 1) return "conflict"
-    const {data: current, error: reloadError} = await db
-      .from("products")
-      .select("id,platform,product_url,updated_at,crawled_at,last_seen_at,price,original_price,sale_price,source_price,source_currency,in_stock,gender,gender_source")
-      .eq("id", row.id)
-      .abortSignal(AbortSignal.timeout(20_000))
-      .maybeSingle()
-    if (reloadError || !current) return "failed"
-    const typed = current as DetailRow & {gender: string[] | null; gender_source: string | null}
+    const typed = outcome.current as DetailRow & {gender: string[] | null; gender_source: string | null}
     row = {
       ...typed,
       unverified_unisex_quarantined: isUnverifiedUnisexRow({
@@ -404,31 +470,36 @@ async function recordRemovedCheck(
   let row = initial
   for (let attempt = 0; attempt < 2; attempt++) {
     const checkedAt = new Date().toISOString()
-    const {data, error} = await db
-      .from("products")
-      .update(buildRemovedProductPatch(checkedAt))
-      .eq("id", row.id)
-      .eq("updated_at", row.updated_at)
-      .select("id")
-      .abortSignal(AbortSignal.timeout(20_000))
-    if (!error && data?.length === 1) return "recorded"
-    if (error) return "failed"
+    const outcome = await applyDetailCasWrite(checkedAt,
+      () => db.from("products")
+        .update(buildRemovedProductPatch(checkedAt))
+        .eq("id", row.id)
+        .eq("updated_at", row.updated_at)
+        .select("id")
+        .abortSignal(AbortSignal.timeout(20_000)),
+      () => db.from("products")
+        .select("id,platform,product_url,updated_at,crawled_at,last_seen_at,price,original_price,sale_price,source_price,source_currency,in_stock,gender,gender_source")
+        .eq("id", row.id)
+        .abortSignal(AbortSignal.timeout(20_000))
+        .maybeSingle(),
+    )
+    if (outcome.kind === "written") return "recorded"
+    if (outcome.kind === "failed") {
+      logDetailDbError("remove", row.platform, outcome.code)
+      return "failed"
+    }
     if (attempt === 1) return "conflict"
-    const {data: current, error: reloadError} = await db
-      .from("products")
-      .select("id,platform,product_url,updated_at,crawled_at,last_seen_at,price,original_price,sale_price,source_price,source_currency,in_stock,gender,gender_source")
-      .eq("id", row.id)
-      .abortSignal(AbortSignal.timeout(20_000))
-      .maybeSingle()
-    if (reloadError || !current) return "failed"
-    row = current as DetailRow
+    row = outcome.current as DetailRow
   }
   return "conflict"
 }
 
 async function main(): Promise<void> {
-  const batchId = positiveInt("batch-id", 0)
-  const since = flag("since")
+  const rolling = process.argv.includes("--rolling")
+  const batchIdRaw = flag("batch-id")
+  const batchId = batchIdRaw ? positiveInt("batch-id", 0) : null
+  if (!rolling && batchId === null) throw new Error("--batch-id=<id> is required unless --rolling is used")
+  const since = flag("since") ?? (rolling ? new Date().toISOString() : null)
   const deadlineRaw = flag("deadline-at")
   if (!since || !Number.isFinite(Date.parse(since))) throw new Error("--since=<ISO timestamp> is required")
   if (!deadlineRaw || !Number.isFinite(Date.parse(deadlineRaw))) throw new Error("--deadline-at=<ISO timestamp> is required")
@@ -453,8 +524,32 @@ async function main(): Promise<void> {
   const limit = Number(flag("limit") ?? 0)
   if (!Number.isInteger(limit) || limit < 0) throw new Error("--limit must be a non-negative integer")
   const db = createProductCollectionClient()
-  const batchSources = await loadRefreshBatchSources(db, batchId)
   const configByKey = new Map(PLATFORMS.map((config) => [config.key, config]))
+  const retryStateFile = rolling ? flag("retry-state-file") : null
+  const retryState = await loadRetryState(retryStateFile)
+  const selectionTime = Date.now()
+  const pruneExpired = (entries: Record<string, RetryEntry>) => {
+    for (const [key, entry] of Object.entries(entries)) {
+      if (!retryPending(entry, selectionTime)) delete entries[key]
+    }
+  }
+  pruneExpired(retryState.products)
+  pruneExpired(retryState.sources)
+  const excluded = parseExcluded()
+  const batchSources = rolling
+    ? [...configByKey.values()]
+      .filter((config) => !config.disabled && !excluded.has(config.key))
+      .map((config) => ({
+        batch_id: 0,
+        platform_key: config.key,
+        platform_type: config.type,
+        product_count: 0,
+        status: "pending" as const,
+        attempts: 0,
+        exception_code: null,
+        exception_message: null,
+      }))
+    : await loadRefreshBatchSources(db, batchId!)
   const sourceTypeByKey = new Map<string, DetailFallbackType>()
   for (const source of batchSources) {
     const type = resolveDetailFallbackType(source.platform_type, configByKey.get(source.platform_key)?.type)
@@ -463,10 +558,13 @@ async function main(): Promise<void> {
   const eligibleSources = batchSources.filter((source) =>
     selectedTypes.has(sourceTypeByKey.get(source.platform_key) ?? "") &&
     (!selectedSite || source.platform_key === selectedSite) &&
+    !retryPending(retryState.sources[source.platform_key], selectionTime) &&
     !["external_block", "config_drift"].includes(source.exception_code ?? ""),
   )
   const eligible = new Set(eligibleSources.map((source) => source.platform_key))
-  const rows = await loadUnconfirmedProducts(db, since, eligible)
+  const loadedRows = await loadUnconfirmedProducts(db, since, eligible)
+  const cooledProducts = loadedRows.filter((row) => retryPending(retryState.products[row.id], selectionTime)).length
+  const rows = loadedRows.filter((row) => !retryPending(retryState.products[row.id], selectionTime))
   const byPlatform = new Map<string, DetailRow[]>()
   for (const row of rows) {
     const group = byPlatform.get(row.platform) ?? []
@@ -478,7 +576,7 @@ async function main(): Promise<void> {
     const sourceType = sourceTypeByKey.get(source.platform_key)
     if (!sourceRows?.length || !sourceType) return []
     sourceRows.sort(priority === "oldest"
-      ? (a, b) => (a.last_seen_at ?? "").localeCompare(b.last_seen_at ?? "")
+      ? compareOldestDetailRows
       : compareLikelyLiveDetailRows)
     const sourceConcurrency = sourceType === "zara"
       ? zaraSourceConcurrency
@@ -495,13 +593,31 @@ async function main(): Promise<void> {
       rows: sourceRows.filter((_, index) => index % sourceConcurrency === lane),
     })).filter((group) => group.rows.length > 0)
   })
+  const compareGroupHeads = (a: SourceGroup, b: SourceGroup): number => {
+    const aRow = a.rows[0]
+    const bRow = b.rows[0]
+    if (!aRow) return 1
+    if (!bRow) return -1
+    return priority === "oldest"
+      ? compareOldestDetailRows(aRow, bRow)
+      : compareLikelyLiveDetailRows(aRow, bRow)
+  }
+  const enqueueGroup = (group: SourceGroup): void => {
+    const index = groups.findIndex((current) => compareGroupHeads(group, current) <= 0)
+    if (index < 0) groups.push(group)
+    else groups.splice(index, 0, group)
+  }
+  groups.sort(compareGroupHeads)
   if (dryRun) {
     console.log(JSON.stringify({
       batch_id: batchId,
+      rolling,
       since,
       priority,
       eligible_sources: groups.length,
       eligible_products: rows.length,
+      cooled_products: cooledProducts,
+      cooled_sources: Object.keys(retryState.sources).length,
       by_type: groups.reduce<Record<string, {sources: number; products: number}>>((summary, group) => {
         const current = summary[group.type] ?? {sources: 0, products: 0}
         current.sources++
@@ -540,6 +656,16 @@ async function main(): Promise<void> {
       eligible_products: rows.filter((row) => sourceTypeByKey.get(row.platform) === "sixshop").length,
       ...emptyFallbackCounters(),
     },
+  }
+  const byZaraRegion: Record<string, FallbackCounters & {eligible_products: number}> = {}
+  for (const source of eligibleSources) {
+    if (sourceTypeByKey.get(source.platform_key) === "zara") {
+      byZaraRegion[source.platform_key] = {eligible_products: 0, ...emptyFallbackCounters()}
+    }
+  }
+  for (const row of rows) {
+    if (sourceTypeByKey.get(row.platform) !== "zara") continue
+    byZaraRegion[row.platform].eligible_products++
   }
   console.log(`상세 보완 시작: ${groups.length}개 소스 · ${rows.length}개 상품 · 동시 ${concurrency} · 마감 ${deadlineRaw}`)
   const hasZara = groups.some((group) => group.type === "zara")
@@ -589,9 +715,13 @@ async function main(): Promise<void> {
           // The group is absent from the shared queue while awaited, enforcing source concurrency=1.
           const config = configByKey.get(group.platform)
           const sourceCurrency = row.source_currency ?? config?.sourceCurrency ?? "KRW"
+          const counters: FallbackCounters[] = [metrics, byType[group.type]]
+          if (group.type === "zara") counters.push(byZaraRegion[group.platform])
+          const count = (field: keyof FallbackCounters) => {
+            for (const counter of counters) counter[field]++
+          }
           // Claim the global limit before the request yields so parallel workers cannot overshoot it.
-          metrics.attempted++
-          byType[group.type].attempted++
+          count("attempted")
           let observation: DetailObservation
           if (group.type === "shopify") {
             observation = await fetchShopify(row, sourceCurrency)
@@ -622,46 +752,61 @@ async function main(): Promise<void> {
               await new Promise((resolve) => setTimeout(resolve, delayMs))
             }
           }
+          let retryReason: Parameters<typeof detailRetryAt>[0] = observation.kind
           if (observation.kind === "confirmed") {
-            if (audit) { metrics.confirmed++; byType[group.type].confirmed++ }
+            if (audit) count("confirmed")
             else {
               const result = await writeConfirmed(db, row, observation)
               if (result === "updated") {
-                metrics.confirmed++; metrics.updated++
-                byType[group.type].confirmed++; byType[group.type].updated++
+                count("confirmed"); count("updated")
               } else if (result === "confirmed") {
-                metrics.confirmed++; byType[group.type].confirmed++
+                count("confirmed")
               } else if (result === "conflict") {
-                metrics.cas_conflicts++; byType[group.type].cas_conflicts++
+                count("cas_conflicts")
+                retryReason = "cas_conflict"
               } else {
-                metrics.db_failed++; byType[group.type].db_failed++
+                count("db_failed")
+                retryReason = "db_failed"
               }
             }
           } else if (observation.kind === "removed") {
-            metrics.removed++
-            byType[group.type].removed++
+            count("removed")
             if (!audit) {
               const result = await recordRemovedCheck(db, row)
               if (result === "recorded") {
-                metrics.removed_recorded++
-                byType[group.type].removed_recorded++
+                count("removed_recorded")
               } else {
-                metrics.removed_record_failed++
-                byType[group.type].removed_record_failed++
+                count("removed_record_failed")
                 if (result === "conflict") {
-                  metrics.cas_conflicts++
-                  byType[group.type].cas_conflicts++
+                  count("cas_conflicts")
+                  retryReason = "cas_conflict"
                 } else {
-                  metrics.db_failed++
-                  byType[group.type].db_failed++
+                  count("db_failed")
+                  retryReason = "db_failed"
                 }
               }
             }
           } else {
-            metrics[observation.kind]++
-            byType[group.type][observation.kind]++
+            count(observation.kind)
           }
-          if (group.rows.length > 0 && Date.now() < deadline) groups.push(group)
+          if (rolling) {
+            const observedAt = Date.now()
+            const productRetryAt = detailRetryAt(retryReason, observedAt, observation.retryAt)
+            if (productRetryAt) {
+              retryState.products[row.id] = {retry_at: productRetryAt, reason: retryReason}
+            } else {
+              delete retryState.products[row.id]
+            }
+            if (observation.kind === "blocked" || observation.kind === "transient") {
+              const sourceRetryAt = detailRetryAt(observation.kind, observedAt, observation.retryAt)
+              if (sourceRetryAt) {
+                retryState.sources[group.platform] = {retry_at: sourceRetryAt, reason: observation.kind}
+              }
+              // Avoid hammering every old URL on a source that is blocked or rate-limited.
+              group.rows.length = 0
+            }
+          }
+          if (group.rows.length > 0 && Date.now() < deadline) enqueueGroup(group)
         }
       } finally {
         await context?.close()
@@ -671,8 +816,18 @@ async function main(): Promise<void> {
     await Promise.all([...zaraSessions.values()].map(({context}) => context.close().catch(() => undefined)))
     await browser?.close()
   }
-  const finalMetrics = {...metrics, priority, by_type: byType}
-  if (!audit) {
+  if (rolling) await saveRetryState(retryStateFile, retryState)
+  const finalMetrics = {
+    ...metrics,
+    priority,
+    rolling,
+    cooled_products: cooledProducts,
+    cooldown_products: Object.keys(retryState.products).length,
+    cooldown_sources: Object.keys(retryState.sources).length,
+    by_type: byType,
+    by_zara_region: byZaraRegion,
+  }
+  if (!audit && batchId !== null) {
     // Listing and detail observations are two halves of one refresh. A source
     // that failed the listing-overlap guard can be recovered once persisted
     // last_seen_at/crawled_at evidence reaches the same 70% threshold.

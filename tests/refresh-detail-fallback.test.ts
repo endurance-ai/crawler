@@ -6,8 +6,10 @@ import {
   buildRemovedProductPatch,
   chunkDetailFallbackPlatforms,
   combinedRefreshCoverage,
+  compareOldestDetailRows,
   detailFallbackPacingMs,
   detailFallbackRecovered,
+  detailRetryAt,
   detailTransientRetryDelayMs,
   isCafe24RemovedRedirect,
   isImwebExpiredStorePage,
@@ -112,6 +114,23 @@ test("detail fallback prefers the current platform type over a stale batch snaps
   assert.equal(resolveDetailFallbackType("imweb", "cafe24"), "cafe24")
   assert.equal(resolveDetailFallbackType("shopify", "custom"), "shopify")
   assert.equal(resolveDetailFallbackType("custom", "structured"), null)
+})
+
+test("rolling detail checks the least recently verified product first", () => {
+  const neverChecked = row({id: "1", last_seen_at: null, crawled_at: null})
+  const checkedYesterday = row({id: "2", last_seen_at: "2026-09-18T00:00:00Z", crawled_at: "2026-09-19T00:00:00Z"})
+  const checkedToday = row({id: "3", last_seen_at: "2026-09-20T00:00:00Z", crawled_at: "2026-09-18T00:00:00Z"})
+  assert.deepEqual([checkedToday, neverChecked, checkedYesterday].sort(compareOldestDetailRows).map((item) => item.id), ["1", "2", "3"])
+})
+
+test("rolling detail cooldowns defer failures without delaying confirmed checks", () => {
+  const now = Date.parse("2026-09-25T00:00:00Z")
+  assert.equal(detailRetryAt("confirmed", now), null)
+  assert.equal(detailRetryAt("removed", now), null)
+  assert.equal(detailRetryAt("transient", now), "2026-09-25T00:30:00.000Z")
+  assert.equal(detailRetryAt("db_failed", now), "2026-09-25T01:00:00.000Z")
+  assert.equal(detailRetryAt("unreadable", now), "2026-09-26T00:00:00.000Z")
+  assert.equal(detailRetryAt("transient", now, "2026-09-25T02:00:00Z"), "2026-09-25T02:00:00.000Z")
 })
 
 test("Imweb detail fallback uses conservative pacing and bounded transient backoff", () => {
