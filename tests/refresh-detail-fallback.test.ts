@@ -8,16 +8,20 @@ import {
   chunkDetailFallbackPlatforms,
   combinedRefreshCoverage,
   compareOldestDetailRows,
+  createRollingDetailGroupQueue,
   detailFallbackPacingMs,
   detailFallbackRecovered,
   detailRetryAt,
   detailTransientRetryDelayMs,
   isCafe24RemovedRedirect,
+  isCafe24BlockedRedirect,
+  isCafe24ErrorRedirect,
   isImwebExpiredStorePage,
   isImwebRemovedRedirect,
   imwebDetailFallbackUrls,
   parseZaraDomDetailPayload,
   parseStructuredDetailPayload,
+  parseSixshopStorefrontResponse,
   parseSixshopDetailPayload,
   resolveDetailFallbackType,
   shopifyProductJsonUrl,
@@ -124,6 +128,62 @@ test("rolling detail checks the least recently verified product first", () => {
   assert.deepEqual([checkedToday, neverChecked, checkedYesterday].sort(compareOldestDetailRows).map((item) => item.id), ["1", "2", "3"])
 })
 
+test("rolling detail gives sparse platforms a minimum share of attempts", () => {
+  const groups = ([
+    ["cafe24", 500],
+    ["shopify", 400],
+    ["imweb", 25],
+    ["sixshop", 10],
+  ] as const).map(([type, count]) => ({type, rows: Array.from({length: count}, (_, i) => i)}))
+  const queue = createRollingDetailGroupQueue(groups)
+  const attempted = new Map<string, number>()
+  for (let i = 0; i < 100; i++) {
+    const group = queue.next()!
+    group.rows.shift()
+    attempted.set(group.type, (attempted.get(group.type) ?? 0) + 1)
+    queue.finish(group, 1)
+  }
+  assert.ok((attempted.get("cafe24") ?? 0) >= 48)
+  assert.ok((attempted.get("shopify") ?? 0) >= 38)
+  assert.ok((attempted.get("imweb") ?? 0) >= 4)
+  assert.ok((attempted.get("sixshop") ?? 0) >= 4)
+})
+
+test("rolling detail rotates sources while keeping each source's oldest row first", () => {
+  const groups = [
+    {type: "cafe24" as const, platform: "old-source", rows: ["oldest", "next"]},
+    {type: "cafe24" as const, platform: "other-source", rows: ["other-oldest", "other-next"]},
+  ]
+  const queue = createRollingDetailGroupQueue(groups)
+  const selected: string[] = []
+  for (let i = 0; i < 4; i++) {
+    const group = queue.next()!
+    selected.push(`${group.platform}:${group.rows.shift()}`)
+    queue.finish(group, 1)
+  }
+  assert.deepEqual(selected, [
+    "old-source:oldest", "other-source:other-oldest",
+    "old-source:next", "other-source:other-next",
+  ])
+})
+
+test("rolling detail leases a bounded source slice before rotating", () => {
+  const groups = [
+    {type: "cafe24" as const, platform: "first", rows: Array.from({length: 25}, (_, i) => i)},
+    {type: "cafe24" as const, platform: "second", rows: Array.from({length: 25}, (_, i) => i)},
+  ]
+  const queue = createRollingDetailGroupQueue(groups)
+  const first = queue.next(20)!
+  assert.equal(first.platform, "first")
+  first.rows.splice(0, 20)
+  queue.finish(first, 20)
+  const second = queue.next(20)!
+  assert.equal(second.platform, "second")
+  second.rows.splice(0, 20)
+  queue.finish(second, 20)
+  assert.equal(queue.next(20)?.platform, "first")
+})
+
 test("rolling detail cooldowns defer failures without delaying confirmed checks", () => {
   const now = Date.parse("2026-09-25T00:00:00Z")
   assert.equal(detailRetryAt("confirmed", now), null)
@@ -156,6 +216,31 @@ test("rolling detail distinguishes isolated retries from a failed pass", () => {
   assert.equal(assessRollingDetailHealth({...counts, transient: 0, confirmed: 3_000, db_failed: 0, cas_conflicts: 0}).status, "success")
   assert.equal(assessRollingDetailHealth({...counts, attempted: 100, confirmed: 75, transient: 0, db_failed: 24, cas_conflicts: 1}).reason, "db_write_rate")
   assert.equal(assessRollingDetailHealth({...counts, attempted: 100, confirmed: 97, transient: 0, db_failed: 0, cas_conflicts: 3}).reason, "cas_conflict_rate")
+})
+
+test("rolling detail reports eligible platforms with no attempts as a coverage gap", () => {
+  const counts = {
+    eligible_products: 200,
+    attempted: 100,
+    confirmed: 100,
+    removed: 0,
+    removed_recorded: 0,
+    blocked: 0,
+    transient: 0,
+    unreadable: 0,
+    db_failed: 0,
+    cas_conflicts: 0,
+    by_type: {
+      cafe24: {eligible_products: 150, attempted: 100},
+      imweb: {eligible_products: 50, attempted: 0},
+    },
+  }
+  assert.equal(assessRollingDetailHealth(counts).reason, "coverage_gap")
+  assert.equal(assessRollingDetailHealth({...counts, by_type: {
+    cafe24: {eligible_products: 150, attempted: 99},
+    imweb: {eligible_products: 50, attempted: 1},
+  }}).status, "success")
+  assert.equal(assessRollingDetailHealth({...counts, db_failed: 5}).reason, "db_write_rate")
 })
 
 test("rolling detail reports no progress only when eligible work was left undone", () => {
@@ -230,6 +315,22 @@ test("Cafe24's same-host HTTP 200 tombstones are treated as removed products", (
   assert.equal(isCafe24RemovedRedirect(product, "https://margesherwood.com/index.html"), true)
   assert.equal(isCafe24RemovedRedirect(product, "https://www.margesherwood.com/product/new-bag/5000/"), false)
   assert.equal(isCafe24RemovedRedirect(product, "https://other-shop.test/404.html"), false)
+})
+
+test("Cafe24 member login redirects are blocked rather than removed", () => {
+  const product = "https://store.test/product/old-bag/42/"
+  assert.equal(isCafe24BlockedRedirect(product, "https://store.test/member/login.html?returnUrl=%2Fproduct%2Fold-bag%2F42%2F"), true)
+  assert.equal(isCafe24BlockedRedirect(product, "https://store.test/product/new-bag/43/"), false)
+  assert.equal(isCafe24BlockedRedirect(product, "https://other.test/member/login.html"), false)
+  assert.equal(isCafe24RemovedRedirect(product, "https://store.test/member/login.html"), false)
+})
+
+test("Cafe24 generic error redirects retry the source without changing stock", () => {
+  const product = "https://store.test/product/old-bag/42/"
+  assert.equal(isCafe24ErrorRedirect(product, "https://store.test/error.html"), true)
+  assert.equal(isCafe24ErrorRedirect(product, "https://store.test/product/error.html"), false)
+  assert.equal(isCafe24ErrorRedirect(product, "https://other.test/error.html"), false)
+  assert.equal(isCafe24RemovedRedirect(product, "https://store.test/error.html"), false)
 })
 
 test("Zara DOM fallback refreshes both restocked and sold-out products without JSON-LD", () => {
@@ -322,4 +423,22 @@ test("Sixshop detail API URL and payload preserve exact stock and sale state", (
     sourceCurrency: "KRW",
     pricingState: "sale",
   })
+})
+
+test("Sixshop gateway 404 requires storefront product evidence before removal", () => {
+  const liveHtml = `<script type="application/ld+json">${JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "Still available bag",
+    offers: {"@type": "Offer", price: "49000", priceCurrency: "KRW"},
+  })}</script>`
+  const live = parseSixshopStorefrontResponse(200, liveHtml, "KRW")
+  assert.equal(live.kind, "confirmed")
+  assert.equal(live.price, 49_000)
+  assert.equal(live.inStock, null)
+  assert.equal(buildDetailRefreshPatch(row({in_stock: true}), live, "2026-09-26T00:00:00Z").in_stock, undefined)
+
+  assert.equal(parseSixshopStorefrontResponse(200, "<html>Store homepage</html>", "KRW").kind, "unreadable")
+  assert.equal(parseSixshopStorefrontResponse(404, "", "KRW").kind, "removed")
+  assert.equal(parseSixshopStorefrontResponse(429, "", "KRW").kind, "transient")
 })

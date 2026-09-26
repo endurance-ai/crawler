@@ -193,10 +193,16 @@ async function extractListItems(page: Page): Promise<ImwebListItem[]> {
  * 정적 판별이 불가능하다 (스파이크 실측). config.categoryUrls가 있으면 스킵.
  */
 async function discoverCategories(page: Page, baseUrl: string): Promise<Array<{name: string; url: string}>> {
-  await page.goto(baseUrl, {waitUntil: "commit", timeout: NAV_TIMEOUT_MS})
-  await page.waitForTimeout(LIST_RENDER_WAIT_MS)
-
-  const links = (await page.evaluate(`(() => {
+  let links: Array<{name: string; url: string}> = []
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await page.goto(baseUrl, {waitUntil: "commit", timeout: NAV_TIMEOUT_MS})
+      await page.waitForTimeout(LIST_RENDER_WAIT_MS)
+    } catch (error) {
+      if (attempt === 1) throw error
+      continue
+    }
+    links = (await page.evaluate(`(() => {
     const skip = /login|logout|join|member|cart|mypage|policy|privacy|guide|board|notice|faq|cs$|about|shop_/i
     const seen = new Set()
     const out = []
@@ -212,6 +218,8 @@ async function discoverCategories(page: Page, baseUrl: string): Promise<Array<{n
     }
     return out
   })()`)) as Array<{name: string; url: string}>
+    if (links.length > 0) break
+  }
 
   const categories: Array<{name: string; url: string}> = []
   for (const candidate of links.slice(0, DISCOVERY_MAX_PAGES)) {
