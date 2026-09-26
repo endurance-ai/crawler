@@ -355,10 +355,22 @@ function singleEvidence(gender: ProductGender[]): ProductGender[] {
   return gender.length === 1 ? gender : []
 }
 
+/** Explicit audience labels, not loose style names such as "Men's Tee". */
+export function inferExplicitProductGender(name: unknown): ProductGender | null {
+  if (typeof name !== "string") return null
+  if (hasGenderToken(name, "men") && hasGenderToken(name, "women")) return null
+  const labels = [...name.matchAll(/(?:\bfor\s+(women(?:'?s)?|woman|men(?:'?s)?|man)\b|[([]\s*(women(?:'?s)?|woman|men(?:'?s)?|man)\s*[)\]])/gi)]
+    .map((match) => inferGenderFromText(match[1] ?? match[2]))
+    .filter((gender): gender is ProductGender => gender !== null)
+  const unique = [...new Set(labels)]
+  return unique.length === 1 ? unique[0] : null
+}
+
 /**
  * 상품 성별 결의. 우선순위:
  *
  *   1. 엔진이 뽑은 상품 성별 men/women (카테고리 유래 등 상품 단위 근거, 단일값만).
+ *      단, 명시적인 상품 대상 표기가 반대이면 URL 충돌 확인 후 상품명을 우선한다.
  *      엔진 unisex 는 약한 주장이라 3·4 가 men/women 을 명시하면 양보하고,
  *      그런 신호가 없을 때만 확정된다 (6 위, config_default 바로 위).
  *   2. kids 가드 (성인 토큰 없이 아동 신호만 있으면 미확인)
@@ -411,7 +423,7 @@ export function resolveProductGenderWithSource(
     return {gender: [], source: null}
   }
 
-  // 엔진이 뽑은 men/women 은 상품 단위 단언이므로 그대로 확정한다.
+  // 엔진 men/women은 보존하되, 명시적인 상품 대상 표기로 카테고리 오분류를 교정한다.
   //
   // unisex 만 예외다 (2026-08-25). 엔진 unisex 의 실제 출처는 대부분
   // `SiteConfig.category.categories[].gender` 인데, 성별 부서가 없는 편집샵을
@@ -426,6 +438,18 @@ export function resolveProductGenderWithSource(
   // 이 규칙이 뒤집는 행은 10개 플랫폼 267행이다.
   const engineGender = !isConfigDefault && fromProduct.length === 1 ? fromProduct[0]! : null
   if (engineGender !== null && engineGender !== "unisex") {
+    const name = evidence.name ?? ""
+    const mixedAudience = hasGenderToken(name, "men") && hasGenderToken(name, "women")
+    const explicit = mixedAudience ? null : (
+      inferGenderFromSiteTextPatterns(name, options.genderTextPatterns) ?? inferExplicitProductGender(name)
+    )
+    if (explicit && explicit !== "unisex" && explicit !== fromProduct[0]) {
+      const fromUrl = inferGenderFromUrl(evidence.productUrl)
+      if (fromUrl && fromUrl !== "unisex" && fromUrl !== explicit) {
+        return {gender: [], source: null, conflict: {url: fromUrl, text: explicit}}
+      }
+      return {gender: [explicit], source: "text"}
+    }
     return {gender: fromProduct, source: productGenderSource}
   }
 

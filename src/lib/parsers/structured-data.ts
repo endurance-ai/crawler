@@ -7,6 +7,9 @@
  * fallback, not the default (SPEC: custom-brand pilot, 2026-07).
  */
 
+import {sameProductPage} from "../product-url-identity"
+import {htmlAttribute, stripInertHtml} from "../html-attributes"
+
 export interface StructuredProductData {
   name: string | null
   description: string | null
@@ -24,7 +27,7 @@ export interface StructuredProductData {
 
 type JsonRecord = Record<string, unknown>
 
-const LD_JSON_SCRIPT = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+const SCRIPT_BLOCK = /(<script\b(?:[^"'<>]|"[^"]*"|'[^']*')*>)([\s\S]*?)<\/script\s*>/gi
 
 function asRecord(value: unknown): JsonRecord | null {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null
@@ -178,8 +181,9 @@ function mapProductNode(node: JsonRecord): StructuredProductData {
  */
 export function extractJsonLdProducts(html: string): StructuredProductData[] {
   const nodes: JsonRecord[] = []
-  for (const match of html.matchAll(LD_JSON_SCRIPT)) {
-    const raw = match[1].trim()
+  for (const match of stripInertHtml(html, true).matchAll(SCRIPT_BLOCK)) {
+    if (htmlAttribute(match[1], "type")?.toLowerCase() !== "application/ld+json") continue
+    const raw = match[2].trim()
     if (!raw) continue
     try {
       collectProductNodes(JSON.parse(raw), nodes)
@@ -196,19 +200,22 @@ export function extractJsonLdProducts(html: string): StructuredProductData[] {
 }
 
 function metaContent(html: string, property: string): string | null {
-  // property= or name=, attribute order varies by template
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)\\s*=\\s*["']${property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]*>`,
-    "i",
-  )
-  const tag = re.exec(html)?.[0]
-  if (!tag) return null
-  const content = /content\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1]
-  return content ? decodeHtmlEntities(content).trim() || null : null
+  // Cafe24 themes often emit generic store OG first, then the current product.
+  // Prefer the last non-empty value so a homepage URL/background cannot hide
+  // product-specific metadata appended by the platform.
+  const tags = [...html.matchAll(/<meta\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi)]
+  for (const match of tags.reverse()) {
+    const key = htmlAttribute(match[0], "property") ?? htmlAttribute(match[0], "name")
+    if (key?.toLowerCase() !== property.toLowerCase()) continue
+    const content = htmlAttribute(match[0], "content")
+    if (content?.trim()) return decodeHtmlEntities(content).trim()
+  }
+  return null
 }
 
 /** Open Graph / product: meta fallback. Weaker than JSON-LD (no color/sku). */
 export function extractOgProduct(html: string): StructuredProductData | null {
+  html = stripInertHtml(html)
   const ogType = metaContent(html, "og:type")
   const price = parsePrice(metaContent(html, "product:price:amount") ?? metaContent(html, "og:price:amount"))
   const name = metaContent(html, "og:title")
@@ -238,6 +245,13 @@ export function extractOgProduct(html: string): StructuredProductData | null {
 export function extractStructuredProduct(html: string): StructuredProductData | null {
   const jsonld = extractJsonLdProducts(html)[0] ?? null
   const og = extractOgProduct(html)
+  return mergeProductFields(jsonld, og)
+}
+
+function mergeProductFields(
+  jsonld: StructuredProductData | null,
+  og: StructuredProductData | null,
+): StructuredProductData | null {
   if (!jsonld) return og
   if (!og) return jsonld
   return {
@@ -253,4 +267,23 @@ export function extractStructuredProduct(html: string): StructuredProductData | 
     url: jsonld.url ?? og.url,
     source: "merged",
   }
+}
+
+/** Select the JSON-LD Product belonging to the current PDP when a page emits
+ * multiple Product nodes (common on variant-rich themes). */
+export function extractStructuredProductForUrl(
+  html: string,
+  pageUrl: string,
+): StructuredProductData | null {
+  const products = extractJsonLdProducts(html)
+  const matched = products.find((product) => product.url && sameProductPage(product.url, pageUrl))
+  const og = extractOgProduct(html)
+  const ownedOg = og && (!og.url || sameProductPage(og.url, pageUrl)) ? og : null
+  if (matched) return mergeProductFields(matched, ownedOg)
+  // Never fall back to an explicitly different product, including another
+  // product_no on Cafe24's shared /product/detail.html path.
+  if (products.length === 1 && !products[0].url) return mergeProductFields(products[0], ownedOg)
+  // Multiple products without a matching identity are ambiguous even when
+  // only one of them omits its URL. The current page's OG is safer evidence.
+  return ownedOg
 }

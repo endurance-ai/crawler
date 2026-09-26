@@ -35,7 +35,7 @@ function candidate(
   }
 }
 
-test("collectImageCandidatesFromHtml stops at authoritative structured product images", () => {
+test("collectImageCandidatesFromHtml supplements structured data with the owned gallery", () => {
   const html = `
     <script type="application/ld+json">
       {
@@ -59,6 +59,7 @@ test("collectImageCandidatesFromHtml stops at authoritative structured product i
     [
       "https://cdn.example.com/model.jpg",
       "https://cdn.example.com/product.jpg",
+      "https://shop.example.com/web/product/big/look.jpg",
     ],
   )
 })
@@ -135,10 +136,45 @@ test("rankImageCandidates prefers an eligible prominent model shot", () => {
     aestheticsScore: 0.1,
   })
 
-  const result = rankImageCandidates([product, model], product.url)
+  const result = rankImageCandidates([product, model], product.url, new Set([product.url, model.url]))
   assert.equal(result.selected.url, model.url)
   assert.equal(result.kind, "model")
   assert.deepEqual(result.ordered.map((item) => item.url), [model.url, product.url])
+})
+
+test("rankImageCandidates never lets an unverified model shot beat a verified product shot", () => {
+  const blackModel = candidate("https://cdn.example.com/black-model.jpg", {
+    humanConfidence: 0.95,
+    humanAreaRatio: 0.58,
+    humanCenterDistance: 0.05,
+    poseJointCount: 12,
+    aestheticsScore: 0.95,
+  })
+  const blueProduct = candidate("https://cdn.example.com/blue-product.jpg", {
+    foregroundAreaRatio: 0.7,
+  })
+  const result = rankImageCandidates(
+    [blackModel, blueProduct],
+    blackModel.url,
+    new Set([blueProduct.url]),
+  )
+  assert.equal(result.selected.url, blueProduct.url)
+  assert.equal(result.kind, "product")
+})
+
+test("rankImageCandidates does not promote an unowned model on visual quality alone", () => {
+  const source = candidate("https://cdn.example.com/ring.jpg")
+  const unrelated = candidate("https://cdn.example.com/striped-shirt.jpg", {
+    humanConfidence: 0.99, humanAreaRatio: 0.55, humanCenterDistance: 0,
+    poseJointCount: 15, aestheticsScore: 0.9,
+  })
+  assert.equal(rankImageCandidates([unrelated, source], source.url).selected.url, source.url)
+})
+
+test("source fallback chooses a usable owned candidate when the source is broken", () => {
+  const broken = candidate("https://cdn.example.com/blank.png", {decoded: false, isUtility: true})
+  const product = candidate("https://cdn.example.com/product.jpg")
+  assert.equal(rankImageCandidates([broken, product], broken.url).selected.url, product.url)
 })
 
 test("rankImageCandidates rejects tiny or utility model shots", () => {
@@ -158,7 +194,7 @@ test("rankImageCandidates rejects tiny or utility model shots", () => {
     textCoverage: 0.7,
   })
 
-  const result = rankImageCandidates([tinyModel, sizeChart, product], product.url)
+  const result = rankImageCandidates([tinyModel, sizeChart, product], product.url, new Set([tinyModel.url, sizeChart.url, product.url]))
   assert.equal(result.selected.url, product.url)
   assert.equal(result.kind, "product")
 })
