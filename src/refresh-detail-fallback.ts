@@ -28,6 +28,7 @@ import {
   detailTransientRetryDelayMs,
   needsDetailFallback,
   isCafe24BlockedRedirect,
+  isCafe24ErrorRedirect,
   isCafe24RemovedRedirect,
   isImwebExpiredStorePage,
   isImwebRemovedRedirect,
@@ -343,6 +344,9 @@ async function fetchCafe24(page: Page, row: DetailRow): Promise<DetailObservatio
     }
     if (isCafe24BlockedRedirect(row.product_url, page.url())) {
       return {kind: "blocked", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
+    }
+    if (isCafe24ErrorRedirect(row.product_url, page.url())) {
+      return {kind: "transient", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
     }
     if (kind !== "confirmed") {
       return {kind, status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}

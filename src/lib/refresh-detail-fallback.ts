@@ -168,6 +168,20 @@ export function isCafe24BlockedRedirect(requestedUrl: string, finalUrl: string):
   }
 }
 
+/** Cafe24's generic error page says nothing about a product's stock state. */
+export function isCafe24ErrorRedirect(requestedUrl: string, finalUrl: string): boolean {
+  try {
+    const requested = new URL(requestedUrl)
+    const final = new URL(finalUrl)
+    const hostname = (value: string) => value.toLowerCase().replace(/^www\./, "")
+    return hostname(requested.hostname) === hostname(final.hostname)
+      && /^\/product(?:\/|$)/i.test(requested.pathname)
+      && /^\/error\.html\/?$/i.test(final.pathname)
+  } catch {
+    return false
+  }
+}
+
 export interface DetailPriorityRow {
   id: string | number
   in_stock: boolean | null

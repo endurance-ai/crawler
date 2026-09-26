@@ -15,6 +15,7 @@ import {
   detailTransientRetryDelayMs,
   isCafe24RemovedRedirect,
   isCafe24BlockedRedirect,
+  isCafe24ErrorRedirect,
   isImwebExpiredStorePage,
   isImwebRemovedRedirect,
   imwebDetailFallbackUrls,
@@ -322,6 +323,14 @@ test("Cafe24 member login redirects are blocked rather than removed", () => {
   assert.equal(isCafe24BlockedRedirect(product, "https://store.test/product/new-bag/43/"), false)
   assert.equal(isCafe24BlockedRedirect(product, "https://other.test/member/login.html"), false)
   assert.equal(isCafe24RemovedRedirect(product, "https://store.test/member/login.html"), false)
+})
+
+test("Cafe24 generic error redirects retry the source without changing stock", () => {
+  const product = "https://store.test/product/old-bag/42/"
+  assert.equal(isCafe24ErrorRedirect(product, "https://store.test/error.html"), true)
+  assert.equal(isCafe24ErrorRedirect(product, "https://store.test/product/error.html"), false)
+  assert.equal(isCafe24ErrorRedirect(product, "https://other.test/error.html"), false)
+  assert.equal(isCafe24RemovedRedirect(product, "https://store.test/error.html"), false)
 })
 
 test("Zara DOM fallback refreshes both restocked and sold-out products without JSON-LD", () => {
