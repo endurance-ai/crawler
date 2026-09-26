@@ -5859,6 +5859,9 @@ const SITE_SHOPIFY_GENDER_COLLECTIONS: Record<string, NonNullable<SiteConfig["sh
 }
 
 const SITE_GENDER_TEXT_PATTERNS: Record<string, NonNullable<SiteConfig["genderTextPatterns"]>> = {
+  // Official product names explicitly identify these men-only lines.
+  "en-579": {men: [/^MENS\s/i]},
+  "en-5258": {men: [/\bMens\b/i]},
   // EMIS uses (W) for current women-specific products; older products use the
   // generic (WOMENS)/(MENS)/(UNISEX) tokens handled by GENDER_RULES.
   emis: {women: [/^\s*\(W\)\s*/i]},

@@ -1,12 +1,7 @@
 /** 휴면 — 모델컷 선별(macOS 전용). 배선·제약은 `src/select-product-images.ts` 헤더 참조. */
 import {collectProductImagesFromHtml} from "./product-images"
 
-/**
- * 플랫폼별로 갈라진다 — macOS(Apple Vision)와 Windows/Linux(로컬 CV, 근사치)는
- * 판별 방식이 달라 점수가 호환되지 않는다. 버전이 다르면 캐시/재선별 대상이 된다
- * (`needsImageReselection` 참조).
- */
-export const IMAGE_SELECTION_VERSION = process.platform === "darwin" ? "mac-vision-v2" : "win-cv-v1"
+export const IMAGE_SELECTION_VERSION = process.platform === "darwin" ? "mac-vision-v5-owned-gallery" : "win-cv-v3-owned-gallery"
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
 export type ImageSelectionKind = "model" | "product" | "fallback"
@@ -51,6 +46,22 @@ export interface RankedImageSelection {
   ordered: ImageCandidateAnalysis[]
   kind: ImageSelectionKind
   score: number
+}
+
+export function sourceFirstSelection(
+  items: ImageCandidateAnalysis[],
+  sourceUrl: string,
+): RankedImageSelection {
+  if (items.length === 0) throw new Error("sourceFirstSelection requires at least one candidate")
+  const eligible = items.filter(baseEligible)
+  const source = eligible.find((item) => item.url === sourceUrl) ?? eligible[0]
+    ?? items.find((item) => item.url === sourceUrl) ?? items[0]
+  return {
+    selected: source,
+    ordered: [source, ...items.filter((item) => item !== source)],
+    kind: "fallback",
+    score: 0,
+  }
 }
 
 interface ImageReselectionInput {
@@ -143,23 +154,26 @@ function qualityScore(item: ImageCandidateAnalysis, kind: Exclude<ImageSelection
 }
 
 /**
- * Lexicographic policy: eligible model shots always precede product-only
- * candidates. A broken/utility candidate can never replace the current URL.
+ * Model preference is allowed only for caller-verified, product-owned images.
+ * Without a verified pool, keep the source rather than trusting visual quality.
  */
 export function rankImageCandidates(
   items: ImageCandidateAnalysis[],
   currentUrl: string,
+  verifiedUrls?: ReadonlySet<string>,
 ): RankedImageSelection {
   if (items.length === 0) throw new Error("rankImageCandidates requires at least one candidate")
+  if (!verifiedUrls) return sourceFirstSelection(items, currentUrl)
   const decorated = items.map((item, index) => {
     const kind: ImageSelectionKind = isEligibleModel(item)
       ? "model"
       : baseEligible(item)
         ? "product"
         : "fallback"
-    const score = kind === "fallback" ? 0 : qualityScore(item, kind)
+    const owned = verifiedUrls.has(item.url)
+    const score = kind === "fallback" || !owned ? 0 : qualityScore(item, kind)
     const tier = kind === "model" ? 2 : kind === "product" ? 1 : 0
-    return {item, index, kind, score, tier}
+    return {item, index, kind: owned ? kind : "fallback", score, tier: owned ? tier : 0}
   })
 
   decorated.sort((a, b) => b.tier - a.tier || b.score - a.score || a.index - b.index)

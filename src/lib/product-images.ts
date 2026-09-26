@@ -1,10 +1,13 @@
-import {extractStructuredProduct} from "./parsers/structured-data"
+import {extractStructuredProductForUrl} from "./parsers/structured-data"
+import {sameProductPage} from "./product-url-identity"
+import {htmlAttribute as attr, stripInertHtml} from "./html-attributes"
 
-export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v2"
+export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v4-scoped"
 
 export const PRODUCT_IMAGE_UTILITY_ASSET_PATTERN =
   String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|(?:campaign[-_]?logo|txt[-_]?naver)(?:[/_.-]|$)|(?:color|colour|option)[-_]?(?:swatch|chip)(?:[/_.-]|$)|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|(?:img_(?:product_(?:tiny|small|medium|big)|404)|empty_thumb)\.(?:gif|jpe?g|png|webp)(?:$))`
 const UTILITY_ASSET_RE = new RegExp(PRODUCT_IMAGE_UTILITY_ASSET_PATTERN, "i")
+const SHARED_ASSET_RE = /(?:\/(?:img-prdback|kakao_bg|left_slide_banner_img)\.(?:png|jpe?g|webp|gif)$|\/web\/upload\/category\/)/i
 const NON_IMAGE_EXT_RE = /\.(?:css|html?|js|json|pdf|svg|woff2?)(?:$|[?#])/i
 const IMAGE_EXT_RE = /\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i
 
@@ -28,7 +31,11 @@ function decodeHtmlEntities(value: string): string {
 export function isProductImageUtilityAsset(raw: unknown, pageUrl: string): boolean {
   if (typeof raw !== "string" || !raw.trim()) return false
   try {
-    return UTILITY_ASSET_RE.test(new URL(decodeHtmlEntities(raw.trim()), pageUrl).pathname)
+    const pathname = new URL(decodeHtmlEntities(raw.trim()), pageUrl).pathname
+    // "ICON" is also a merchandise line, not always a UI icon. Shopify's
+    // product-photo filenames include a long numeric asset suffix in this case.
+    if (/\/files\/(?:icon|logo)-[\w-]+-\d{5,}\.(?:jpe?g|png|webp)$/i.test(pathname)) return false
+    return UTILITY_ASSET_RE.test(pathname) || SHARED_ASSET_RE.test(pathname)
   } catch {
     return false
   }
@@ -118,26 +125,18 @@ export function sanitizeProductImageFields(input: {
   }
 }
 
-function attr(tag: string, name: string): string | null {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const quoted = new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i").exec(tag)
-  if (quoted) return quoted[2]
-  return new RegExp(`(?:^|\\s)${escaped}\\s*=\\s*([^\\s>]+)`, "i").exec(tag)?.[1] ?? null
-}
-
 function isLikelyOptionImageTag(tag: string): boolean {
   const classOrId = `${attr(tag, "class") ?? ""} ${attr(tag, "id") ?? ""}`
   if (/(?:swatch|swatches|color-swatch|colour-swatch|color-chip|colour-chip|option-image|option_thumb|colorchip|logo)/i.test(classOrId)) return true
-  if (attr(tag, "data-color") || attr(tag, "data-option") || attr(tag, "role")?.toLowerCase() === "option") return true
+  if (attr(tag, "data-color") !== null || attr(tag, "data-option") !== null || attr(tag, "role")?.toLowerCase() === "option") return true
   if (attr(tag, "data-zoom-image") || attr(tag, "data-origin") || attr(tag, "data-original") || attr(tag, "srcset") || attr(tag, "data-srcset")) return false
   const widthRaw = attr(tag, "width")
   const heightRaw = attr(tag, "height")
   const width = Number(widthRaw)
   const height = Number(heightRaw)
-  if (widthRaw !== null && heightRaw !== null && Number.isFinite(width) && Number.isFinite(height)) {
-    if (width <= 96 || height <= 96) return true
-    if (width === height && width <= 256) return true
-  }
+  if ((widthRaw !== null && Number.isFinite(width) && width <= 96)
+    || (heightRaw !== null && Number.isFinite(height) && height <= 96)) return true
+  if (widthRaw !== null && heightRaw !== null && Number.isFinite(width) && width === height && width <= 256) return true
   return false
 }
 
@@ -156,123 +155,70 @@ function bestSrcsetUrl(value: string): string | null {
   return parsed[0]?.url ?? null
 }
 
-/**
- * Static-HTML path. Structured product data is authoritative; DOM images are
- * accepted only when their own tag carries a product/gallery/detail signal.
- * Browser engines should use collectProductImagesFromPage for scoped DOM data.
- */
+const OWNED_IMAGE_ROOT_RE = /(?:xans-product-(?:image|addimage)|keyImg|prdDetail(?:Content)?|detail[-_ ]?area|product[-_ ]?(?:gallery|images)|(?:gallery|detail|zoom)[-_ ]?(?:image|img)|item[-_ ]?image)/i
+const EXCLUDED_IMAGE_ROOT_RE = /(?:product[-_ ]?(?:list|card)|recommend|related|relation|recent|banner|lookbook|collection|size[-_ ]?(?:chart|guide))/i
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"])
+
+/** Scan ancestry, not all page images. Ignore scripts/templates/comments and
+ * keep quoted > inside tags. Both collection paths share this ownership rule. */
+function collectScopedImages(html: string, pageUrl: string): string[] {
+  const inert = stripInertHtml(html)
+  const stack: Array<{tag: string; owned: boolean; excluded: boolean}> = []
+  const images: string[] = []
+  for (const match of inert.matchAll(/<\/?([a-z][\w:-]*)\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi)) {
+    const tag = match[0]
+    const name = match[1].toLowerCase()
+    if (tag.startsWith("</")) {
+      const index = stack.map((frame) => frame.tag).lastIndexOf(name)
+      if (index >= 0) stack.splice(index)
+      continue
+    }
+    const parent = stack[stack.length - 1]
+    const hints = ["id", "class", "module", "data-component", "data-testid"].map((key) => attr(tag, key) ?? "").join(" ")
+    const rawHref = name === "a" ? attr(tag, "href") : null
+    const href = rawHref ? decodeHtmlEntities(rawHref) : null
+    const otherProduct = href && /(?:\/(?:products?|goods?|items?|p)\/|[?&](?:product_no|variant|sku|pid|goodsNo|product_id|idx|id|branduid)=)/i.test(href)
+      && !IMAGE_EXT_RE.test(href) && !sameProductPage(href, pageUrl)
+    const excluded = Boolean(parent?.excluded || /^(header|footer|nav)$/.test(name)
+      || EXCLUDED_IMAGE_ROOT_RE.test(hints) || otherProduct)
+    const componentGallery = /ProductImage/i.test(attr(tag, "data-component") ?? "")
+      || /product-image/i.test(attr(tag, "data-testid") ?? "")
+    const owned = Boolean(parent?.owned || OWNED_IMAGE_ROOT_RE.test(hints) || componentGallery)
+    if (owned && !excluded) {
+      if (name === "img" || name === "source") {
+        if (isLikelyOptionImageTag(tag)) continue
+        const srcset = attr(tag, "srcset") || attr(tag, "data-srcset")
+        if (srcset) images.push(bestSrcsetUrl(srcset) ?? "")
+        for (const key of ["data-zoom-image", "data-origin", "data-original", "data-lazy-src", "ec-data-src", "data-src", "src"]) {
+          const value = attr(tag, key)
+          if (value) images.push(value)
+        }
+      } else if (href && IMAGE_EXT_RE.test(href)) images.push(href)
+    }
+    if (!VOID_TAGS.has(name) && !/\/\s*>$/.test(tag)) stack.push({tag: name, owned, excluded})
+  }
+  return images
+}
+
+/** Merge structured images with owned galleries, never page-wide imagery. */
 export function collectProductImagesFromHtml(
   html: string,
   pageUrl: string,
   existing: string[] = [],
 ): string[] {
-  const structured = extractStructuredProduct(html)
-  // Product JSON-LD / OG belongs to the current PDP. Do not widen an already
-  // authoritative pool with arbitrary DOM images from recommendations, global
-  // campaigns, or another product card rendered on the same page.
-  const hinted: string[] = []
-  for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
-    const tag = match[0]
-    if (isLikelyOptionImageTag(tag)) continue
-    if (!/(?:xans-product-(?:image|addimage)|keyImg|product[-_ ]?(?:gallery|images)|(?:gallery|detail|zoom)[-_ ]?(?:image|img)|item[-_ ]?image)/i.test(tag)) continue
-    if (/(?:product[-_ ]?(?:list|card)|recommend|related|relation|recent|banner|lookbook|collection|size[-_ ]?(?:chart|guide))/i.test(tag)) continue
-    const srcset = attr(tag, "srcset") ?? attr(tag, "data-srcset")
-    if (srcset) hinted.push(bestSrcsetUrl(srcset) ?? "")
-    for (const name of ["data-zoom-image", "data-origin", "data-original", "data-lazy-src", "data-src", "src"]) {
-      const value = attr(tag, name)
-      if (value) hinted.push(value)
-    }
-  }
-  // Structured data usually contains the representative image only. Keep it
-  // authoritative for ordering, but also retain explicitly product-owned
-  // gallery images from the page instead of dropping them whenever JSON-LD is
-  // present.
+  const structured = extractStructuredProductForUrl(html, pageUrl)
   return dropRedundantLowResolutionVariants(
-    mergeProductImages(existing[0], pageUrl, existing.slice(1), structured?.images, hinted),
-    pageUrl,
+    mergeProductImages(existing[0], pageUrl, existing.slice(1), structured?.images, collectScopedImages(html, pageUrl)), pageUrl,
   )
 }
 
-/** Collect only product-owned gallery/detail DOM nodes; never scan the whole page. */
+/** Use the live DOM, including dynamically hydrated galleries and lazy URLs. */
 export async function collectProductImagesFromPage(
   page: ProductImagePage,
   existing: string[] = [],
 ): Promise<string[]> {
-  const extracted = await page.evaluate(() => {
-    const roots = [
-      ".xans-product-image",
-      ".xans-product-addimage",
-      ".keyImg",
-      "[class*='product-gallery']",
-      "[class*='product-images']",
-      "[data-component*='ProductImage']",
-      "[data-testid*='product-image']",
-    ]
-    const excluded =
-      "header, footer, nav, [class*='product-list'], [class*='product-card'], [class*='relation'], [class*='recommend'], [class*='recent'], [class*='banner'], [class*='lookbook'], [class*='collection'], [class*='size-chart'], [class*='size-guide']"
-    const values: string[] = []
-    const seenElements = new Set<Element>()
-    for (const selector of roots) {
-      for (const root of document.querySelectorAll(selector)) {
-        if (root.matches(excluded) || root.closest(excluded)) continue
-        const images = root instanceof HTMLImageElement ? [root, ...root.querySelectorAll("img")] : [...root.querySelectorAll("img")]
-        for (const img of images) {
-          if (seenElements.has(img) || img.closest(excluded)) continue
-          const classOrId = `${img.getAttribute("class") || ""} ${img.getAttribute("id") || ""}`
-          if (
-            /(?:swatch|swatches|color-swatch|colour-swatch|color-chip|colour-chip|option-image|option_thumb|colorchip|logo)/i.test(classOrId)
-            || img.hasAttribute("data-color")
-            || img.hasAttribute("data-option")
-            || img.getAttribute("role")?.toLowerCase() === "option"
-          ) continue
-          const hasHighResolutionSource = ["data-zoom-image", "data-origin", "data-original", "srcset", "data-srcset"]
-            .some((name) => !!img.getAttribute(name))
-          if (!hasHighResolutionSource) {
-            const widthRaw = img.getAttribute("width")
-            const heightRaw = img.getAttribute("height")
-            const width = Number(widthRaw)
-            const height = Number(heightRaw)
-            if ((widthRaw !== null && Number.isFinite(width) && width <= 96) || (heightRaw !== null && Number.isFinite(height) && height <= 96)) continue
-            if (widthRaw !== null && heightRaw !== null && Number.isFinite(width) && width === height && width <= 256) continue
-          }
-          seenElements.add(img)
-          const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || ""
-          if (srcset) {
-            const best = srcset
-              .split(",")
-              .map((part) => {
-                const match = part.trim().match(/^(\S+)(?:\s+(\d+(?:\.\d+)?)(w|x))?$/i)
-                const numeric = Number(match?.[2] || 0)
-                return match ? {url: match[1], score: match[3]?.toLowerCase() === "x" ? numeric * 1000 : numeric} : null
-              })
-              .filter((item): item is {url: string; score: number} => item !== null)
-              .sort((a, b) => b.score - a.score)[0]
-            if (best?.url) values.push(best.url)
-          }
-          for (const name of ["data-zoom-image", "data-origin", "data-original", "data-lazy-src", "data-src", "src"]) {
-            const value = img.getAttribute(name)
-            if (value) values.push(value)
-          }
-        }
-        for (const anchor of root.querySelectorAll("a[href]")) {
-          const href = anchor.getAttribute("href") || ""
-          if (/\.(?:avif|gif|heic|heif|jpe?g|png|webp)(?:$|[?#])/i.test(href)) values.push(href)
-        }
-      }
-    }
-    const structuredHtml = [...document.querySelectorAll("script[type='application/ld+json'], meta[property^='og:'], meta[property^='product:']")]
-      .map((node) => node.outerHTML)
-      .join("\n")
-    return {values, structuredHtml}
-  })
-  const structured = extractStructuredProduct(extracted.structuredHtml)
-  // JSON-LD/OG commonly exposes only one representative image. The scoped DOM
-  // collector can see the rest of the current product gallery, so merge both
-  // sources while keeping the representative image first.
-  return dropRedundantLowResolutionVariants(
-    mergeProductImages(existing[0], page.url(), existing.slice(1), structured?.images, extracted.values),
-    page.url(),
-  )
+  const html = await page.evaluate(() => document.documentElement.outerHTML)
+  return collectProductImagesFromHtml(html, page.url(), existing)
 }
 
 export function hasExplicitImageExtension(url: string): boolean {
