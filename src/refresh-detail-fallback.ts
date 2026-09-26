@@ -36,6 +36,7 @@ import {
   parseZaraDomDetailPayload,
   parseShopifyDetailPayload,
   parseStructuredDetailPayload,
+  parseSixshopStorefrontResponse,
   parseSixshopDetailPayload,
   resolveDetailFallbackType,
   shopifyProductJsonUrl,
@@ -307,6 +308,18 @@ async function fetchSixshopDetail(row: DetailRow, sourceCurrency: string): Promi
       signal: AbortSignal.timeout(30_000),
     })
     const kind = classifyDetailHttpStatus(response.status)
+    if (kind === "removed") {
+      // The gateway's 404 does not prove that the storefront PDP was removed.
+      const storefrontResponse = await fetch(row.product_url, {
+        headers: {Accept: "text/html", "User-Agent": "Mozilla/5.0 (compatible; kiko-refresh/1.0)"},
+        signal: AbortSignal.timeout(30_000),
+      })
+      return parseSixshopStorefrontResponse(
+        storefrontResponse.status,
+        await storefrontResponse.text(),
+        sourceCurrency,
+      )
+    }
     if (kind !== "confirmed") {
       return {kind, status: response.status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency}
     }

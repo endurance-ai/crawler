@@ -1,5 +1,5 @@
 import {toRefreshPriceFields, type RefreshableRow, type RefreshPatch} from "./listing-refresh"
-import type {StructuredProductData} from "./parsers/structured-data"
+import {extractStructuredProduct, type StructuredProductData} from "./parsers/structured-data"
 import type {Product} from "./types"
 
 export type DetailFetchKind = "confirmed" | "removed" | "blocked" | "transient" | "unreadable"
@@ -478,6 +478,22 @@ export function parseStructuredDetailPayload(
     sourceCurrency: currency,
     // A single structured current price does not prove regular-vs-sale.
     pricingState: "unknown",
+  }
+}
+
+/** The Sixshop gateway can return 404 while the public product page is live. */
+export function parseSixshopStorefrontResponse(
+  status: number,
+  html: string,
+  sourceCurrency: string,
+): DetailObservation {
+  const kind = classifyDetailHttpStatus(status)
+  if (kind !== "confirmed") {
+    return {kind, status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency}
+  }
+  const parsed = parseStructuredDetailPayload(extractStructuredProduct(html), sourceCurrency)
+  return parsed ? {...parsed, status} : {
+    kind: "unreadable", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency,
   }
 }
 

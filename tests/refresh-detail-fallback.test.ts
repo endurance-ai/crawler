@@ -19,6 +19,7 @@ import {
   imwebDetailFallbackUrls,
   parseZaraDomDetailPayload,
   parseStructuredDetailPayload,
+  parseSixshopStorefrontResponse,
   parseSixshopDetailPayload,
   resolveDetailFallbackType,
   shopifyProductJsonUrl,
@@ -404,4 +405,22 @@ test("Sixshop detail API URL and payload preserve exact stock and sale state", (
     sourceCurrency: "KRW",
     pricingState: "sale",
   })
+})
+
+test("Sixshop gateway 404 requires storefront product evidence before removal", () => {
+  const liveHtml = `<script type="application/ld+json">${JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "Still available bag",
+    offers: {"@type": "Offer", price: "49000", priceCurrency: "KRW"},
+  })}</script>`
+  const live = parseSixshopStorefrontResponse(200, liveHtml, "KRW")
+  assert.equal(live.kind, "confirmed")
+  assert.equal(live.price, 49_000)
+  assert.equal(live.inStock, null)
+  assert.equal(buildDetailRefreshPatch(row({in_stock: true}), live, "2026-09-26T00:00:00Z").in_stock, undefined)
+
+  assert.equal(parseSixshopStorefrontResponse(200, "<html>Store homepage</html>", "KRW").kind, "unreadable")
+  assert.equal(parseSixshopStorefrontResponse(404, "", "KRW").kind, "removed")
+  assert.equal(parseSixshopStorefrontResponse(429, "", "KRW").kind, "transient")
 })
