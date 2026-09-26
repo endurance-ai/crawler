@@ -27,6 +27,7 @@ import {
   detailRetryAt,
   detailTransientRetryDelayMs,
   needsDetailFallback,
+  isCafe24BlockedRedirect,
   isCafe24RemovedRedirect,
   isImwebExpiredStorePage,
   isImwebRemovedRedirect,
@@ -339,6 +340,9 @@ async function fetchCafe24(page: Page, row: DetailRow): Promise<DetailObservatio
     const kind = classifyDetailHttpStatus(status)
     if (kind === "removed" || isCafe24RemovedRedirect(row.product_url, page.url())) {
       return {kind: "removed", status, inStock: false, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
+    }
+    if (isCafe24BlockedRedirect(row.product_url, page.url())) {
+      return {kind: "blocked", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
     }
     if (kind !== "confirmed") {
       return {kind, status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}

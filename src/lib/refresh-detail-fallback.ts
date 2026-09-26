@@ -154,6 +154,20 @@ export function isCafe24RemovedRedirect(requestedUrl: string, finalUrl: string):
   }
 }
 
+/** A member login redirect is an access restriction, not evidence of a deleted product. */
+export function isCafe24BlockedRedirect(requestedUrl: string, finalUrl: string): boolean {
+  try {
+    const requested = new URL(requestedUrl)
+    const final = new URL(finalUrl)
+    const hostname = (value: string) => value.toLowerCase().replace(/^www\./, "")
+    return hostname(requested.hostname) === hostname(final.hostname)
+      && /^\/product(?:\/|$)/i.test(requested.pathname)
+      && /^\/member\/login(?:\.html)?\/?$/i.test(final.pathname)
+  } catch {
+    return false
+  }
+}
+
 export interface DetailPriorityRow {
   id: string | number
   in_stock: boolean | null

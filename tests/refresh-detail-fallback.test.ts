@@ -14,6 +14,7 @@ import {
   detailRetryAt,
   detailTransientRetryDelayMs,
   isCafe24RemovedRedirect,
+  isCafe24BlockedRedirect,
   isImwebExpiredStorePage,
   isImwebRemovedRedirect,
   imwebDetailFallbackUrls,
@@ -313,6 +314,14 @@ test("Cafe24's same-host HTTP 200 tombstones are treated as removed products", (
   assert.equal(isCafe24RemovedRedirect(product, "https://margesherwood.com/index.html"), true)
   assert.equal(isCafe24RemovedRedirect(product, "https://www.margesherwood.com/product/new-bag/5000/"), false)
   assert.equal(isCafe24RemovedRedirect(product, "https://other-shop.test/404.html"), false)
+})
+
+test("Cafe24 member login redirects are blocked rather than removed", () => {
+  const product = "https://store.test/product/old-bag/42/"
+  assert.equal(isCafe24BlockedRedirect(product, "https://store.test/member/login.html?returnUrl=%2Fproduct%2Fold-bag%2F42%2F"), true)
+  assert.equal(isCafe24BlockedRedirect(product, "https://store.test/product/new-bag/43/"), false)
+  assert.equal(isCafe24BlockedRedirect(product, "https://other.test/member/login.html"), false)
+  assert.equal(isCafe24RemovedRedirect(product, "https://store.test/member/login.html"), false)
 })
 
 test("Zara DOM fallback refreshes both restocked and sold-out products without JSON-LD", () => {
