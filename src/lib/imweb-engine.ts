@@ -19,7 +19,8 @@
 import {chromium, type Browser, type Page} from "playwright"
 import type {CrawlResult, Product, SiteConfig} from "./types"
 import {normalizeObservedPricing} from "./product-pricing"
-import {extractStructuredProduct} from "./parsers/structured-data"
+import {extractStructuredProductForUrl} from "./parsers/structured-data"
+import {sameProductPage} from "./product-url-identity"
 import {CURRENCY_SYMBOL} from "./fx"
 import {shouldCrawlDetails} from "./platform-config-lifecycle"
 import {
@@ -244,8 +245,9 @@ async function enrichFromDetail(product: Product, delay: number): Promise<void> 
     signal: AbortSignal.timeout(NAV_TIMEOUT_MS),
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!sameProductPage(res.url, product.productUrl)) throw new Error("product page identity mismatch")
   const html = await res.text()
-  const structured = extractStructuredProduct(html)
+  const structured = extractStructuredProductForUrl(html, product.productUrl)
   const images = collectProductImagesFromHtml(html, product.productUrl, [
     product.imageUrl,
     ...(product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION

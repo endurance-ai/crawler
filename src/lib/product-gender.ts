@@ -404,8 +404,9 @@ export function resolveProductGenderWithSource(
     (cleaned, pattern) => cleaned.replace(pattern, " "),
     value,
   ) ?? value
+  const mixedTextAudience = hasGenderToken(text, "men") && hasGenderToken(text, "women")
   const rawFromText = text
-    ? inferGenderFromSiteTextPatterns(text, options.genderTextPatterns) ?? inferGenderFromText(text)
+    ? (mixedTextAudience ? null : inferGenderFromSiteTextPatterns(text, options.genderTextPatterns)) ?? inferGenderFromText(text)
     : null
   const fromUrl = inferGenderFromUrl(url)
 

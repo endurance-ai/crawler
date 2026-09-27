@@ -148,8 +148,32 @@ test("Cafe24 galleries and lazy detail images supplement a one-image OG pool", a
   `
   const expected = ["https://cdn.example.com/front.jpg", "https://shop.example.com/back.jpg", "https://shop.example.com/detail.jpg"]
   assert.deepEqual(collectProductImagesFromHtml(html, url), expected)
-  const page = {url: () => url, evaluate: async () => html} as unknown as Parameters<typeof collectProductImagesFromPage>[0]
-  assert.deepEqual(await collectProductImagesFromPage(page), expected)
+  const page = {url: () => url, evaluate: async () => ({html, url})} as unknown as Parameters<typeof collectProductImagesFromPage>[0]
+  assert.deepEqual(await collectProductImagesFromPage(page, url), expected)
+})
+
+test("browser collection rejects a redirected or reused page, including navigation during capture", async () => {
+  const expected = "https://shop.example.com/product/detail.html?product_no=12"
+  const other = expected.replace("12", "99")
+  for (const state of ["reused", "redirect", "returned"]) {
+    let current = state === "reused" ? other : expected
+    const page = {
+      url: () => current,
+      evaluate: async () => {
+        current = state === "returned" ? expected : other
+        return {html: '<div class="product-gallery"><img src="/other.jpg"></div>', url: other}
+      },
+    } as unknown as Parameters<typeof collectProductImagesFromPage>[0]
+    await assert.rejects(collectProductImagesFromPage(page, expected, ["https://cdn.example.com/own.jpg"]), /product page identity/i)
+  }
+})
+
+test("browser collection accepts equivalent Cafe24 canonical URLs", async () => {
+  const page = {
+    url: () => "https://shop.example.com/product/detail.html?product_no=12&cate_no=9",
+    evaluate: async () => ({html: '<div class="product-gallery"><img src="/own.jpg"></div>', url: "https://shop.example.com/product/detail.html?product_no=12&cate_no=9"}),
+  } as unknown as Parameters<typeof collectProductImagesFromPage>[0]
+  assert.deepEqual(await collectProductImagesFromPage(page, "https://shop.example.com/product/tee/12/"), ["https://shop.example.com/own.jpg"])
 })
 
 test("global OG backgrounds and blank placeholders cannot displace the real gallery", () => {

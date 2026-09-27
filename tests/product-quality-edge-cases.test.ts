@@ -50,6 +50,18 @@ test("OG attribute parsing preserves apostrophes and quoted angle brackets", () 
   assert.equal(extractStructuredProductForUrl(html,page)?.name,"Women's top > basics")
 })
 
+test("OG product metadata never inherits an image from a preceding storefront block", () => {
+  const meta = (key: string, value: string) => `<meta property="og:${key}" content="${value}">`
+  for (const keys of [["type", "url", "image"], ["url", "type", "image"], ["url", "image"]]) {
+    const store: Record<string, string> = {type: "website", url: "https://shop.example.com/", image: "https://cdn.example.com/store-social.jpg"}
+    const prefix = keys.map(key => meta(key, store[key])).join("")
+    for (const suffix of [meta("type", "product") + meta("url", page), meta("url", page) + meta("type", "product")]) {
+      assert.deepEqual(collectProductImagesFromHtml(prefix + suffix + '<div class="product-gallery"><img src="/own.jpg"></div>', page), ["https://shop.example.com/own.jpg"])
+      assert.deepEqual(collectProductImagesFromHtml(prefix + suffix + meta("image", "https://cdn.example.com/hero.jpg"), page), ["https://cdn.example.com/hero.jpg"])
+    }
+  }
+})
+
 test("DOM component galleries remain supported without admitting generic product cards", () => {
   const html=`<div data-component="ProductImage"><img src="/front.jpg"></div>
     <div data-testid="product-image"><img src="/back.jpg"></div>
@@ -69,6 +81,20 @@ test("empty srcset does not hide the lazy high-resolution gallery source", () =>
   assert.deepEqual(collectProductImagesFromHtml(html,page),["https://shop.example.com/large.jpg"])
 })
 
+test("low-resolution deduplication removes only a proven duplicate of the same asset", () => {
+  const paths = ["/web/product/big/front.jpg", "/web/product/small/front.jpg", "/web/product/small/back.jpg", "/web/product/small/front.jpg?v=2", "https://other.example.com/web/product/small/front.jpg"]
+  const html = `<div class="product-gallery">${paths.map(src => `<img src="${src}">`).join("")}</div>`
+  assert.deepEqual(collectProductImagesFromHtml(html, page), [paths[0], ...paths.slice(2)].map(src => new URL(src, page).href))
+})
+
+test("scoped structured images resolve relative references but reject non-web schemes", () => {
+  const images = ["/front.jpg", "//cdn.example.com/back.jpg", "detail.jpg", "javascript:alert(1)", "data:image/png;base64,abcd", "blob:https://shop.example.com/id"]
+  const html = product({url: page, image: images})
+  assert.deepEqual(collectProductImagesFromHtml(html, page), ["https://shop.example.com/front.jpg", "https://cdn.example.com/back.jpg", "https://shop.example.com/product/detail.jpg"])
+  assert.deepEqual(collectProductImagesFromHtml(og(page, "/hero.jpg"), page), ["https://shop.example.com/hero.jpg"])
+  assert.deepEqual(collectProductImagesFromHtml(product({url: page, image: {"@type": "ImageObject", contentUrl: "/object.jpg"}}), page), ["https://shop.example.com/object.jpg"])
+})
+
 test("mixed explicit audiences cannot force a single-sex category override", () => {
   for(const name of ["Coat FOR MEN AND WOMEN","Coat for men/women","Coat for women & men","(men) and (women) coat"]) {
     assert.equal(inferExplicitProductGender(name),null,name)
@@ -80,6 +106,16 @@ test("site-specific audience rules cannot force mixed labels into one gender", (
   assert.deepEqual(resolveProductGenderWithSource(["women"], {name:"For Mens and Womens bracelet"}, "engine", {
     genderTextPatterns: {men:[/\bMens\b/i]},
   }), {gender:["women"],source:"engine"})
+})
+
+test("mixed audiences bypass one-sided site rules in every gender resolution branch", () => {
+  const options = {genderTextPatterns: {men: [/\bMens\b/i]}}
+  const evidence = {name: "For Mens and Womens bracelet"}
+  assert.deepEqual(resolveProductGenderWithSource(["unisex"], evidence, "engine", options), {gender: ["unisex"], source: "engine"})
+  assert.deepEqual(resolveProductGenderWithSource([], evidence, "engine", options), {gender: [], source: null})
+  assert.deepEqual(resolveProductGenderWithSource(["women"], evidence, "config_default", options), {gender: ["women"], source: "config_default"})
+  assert.deepEqual(resolveProductGenderWithSource([], {...evidence, productUrl: "https://shop.example.com/women/bracelet"}, "engine", options), {gender: ["women"], source: "url"})
+  assert.deepEqual(resolveProductGenderWithSource([], {...evidence, name: evidence.name + " unisex"}, "engine", options), {gender: ["unisex"], source: "text"})
 })
 
 test("inert Open Graph markup cannot replace real product metadata", () => {

@@ -1,5 +1,28 @@
 # 크롤러 지속 운영 아키텍처 (operations)
 
+## Product image and gender guardrails
+
+`product-images-v5-identity` requires the requested product URL when collecting
+browser images. URL identity is checked before capture, inside the DOM snapshot,
+and afterward, including product numbers and variant parameters. Failed Cafe24
+detail navigation keeps listing evidence without marking the gallery complete;
+it never reads a potentially reused page as the requested product. Imweb detail
+responses also require matching final URLs.
+
+Repeated OG identity fields delimit metadata blocks: a later product URL cannot
+inherit a preceding storefront image. Scoped JSON-LD/OG image references resolve
+relative to the product page. Cafe24 small images are retained unless the same
+asset has a medium/big counterpart, or the same element supplies a valid larger
+responsive image. Filename, host, and query differences are preserved when they
+do not prove duplication.
+
+Mixed men/women text bypasses one-sided site regex rules across all gender
+resolution branches. Existing engine/default/URL evidence and explicit unisex
+policy still apply; mixed text alone does not create an unisex label.
+
+These are code-level guards. Existing rows require a separately approved repair;
+changing the collection version does not itself deploy or rewrite stored data.
+
 > 2026-09-12 pipeline-integrity 배포와 복구 절차는 [`../../kikoai/kikoai-handoff/pipeline-integrity/rollout-runbook.md`](../../kikoai/kikoai-handoff/pipeline-integrity/rollout-runbook.md)를 따른다. 아래의 과거 설계보다 새 런북의 prepared write, candidate lease/revision, Qwen hard gate, structured report 규칙이 우선한다.
 >
 > 현재 wrapper는 crawl 입력 hash와 artifact SHA-256 stamp가 모두 맞을 때만 cache를 재사용하고, 새 crawl은 과거 import/report/embedding marker를 무효화한다. Candidate의 `--max-age-hours`는 claim뿐 아니라 checkpoint/publish에서도 유지·재검증된다. Manifest recovery는 기본 dry-run이며 실제 변경은 `--apply`가 필요하고, apply 결과는 finding마다 유효한 manifest-bound checkpoint에 atomic하게 기록된다.
