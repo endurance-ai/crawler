@@ -6,6 +6,7 @@ import {normalizeProductForImport, prepareProductForImport} from "../src/lib/pre
 import {recoverCafe24CandidateDetailPricing} from "../src/lib/candidate-detail-pricing"
 import type {Cafe24Page} from "../src/lib/cafe24-page"
 import type {Product, SiteConfig} from "../src/lib/types"
+import {getSiteConfig} from "../src/configs/platforms"
 
 const config = {key: "shop", name: "Shop", type: "shopify", baseUrl: "https://example.com"} satisfies SiteConfig
 
@@ -21,6 +22,25 @@ function product(overrides: Partial<Product> = {}): Product {
 }
 
 const existingBrand = () => ({status: "existing" as const, brand: "F/ce", brandNodeId: "42"})
+
+test("mixed audience names do not become men-only in the prepared DB payload", async () => {
+  const site = getSiteConfig("en-5258")!
+  const result = await prepareProductForImport({
+    product: product({
+      name: "For Mens and Womens bracelet", brand: site.brand, category: "accessories", subcategory: "bracelet",
+      gender: ["women"], genderSource: "config_default", platform: site.key,
+      productUrl: new URL("/product/detail.html?product_no=42", site.baseUrl).href,
+    }),
+    config: site, observedAt: "2026-09-26T00:00:00Z", expectedUpdatedAt: null,
+  }, {
+    resolveBrand: existingBrand,
+    normalize: async () => ({category: "accessories", subcategory: "bracelet", model: "test-stub"}),
+  })
+  assert.equal(result.status, "prepared")
+  if (result.status !== "prepared") return
+  assert.deepEqual(result.prepared.product.gender, ["women"])
+  assert.equal(result.prepared.product.gender_source, "config_default")
+})
 
 test("prepares a confirmed product with not_required normalization", async () => {
   const result = await prepareProductForImport(

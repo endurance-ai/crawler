@@ -41,6 +41,7 @@ import {
   type Cafe24CategoryCandidate,
 } from "./cafe24-chain"
 import {inferGenderFromSiteTextPatterns, inferGenderFromText} from "./product-gender"
+import {sameProductPage} from "./product-url-identity"
 
 // page.evaluate() has no built-in timeout in Playwright — wrap every evaluate call
 // with this to prevent indefinite hangs when page JS is stuck or network stalls.
@@ -1483,6 +1484,7 @@ export async function crawlCafe24(
             if (
               known
               && product.detailFetchedAt
+              && product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
               && !config.verifyStockFromDetail
               && !config.cafe24CanonicalDetailGender
             ) {
@@ -1492,6 +1494,7 @@ export async function crawlCafe24(
                 detailFallbacks: null,
                 detailStock: null,
                 images: product.images ?? (product.imageUrl ? [product.imageUrl] : []),
+                imageCollectionComplete: true,
               }
             }
             const lease = externalDetailFactory ? await externalDetailFactory() : workerLeases[slot]!
@@ -1505,21 +1508,24 @@ export async function crawlCafe24(
                 25_000,
                 `detail:${product.productUrl.slice(-50)}`
               )
-              const detailFallbacks = await extractCafe24DetailFallbacks(pg)
-              const detailStock = config.verifyStockFromDetail
-                ? await extractCafe24DetailStock(pg)
-                : null
-              const images = await collectProductImagesFromPage(pg, [
+              // The parser may return after a redirect. Verify the requested
+              // product before reading any fallback fields from this worker.
+              const images = await collectProductImagesFromPage(pg, product.productUrl, [
                 product.imageUrl,
                 ...(product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
                   ? (product.images ?? [])
                   : []),
-              ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
+              ])
+              const detailFallbacks = await extractCafe24DetailFallbacks(pg)
+              const detailStock = config.verifyStockFromDetail
+                ? await extractCafe24DetailStock(pg)
+                : null
+              if (!sameProductPage(pg.url(), product.productUrl)) throw new Error("product page identity changed during detail extraction")
               if (options.enrichDetailPage) {
                 await options.enrichDetailPage(pg, product).catch(() => {})
               }
               product.detailFetchedAt = new Date().toISOString()
-              return {product, detail, detailFallbacks, detailStock, images}
+              return {product, detail, detailFallbacks, detailStock, images, imageCollectionComplete: true}
             }
             try {
               return await collectDetail()
@@ -1541,30 +1547,25 @@ export async function crawlCafe24(
               // 슬롯에서 새 URL로 goto할 때 "interrupted by another navigation"
               // 에러가 나는 걸 막기 위해 about:blank로 강제 리셋해 정리한다
               // (2026-07-06, 페이지 재사용 도입 후 A.R.U 등에서 확인된 회귀).
-              const detailFallbacks = await extractCafe24DetailFallbacks(pg).catch(() => null)
-              const detailStock = config.verifyStockFromDetail
-                ? await extractCafe24DetailStock(pg).catch(() => null)
-                : null
-              const images = await collectProductImagesFromPage(pg, [
-                product.imageUrl,
-                ...(product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
-                  ? (product.images ?? [])
-                  : []),
-              ]).catch(() => product.images ?? (product.imageUrl ? [product.imageUrl] : []))
+              // A timed-out navigation can still be running, or this reusable
+              // page can contain the previous product. Do not harvest its DOM.
+              const images = product.imageCollectionVersion === PRODUCT_IMAGE_COLLECTION_VERSION
+                ? (product.images ?? (product.imageUrl ? [product.imageUrl] : []))
+                : (product.imageUrl ? [product.imageUrl] : [])
               await pg.goto("about:blank", {timeout: 5000}).catch(() => {})
-              return {product, detail: null, detailFallbacks, detailStock, images}
+              return {product, detail: null, detailFallbacks: null, detailStock: null, images, imageCollectionComplete: false}
             } finally {
               if (externalDetailFactory) await lease.close()
             }
           })
         )
 
-        for (const {product, detail, detailFallbacks, detailStock, images} of results) {
+        for (const {product, detail, detailFallbacks, detailStock, images, imageCollectionComplete} of results) {
           if (!detail && !detailFallbacks && images.length === 0) continue
           if (detailStock !== null) product.inStock = detailStock
           if (images.length > 0) {
             product.images = images
-            product.imageCollectionVersion = PRODUCT_IMAGE_COLLECTION_VERSION
+            if (imageCollectionComplete) product.imageCollectionVersion = PRODUCT_IMAGE_COLLECTION_VERSION
           }
           if (detailFallbacks) {
             applyCafe24DetailFallbacks(product, detailFallbacks)

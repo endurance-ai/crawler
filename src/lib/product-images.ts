@@ -2,7 +2,7 @@ import {extractStructuredProductForUrl} from "./parsers/structured-data"
 import {sameProductPage} from "./product-url-identity"
 import {htmlAttribute as attr, stripInertHtml} from "./html-attributes"
 
-export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v4-scoped"
+export const PRODUCT_IMAGE_COLLECTION_VERSION = "product-images-v5-identity"
 
 export const PRODUCT_IMAGE_UTILITY_ASSET_PATTERN =
   String.raw`(?:^|/)(?:(?:icon|ico|logo|badge|button|btn|blank|spacer|loading|spinner|pixel|sprite|banner|payment|naver)(?:[/_.-])|(?:campaign[-_]?logo|txt[-_]?naver)(?:[/_.-]|$)|(?:color|colour|option)[-_]?(?:swatch|chip)(?:[/_.-]|$)|size(?:[-_ ]?(?:chart|guide))(?:[/_.-]|$)|guide(?:[/_.-]|$)|web/main(?:/|$)|(?:img_(?:product_(?:tiny|small|medium|big)|404)|empty_thumb)\.(?:gif|jpe?g|png|webp)(?:$))`
@@ -89,7 +89,7 @@ export function mergeProductImages(
   return images
 }
 
-/** Cafe24's `small` variant is useful only when no larger product image exists. */
+/** Identify Cafe24's low-resolution variant without assuming it is redundant. */
 export function isLowResolutionProductVariant(raw: unknown, pageUrl: string): boolean {
   if (typeof raw !== "string" || !raw.trim()) return false
   try {
@@ -100,8 +100,13 @@ export function isLowResolutionProductVariant(raw: unknown, pageUrl: string): bo
 }
 
 function dropRedundantLowResolutionVariants(images: string[], pageUrl: string): string[] {
-  if (!images.some((url) => !isLowResolutionProductVariant(url, pageUrl))) return images
-  return images.filter((url) => !isLowResolutionProductVariant(url, pageUrl))
+  const assetKey = (raw: string): string => {
+    const url = new URL(raw, pageUrl)
+    url.pathname = url.pathname.replace(/\/web\/product\/(?:small|medium|big)\//i, "/web/product/")
+    return url.href
+  }
+  const larger = new Set(images.filter(url => /\/web\/product\/(?:medium|big)\//i.test(new URL(url).pathname)).map(assetKey))
+  return images.filter(url => !isLowResolutionProductVariant(url, pageUrl) || !larger.has(assetKey(url)))
 }
 
 export function sanitizeProductImageFields(input: {
@@ -188,9 +193,15 @@ function collectScopedImages(html: string, pageUrl: string): string[] {
       if (name === "img" || name === "source") {
         if (isLikelyOptionImageTag(tag)) continue
         const srcset = attr(tag, "srcset") || attr(tag, "data-srcset")
-        if (srcset) images.push(bestSrcsetUrl(srcset) ?? "")
+        const responsive = srcset ? bestSrcsetUrl(srcset) : null
+        if (responsive) images.push(responsive)
         for (const key of ["data-zoom-image", "data-origin", "data-original", "data-lazy-src", "ec-data-src", "data-src", "src"]) {
           const value = attr(tag, key)
+          // src/srcset on the same element explicitly describe one image,
+          // even when the responsive filenames differ.
+          if (key === "src" && isLowResolutionProductVariant(value, pageUrl)
+            && responsive && normalizeProductImageUrl(responsive, pageUrl)
+            && !isLowResolutionProductVariant(responsive, pageUrl)) continue
           if (value) images.push(value)
         }
       } else if (href && IMAGE_EXT_RE.test(href)) images.push(href)
@@ -215,10 +226,15 @@ export function collectProductImagesFromHtml(
 /** Use the live DOM, including dynamically hydrated galleries and lazy URLs. */
 export async function collectProductImagesFromPage(
   page: ProductImagePage,
+  expectedProductUrl: string,
   existing: string[] = [],
 ): Promise<string[]> {
-  const html = await page.evaluate(() => document.documentElement.outerHTML)
-  return collectProductImagesFromHtml(html, page.url(), existing)
+  if (!sameProductPage(page.url(), expectedProductUrl)) throw new Error("product page identity mismatch")
+  const snapshot = await page.evaluate(() => ({html: document.documentElement.outerHTML, url: location.href}))
+  if (!sameProductPage(snapshot.url, expectedProductUrl) || !sameProductPage(page.url(), expectedProductUrl)) {
+    throw new Error("product page identity changed during collection")
+  }
+  return collectProductImagesFromHtml(snapshot.html, snapshot.url, existing)
 }
 
 export function hasExplicitImageExtension(url: string): boolean {

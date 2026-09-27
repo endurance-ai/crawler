@@ -87,11 +87,17 @@ function parseAvailability(value: unknown): boolean | null {
   return null
 }
 
-function extractImages(value: unknown): string[] {
+function extractImages(value: unknown, pageUrl?: string): string[] {
   const urls: string[] = []
   const push = (u: unknown): void => {
     const s = asString(u)
-    if (s && /^https?:\/\//.test(s) && !urls.includes(s)) urls.push(s)
+    if (!s) return
+    try {
+      const url = pageUrl ? new URL(s, pageUrl).href : s
+      if (/^https?:\/\//i.test(url) && !urls.includes(url)) urls.push(url)
+    } catch {
+      // Ignore malformed references without losing the rest of the gallery.
+    }
   }
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -156,7 +162,7 @@ function stripHtml(text: string): string {
   return decodeHtmlEntities(text.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim()
 }
 
-function mapProductNode(node: JsonRecord): StructuredProductData {
+function mapProductNode(node: JsonRecord, pageUrl?: string): StructuredProductData {
   const brandRec = asRecord(node.brand)
   const offer = extractOffer(node.offers)
   const rawDescription = asString(node.description)
@@ -166,7 +172,7 @@ function mapProductNode(node: JsonRecord): StructuredProductData {
     brand: asString(node.brand) ?? (brandRec ? asString(brandRec.name) : null),
     price: offer.price,
     currency: offer.currency,
-    images: extractImages(node.image),
+    images: extractImages(node.image, pageUrl),
     inStock: offer.inStock,
     color: asString(node.color),
     sku: asString(node.sku) ?? asString(node.productID),
@@ -179,7 +185,7 @@ function mapProductNode(node: JsonRecord): StructuredProductData {
  * Extract every schema.org/Product node from the page's JSON-LD blocks.
  * Malformed JSON blocks are skipped silently (common in the wild).
  */
-export function extractJsonLdProducts(html: string): StructuredProductData[] {
+export function extractJsonLdProducts(html: string, pageUrl?: string): StructuredProductData[] {
   const nodes: JsonRecord[] = []
   for (const match of stripInertHtml(html, true).matchAll(SCRIPT_BLOCK)) {
     if (htmlAttribute(match[1], "type")?.toLowerCase() !== "application/ld+json") continue
@@ -196,13 +202,11 @@ export function extractJsonLdProducts(html: string): StructuredProductData[] {
       }
     }
   }
-  return nodes.map(mapProductNode)
+  return nodes.map(node => mapProductNode(node, pageUrl))
 }
 
 function metaContent(html: string, property: string): string | null {
-  // Cafe24 themes often emit generic store OG first, then the current product.
-  // Prefer the last non-empty value so a homepage URL/background cannot hide
-  // product-specific metadata appended by the platform.
+  // Within the selected coherent block, prefer the last non-empty value.
   const tags = [...html.matchAll(/<meta\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi)]
   for (const match of tags.reverse()) {
     const key = htmlAttribute(match[0], "property") ?? htmlAttribute(match[0], "name")
@@ -213,9 +217,31 @@ function metaContent(html: string, property: string): string | null {
   return null
 }
 
+/** Repeated identity fields start a new OG block. Keep images and identity
+ * together: a later product URL must not adopt an earlier storefront image.
+ * Metadata after the previous image can be the start of the next block (some
+ * Cafe24 themes put og:type before their second og:url).
+ */
+function lastOgBlock(html: string): string {
+  let tags: Array<{html: string; key: string}> = []
+  const identity = new Set(["og:type", "og:url", "og:title"])
+  for (const match of html.matchAll(/<meta\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi)) {
+    const key = (htmlAttribute(match[0], "property") ?? htmlAttribute(match[0], "name") ?? "").toLowerCase()
+    if (!key.startsWith("og:") && !key.startsWith("product:")) continue
+    if (identity.has(key) && tags.some(tag => tag.key === key)) {
+      const keys = tags.map(tag => tag.key)
+      const lastImage = Math.max(keys.lastIndexOf("og:image"), keys.lastIndexOf("og:image:secure_url"))
+      const trailing = lastImage < 0 ? [] : tags.slice(lastImage + 1)
+      tags = trailing.some(tag => identity.has(tag.key)) && !trailing.some(tag => tag.key === key) ? trailing : []
+    }
+    tags.push({html: match[0], key})
+  }
+  return tags.map(tag => tag.html).join("")
+}
+
 /** Open Graph / product: meta fallback. Weaker than JSON-LD (no color/sku). */
-export function extractOgProduct(html: string): StructuredProductData | null {
-  html = stripInertHtml(html)
+export function extractOgProduct(html: string, pageUrl?: string): StructuredProductData | null {
+  html = lastOgBlock(stripInertHtml(html))
   const ogType = metaContent(html, "og:type")
   const price = parsePrice(metaContent(html, "product:price:amount") ?? metaContent(html, "og:price:amount"))
   const name = metaContent(html, "og:title")
@@ -228,7 +254,7 @@ export function extractOgProduct(html: string): StructuredProductData | null {
     brand: metaContent(html, "product:brand"),
     price,
     currency: metaContent(html, "product:price:currency") ?? metaContent(html, "og:price:currency"),
-    images: image && /^https?:\/\//.test(image) ? [image] : [],
+    images: extractImages(image, pageUrl),
     inStock: parseAvailability(metaContent(html, "product:availability") ?? metaContent(html, "og:availability")),
     color: null,
     sku: null,
@@ -275,9 +301,9 @@ export function extractStructuredProductForUrl(
   html: string,
   pageUrl: string,
 ): StructuredProductData | null {
-  const products = extractJsonLdProducts(html)
+  const products = extractJsonLdProducts(html, pageUrl)
   const matched = products.find((product) => product.url && sameProductPage(product.url, pageUrl))
-  const og = extractOgProduct(html)
+  const og = extractOgProduct(html, pageUrl)
   const ownedOg = og && (!og.url || sameProductPage(og.url, pageUrl)) ? og : null
   if (matched) return mergeProductFields(matched, ownedOg)
   // Never fall back to an explicitly different product, including another

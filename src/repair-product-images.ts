@@ -136,7 +136,7 @@ async function collectOne(page: Page, row: ProductRow): Promise<CollectedRow> {
   if (!navigation.ok) return {row, images: existing, error: navigation.error ?? "navigation failed"}
   await page.waitForTimeout(500)
   try {
-    const images = await collectProductImagesFromPage(page, existing)
+    const images = await collectProductImagesFromPage(page, row.product_url, existing)
     return images.length > 0 ? {row, images} : {row, images, error: "no product-owned images found"}
   } catch (error) {
     return {row, images: existing, error: error instanceof Error ? error.message : String(error)}
