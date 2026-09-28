@@ -7,6 +7,16 @@ import {
 } from "../src/configs/gender-defaults"
 import {getSiteConfig} from "../src/configs/platforms"
 
+test("official catalog-wide gender evidence applies only to the verified sites", () => {
+  for (const key of ["ullajohnson", "commesea", "studiojkoo"]) {
+    assert.deepEqual(getSiteConfig(key)?.defaultGender, ["women"])
+  }
+  assert.deepEqual(getSiteConfig("mutimer")?.defaultGender, ["unisex"])
+  assert.equal(getSiteConfig("mutimer")?.verifiedUnisexDefault, true)
+  // CPFM also sells explicitly gendered lines, so a site-wide fallback is unsafe.
+  assert.equal(getSiteConfig("cpfm")?.defaultGender, undefined)
+})
+
 test("8DIVISION의 성별 미구분 상품군을 unisex로 세탁하지 않는다", () => {
   const eightDivision = getSiteConfig("8division")
   assert.ok(eightDivision?.category?.categories?.length)

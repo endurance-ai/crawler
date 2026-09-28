@@ -5745,6 +5745,7 @@ const SITE_KIDS_GENDER_NOISE_PATTERNS: Record<string, RegExp[]> = {
 // defaultGender=unisex는 이 목록에 공식 근거가 기록된 사이트만 허용한다.
 // 성별 메뉴가 없다는 사실만으로는 여기에 추가하지 않는다.
 const SITE_VERIFIED_UNISEX_DEFAULTS = new Set([
+  "mutimer", // Official About: the entire ready-to-wear collection is unisex.
   "sport-chamber", // 공식 취급처가 의류·헤드웨어·소품을 모두 공용으로 명시
   "libere-official", // 공식 브랜드 콘텐츠가 유니섹스 패션 브랜드로 명시
   "rollingstudios", // 공식 About이 캐주얼 유니섹스 브랜드이며 모든 제품으로 범위를 명시

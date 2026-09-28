@@ -38,6 +38,17 @@ import type {ProductGender} from "../lib/product-gender"
 import type {SiteConfig} from "../lib/types"
 
 export const SITE_GENDER_DEFAULTS: Record<string, ProductGender[]> = {
+  // Official catalog/about pages reviewed 2026-09-28. These are catalog-wide
+  // claims, so unlabeled products can use the site fallback safely.
+  // https://ullajohnson.com/collections/shop-all
+  ullajohnson: ["women"],
+  // https://m.commesea.com/brand.html
+  commesea: ["women"],
+  // https://en.studiojkoo.com/shopinfo/company.html
+  studiojkoo: ["women"],
+  // https://mutimer.co/pages/about-us
+  mutimer: ["unisex"],
+
   // 2026-09-01 user-confirmed from the current brand-node QC batch.
   ceyesseoul: ["men"],
   franksupply: ["men"],
