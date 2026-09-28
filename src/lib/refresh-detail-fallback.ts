@@ -1,5 +1,5 @@
 import {toRefreshPriceFields, type RefreshableRow, type RefreshPatch} from "./listing-refresh"
-import type {StructuredProductData} from "./parsers/structured-data"
+import {extractStructuredProduct, type StructuredProductData} from "./parsers/structured-data"
 import type {Product} from "./types"
 
 export type DetailFetchKind = "confirmed" | "removed" | "blocked" | "transient" | "unreadable"
@@ -154,6 +154,34 @@ export function isCafe24RemovedRedirect(requestedUrl: string, finalUrl: string):
   }
 }
 
+/** A member login redirect is an access restriction, not evidence of a deleted product. */
+export function isCafe24BlockedRedirect(requestedUrl: string, finalUrl: string): boolean {
+  try {
+    const requested = new URL(requestedUrl)
+    const final = new URL(finalUrl)
+    const hostname = (value: string) => value.toLowerCase().replace(/^www\./, "")
+    return hostname(requested.hostname) === hostname(final.hostname)
+      && /^\/product(?:\/|$)/i.test(requested.pathname)
+      && /^\/member\/login(?:\.html)?\/?$/i.test(final.pathname)
+  } catch {
+    return false
+  }
+}
+
+/** Cafe24's generic error page says nothing about a product's stock state. */
+export function isCafe24ErrorRedirect(requestedUrl: string, finalUrl: string): boolean {
+  try {
+    const requested = new URL(requestedUrl)
+    const final = new URL(finalUrl)
+    const hostname = (value: string) => value.toLowerCase().replace(/^www\./, "")
+    return hostname(requested.hostname) === hostname(final.hostname)
+      && /^\/product(?:\/|$)/i.test(requested.pathname)
+      && /^\/error\.html\/?$/i.test(final.pathname)
+  } catch {
+    return false
+  }
+}
+
 export interface DetailPriorityRow {
   id: string | number
   in_stock: boolean | null
@@ -229,7 +257,7 @@ export type DetailRetryReason = DetailFetchKind | "db_failed" | "cas_conflict"
 
 export type RollingDetailHealth = {
   status: "success" | "degraded" | "failed"
-  reason: "none" | "no_progress" | "low_evidence" | "db_write_rate" | "cas_conflict_rate" | "retry_pending"
+  reason: "none" | "no_progress" | "low_evidence" | "db_write_rate" | "cas_conflict_rate" | "coverage_gap" | "retry_pending"
   persisted: number
   persistence_attempted: number
 }
@@ -246,6 +274,7 @@ export function assessRollingDetailHealth(counts: {
   unreadable: number
   db_failed: number
   cas_conflicts: number
+  by_type?: Partial<Record<DetailFallbackType, {eligible_products: number; attempted: number}>>
 }, audit = false): RollingDetailHealth {
   const persistenceAttempted = counts.attempted - counts.blocked - counts.transient - counts.unreadable
   const persisted = counts.confirmed + (audit ? counts.removed : counts.removed_recorded)
@@ -263,12 +292,62 @@ export function assessRollingDetailHealth(counts: {
   if (failureRateExceeded(counts.cas_conflicts)) {
     return {status: "failed", reason: "cas_conflict_rate", persisted, persistence_attempted: persistenceAttempted}
   }
+  if (counts.attempted >= 10 && Object.values(counts.by_type ?? {}).some((type) =>
+    type && type.eligible_products > 0 && type.attempted === 0)) {
+    return {status: "degraded", reason: "coverage_gap", persisted, persistence_attempted: persistenceAttempted}
+  }
   const retryPending = counts.db_failed + counts.cas_conflicts + counts.blocked + counts.transient + counts.unreadable > 0
   return {
     status: retryPending ? "degraded" : "success",
     reason: retryPending ? "retry_pending" : "none",
     persisted,
     persistence_attempted: persistenceAttempted,
+  }
+}
+
+/** Rotate sources within each type while reserving a small share for sparse types. */
+export function createRollingDetailGroupQueue<T extends {type: DetailFallbackType; rows: unknown[]}>(
+  groups: T[],
+  minimumTypeShare = 0.05,
+): {next: (maxItems?: number) => T | undefined; finish: (group: T, attempted: number) => void} {
+  const queues = new Map<DetailFallbackType, T[]>()
+  const products = new Map<DetailFallbackType, number>()
+  const served = new Map<DetailFallbackType, number>()
+  const reservations = new Map<T, number>()
+  const totalProducts = groups.reduce((total, group) => total + group.rows.length, 0)
+  for (const group of groups) {
+    const queue = queues.get(group.type) ?? []
+    queue.push(group)
+    queues.set(group.type, queue)
+    products.set(group.type, (products.get(group.type) ?? 0) + group.rows.length)
+  }
+  return {
+    next: (maxItems = 1) => {
+      let selected: DetailFallbackType | undefined
+      let lowestScore = Number.POSITIVE_INFINITY
+      for (const [type, queue] of queues) {
+        if (queue.length === 0) continue
+        const share = Math.max((products.get(type) ?? 0) / totalProducts, minimumTypeShare)
+        const score = (served.get(type) ?? 0) / share
+        if (score < lowestScore) {
+          selected = type
+          lowestScore = score
+        }
+      }
+      if (!selected) return undefined
+      const group = queues.get(selected)!.shift()!
+      const reserved = Math.min(maxItems, group.rows.length)
+      reservations.set(group, reserved)
+      served.set(selected, (served.get(selected) ?? 0) + reserved)
+      return group
+    },
+    finish: (group, attempted) => {
+      const reserved = reservations.get(group)
+      if (reserved === undefined) throw new Error("rolling detail group was not reserved")
+      reservations.delete(group)
+      served.set(group.type, (served.get(group.type) ?? 0) - reserved + attempted)
+      if (group.rows.length > 0) queues.get(group.type)!.push(group)
+    },
   }
 }
 
@@ -427,6 +506,22 @@ export function parseStructuredDetailPayload(
     sourceCurrency: currency,
     // A single structured current price does not prove regular-vs-sale.
     pricingState: "unknown",
+  }
+}
+
+/** The Sixshop gateway can return 404 while the public product page is live. */
+export function parseSixshopStorefrontResponse(
+  status: number,
+  html: string,
+  sourceCurrency: string,
+): DetailObservation {
+  const kind = classifyDetailHttpStatus(status)
+  if (kind !== "confirmed") {
+    return {kind, status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency}
+  }
+  const parsed = parseStructuredDetailPayload(extractStructuredProduct(html), sourceCurrency)
+  return parsed ? {...parsed, status} : {
+    kind: "unreadable", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency,
   }
 }
 

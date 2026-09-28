@@ -21,11 +21,14 @@ import {
   combinedRefreshCoverage,
   compareOldestDetailRows,
   compareLikelyLiveDetailRows,
+  createRollingDetailGroupQueue,
   detailFallbackPacingMs,
   detailFallbackRecovered,
   detailRetryAt,
   detailTransientRetryDelayMs,
   needsDetailFallback,
+  isCafe24BlockedRedirect,
+  isCafe24ErrorRedirect,
   isCafe24RemovedRedirect,
   isImwebExpiredStorePage,
   isImwebRemovedRedirect,
@@ -35,6 +38,7 @@ import {
   parseZaraDomDetailPayload,
   parseShopifyDetailPayload,
   parseStructuredDetailPayload,
+  parseSixshopStorefrontResponse,
   parseSixshopDetailPayload,
   resolveDetailFallbackType,
   shopifyProductJsonUrl,
@@ -306,6 +310,18 @@ async function fetchSixshopDetail(row: DetailRow, sourceCurrency: string): Promi
       signal: AbortSignal.timeout(30_000),
     })
     const kind = classifyDetailHttpStatus(response.status)
+    if (kind === "removed") {
+      // The gateway's 404 does not prove that the storefront PDP was removed.
+      const storefrontResponse = await fetch(row.product_url, {
+        headers: {Accept: "text/html", "User-Agent": "Mozilla/5.0 (compatible; kiko-refresh/1.0)"},
+        signal: AbortSignal.timeout(30_000),
+      })
+      return parseSixshopStorefrontResponse(
+        storefrontResponse.status,
+        await storefrontResponse.text(),
+        sourceCurrency,
+      )
+    }
     if (kind !== "confirmed") {
       return {kind, status: response.status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency}
     }
@@ -325,6 +341,12 @@ async function fetchCafe24(page: Page, row: DetailRow): Promise<DetailObservatio
     const kind = classifyDetailHttpStatus(status)
     if (kind === "removed" || isCafe24RemovedRedirect(row.product_url, page.url())) {
       return {kind: "removed", status, inStock: false, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
+    }
+    if (isCafe24BlockedRedirect(row.product_url, page.url())) {
+      return {kind: "blocked", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
+    }
+    if (isCafe24ErrorRedirect(row.product_url, page.url())) {
+      return {kind: "transient", status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
     }
     if (kind !== "confirmed") {
       return {kind, status, inStock: null, price: null, originalPrice: null, salePrice: null, sourceCurrency: row.source_currency ?? null}
@@ -609,6 +631,7 @@ async function main(): Promise<void> {
     else groups.splice(index, 0, group)
   }
   groups.sort(compareGroupHeads)
+  const fairQueue = rolling && priority === "oldest" ? createRollingDetailGroupQueue(groups) : null
   if (dryRun) {
     console.log(JSON.stringify({
       batch_id: batchId,
@@ -698,6 +721,7 @@ async function main(): Promise<void> {
       let context = null as Awaited<ReturnType<NonNullable<typeof browser>["newContext"]>> | null
       let page: Page | null = null
       let cafe24Requests = 0
+      let cafe24Platform: string | null = null
       const resetCafe24Context = async () => {
         await context?.close().catch(() => undefined)
         if (!browser) return
@@ -709,76 +733,70 @@ async function main(): Promise<void> {
       try {
         while (Date.now() < deadline) {
           if (limit > 0 && metrics.attempted >= limit) break
-          const group = groups.shift()
+          const quantum = fairQueue ? 20 : 1
+          const group = fairQueue ? fairQueue.next(quantum) : groups.shift()
           if (!group) break
-          const row = group.rows.shift()
-          if (!row) continue
-          // The group is absent from the shared queue while awaited, enforcing source concurrency=1.
-          const config = configByKey.get(group.platform)
-          const sourceCurrency = row.source_currency ?? config?.sourceCurrency ?? "KRW"
-          const counters: FallbackCounters[] = [metrics, byType[group.type]]
-          if (group.type === "zara") counters.push(byZaraRegion[group.platform])
-          const count = (field: keyof FallbackCounters) => {
-            for (const counter of counters) counter[field]++
-          }
-          // Claim the global limit before the request yields so parallel workers cannot overshoot it.
-          count("attempted")
-          let observation: DetailObservation
-          if (group.type === "shopify") {
-            observation = await fetchShopify(row, sourceCurrency)
-            // Detail endpoints are more aggressively rate-limited than
-            // `/products.json`. Respect the source pacing just like the
-            // listing engine; the nightly worker keeps one lane per source.
-            const delayMs = Math.max(250, config?.crawlDelay ?? 500)
-            if (group.rows.length > 0 && Date.now() + delayMs < deadline) {
-              await new Promise((resolve) => setTimeout(resolve, delayMs))
+          let groupAttempts = 0
+          // Keep a browser worker on one source for a bounded slice. Rapid
+          // cross-origin navigation leaves Chromium renderer tasks behind.
+          for (; groupAttempts < quantum && Date.now() < deadline; ) {
+            if (limit > 0 && metrics.attempted >= limit) break
+            const row = group.rows.shift()
+            if (!row) break
+            // The group is absent from the shared queue while awaited, enforcing source concurrency=1.
+            const config = configByKey.get(group.platform)
+            const sourceCurrency = row.source_currency ?? config?.sourceCurrency ?? "KRW"
+            const counters: FallbackCounters[] = [metrics, byType[group.type]]
+            if (group.type === "zara") counters.push(byZaraRegion[group.platform])
+            const count = (field: keyof FallbackCounters) => {
+              for (const counter of counters) counter[field]++
             }
-          } else if (group.type === "cafe24") {
-            if (!page || cafe24Requests >= cafe24ContextMaxRequests) await resetCafe24Context()
-            observation = await fetchCafe24(page!, row)
-            cafe24Requests++
-          } else if (group.type === "zara") {
-            const zaraPage = await getZaraPage(group.platform, group.lane)
-            observation = await fetchZara(zaraPage, row, sourceCurrency)
-            if (observation.kind === "transient" && Date.now() + 2_000 < deadline) {
-              await zaraPage.waitForTimeout(2_000)
+            // Claim the global limit before the request yields so parallel workers cannot overshoot it.
+            count("attempted")
+            groupAttempts++
+            let observation: DetailObservation
+            if (group.type === "shopify") {
+              observation = await fetchShopify(row, sourceCurrency)
+              // Detail endpoints are more aggressively rate-limited than
+              // `/products.json`. Respect the source pacing just like the
+              // listing engine; the nightly worker keeps one lane per source.
+              const delayMs = Math.max(250, config?.crawlDelay ?? 500)
+              if (group.rows.length > 0 && Date.now() + delayMs < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, delayMs))
+              }
+            } else if (group.type === "cafe24") {
+              if (!page || cafe24Requests >= cafe24ContextMaxRequests || cafe24Platform !== group.platform) {
+                await resetCafe24Context()
+                cafe24Platform = group.platform
+              }
+              observation = await fetchCafe24(page!, row)
+              cafe24Requests++
+            } else if (group.type === "zara") {
+              const zaraPage = await getZaraPage(group.platform, group.lane)
               observation = await fetchZara(zaraPage, row, sourceCurrency)
-            }
-          } else {
-            observation = group.type === "sixshop"
-              ? await fetchSixshopDetail(row, sourceCurrency)
-              : await fetchStructuredDetail(row, sourceCurrency, deadline, config?.categoryUrls ?? [])
-            const delayMs = detailFallbackPacingMs(group.type, config?.crawlDelay)
-            if (group.rows.length > 0 && Date.now() + delayMs < deadline) {
-              await new Promise((resolve) => setTimeout(resolve, delayMs))
-            }
-          }
-          let retryReason: Parameters<typeof detailRetryAt>[0] = observation.kind
-          if (observation.kind === "confirmed") {
-            if (audit) count("confirmed")
-            else {
-              const result = await writeConfirmed(db, row, observation)
-              if (result === "updated") {
-                count("confirmed"); count("updated")
-              } else if (result === "confirmed") {
-                count("confirmed")
-              } else if (result === "conflict") {
-                count("cas_conflicts")
-                retryReason = "cas_conflict"
-              } else {
-                count("db_failed")
-                retryReason = "db_failed"
+              if (observation.kind === "transient" && Date.now() + 2_000 < deadline) {
+                await zaraPage.waitForTimeout(2_000)
+                observation = await fetchZara(zaraPage, row, sourceCurrency)
+              }
+            } else {
+              observation = group.type === "sixshop"
+                ? await fetchSixshopDetail(row, sourceCurrency)
+                : await fetchStructuredDetail(row, sourceCurrency, deadline, config?.categoryUrls ?? [])
+              const delayMs = detailFallbackPacingMs(group.type, config?.crawlDelay)
+              if (group.rows.length > 0 && Date.now() + delayMs < deadline) {
+                await new Promise((resolve) => setTimeout(resolve, delayMs))
               }
             }
-          } else if (observation.kind === "removed") {
-            count("removed")
-            if (!audit) {
-              const result = await recordRemovedCheck(db, row)
-              if (result === "recorded") {
-                count("removed_recorded")
-              } else {
-                count("removed_record_failed")
-                if (result === "conflict") {
+            let retryReason: Parameters<typeof detailRetryAt>[0] = observation.kind
+            if (observation.kind === "confirmed") {
+              if (audit) count("confirmed")
+              else {
+                const result = await writeConfirmed(db, row, observation)
+                if (result === "updated") {
+                  count("confirmed"); count("updated")
+                } else if (result === "confirmed") {
+                  count("confirmed")
+                } else if (result === "conflict") {
                   count("cas_conflicts")
                   retryReason = "cas_conflict"
                 } else {
@@ -786,28 +804,46 @@ async function main(): Promise<void> {
                   retryReason = "db_failed"
                 }
               }
-            }
-          } else {
-            count(observation.kind)
-          }
-          if (rolling) {
-            const observedAt = Date.now()
-            const productRetryAt = detailRetryAt(retryReason, observedAt, observation.retryAt)
-            if (productRetryAt) {
-              retryState.products[row.id] = {retry_at: productRetryAt, reason: retryReason}
-            } else {
-              delete retryState.products[row.id]
-            }
-            if (observation.kind === "blocked" || observation.kind === "transient") {
-              const sourceRetryAt = detailRetryAt(observation.kind, observedAt, observation.retryAt)
-              if (sourceRetryAt) {
-                retryState.sources[group.platform] = {retry_at: sourceRetryAt, reason: observation.kind}
+            } else if (observation.kind === "removed") {
+              count("removed")
+              if (!audit) {
+                const result = await recordRemovedCheck(db, row)
+                if (result === "recorded") {
+                  count("removed_recorded")
+                } else {
+                  count("removed_record_failed")
+                  if (result === "conflict") {
+                    count("cas_conflicts")
+                    retryReason = "cas_conflict"
+                  } else {
+                    count("db_failed")
+                    retryReason = "db_failed"
+                  }
+                }
               }
-              // Avoid hammering every old URL on a source that is blocked or rate-limited.
-              group.rows.length = 0
+            } else {
+              count(observation.kind)
+            }
+            if (rolling) {
+              const observedAt = Date.now()
+              const productRetryAt = detailRetryAt(retryReason, observedAt, observation.retryAt)
+              if (productRetryAt) {
+                retryState.products[row.id] = {retry_at: productRetryAt, reason: retryReason}
+              } else {
+                delete retryState.products[row.id]
+              }
+              if (observation.kind === "blocked" || observation.kind === "transient") {
+                const sourceRetryAt = detailRetryAt(observation.kind, observedAt, observation.retryAt)
+                if (sourceRetryAt) {
+                  retryState.sources[group.platform] = {retry_at: sourceRetryAt, reason: observation.kind}
+                }
+                // Avoid hammering every old URL on a source that is blocked or rate-limited.
+                group.rows.length = 0
+              }
             }
           }
-          if (group.rows.length > 0 && Date.now() < deadline) enqueueGroup(group)
+          if (fairQueue) fairQueue.finish(group, groupAttempts)
+          else if (group.rows.length > 0 && Date.now() < deadline) enqueueGroup(group)
         }
       } finally {
         await context?.close()
@@ -818,12 +854,13 @@ async function main(): Promise<void> {
     await browser?.close()
   }
   if (rolling) await saveRetryState(retryStateFile, retryState)
-  const health = rolling ? assessRollingDetailHealth(metrics, audit) : null
+  const health = rolling ? assessRollingDetailHealth({...metrics, by_type: byType}, audit) : null
   const finalMetrics = {
     ...metrics,
     ...(health ? {health} : {}),
     priority,
     rolling,
+    ...(fairQueue ? {selection_policy: "weighted_type_source_rotation", minimum_type_share: 0.05} : {}),
     cooled_products: cooledProducts,
     cooldown_products: Object.keys(retryState.products).length,
     cooldown_sources: Object.keys(retryState.sources).length,
